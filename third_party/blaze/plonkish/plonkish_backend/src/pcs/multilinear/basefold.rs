@@ -10,7 +10,7 @@ use crate::{
     },
     poly::{multilinear::MultilinearPolynomial, Polynomial},
     util::{
-        arithmetic::{div_ceil, horner, inner_product, steps, BatchInvert, Field, PrimeField},
+        arithmetic::{div_ceil, horner, inner_product, steps, Field, PrimeField},
         code::{
             binary_rs::{BinarySubspace, OnTheFlyTwiddleAccess, TwiddleAccess},
             Brakedown, BrakedownSpec, LinearCodes,
@@ -28,7 +28,6 @@ use aes::cipher::{KeyIvInit, StreamCipher, StreamCipherSeek};
 use core::fmt::Debug;
 use core::ptr::addr_of;
 use ctr;
-use ff::BatchInverter;
 use generic_array::GenericArray;
 use halo2_curves::bn256::{Bn256, Fr};
 use rayon::iter::IntoParallelIterator;
@@ -1071,8 +1070,10 @@ pub fn evaluate_over_foldable_domain_generic_basecode<F: PrimeField>(
             .for_each(|chunk| {
                 let half_chunk = chunk_size >> 1;
                 for j in half_chunk..chunk_size {
-                    let rhs = chunk[j] * level[j - half_chunk];
-                    chunk[j] = chunk[j - half_chunk] - rhs;
+                    let t = level[j - half_chunk];
+                    let rhs = chunk[j] * t;
+                    let lhs = chunk[j] * (t + F::ONE);
+                    chunk[j] = chunk[j - half_chunk] + lhs;
                     chunk[j - half_chunk] = chunk[j - half_chunk] + rhs;
                 }
             });
@@ -1087,15 +1088,13 @@ pub fn evaluate_over_foldable_domain<F: PrimeField>(
     log_rate: usize,
     mut coeffs: Type2Polynomial<F>,
     table: &Vec<Vec<F>>,
-    code_type: String,
+    _code_type: String,
 ) -> Type1Polynomial<F> {
     //iterate over array, replacing even indices with (evals[i] - evals[(i+1)])
     let k = coeffs.poly.len();
     let logk = log2_strict(k);
     let cl = 1 << (logk + log_rate);
     let rate = 1 << log_rate;
-    let subspace = BinarySubspace::<F>::with_dim(table.len() + 1).ok().unwrap();
-    let twiddle_accesses = OnTheFlyTwiddleAccess::generate(&subspace).ok().unwrap();
     let mut coeffs_with_rep = vec![F::ZERO; cl];
 
     //base code - in this case is the repetition code
@@ -1117,15 +1116,9 @@ pub fn evaluate_over_foldable_domain<F: PrimeField>(
             .for_each(|chunk| {
                 let half_chunk = chunk_size >> 1;
                 for j in half_chunk..chunk_size {
-                    let rhs = chunk[j] * level[j - half_chunk];
-                    let mut lhs = F::ZERO;
-                    if code_type == "binary_rs".to_string() {
-                        lhs = chunk[j]
-                            * twiddle_accesses[table.len() - table_level - 1]
-                                .get_odd_from_even(level[j - half_chunk]);
-                    } else {
-                        lhs = -rhs;
-                    }
+                    let t = level[j - half_chunk];
+                    let rhs = chunk[j] * t;
+                    let lhs = chunk[j] * (t + F::ONE);
                     chunk[j] = chunk[j - half_chunk] + lhs;
                     chunk[j - half_chunk] = chunk[j - half_chunk] + rhs;
                 }
@@ -1156,8 +1149,10 @@ pub fn evaluate_over_foldable_domain_2<F: PrimeField>(
             .for_each(|chunk| {
                 let half_chunk = chunk_size >> 1;
                 for j in half_chunk..chunk_size {
-                    let rhs = chunk[j] * level[j - half_chunk];
-                    chunk[j] = chunk[j - half_chunk] - rhs;
+                    let t = level[j - half_chunk];
+                    let rhs = chunk[j] * t;
+                    let lhs = chunk[j] * (t + F::ONE);
+                    chunk[j] = chunk[j - half_chunk] + lhs;
                     chunk[j - half_chunk] = chunk[j - half_chunk] + rhs;
                 }
             });
@@ -1507,14 +1502,13 @@ fn query_binary_table<F: PrimeField>(
     table: &Vec<Vec<(F, F)>>,
     level: usize,
     index: usize,
-    subspace: &BinarySubspace<F>,
+    _subspace: &BinarySubspace<F>,
 ) -> (F, F) {
     assert_eq!(table[level].len(), 1 << level);
     let half_block = (1 << level);
     assert_eq!(index < half_block, true);
     let even = table[level][index % half_block].0;
-    let twiddle_accesses = OnTheFlyTwiddleAccess::generate(&subspace).unwrap();
-    let odd = twiddle_accesses[table.len() - level - 1].get_odd_from_even(even);
+    let odd = even + F::ONE;
     (even, odd)
 }
 
@@ -1527,10 +1521,9 @@ fn basefold_one_round_by_interpolation_weights<F: PrimeField>(
     log_rate: usize,
     code_type: String,
 ) -> Type1Polynomial<F> {
-    let mut subspace = BinarySubspace::<F>::with_dim(num_vars + log_rate + 1)
+    let subspace = BinarySubspace::<F>::with_dim(num_vars + log_rate + 1)
         .ok()
         .unwrap();
-    let twiddle_accesses = OnTheFlyTwiddleAccess::generate(&subspace).unwrap();
     let leveli = table.len() - 1 - table_offset;
     let level = &table[leveli];
     assert_eq!(1 << leveli, values.poly.len() >> 1);
@@ -1545,7 +1538,7 @@ fn basefold_one_round_by_interpolation_weights<F: PrimeField>(
                 (x0, x1) = query_binary_table(table, leveli, i, &subspace);
             } else {
                 x0 = level[i].0;
-                x1 = -x0;
+                x1 = x0 + F::ONE;
             }
             interpolate2_weights::<F>([(x0, ys[0]), (x1, ys[1])], level[i].1, challenge)
         })
@@ -1565,7 +1558,7 @@ fn basefold_one_round_by_interpolation_weights_not_faster<F: PrimeField>(
         *v = interpolate2_weights::<F>(
             [
                 (level[i].0, values[2 * i]),
-                (-(level[i].0), values[2 * i + 1]),
+                (level[i].0 + F::ONE, values[2 * i + 1]),
             ],
             level[i].1,
             challenge,
@@ -1744,7 +1737,7 @@ pub fn query_point<F: PrimeField>(
     );
 
     if level_index >= (block_length >> 1) {
-        el = -F::ONE * el;
+        el += F::ONE;
     }
 
     return el;
@@ -1765,7 +1758,8 @@ pub fn query_point_binary_rs<F: PrimeField>(
 
     let ri0 = left_index; //reverse_bits(left_index, level);
 
-    twiddle_accesses[log_total_block_length - level - 1].get_pair(level, ri0)
+    let (x0, _) = twiddle_accesses[log_total_block_length - level - 1].get_pair(level, ri0);
+    (x0, x0 + F::ONE)
     /*if level_index >= half_block{
         w_1
     }
@@ -2230,7 +2224,25 @@ mod test {
                         let (x0, x1) =
                             super::query_binary_table(&table_w_weights, level, index, &subspace);
                         assert_ne!(x0, x1);
+                        assert_eq!(x1, x0 + F::ONE);
+                        assert_eq!(table_w_weights[level][index].1, F::ONE);
                         assert_eq!((x1 - x0) * table_w_weights[level][index].1, F::ONE);
+                    }
+                }
+            }
+        }
+    }
+
+    #[test]
+    fn test_random_table_weights_are_unit() {
+        type F = Mersenne127;
+        let mut rng = ChaCha8Rng::from_seed([7; 32]);
+        for num_vars in 1..=5 {
+            for log_rate in 1..=2 {
+                let (table_w_weights, _) = get_table_aes::<F>(1 << num_vars, log_rate, &mut rng);
+                for level in table_w_weights {
+                    for (_, weight) in level {
+                        assert_eq!(weight, F::ONE);
                     }
                 }
             }
@@ -2648,11 +2660,10 @@ fn verifier_query_phase<F: PrimeField, H: Hash>(
         GenericArray::from_slice(&key[..]),
         GenericArray::from_slice(&iv[..]),
     );
-    let mut subspace = BinarySubspace::<F>::with_dim(num_vars + log_rate + 1)
+    let subspace = BinarySubspace::<F>::with_dim(num_vars + log_rate + 1)
         .ok()
         .unwrap();
 
-    let twiddle_accesses = OnTheFlyTwiddleAccess::generate(&subspace).unwrap();
     queries_usize
         .iter_mut()
         .enumerate()
@@ -2693,11 +2704,12 @@ fn verifier_query_phase<F: PrimeField, H: Hash>(
                         num_vars + log_rate - i - 1,
                         &mut cipher,
                     );
-                    x1 = -x0;
+                    x1 = x0 + F::ONE;
                 }
 
-                let res = interpolate2(
+                let res = interpolate2_weights(
                     [(x0, cur_queries[i][0]), (x1, cur_queries[i][1])],
+                    F::ONE,
                     fold_challenges[i],
                 );
 
@@ -2763,19 +2775,7 @@ fn get_table<F: PrimeField>(
 
     assert_eq!(flat_table.len(), 1 << lg_n);
 
-    let mut weights: Vec<F> = flat_table
-        .par_iter()
-        .map(|el| F::ZERO - *el - *el)
-        .collect();
-
-    let mut scratch_space = vec![F::ZERO; weights.len()];
-    BatchInverter::invert_with_external_scratch(&mut weights, &mut scratch_space);
-
-    let mut flat_table_w_weights = flat_table
-        .iter()
-        .zip(weights)
-        .map(|(el, w)| (*el, w))
-        .collect_vec();
+    let mut flat_table_w_weights = flat_table.iter().map(|el| (*el, F::ONE)).collect_vec();
 
     let mut unflattened_table_w_weights = vec![Vec::new(); lg_n];
     let mut unflattened_table = vec![Vec::new(); lg_n];
@@ -2827,19 +2827,7 @@ fn get_table_aes<F: PrimeField>(
 
     assert_eq!(flat_table.len(), 1 << lg_n);
 
-    let mut weights: Vec<F> = flat_table
-        .par_iter()
-        .map(|el| F::ZERO - *el - *el)
-        .collect();
-
-    let mut scratch_space = vec![F::ZERO; weights.len()];
-    BatchInverter::invert_with_external_scratch(&mut weights, &mut scratch_space);
-
-    let mut flat_table_w_weights = flat_table
-        .iter()
-        .zip(weights)
-        .map(|(el, w)| (*el, w))
-        .collect_vec();
+    let mut flat_table_w_weights = flat_table.iter().map(|el| (*el, F::ONE)).collect_vec();
 
     let mut unflattened_table_w_weights = vec![Vec::new(); lg_n];
     let mut unflattened_table = vec![Vec::new(); lg_n];
@@ -2865,7 +2853,6 @@ pub fn get_table_additive_binary<F: PrimeField>(
 ) -> (Vec<Vec<(F, F)>>, Vec<Vec<F>>) {
     let lg_n: usize = rate + log2_strict(poly_size);
 
-    // Create a binary subspace for the twiddle factors
     let subspace = BinarySubspace::<F>::with_dim(lg_n + 1).ok().unwrap();
     let twiddle_accesses = OnTheFlyTwiddleAccess::generate(&subspace).unwrap();
 
@@ -2874,21 +2861,12 @@ pub fn get_table_additive_binary<F: PrimeField>(
     for level in 0..lg_n {
         for i in 0..(1 << level) {
             let level_twiddles = &twiddle_accesses[lg_n - level - 1];
-            let (w_0, w_1) = level_twiddles.get_pair(level, i);
-            flat_table.push((w_0, w_1));
+            let (w_0, _) = level_twiddles.get_pair(level, i);
+            flat_table.push((w_0, w_0 + F::ONE));
         }
     }
 
-    let mut weights: Vec<F> = flat_table.iter().map(|(w0, w1)| *w1 - *w0).collect();
-
-    let mut scratch_space = vec![F::ZERO; weights.len()];
-    BatchInverter::invert_with_external_scratch(&mut weights, &mut scratch_space);
-
-    let mut flat_table_w_weights = flat_table
-        .iter()
-        .zip(weights)
-        .map(|(el, w)| (el.0, w))
-        .collect_vec();
+    let mut flat_table_w_weights = flat_table.iter().map(|el| (el.0, F::ONE)).collect_vec();
 
     assert_eq!(flat_table_w_weights.len(), flat_table.len());
 

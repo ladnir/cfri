@@ -313,6 +313,7 @@ fn test_permutation() {
     );
 }
 
+#[cfg(feature = "benchmark")]
 #[test]
 #[ignore = "large permutation timing experiment; default tests should stay under one second"]
 fn test_permutation_performance() {
@@ -344,6 +345,7 @@ fn compare_accumulators(k: usize) {
     println!("serial accumulator {:?} : {:?}", k, now.elapsed());
 }
 
+#[cfg(feature = "benchmark")]
 #[test]
 #[ignore = "large accumulator timing experiment; default tests should stay under one second"]
 fn test_accumulator_performance() {

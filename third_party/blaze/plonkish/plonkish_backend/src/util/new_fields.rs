@@ -88,6 +88,7 @@ impl Mersenne61 {
     }
 }
 
+#[cfg(feature = "benchmark")]
 #[test]
 #[ignore = "microbenchmark; default tests should stay under one second"]
 fn bench_new() {
@@ -530,6 +531,7 @@ fn test_basic_arith() {
     assert_eq!(a * c + b * c, prod);
 }
 
+#[cfg(feature = "benchmark")]
 #[test]
 #[ignore = "microbenchmark; default tests should stay under one second"]
 fn compare_mult() {

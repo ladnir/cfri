@@ -92,6 +92,7 @@ pub fn horner_orig<F: Field>(coeffs: &[F], x: &F) -> F {
         .rev()
         .fold(F::ZERO, |acc, coeff| acc * x + coeff)
 }
+#[cfg(feature = "benchmark")]
 #[test]
 #[ignore = "microbenchmark; default tests should stay under one second"]
 fn bench_horner() {

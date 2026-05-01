@@ -733,6 +733,7 @@ pub fn multilinear_evaluation_ztoa<F: PrimeField>(poly: &mut Vec<F>, point: &Vec
         poly.dedup();
     }
 }
+#[cfg(feature = "benchmark")]
 #[test]
 #[ignore = "large multilinear-evaluation timing sweep; default tests should stay under one second"]
 fn bench_multilinear_eval() {

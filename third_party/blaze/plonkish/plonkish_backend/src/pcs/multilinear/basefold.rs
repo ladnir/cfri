@@ -984,6 +984,7 @@ where
     }
 }
 
+#[cfg(feature = "benchmark")]
 #[test]
 #[ignore = "large Reed-Solomon encoding timing experiment; default tests should stay under one second"]
 fn time_rs_code() {
@@ -1463,6 +1464,7 @@ fn sum_check<F: PrimeField>(
     }
     sum_check_oracles_vec
 }
+#[cfg(feature = "benchmark")]
 #[test]
 #[ignore = "large sumcheck timing experiment; default tests should stay under one second"]
 fn time_sumcheck() {
@@ -1915,6 +1917,7 @@ pub fn multilinear_evaluation_atoz<F: PrimeField>(poly: &mut Vec<F>, point: &Vec
         poly.dedup();
     }
 }
+#[cfg(feature = "benchmark")]
 #[test]
 #[ignore = "large multilinear-evaluation timing sweep; default tests should stay under one second"]
 fn bench_multilinear_eval() {
@@ -2257,6 +2260,7 @@ mod test {
     }
 
     struct PretendHash {}
+    #[cfg(feature = "benchmark")]
     #[test]
     #[ignore = "hash timing experiment; default tests should stay under one second"]
     fn test_sha3_hashes() {
@@ -2284,6 +2288,7 @@ mod test {
         println!("hash a lot sha3 time {:?}", hash_alot.elapsed());
     }
 
+    #[cfg(feature = "benchmark")]
     #[test]
     #[ignore = "hash timing experiment; default tests should stay under one second"]
     fn test_blake2b_hashes() {
@@ -2311,6 +2316,7 @@ mod test {
         println!("hash alot blake2 time {:?}", hash_alot.elapsed());
     }
 
+    #[cfg(feature = "benchmark")]
     #[test]
     #[ignore = "hash timing experiment; default tests should stay under one second"]
     fn test_blake2b_no_finalize() {
@@ -2344,6 +2350,7 @@ mod test {
         println!("hash alot blake2 time no finalize{:?}", hash_alot.elapsed());
     }
 
+    #[cfg(feature = "benchmark")]
     #[test]
     #[ignore = "stream-cipher timing experiment; default tests should stay under one second"]
     fn test_cipher() {
@@ -2424,6 +2431,7 @@ mod test {
         println!("byte1 {:?}", bufnew);
     }
 
+    #[cfg(feature = "benchmark")]
     #[test]
     #[ignore = "hash timing experiment; default tests should stay under one second"]
     fn test_blake2b_simd_hashes() {

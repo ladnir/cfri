@@ -156,6 +156,7 @@ fn prev(b: usize, x_inv: usize) -> usize {
 mod test {
     use crate::util::{arithmetic::BooleanHypercube, expression::Rotation};
 
+    #[cfg(feature = "benchmark")]
     #[test]
     #[ignore = "cause it takes some minutes to run with release profile"]
     fn boolean_hypercube_iter() {
@@ -169,6 +170,7 @@ mod test {
         }
     }
 
+    #[cfg(feature = "benchmark")]
     #[test]
     #[ignore = "cause it takes some minutes to run with release profile"]
     fn boolean_hypercube_prev() {

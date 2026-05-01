@@ -1377,6 +1377,7 @@ fn test_batch_basefold_binary() {
 
     run_batch_commit_open_verify::<_, Pcs, Blake2sTranscript<_>>();
 }
+#[cfg(feature = "benchmark")]
 #[test]
 #[ignore = "large transpose timing experiment; default tests should stay under one second"]
 fn test_transpose() {
@@ -1402,6 +1403,7 @@ fn transpose<F: std::marker::Send + std::marker::Sync + Copy>(data: &Vec<Vec<F>>
         .collect()
 }
 
+#[cfg(feature = "benchmark")]
 #[test]
 #[ignore = "large RAA timing sweep; default tests should stay under one second"]
 fn bench_raa() {
@@ -1409,6 +1411,7 @@ fn bench_raa() {
         bench_single_raa_aux(k);
     }
 }
+#[cfg(feature = "benchmark")]
 #[test]
 #[ignore = "large Blaze commit timing sweep; default tests should stay under one second"]
 fn bench_commit() {
@@ -1421,6 +1424,7 @@ fn bench_commit() {
         bench_commit_aux(k, 2048);
     }
 }
+#[cfg(feature = "benchmark")]
 #[test]
 #[ignore = "large Blaze fast-commit timing sweep; default tests should stay under one second"]
 fn bench_fast_commit() {
@@ -1771,6 +1775,7 @@ fn test_lc_to_b128() {
         ]
     );
 }
+#[cfg(feature = "benchmark")]
 #[test]
 #[ignore = "large linear-combination timing experiment; default tests should stay under one second"]
 fn test_linear_combo() {
@@ -1895,6 +1900,7 @@ fn create_permutation_extension() {
     todo!()
 }
 
+#[cfg(feature = "benchmark")]
 #[test]
 #[ignore = "large Merkle timing experiment; default tests should stay under one second"]
 fn test_merkle_tree() {
@@ -1914,6 +1920,7 @@ fn test_merkle_tree() {
     // assert_eq!(root_new, root_old);
 }
 
+#[cfg(feature = "benchmark")]
 #[test]
 #[ignore = "large Merkle comparison over 2^20 elements; default tests should stay under one second"]
 fn test_merkle_long() {

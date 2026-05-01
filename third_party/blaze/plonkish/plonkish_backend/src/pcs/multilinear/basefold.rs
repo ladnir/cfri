@@ -775,8 +775,6 @@ where
         transcript: &mut impl TranscriptRead<Self::CommitmentChunk, F>,
     ) -> Result<(), Error> {
         use std::env;
-        println!("VERIFY");
-
         let comms = comms.into_iter().collect_vec();
         validate_input("batch verify", vp.num_vars, [], points)?;
         transcript.read_commitments(comms.len());
@@ -912,7 +910,6 @@ where
             query_merkle_paths.push(merkle_paths);
         }
 
-        println!("verifier query phase");
         let queries_usize = verifier_query_phase::<F, H>(
             &query_challenges,
             &query_merkle_paths,
@@ -2250,13 +2247,11 @@ mod test {
     }
 
     #[test]
-    #[ignore = "known verifier query assertion failure: challenge count is 33, verifier currently asserts 1"]
     fn commit_open_verify() {
         run_commit_open_verify::<_, Pcs, Blake2sTranscript<_>>();
     }
 
     #[test]
-    #[ignore = "known verifier query assertion failure: challenge count is 33, verifier currently asserts 1"]
     fn batch_commit_open_verify() {
         run_batch_commit_open_verify::<_, Pcs, Blake2sTranscript<_>>();
     }
@@ -2634,9 +2629,8 @@ fn verifier_query_phase<F: PrimeField, H: Hash>(
     eval: &F,
     code_type: &str,
 ) -> Vec<usize> {
-    println!("VERIFIER QUERY PHASE");
-    println!("CHALLEGNES LENGTH {:?}", query_challenges.len());
-    assert_eq!(query_challenges.len(), 1);
+    assert_eq!(query_merkle_paths.len(), query_challenges.len());
+    assert_eq!(queries.len(), query_challenges.len());
     let n = (1 << (num_vars + log_rate));
     let mut queries_usize: Vec<usize> = query_challenges
         .par_iter()

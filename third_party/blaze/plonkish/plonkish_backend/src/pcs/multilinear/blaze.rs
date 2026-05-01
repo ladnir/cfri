@@ -1264,7 +1264,6 @@ fn test_perm() {
     );
 }
 #[test]
-#[ignore = "known BaseFold verifier query assertion failure: challenge count is 402, verifier currently asserts 1"]
 fn test_basefold_binary() {
     use crate::pcs::multilinear::basefold::Basefold;
     use crate::pcs::PolynomialCommitmentScheme;
@@ -1340,7 +1339,6 @@ fn test_basefold_binary() {
     //  println!("proof{:?}", proof);
 }
 #[test]
-#[ignore = "known BaseFold verifier query assertion failure: challenge count is 402, verifier currently asserts 1"]
 fn test_batch_basefold_binary() {
     use crate::pcs::multilinear::{
         basefold::Basefold,

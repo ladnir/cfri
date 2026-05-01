@@ -60,7 +60,7 @@ impl B128 {
 impl Default for B128 {
     // Required method
     fn default() -> Self {
-        todo!()
+        Self::ZERO
     }
 }
 
@@ -219,11 +219,13 @@ fn test_inv() {
         let inv = test.inverse();
         let inv_inv = inv.inverse();
         assert_eq!(test, inv_inv);
+        assert_eq!(test * inv, B128::ONE);
 
         let test2 = B128::new([100u64, 1234u64]);
         let inv = test2.inverse();
         let inv_inv = inv.inverse();
         assert_eq!(inv_inv, test2);
+        assert_eq!(test2 * inv, B128::ONE);
     }
 }
 
@@ -418,11 +420,9 @@ fn test_one() {
 }
 impl Field for B128 {
     const ZERO: B128 = Self { value: [0, 0] }; //todo!();//Self{ value: None };
-    const ONE: B128 = Self { value: [0, 1] }; //todo!();//Self{ value: None };
+    const ONE: B128 = Self { value: [1, 0] }; //todo!();//Self{ value: None };
 
-    //todo, change this to use the rng it is being passed and do something directly
     fn random(mut rng: impl RngCore) -> Self {
-        let mut rng = ChaCha8Rng::from_entropy();
         let mut bytes = [0u8; 8];
         rng.fill_bytes(&mut bytes);
         let x = u64::from_le_bytes(bytes);
@@ -497,6 +497,6 @@ impl PrimeField for B128 {
 }
 impl From<u64> for B128 {
     fn from(val: u64) -> Self {
-        Self { value: [0, val] }
+        Self { value: [val, 0] }
     }
 }

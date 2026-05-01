@@ -1094,9 +1094,7 @@ pub fn evaluate_over_foldable_domain<F: PrimeField>(
     let logk = log2_strict(k);
     let cl = 1 << (logk + log_rate);
     let rate = 1 << log_rate;
-    let subspace = BinarySubspace::<F>::with_dim(log_rate + logk + 1)
-        .ok()
-        .unwrap();
+    let subspace = BinarySubspace::<F>::with_dim(table.len() + 1).ok().unwrap();
     let twiddle_accesses = OnTheFlyTwiddleAccess::generate(&subspace).ok().unwrap();
     let mut coeffs_with_rep = vec![F::ZERO; cl];
 
@@ -1110,7 +1108,8 @@ pub fn evaluate_over_foldable_domain<F: PrimeField>(
 
     let mut chunk_size = rate; //block length of the base code
     for i in 0..logk {
-        let level = &table[i + log_rate];
+        let table_level = i + log_rate;
+        let level = &table[table_level];
         chunk_size = chunk_size << 1;
         assert_eq!(level.len(), chunk_size >> 1);
         <Vec<F> as AsMut<[F]>>::as_mut(&mut coeffs_with_rep)
@@ -1122,7 +1121,7 @@ pub fn evaluate_over_foldable_domain<F: PrimeField>(
                     let mut lhs = F::ZERO;
                     if code_type == "binary_rs".to_string() {
                         lhs = chunk[j]
-                            * twiddle_accesses[logk - i - 1]
+                            * twiddle_accesses[table.len() - table_level - 1]
                                 .get_odd_from_even(level[j - half_chunk]);
                     } else {
                         lhs = -rhs;
@@ -1515,7 +1514,7 @@ fn query_binary_table<F: PrimeField>(
     assert_eq!(index < half_block, true);
     let even = table[level][index % half_block].0;
     let twiddle_accesses = OnTheFlyTwiddleAccess::generate(&subspace).unwrap();
-    let odd = twiddle_accesses[table.len() - level].get_odd_from_even(even);
+    let odd = twiddle_accesses[table.len() - level - 1].get_odd_from_even(even);
     (even, odd)
 }
 
@@ -1766,7 +1765,7 @@ pub fn query_point_binary_rs<F: PrimeField>(
 
     let ri0 = left_index; //reverse_bits(left_index, level);
 
-    twiddle_accesses[log_total_block_length - level].get_pair(level - 1, ri0)
+    twiddle_accesses[log_total_block_length - level - 1].get_pair(level, ri0)
     /*if level_index >= half_block{
         w_1
     }
@@ -2133,44 +2132,109 @@ mod test {
     }
 
     #[test]
-    #[ignore = "known binary_rs fold invariant failure; BaseFold folding/query equation needs repair"]
     fn test_binary_rs_transform() {
         type F = B128;
-        use rand::rngs::OsRng;
-        let num_vars = 5;
-        let log_rate = 1;
-        let poly = MultilinearPolynomial::<F>::rand(num_vars, OsRng);
-        let mut rng = ChaCha8Rng::from_entropy();
+        for num_vars in 1..=5 {
+            for log_rate in 1..=2 {
+                let poly = MultilinearPolynomial::<F>::new(
+                    (0..(1 << num_vars))
+                        .map(|i| F::from((17 * i + 3 * num_vars + log_rate) as u64))
+                        .collect(),
+                );
 
-        let (table_w_weights, table) = get_table_additive_binary((1 << num_vars), log_rate);
-        let (mut coeffs, _) = interpolate_over_boolean_hypercube_with_copy(&Type2Polynomial {
-            poly: poly.evals().to_vec(),
-        });
+                let (table_w_weights, table) = get_table_additive_binary((1 << num_vars), log_rate);
+                let (mut coeffs, _) =
+                    interpolate_over_boolean_hypercube_with_copy(&Type2Polynomial {
+                        poly: poly.evals().to_vec(),
+                    });
 
-        let commitment = evaluate_over_foldable_domain(
-            log_rate,
-            coeffs.clone(),
-            &table,
-            "binary_rs".to_string(),
-        );
+                let commitment = evaluate_over_foldable_domain(
+                    log_rate,
+                    coeffs.clone(),
+                    &table,
+                    "binary_rs".to_string(),
+                );
 
-        let challenge = rand_chacha::<F>(&mut rng);
-        let fold = basefold_one_round_by_interpolation_weights(
-            &table_w_weights,
-            0,
-            &commitment,
-            challenge,
-            num_vars,
-            log_rate,
-            "binary_rs".to_string(),
-        );
+                let challenge = F::from((9 + num_vars + log_rate) as u64);
+                let fold = basefold_one_round_by_interpolation_weights(
+                    &table_w_weights,
+                    0,
+                    &commitment,
+                    challenge,
+                    num_vars,
+                    log_rate,
+                    "binary_rs".to_string(),
+                );
 
-        let chal_vec = vec![challenge];
-        multilinear_evaluation_ztoa(&mut coeffs, &chal_vec);
-        let commitment_after =
-            evaluate_over_foldable_domain(log_rate, coeffs, &table, "binary_rs".to_string());
+                let left_coeffs = Type2Polynomial {
+                    poly: coeffs.poly[..(coeffs.poly.len() >> 1)].to_vec(),
+                };
+                let right_coeffs = Type2Polynomial {
+                    poly: coeffs.poly[(coeffs.poly.len() >> 1)..].to_vec(),
+                };
+                let manual_coeffs = Type2Polynomial {
+                    poly: coeffs.poly[..(coeffs.poly.len() >> 1)]
+                        .iter()
+                        .zip(coeffs.poly[(coeffs.poly.len() >> 1)..].iter())
+                        .map(|(left, right)| *left + challenge * *right)
+                        .collect(),
+                };
+                multilinear_evaluation_ztoa(&mut coeffs, &vec![challenge]);
+                assert_eq!(coeffs, manual_coeffs);
 
-        assert_eq!(commitment_after, fold);
+                let commitment_after = evaluate_over_foldable_domain(
+                    log_rate,
+                    coeffs,
+                    &table,
+                    "binary_rs".to_string(),
+                );
+                let left_commitment = evaluate_over_foldable_domain(
+                    log_rate,
+                    left_coeffs,
+                    &table,
+                    "binary_rs".to_string(),
+                );
+                let right_commitment = evaluate_over_foldable_domain(
+                    log_rate,
+                    right_coeffs,
+                    &table,
+                    "binary_rs".to_string(),
+                );
+                let linear_commitment = Type1Polynomial {
+                    poly: left_commitment
+                        .poly
+                        .iter()
+                        .zip(right_commitment.poly.iter())
+                        .map(|(left, right)| *left + challenge * *right)
+                        .collect(),
+                };
+                assert_eq!(commitment_after, linear_commitment);
+                assert_eq!(commitment_after, fold);
+            }
+        }
+    }
+
+    #[test]
+    fn test_binary_rs_table_weights() {
+        type F = B128;
+        for num_vars in 1..=5 {
+            for log_rate in 1..=2 {
+                let (table_w_weights, _) = get_table_additive_binary::<F>(1 << num_vars, log_rate);
+                let subspace = crate::util::code::binary_rs::BinarySubspace::<F>::with_dim(
+                    num_vars + log_rate + 1,
+                )
+                .unwrap();
+
+                for level in 0..table_w_weights.len() {
+                    for index in 0..table_w_weights[level].len() {
+                        let (x0, x1) =
+                            super::query_binary_table(&table_w_weights, level, index, &subspace);
+                        assert_ne!(x0, x1);
+                        assert_eq!((x1 - x0) * table_w_weights[level][index].1, F::ONE);
+                    }
+                }
+            }
+        }
     }
 
     #[test]
@@ -2801,19 +2865,16 @@ pub fn get_table_additive_binary<F: PrimeField>(
 ) -> (Vec<Vec<(F, F)>>, Vec<Vec<F>>) {
     let lg_n: usize = rate + log2_strict(poly_size);
 
-    let now = Instant::now();
-
     // Create a binary subspace for the twiddle factors
     let subspace = BinarySubspace::<F>::with_dim(lg_n + 1).ok().unwrap();
     let twiddle_accesses = OnTheFlyTwiddleAccess::generate(&subspace).unwrap();
 
     // Generate flat table using twiddle factors
     let mut flat_table = Vec::with_capacity(1 << (lg_n));
-    //1 to lg_n
-    for j in 1..lg_n + 1 {
-        for i in 0..(1 << j) {
-            let j_t = &twiddle_accesses[lg_n - j];
-            let (w_0, w_1) = j_t.get_pair(j - 1, i);
+    for level in 0..lg_n {
+        for i in 0..(1 << level) {
+            let level_twiddles = &twiddle_accesses[lg_n - level - 1];
+            let (w_0, w_1) = level_twiddles.get_pair(level, i);
             flat_table.push((w_0, w_1));
         }
     }
@@ -2834,24 +2895,17 @@ pub fn get_table_additive_binary<F: PrimeField>(
     let mut unflattened_table_w_weights = vec![Vec::new(); lg_n];
     let mut unflattened_table = vec![Vec::<F>::new(); lg_n];
 
-    let mut level_weights = flat_table_w_weights[0..2].to_vec();
-    reverse_index_bits_in_place(&mut level_weights);
-    unflattened_table_w_weights[0] = level_weights;
-
-    let mut unflattened_table_w_weights = vec![Vec::new(); lg_n];
-    let mut unflattened_table = vec![Vec::new(); lg_n];
-
-    unflattened_table[0] = vec![F::ZERO];
-    unflattened_table_w_weights[0] = vec![(F::ZERO, F::ZERO)];
-    for i in 0..(lg_n - 1) {
-        unflattened_table[i + 1] = flat_table[((1 << (i + 1)) - 2)..((1 << (i + 2)) - 2)]
+    for level in 0..lg_n {
+        let start = (1 << level) - 1;
+        let end = (1 << (level + 1)) - 1;
+        unflattened_table[level] = flat_table[start..end]
             .to_vec()
             .iter()
             .map(|f| f.0)
             .collect::<Vec<_>>();
-        let mut level = flat_table_w_weights[((1 << (i + 1)) - 2)..((1 << (i + 2)) - 2)].to_vec();
-        reverse_index_bits_in_place(&mut level);
-        unflattened_table_w_weights[i + 1] = level;
+        let mut level_weights = flat_table_w_weights[start..end].to_vec();
+        reverse_index_bits_in_place(&mut level_weights);
+        unflattened_table_w_weights[level] = level_weights;
     }
 
     return (unflattened_table_w_weights, unflattened_table);

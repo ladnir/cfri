@@ -1953,16 +1953,20 @@ mod test {
     };
 
     use crate::{
-        pcs::multilinear::{
-            basefold::{
-                basefold_one_round_by_interpolation_weights, encode_repetition_basecode,
-                encode_rs_basecode, evaluate_over_foldable_domain, evaluate_over_foldable_domain_2,
-                evaluate_over_foldable_domain_generic_basecode, get_table_additive_binary,
-                get_table_aes, interpolate_over_boolean_hypercube_with_copy, log2_strict,
-                multilinear_evaluation_atoz, multilinear_evaluation_ztoa, one_level_eval_hc,
-                one_level_interp_hc, rand_chacha, Basefold, Type1Polynomial, Type2Polynomial,
+        pcs::{
+            multilinear::{
+                basefold::{
+                    basefold_one_round_by_interpolation_weights, encode_repetition_basecode,
+                    encode_rs_basecode, evaluate_over_foldable_domain,
+                    evaluate_over_foldable_domain_2,
+                    evaluate_over_foldable_domain_generic_basecode, get_table_additive_binary,
+                    get_table_aes, interpolate_over_boolean_hypercube_with_copy, log2_strict,
+                    multilinear_evaluation_atoz, multilinear_evaluation_ztoa, one_level_eval_hc,
+                    one_level_interp_hc, rand_chacha, Basefold, Type1Polynomial, Type2Polynomial,
+                },
+                test::{run_batch_commit_open_verify, run_commit_open_verify},
             },
-            test::{run_batch_commit_open_verify, run_commit_open_verify},
+            Evaluation, PolynomialCommitmentScheme,
         },
         poly::{multilinear::MultilinearPolynomial, Polynomial},
         util::{
@@ -1971,6 +1975,7 @@ mod test {
             new_fields::{Mersenne127, Mersenne61},
             play_field::PlayField,
             transcript::{Blake2sTranscript, Keccak256Transcript},
+            Itertools,
         },
     };
     use halo2_curves::{ff::Field, secp256k1::Fp};
@@ -1979,7 +1984,10 @@ mod test {
         rand_core::{RngCore, SeedableRng},
         ChaCha12Rng, ChaCha8Rng,
     };
-    use std::io;
+    use std::{
+        io,
+        panic::{catch_unwind, AssertUnwindSafe},
+    };
 
     use crate::pcs::multilinear::basefold::Instant;
     use crate::pcs::multilinear::BasefoldExtParams;
@@ -2011,6 +2019,312 @@ mod test {
 
         fn get_code_type() -> String {
             "random".to_string()
+        }
+    }
+
+    #[derive(Debug)]
+    struct RandomRate1;
+
+    impl BasefoldExtParams for RandomRate1 {
+        fn get_reps() -> usize {
+            5
+        }
+
+        fn get_rate() -> usize {
+            1
+        }
+
+        fn get_basecode_rounds() -> usize {
+            0
+        }
+
+        fn get_rs_basecode() -> bool {
+            false
+        }
+
+        fn get_code_type() -> String {
+            "random".to_string()
+        }
+    }
+
+    #[derive(Debug)]
+    struct RandomRate2;
+
+    impl BasefoldExtParams for RandomRate2 {
+        fn get_reps() -> usize {
+            5
+        }
+
+        fn get_rate() -> usize {
+            2
+        }
+
+        fn get_basecode_rounds() -> usize {
+            0
+        }
+
+        fn get_rs_basecode() -> bool {
+            false
+        }
+
+        fn get_code_type() -> String {
+            "random".to_string()
+        }
+    }
+
+    #[derive(Debug)]
+    struct RandomRsRate1;
+
+    impl BasefoldExtParams for RandomRsRate1 {
+        fn get_reps() -> usize {
+            5
+        }
+
+        fn get_rate() -> usize {
+            1
+        }
+
+        fn get_basecode_rounds() -> usize {
+            1
+        }
+
+        fn get_rs_basecode() -> bool {
+            true
+        }
+
+        fn get_code_type() -> String {
+            "random".to_string()
+        }
+    }
+
+    #[derive(Debug)]
+    struct BinaryRate1;
+
+    impl BasefoldExtParams for BinaryRate1 {
+        fn get_reps() -> usize {
+            7
+        }
+
+        fn get_rate() -> usize {
+            1
+        }
+
+        fn get_basecode_rounds() -> usize {
+            0
+        }
+
+        fn get_rs_basecode() -> bool {
+            false
+        }
+
+        fn get_code_type() -> String {
+            "binary_rs".to_string()
+        }
+    }
+
+    #[derive(Debug)]
+    struct BinaryRate2;
+
+    impl BasefoldExtParams for BinaryRate2 {
+        fn get_reps() -> usize {
+            7
+        }
+
+        fn get_rate() -> usize {
+            2
+        }
+
+        fn get_basecode_rounds() -> usize {
+            0
+        }
+
+        fn get_rs_basecode() -> bool {
+            false
+        }
+
+        fn get_code_type() -> String {
+            "binary_rs".to_string()
+        }
+    }
+
+    fn make_single_proof<F, Pcs, T>(num_vars: usize, seed: u8) -> (Pcs::VerifierParam, Vec<u8>)
+    where
+        F: PrimeField,
+        Pcs: PolynomialCommitmentScheme<F, Polynomial = MultilinearPolynomial<F>>,
+        T: TranscriptRead<Pcs::CommitmentChunk, F>
+            + TranscriptWrite<Pcs::CommitmentChunk, F>
+            + InMemoryTranscript<Param = ()>,
+    {
+        let mut rng = ChaCha8Rng::from_seed([seed; 32]);
+        let poly_size = 1 << num_vars;
+        let param = Pcs::setup(poly_size, 1, &mut rng).unwrap();
+        let (pp, vp) = Pcs::trim(&param, poly_size, 1).unwrap();
+        let poly = MultilinearPolynomial::rand(num_vars, &mut rng);
+        let mut transcript = T::new(());
+        let comm = Pcs::commit_and_write(&pp, &poly, &mut transcript).unwrap();
+        let point = transcript.squeeze_challenges(num_vars);
+        let eval = poly.evaluate(point.as_slice());
+        transcript.write_field_element(&eval).unwrap();
+        Pcs::open(&pp, &poly, &comm, &point, &eval, &mut transcript).unwrap();
+        (vp, transcript.into_proof())
+    }
+
+    fn verify_single_proof<F, Pcs, T>(
+        vp: &Pcs::VerifierParam,
+        proof: &[u8],
+        num_vars: usize,
+        wrong_point: bool,
+    ) -> Result<(), crate::Error>
+    where
+        F: PrimeField,
+        Pcs: PolynomialCommitmentScheme<F, Polynomial = MultilinearPolynomial<F>>,
+        T: TranscriptRead<Pcs::CommitmentChunk, F>
+            + TranscriptWrite<Pcs::CommitmentChunk, F>
+            + InMemoryTranscript<Param = ()>,
+    {
+        let mut transcript = T::from_proof((), proof);
+        let comm = Pcs::read_commitment(vp, &mut transcript)?;
+        let mut point = transcript.squeeze_challenges(num_vars);
+        if wrong_point {
+            point[0] += F::ONE;
+        }
+        let eval = transcript.read_field_element()?;
+        Pcs::verify(vp, &comm, &point, &eval, &mut transcript)
+    }
+
+    fn verify_single_proof_rejects<F, Pcs, T>(
+        vp: &Pcs::VerifierParam,
+        proof: &[u8],
+        num_vars: usize,
+        wrong_point: bool,
+    ) where
+        F: PrimeField,
+        Pcs: PolynomialCommitmentScheme<F, Polynomial = MultilinearPolynomial<F>>,
+        T: TranscriptRead<Pcs::CommitmentChunk, F>
+            + TranscriptWrite<Pcs::CommitmentChunk, F>
+            + InMemoryTranscript<Param = ()>,
+    {
+        let result = catch_unwind(AssertUnwindSafe(|| {
+            verify_single_proof::<F, Pcs, T>(vp, proof, num_vars, wrong_point)
+        }));
+        assert!(
+            result.is_err() || result.unwrap().is_err(),
+            "tampered proof unexpectedly verified"
+        );
+    }
+
+    fn run_single_case<F, Pcs, T>(num_vars: usize, seed: u8)
+    where
+        F: PrimeField,
+        Pcs: PolynomialCommitmentScheme<F, Polynomial = MultilinearPolynomial<F>>,
+        T: TranscriptRead<Pcs::CommitmentChunk, F>
+            + TranscriptWrite<Pcs::CommitmentChunk, F>
+            + InMemoryTranscript<Param = ()>,
+    {
+        let (vp, proof) = make_single_proof::<F, Pcs, T>(num_vars, seed);
+        assert!(verify_single_proof::<F, Pcs, T>(&vp, proof.as_slice(), num_vars, false).is_ok());
+    }
+
+    fn run_batch_case<F, Pcs, T>(num_vars: usize, batch_size: usize, num_points: usize, seed: u8)
+    where
+        F: PrimeField,
+        Pcs: PolynomialCommitmentScheme<F, Polynomial = MultilinearPolynomial<F>>,
+        T: TranscriptRead<Pcs::CommitmentChunk, F>
+            + TranscriptWrite<Pcs::CommitmentChunk, F>
+            + InMemoryTranscript<Param = ()>,
+    {
+        let mut rng = ChaCha8Rng::from_seed([seed; 32]);
+        let poly_size = 1 << num_vars;
+        let param = Pcs::setup(poly_size, batch_size, &mut rng).unwrap();
+        let (pp, vp) = Pcs::trim(&param, poly_size, batch_size).unwrap();
+        let polys = (0..batch_size)
+            .map(|_| MultilinearPolynomial::rand(num_vars, &mut rng))
+            .collect_vec();
+        let eval_indices = (0..batch_size)
+            .cartesian_product(0..num_points)
+            .collect_vec();
+
+        let proof = {
+            let mut transcript = T::new(());
+            let comms = Pcs::batch_commit_and_write(&pp, &polys, &mut transcript).unwrap();
+            let points = (0..num_points)
+                .map(|_| transcript.squeeze_challenges(num_vars))
+                .collect_vec();
+            let evals = eval_indices
+                .iter()
+                .map(|&(poly, point)| {
+                    Evaluation::new(poly, point, polys[poly].evaluate(&points[point]))
+                })
+                .collect_vec();
+            transcript
+                .write_field_elements(evals.iter().map(Evaluation::value))
+                .unwrap();
+            Pcs::batch_open(&pp, &polys, &comms, &points, &evals, &mut transcript).unwrap();
+            transcript.into_proof()
+        };
+
+        let result = {
+            let mut transcript = T::from_proof((), proof.as_slice());
+            let comms = Pcs::read_commitments(&vp, batch_size, &mut transcript).unwrap();
+            let points = (0..num_points)
+                .map(|_| transcript.squeeze_challenges(num_vars))
+                .collect_vec();
+            let eval_values = transcript.read_field_elements(eval_indices.len()).unwrap();
+            let evals = eval_indices
+                .iter()
+                .copied()
+                .zip(eval_values)
+                .map(|((poly, point), value)| Evaluation::new(poly, point, value))
+                .collect_vec();
+            Pcs::batch_verify(&vp, &comms, &points, &evals, &mut transcript)
+        };
+        assert!(result.is_ok());
+    }
+
+    fn deterministic_coeffs<F: PrimeField>(num_vars: usize, salt: u64) -> Type2Polynomial<F> {
+        Type2Polynomial {
+            poly: (0..(1 << num_vars))
+                .map(|i| F::from(17 * i as u64 + 31 * salt + 9))
+                .collect(),
+        }
+    }
+
+    fn run_repeated_fold_consistency<F: PrimeField>(
+        num_vars: usize,
+        log_rate: usize,
+        code_type: &str,
+    ) {
+        let (table_w_weights, table) = if code_type == "binary_rs" {
+            get_table_additive_binary::<F>(1 << num_vars, log_rate)
+        } else {
+            let mut rng = ChaCha8Rng::from_seed([11 + num_vars as u8 + log_rate as u8; 32]);
+            get_table_aes::<F>(1 << num_vars, log_rate, &mut rng)
+        };
+
+        let mut coeffs = deterministic_coeffs::<F>(num_vars, log_rate as u64);
+        let mut folded =
+            evaluate_over_foldable_domain(log_rate, coeffs.clone(), &table, code_type.to_string());
+
+        for round in 0..num_vars {
+            let challenge = F::from(23 + 5 * round as u64 + 7 * log_rate as u64);
+            folded = basefold_one_round_by_interpolation_weights(
+                &table_w_weights,
+                round,
+                &folded,
+                challenge,
+                num_vars,
+                log_rate,
+                code_type.to_string(),
+            );
+
+            multilinear_evaluation_ztoa(&mut coeffs, &vec![challenge]);
+            let expected = evaluate_over_foldable_domain(
+                log_rate,
+                coeffs.clone(),
+                &table,
+                code_type.to_string(),
+            );
+            assert_eq!(folded, expected, "round {round} failed");
         }
     }
 
@@ -2245,6 +2559,133 @@ mod test {
                         assert_eq!(weight, F::ONE);
                     }
                 }
+            }
+        }
+    }
+
+    #[test]
+    fn basefold_robustness_random_commit_open_grid() {
+        type RandomRate1Pcs = Basefold<Fr, Blake2s256, RandomRate1>;
+        type RandomRate2Pcs = Basefold<Fr, Blake2s256, RandomRate2>;
+        type RandomRsRate1Pcs = Basefold<Fr, Blake2s256, RandomRsRate1>;
+
+        for num_vars in 2..=4 {
+            run_single_case::<Fr, RandomRate1Pcs, Blake2sTranscript<_>>(
+                num_vars,
+                10 + num_vars as u8,
+            );
+            run_single_case::<Fr, RandomRate2Pcs, Blake2sTranscript<_>>(
+                num_vars,
+                20 + num_vars as u8,
+            );
+            run_single_case::<Fr, RandomRsRate1Pcs, Blake2sTranscript<_>>(
+                num_vars,
+                30 + num_vars as u8,
+            );
+        }
+    }
+
+    #[test]
+    fn basefold_robustness_binary_commit_open_grid() {
+        type BinaryRate1Pcs = Basefold<B128, Blake2s256, BinaryRate1>;
+        type BinaryRate2Pcs = Basefold<B128, Blake2s256, BinaryRate2>;
+
+        for num_vars in 2..=4 {
+            run_single_case::<B128, BinaryRate1Pcs, Blake2sTranscript<_>>(
+                num_vars,
+                40 + num_vars as u8,
+            );
+            run_single_case::<B128, BinaryRate2Pcs, Blake2sTranscript<_>>(
+                num_vars,
+                50 + num_vars as u8,
+            );
+        }
+    }
+
+    #[test]
+    fn basefold_robustness_batch_grid() {
+        type RandomRate1Pcs = Basefold<Fr, Blake2s256, RandomRate1>;
+        type RandomRate2Pcs = Basefold<Fr, Blake2s256, RandomRate2>;
+        type BinaryRate1Pcs = Basefold<B128, Blake2s256, BinaryRate1>;
+
+        run_batch_case::<Fr, RandomRate1Pcs, Blake2sTranscript<_>>(3, 3, 2, 60);
+        run_batch_case::<Fr, RandomRate2Pcs, Blake2sTranscript<_>>(3, 3, 2, 61);
+        run_batch_case::<B128, BinaryRate1Pcs, Blake2sTranscript<_>>(3, 3, 2, 62);
+    }
+
+    #[test]
+    fn basefold_robustness_rejects_wrong_point() {
+        type RandomRate1Pcs = Basefold<Fr, Blake2s256, RandomRate1>;
+        type BinaryRate1Pcs = Basefold<B128, Blake2s256, BinaryRate1>;
+
+        let (vp, proof) = make_single_proof::<Fr, RandomRate1Pcs, Blake2sTranscript<_>>(3, 70);
+        assert!(
+            verify_single_proof::<Fr, RandomRate1Pcs, Blake2sTranscript<_>>(
+                &vp,
+                proof.as_slice(),
+                3,
+                false
+            )
+            .is_ok()
+        );
+        verify_single_proof_rejects::<Fr, RandomRate1Pcs, Blake2sTranscript<_>>(
+            &vp,
+            proof.as_slice(),
+            3,
+            true,
+        );
+
+        let (vp, proof) = make_single_proof::<B128, BinaryRate1Pcs, Blake2sTranscript<_>>(3, 71);
+        assert!(
+            verify_single_proof::<B128, BinaryRate1Pcs, Blake2sTranscript<_>>(
+                &vp,
+                proof.as_slice(),
+                3,
+                false
+            )
+            .is_ok()
+        );
+        verify_single_proof_rejects::<B128, BinaryRate1Pcs, Blake2sTranscript<_>>(
+            &vp,
+            proof.as_slice(),
+            3,
+            true,
+        );
+    }
+
+    #[test]
+    fn basefold_robustness_rejects_tampered_proof() {
+        type RandomRate1Pcs = Basefold<Fr, Blake2s256, RandomRate1>;
+        type BinaryRate1Pcs = Basefold<B128, Blake2s256, BinaryRate1>;
+
+        let (vp, mut proof) = make_single_proof::<Fr, RandomRate1Pcs, Blake2sTranscript<_>>(3, 80);
+        let proof_idx = proof.len() / 2;
+        proof[proof_idx] ^= 1;
+        verify_single_proof_rejects::<Fr, RandomRate1Pcs, Blake2sTranscript<_>>(
+            &vp,
+            proof.as_slice(),
+            3,
+            false,
+        );
+
+        let (vp, mut proof) =
+            make_single_proof::<B128, BinaryRate1Pcs, Blake2sTranscript<_>>(3, 81);
+        let proof_idx = proof.len() / 2;
+        proof[proof_idx] ^= 1;
+        verify_single_proof_rejects::<B128, BinaryRate1Pcs, Blake2sTranscript<_>>(
+            &vp,
+            proof.as_slice(),
+            3,
+            false,
+        );
+    }
+
+    #[test]
+    fn basefold_robustness_repeated_folding_matches_reencoding() {
+        for num_vars in 2..=5 {
+            for log_rate in 1..=2 {
+                run_repeated_fold_consistency::<Mersenne127>(num_vars, log_rate, "random");
+                run_repeated_fold_consistency::<B128>(num_vars, log_rate, "binary_rs");
             }
         }
     }

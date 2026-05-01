@@ -1775,6 +1775,67 @@ fn test_lc_to_b128() {
         ]
     );
 }
+
+#[test]
+fn blaze_robustness_linear_combo_matches_reference_small() {
+    let rows = vec![
+        (0..32)
+            .map(|i| Blazeu64 {
+                value: 0x9e37_79b9_7f4a_7c15u64.rotate_left(i as u32),
+            })
+            .collect_vec(),
+        (0..32)
+            .map(|i| Blazeu64 {
+                value: 0xd1b5_4a32_d192_ed03u64.rotate_right(i as u32),
+            })
+            .collect_vec(),
+    ];
+    let bit_challenges = (0..128)
+        .map(|i| {
+            vec![
+                Blazeu64 {
+                    value: 0xfedc_ba98_7654_3210u64.rotate_left(i as u32),
+                },
+                Blazeu64 {
+                    value: 0x0123_4567_89ab_cdefu64.rotate_right(i as u32),
+                },
+            ]
+        })
+        .collect_vec();
+
+    let reference = blazefield_linear_combo(&bit_challenges, &rows, 128);
+    assert_eq!(
+        reference,
+        blazefield_linear_combo_transpose(&bit_challenges, &rows, 128)
+    );
+    assert_eq!(
+        reference,
+        blazefield_linear_combo_faster(&bit_challenges, &rows, 128)
+    );
+    let packed_rows = bf_to_long_b128_vec_long(&rows);
+    let packed_challenges = vec![B128 {
+        value: [0xfedc_ba98_7654_3210, 0x0123_4567_89ab_cdef],
+    }];
+    assert_eq!(
+        linear_combination(packed_rows, packed_challenges.clone()),
+        blazefield_linear_combo_even_faster(&packed_challenges, &rows, 128)
+    );
+}
+
+#[test]
+fn blaze_robustness_merkle_long_matches_single_row_small() {
+    let data = (0..1024)
+        .map(|i| Blazeu64 {
+            value: (i as u64).wrapping_mul(0x9e37_79b9_7f4a_7c15),
+        })
+        .collect_vec();
+    let rows = vec![data.clone()];
+
+    let tree = merkelize::<Blake2s, Blazeu64>(&data);
+    assert_eq!(tree, merkelize_long::<Blake2s, Blazeu64>(&rows));
+    assert_eq!(tree, merkelize_long_par::<Blake2s, Blazeu64>(&rows));
+}
+
 #[cfg(feature = "benchmark")]
 #[test]
 #[ignore = "large linear-combination timing experiment; default tests should stay under one second"]

@@ -1,0 +1,11 @@
+/target/
+/third_party/**/target/
+*.pdb
+*.ilk
+*.exe
+*.dll
+*.lib
+*.obj
+.DS_Store
+*~
+\#*\#

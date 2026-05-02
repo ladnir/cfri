@@ -19,6 +19,7 @@ fn small_blaze_proof() -> (
     blaze::BlazeVerifierParam,
     blaze::BlazeCommitment<Blazeu64, Blake2s>,
     Vec<B128>,
+    B128,
     Vec<u8>,
     Vec<u8>,
 ) {
@@ -43,7 +44,7 @@ fn small_blaze_proof() -> (
     let comm = blaze::commit_and_write::<Blazeu64, Blake2s>(&pp, &data, &mut blaze_transcript);
     let mut b128_transcript = Blake2sTranscript::new(());
     let point = b128_transcript.squeeze_challenges(num_vars);
-    blaze::open(
+    let eval = blaze::open(
         &pp,
         &data,
         &comm,
@@ -57,30 +58,50 @@ fn small_blaze_proof() -> (
     let blaze_proof = blaze_transcript.into_proof();
     let b128_proof = b128_transcript.into_proof();
 
-    (vp, comm, point, blaze_proof, b128_proof)
+    (vp, comm, point, eval, blaze_proof, b128_proof)
 }
 
 #[test]
 fn blaze_native_commit_open_verify_small() {
-    let (vp, comm, point, blaze_proof, b128_proof) = small_blaze_proof();
+    let (vp, comm, point, eval, blaze_proof, b128_proof) = small_blaze_proof();
     let mut blaze_transcript = BlazeBlake2sTranscript::from_proof((), blaze_proof.as_slice());
     let mut b128_transcript = Blake2sTranscript::from_proof((), b128_proof.as_slice());
 
-    assert!(blaze::verify(
-        &vp,
-        &comm,
-        &point,
-        &Blazeu64::zero(),
-        &mut b128_transcript,
-        &mut blaze_transcript,
-    )
-    .is_ok());
+    assert_eq!(
+        blaze::verify(
+            &vp,
+            &comm,
+            &point,
+            &eval,
+            &mut b128_transcript,
+            &mut blaze_transcript,
+        ),
+        Ok(())
+    );
 }
 
 #[test]
-#[ignore = "known correctness gap: Blaze verifier currently ignores the claimed evaluation"]
 fn blaze_native_rejects_wrong_eval_small() {
-    let (vp, comm, point, blaze_proof, b128_proof) = small_blaze_proof();
+    let (vp, comm, point, eval, blaze_proof, b128_proof) = small_blaze_proof();
+    assert_rejects_or_panics(|| {
+        let mut blaze_transcript = BlazeBlake2sTranscript::from_proof((), blaze_proof.as_slice());
+        let mut b128_transcript = Blake2sTranscript::from_proof((), b128_proof.as_slice());
+        let wrong_eval = eval + B128::from(123u64);
+        blaze::verify(
+            &vp,
+            &comm,
+            &point,
+            &wrong_eval,
+            &mut b128_transcript,
+            &mut blaze_transcript,
+        )
+    });
+}
+
+#[test]
+fn blaze_native_rejects_wrong_point_small() {
+    let (vp, comm, mut point, eval, blaze_proof, b128_proof) = small_blaze_proof();
+    point[0] += B128::from(1u64);
     assert_rejects_or_panics(|| {
         let mut blaze_transcript = BlazeBlake2sTranscript::from_proof((), blaze_proof.as_slice());
         let mut b128_transcript = Blake2sTranscript::from_proof((), b128_proof.as_slice());
@@ -88,7 +109,7 @@ fn blaze_native_rejects_wrong_eval_small() {
             &vp,
             &comm,
             &point,
-            &Blazeu64 { value: 123 },
+            &eval,
             &mut b128_transcript,
             &mut blaze_transcript,
         )

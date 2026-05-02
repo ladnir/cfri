@@ -492,6 +492,56 @@ fn linear_combination<F: PrimeField>(vecs: Vec<Vec<F>>, coeffs: Vec<F>) -> Vec<F
     });
     result
 }
+
+fn eval_folded_blaze_poly(folded_poly: &[B128], point: &[B128]) -> Result<B128, Error> {
+    if folded_poly.len() != (1usize << point.len()) {
+        return Err(Error::InvalidPcsOpen(format!(
+            "Invalid Blaze opening point length: folded polynomial has {} evaluations but point has {} coordinates",
+            folded_poly.len(),
+            point.len()
+        )));
+    }
+
+    let mut poly = Type2Polynomial {
+        poly: folded_poly.to_vec(),
+    };
+    multilinear_evaluation_ztoa(&mut poly, &point.to_vec());
+    Ok(poly.poly[0])
+}
+
+fn expected_folded_blaze_eval<F: BlazeField, H: Hash>(
+    comm: &BlazeCommitment<F, H>,
+    point: &[B128],
+    challenges: &[B128],
+) -> Result<B128, Error> {
+    if comm.bh_evals.is_empty() {
+        return Err(Error::InvalidPcsOpen(
+            "Invalid Blaze commitment: empty evaluation matrix".to_string(),
+        ));
+    }
+
+    let row_size = comm.bh_evals[0].len();
+    let num_vars = log2_strict(row_size);
+    if point.len() != num_vars {
+        return Err(Error::InvalidPcsOpen(format!(
+            "Invalid Blaze opening point length: expected {num_vars}, got {}",
+            point.len()
+        )));
+    }
+
+    let folded_poly =
+        blazefield_linear_combo_even_faster(&challenges.to_vec(), &comm.bh_evals, 128);
+    eval_folded_blaze_poly(&folded_poly, point)
+}
+
+fn check_transcript_point(transcript_point: &[B128], claimed_point: &[B128]) -> Result<(), Error> {
+    if transcript_point != claimed_point {
+        return Err(Error::InvalidPcsOpen(
+            "Blaze opening point does not match transcript challenge".to_string(),
+        ));
+    }
+    Ok(())
+}
 #[cfg(feature = "upstream-tests")]
 #[test]
 fn test_split() {
@@ -508,7 +558,7 @@ pub fn open<F: BlazeField, H: Hash>(
     eval: &B128,
     blazetranscript: &mut impl TranscriptWrite<CommitmentChunk<H>, F>,
     b128transcript: &mut impl TranscriptWrite<CommitmentChunk<H>, B128>,
-) -> Result<(), Error> {
+) -> Result<B128, Error> {
     type Pcs<H> = Basefold<B128, H, Five>;
     #[derive(Debug)]
     pub struct Five {};
@@ -545,14 +595,8 @@ pub fn open<F: BlazeField, H: Hash>(
     println!("linear combo {:?}", now.elapsed());
 
     let now = Instant::now();
-    let first_part = &point[0..num_vars_per_row];
-    let second_part = &point[num_vars_per_row..log2_strict(comm.bh_evals[0].len())];
-    //interpolate each row over the boolean hypercube and evaluate at half of the verifiers point
-    let mut row_evals = Type2Polynomial {
-        poly: one_dimension_eval(&comm.bh_evals, first_part.to_vec()),
-    };
-    //    let final_eval = two_dimension_eval::<F>(&mut row_evals,second_part.to_vec());
-    // assert_eq!(&final_eval, eval);
+    let opening_eval = eval_folded_blaze_poly(&folded_poly_b128, point)?;
+    b128transcript.write_field_element(&opening_eval)?;
 
     println!("eval {:?}", now.elapsed());
 
@@ -742,7 +786,7 @@ pub fn open<F: BlazeField, H: Hash>(
         &points,
         &evals_al,
         b128transcript,
-    );
+    )?;
 
     println!("batch open time {:?}", now.elapsed());
 
@@ -778,7 +822,7 @@ pub fn open<F: BlazeField, H: Hash>(
         }
     });
     println!("collect queries {:?}", now.elapsed());
-    Ok(())
+    Ok(opening_eval)
 }
 
 pub fn faster_open<F: BlazeField, H: Hash>(
@@ -789,7 +833,7 @@ pub fn faster_open<F: BlazeField, H: Hash>(
     eval: &B128,
     blazetranscript: &mut impl TranscriptWrite<CommitmentChunk<H>, F>,
     b128transcript: &mut impl TranscriptWrite<CommitmentChunk<H>, B128>,
-) -> Result<(), Error> {
+) -> Result<B128, Error> {
     let row_size = comm.bh_evals[0].len();
     let col_size = comm.bh_evals.len();
     let num_vars_per_row = log2_strict(row_size);
@@ -803,12 +847,8 @@ pub fn faster_open<F: BlazeField, H: Hash>(
     println!("linear combo {:?}", now.elapsed());
 
     let now = Instant::now();
-    let first_part = &point[0..num_vars_per_row];
-    let second_part = &point[num_vars_per_row..log2_strict(comm.bh_evals[0].len())];
-    //interpolate each row over the boolean hypercube and evaluate at half of the verifiers point
-    let mut row_evals = Type2Polynomial {
-        poly: one_dimension_eval(&comm.bh_evals, first_part.to_vec()),
-    };
+    let opening_eval = eval_folded_blaze_poly(&folded_poly_b128, point)?;
+    println!("eval {:?}", now.elapsed());
 
     //query commitment merkle tree and write to transcript
     let mut queries = b128transcript.squeeze_challenges(pp.num_queries); //ned to fix this, it only works for prime fields
@@ -843,25 +883,25 @@ pub fn faster_open<F: BlazeField, H: Hash>(
     println!("collect queries {:?}", now.elapsed());
 
     b128transcript.write_field_elements(&folded_poly_b128);
-    Ok(())
+    Ok(opening_eval)
 }
 
 pub fn faster_verify<F: BlazeField, H: Hash>(
     vp: &BlazeVerifierParam,
     comm: &BlazeCommitment<F, H>,
     point: &Vec<B128>,
-    eval: &F,
+    eval: &B128,
     b128transcript: &mut impl TranscriptRead<CommitmentChunk<H>, B128>,
     blazetranscript: &mut impl TranscriptRead<CommitmentChunk<H>, F>,
 ) -> Result<(), Error> {
-    let point = iter::repeat_with(|| b128transcript.squeeze_challenges(vp.num_vars))
-        .take(1)
-        .collect_vec();
+    let transcript_point = b128transcript.squeeze_challenges(vp.num_vars);
+    check_transcript_point(&transcript_point, point)?;
 
     //read the blaze commitment root
     let blaze_root = blazetranscript.read_commitment();
 
-    let challenges: Vec<B128> = bf_to_b128_vec(&blazetranscript.squeeze_challenges(vp.num_rows));
+    let challenges: Vec<B128> =
+        bf_to_b128_vec(&blazetranscript.squeeze_challenges(vp.num_rows >> 1));
 
     let q_challenges = b128transcript.squeeze_challenges(vp.num_queries);
     let row_len = 1 << (vp.num_vars);
@@ -923,6 +963,21 @@ pub fn faster_verify<F: BlazeField, H: Hash>(
         })
         .collect::<Vec<_>>();
     println!("linear combo {:?}", now.elapsed());
+
+    let folded_poly_b128 = b128transcript.read_field_elements(row_len)?;
+    let proof_eval = eval_folded_blaze_poly(&folded_poly_b128, point)?;
+    if &proof_eval != eval {
+        return Err(Error::InvalidPcsOpen(
+            "Blaze claimed evaluation does not match proof evaluation".to_string(),
+        ));
+    }
+
+    let expected_eval = expected_folded_blaze_eval(comm, point, &challenges)?;
+    if expected_eval != proof_eval {
+        return Err(Error::InvalidPcsOpen(
+            "Blaze proof evaluation does not match committed folded polynomial".to_string(),
+        ));
+    }
     Ok(())
 }
 
@@ -930,7 +985,7 @@ pub fn verify<F: BlazeField, H: Hash>(
     vp: &BlazeVerifierParam,
     comm: &BlazeCommitment<F, H>,
     point: &Vec<B128>,
-    eval: &F,
+    eval: &B128,
     b128transcript: &mut impl TranscriptRead<CommitmentChunk<H>, B128>,
     blazetranscript: &mut impl TranscriptRead<CommitmentChunk<H>, F>,
 ) -> Result<(), Error> {
@@ -956,46 +1011,75 @@ pub fn verify<F: BlazeField, H: Hash>(
             "binary_rs".to_string()
         }
     }
-    let point = iter::repeat_with(|| b128transcript.squeeze_challenges(vp.num_vars))
-        .take(1)
-        .collect_vec();
+    let transcript_point = b128transcript.squeeze_challenges(vp.num_vars);
+    check_transcript_point(&transcript_point, point)?;
     type Pcs<H> = Basefold<B128, H, Five>;
     //read the blaze commitment root
     let blaze_root = blazetranscript.read_commitment();
 
-    let challenges: Vec<B128> = bf_to_b128_vec(&blazetranscript.squeeze_challenges(vp.num_rows));
+    let challenges: Vec<B128> =
+        bf_to_b128_vec(&blazetranscript.squeeze_challenges(vp.num_rows >> 1));
+    let proof_eval = b128transcript.read_field_element()?;
+    if &proof_eval != eval {
+        return Err(Error::InvalidPcsOpen(
+            "Blaze claimed evaluation does not match proof evaluation".to_string(),
+        ));
+    }
+
+    let expected_eval = expected_folded_blaze_eval(comm, point, &challenges)?;
+    if expected_eval != proof_eval {
+        return Err(Error::InvalidPcsOpen(
+            "Blaze proof evaluation does not match committed folded polynomial".to_string(),
+        ));
+    }
 
     //read basefold roots
 
-    let mut basefold_comms1 =
-        &Pcs::<H>::read_commitments(&vp.split_basefold_verifier_param, 4, b128transcript).unwrap();
+    let num_split_chunks = 1 << vp.log_num_chunks;
+    let num_raa_comms = 3 * num_split_chunks;
+    let num_perm_comms = 4 * num_split_chunks;
 
-    let rand_point = b128transcript.squeeze_challenges(vp.reg_basefold_verifier_param.num_vars);
-    let (alpha, beta) = (
+    let basefold_comms1 = Pcs::<H>::read_commitments(
+        &vp.split_basefold_verifier_param,
+        num_raa_comms,
+        b128transcript,
+    )
+    .unwrap();
+
+    let (_alpha, _beta) = (
         b128transcript.squeeze_challenge(),
         b128transcript.squeeze_challenge(),
     );
 
-    let basefold_comms2 =
-        &Pcs::<H>::read_commitments(&vp.split_basefold_verifier_param, 4, b128transcript).unwrap();
+    let basefold_comms2 = Pcs::<H>::read_commitments(
+        &vp.split_basefold_verifier_param,
+        num_perm_comms,
+        b128transcript,
+    )
+    .unwrap();
 
-    let basefold_comms = chain(basefold_comms1, basefold_comms2).collect::<Vec<_>>();
+    let rand_point = b128transcript.squeeze_challenges(vp.reg_basefold_verifier_param.num_vars);
+
+    let basefold_comms = chain(basefold_comms1.iter(), basefold_comms2.iter()).collect::<Vec<_>>();
     //read sumcheck transcript
-    let coeffs = b128transcript.squeeze_challenges(2);
+    let coeffs = b128transcript.squeeze_challenges(4);
 
     let now = Instant::now();
     let mut all_sumcheck_oracles = Vec::new();
-    for i in 0..3 {
+    for _ in 0..3 {
         let mut sum_check_oracles = Vec::new();
-        for i in 0..vp.reg_basefold_verifier_param.num_rounds {
+        for _ in 0..vp.reg_basefold_verifier_param.num_rounds {
             sum_check_oracles.push(b128transcript.read_field_elements(3).unwrap());
+            b128transcript.squeeze_challenge();
         }
         sum_check_oracles.push(b128transcript.read_field_elements(3).unwrap());
         all_sumcheck_oracles.push(sum_check_oracles);
     }
     println!("verify sumchecks {:?}", now.elapsed());
 
-    let evaluations: Vec<B128> = b128transcript.read_field_elements(8).unwrap();
+    let evaluations: Vec<B128> = b128transcript
+        .read_field_elements(num_raa_comms + num_perm_comms)
+        .unwrap();
     let evals_al = evaluations
         .iter()
         .enumerate()
@@ -1021,7 +1105,7 @@ pub fn verify<F: BlazeField, H: Hash>(
         &points,
         &evals_al,
         b128transcript,
-    );
+    )?;
     println!("batch verify {:?}", now.elapsed());
 
     let q_challenges = b128transcript.squeeze_challenges(vp.num_queries);
@@ -1489,7 +1573,7 @@ fn bench_commit_aux(k: usize, col_size: usize) {
         .take(1)
         .collect_vec();
     let now = Instant::now();
-    open(
+    let eval = open(
         &pp,
         &data,
         &com,
@@ -1497,7 +1581,8 @@ fn bench_commit_aux(k: usize, col_size: usize) {
         &B128::zero(),
         &mut blaze_transcript,
         &mut b128_transcript,
-    );
+    )
+    .unwrap();
 
     println!("open time {:?} for {:?} columns", now.elapsed(), col_size);
 
@@ -1511,7 +1596,7 @@ fn bench_commit_aux(k: usize, col_size: usize) {
         &vp,
         &com,
         &point[0],
-        &Blazeu64::zero(),
+        &eval,
         &mut b128transcript,
         &mut blazetranscript,
     );
@@ -1539,7 +1624,7 @@ fn bench_fast_commit_aux(k: usize, col_size: usize) {
         .take(1)
         .collect_vec();
     let now = Instant::now();
-    faster_open(
+    let eval = faster_open(
         &pp,
         &data,
         &com,
@@ -1547,7 +1632,8 @@ fn bench_fast_commit_aux(k: usize, col_size: usize) {
         &B128::zero(),
         &mut blaze_transcript,
         &mut b128_transcript,
-    );
+    )
+    .unwrap();
 
     println!("open time {:?} for {:?} columns", now.elapsed(), col_size);
 
@@ -1561,7 +1647,7 @@ fn bench_fast_commit_aux(k: usize, col_size: usize) {
         &vp,
         &com,
         &point[0],
-        &Blazeu64::zero(),
+        &eval,
         &mut b128transcript,
         &mut blazetranscript,
     );

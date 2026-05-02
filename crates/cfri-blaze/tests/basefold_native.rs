@@ -1,7 +1,7 @@
 use blake2::Blake2s256;
 use cfri_blaze::imported::{Basefold, BasefoldExtParams, MultilinearPolynomial};
-use plonkish_backend::util::arithmetic::Field;
-use plonkish_backend::{
+use cfri_blaze::plonkish_backend::util::arithmetic::Field;
+use cfri_blaze::plonkish_backend::{
     halo2_curves::bn256::Fr,
     pcs::PolynomialCommitmentScheme,
     util::transcript::{
@@ -39,7 +39,9 @@ impl BasefoldExtParams for SmallRandomCode {
 
 type Pcs = Basefold<Fr, Blake2s256, SmallRandomCode>;
 
-fn assert_rejects_or_panics(verify: impl FnOnce() -> Result<(), plonkish_backend::Error>) {
+fn assert_rejects_or_panics(
+    verify: impl FnOnce() -> Result<(), cfri_blaze::plonkish_backend::Error>,
+) {
     let result = catch_unwind(AssertUnwindSafe(verify));
     assert!(result.map(|valid| valid.is_err()).unwrap_or(true));
 }

@@ -1,5 +1,11 @@
+#![feature(portable_simd)]
+#![feature(stdarch_x86_avx512)]
+
+pub mod plonkish_backend;
+pub mod plonky2_util;
+
 pub mod imported {
-    pub use plonkish_backend::{
+    pub use crate::plonkish_backend::{
         pcs::multilinear::blaze,
         pcs::multilinear::{Basefold, BasefoldExtParams},
         poly::multilinear::MultilinearPolynomial,

@@ -1,14 +1,16 @@
 use cfri_blaze::imported::{blaze, Blazeu64, B128};
-use num_traits::Zero;
-use plonkish_backend::util::{
+use cfri_blaze::plonkish_backend::util::{
     blaze_transcript::BlazeBlake2sTranscript,
     hash::Blake2s,
     transcript::{Blake2sTranscript, FieldTranscript, InMemoryTranscript},
 };
+use num_traits::Zero;
 use rand_chacha::{rand_core::SeedableRng, ChaCha8Rng};
 use std::panic::{catch_unwind, AssertUnwindSafe};
 
-fn assert_rejects_or_panics(verify: impl FnOnce() -> Result<(), plonkish_backend::Error>) {
+fn assert_rejects_or_panics(
+    verify: impl FnOnce() -> Result<(), cfri_blaze::plonkish_backend::Error>,
+) {
     let result = catch_unwind(AssertUnwindSafe(verify));
     assert!(result.map(|valid| valid.is_err()).unwrap_or(true));
 }

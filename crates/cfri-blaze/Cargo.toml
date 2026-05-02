@@ -16,7 +16,6 @@ ctr = { git = "https://github.com/RustCrypto/block-modes", rev = "78fefba5a80f3d
 ff = { version = "0.13", features = ["derive"] }
 generic-array = { version = "0.14", features = ["serde"] }
 halo2_curves = { git = "https://github.com/privacy-scaling-explorations/halo2curves", tag = "v0.4.0", package = "halo2curves", features = ["derive_serde"] }
-halo2_proofs = { git = "https://github.com/han0110/halo2.git", branch = "feature/for-benchmark", optional = true }
 hex-literal = "0.4"
 itertools = "0.13"
 num-bigint = "0.4"
@@ -33,13 +32,8 @@ subtle = "2"
 threadpool = "1"
 
 [features]
-default = ["parallel", "frontend-halo2", "sanity-check"]
+default = ["parallel", "sanity-check"]
 benchmark = ["parallel"]
-frontend-halo2 = ["dep:halo2_proofs"]
 parallel = []
 sanity-check = []
 upstream-tests = []
-
-[dev-dependencies]
-criterion = "0.4"
-paste = "1"

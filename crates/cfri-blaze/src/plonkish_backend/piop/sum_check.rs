@@ -295,59 +295,6 @@ pub(super) mod test {
                     },
                 );
             }
-
-            #[test]
-            fn sum_check_vanilla_plonk() {
-                use halo2_curves::bn256::Fr;
-                use $crate::plonkish_backend::{
-                    backend::hyperplonk::util::{
-                        rand_vanilla_plonk_assignment, vanilla_plonk_expression,
-                    },
-                    piop::sum_check::test::run_zero_check,
-                    util::test::{rand_vec, seeded_std_rng},
-                };
-
-                run_zero_check::<$impl>(
-                    2..8,
-                    |num_vars| vanilla_plonk_expression(num_vars),
-                    |_| ((), ()),
-                    |num_vars| {
-                        let (polys, challenges) = rand_vanilla_plonk_assignment(
-                            num_vars,
-                            seeded_std_rng(),
-                            seeded_std_rng(),
-                        );
-                        (polys, challenges, rand_vec(num_vars, seeded_std_rng()))
-                    },
-                );
-            }
-
-            #[test]
-            fn sum_check_vanilla_plonk_with_lookup() {
-                use halo2_curves::bn256::Fr;
-                use $crate::plonkish_backend::{
-                    backend::hyperplonk::util::{
-                        rand_vanilla_plonk_with_lookup_assignment,
-                        vanilla_plonk_with_lookup_expression,
-                    },
-                    piop::sum_check::test::run_zero_check,
-                    util::test::{rand_vec, seeded_std_rng},
-                };
-
-                run_zero_check::<$impl>(
-                    2..8,
-                    |num_vars| vanilla_plonk_with_lookup_expression(num_vars),
-                    |_| ((), ()),
-                    |num_vars| {
-                        let (polys, challenges) = rand_vanilla_plonk_with_lookup_assignment(
-                            num_vars,
-                            seeded_std_rng(),
-                            seeded_std_rng(),
-                        );
-                        (polys, challenges, rand_vec(num_vars, seeded_std_rng()))
-                    },
-                );
-            }
         };
     }
 

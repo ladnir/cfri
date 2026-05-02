@@ -6,30 +6,11 @@ use crate::plonkish_backend::{
 };
 mod basefold;
 pub mod blaze;
-mod brakedown;
-mod gemini;
-mod hyrax;
-mod ipa;
-mod kzg;
-mod zeromorph;
-mod zeromorph_fri;
 pub use basefold::{
     evaluate_over_foldable_domain, interpolate_over_boolean_hypercube_with_copy, Basefold,
     BasefoldCommitment, BasefoldExtParams, BasefoldParams, BasefoldProverParams,
     BasefoldVerifierParams, Type1Polynomial, Type2Polynomial,
 };
-pub use brakedown::{
-    MultilinearBrakedown, MultilinearBrakedownCommitment, MultilinearBrakedownParams,
-};
-pub use gemini::Gemini;
-pub use hyrax::{MultilinearHyrax, MultilinearHyraxCommitment, MultilinearHyraxParams};
-pub use ipa::{MultilinearIpa, MultilinearIpaCommitment, MultilinearIpaParams};
-pub use kzg::{
-    MultilinearKzg, MultilinearKzgCommitment, MultilinearKzgParams, MultilinearKzgProverParams,
-    MultilinearKzgVerifierParams,
-};
-pub use zeromorph::{Zeromorph, ZeromorphKzgProverParam, ZeromorphKzgVerifierParam};
-pub use zeromorph_fri::{ZeromorphFri, ZeromorphFriProverParam, ZeromorphFriVerifierParam};
 
 fn validate_input<'a, F: Field>(
     function: &str,

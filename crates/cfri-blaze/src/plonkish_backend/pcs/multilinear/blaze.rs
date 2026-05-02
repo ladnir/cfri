@@ -22,7 +22,6 @@ use std::iter::Chain;
 use crate::plonkish_backend::util::code::{repetition_code_long, serial_accumulator_long};
 use crate::plonkish_backend::util::hash::Blake2s;
 
-use crate::plonkish_backend::backend::hyperplonk::prover::permutation_z_polys;
 use crate::plonkish_backend::pcs::multilinear::BasefoldExtParams;
 use crate::plonkish_backend::util::binary_extension_fields::B128;
 
@@ -49,7 +48,7 @@ use crate::plonkish_backend::{
     poly::{multilinear::MultilinearPolynomial, Polynomial},
     util::{
         arithmetic::{div_ceil, horner, inner_product, steps, BatchInvert, Field, PrimeField},
-        code::{encode_bits, encode_bits_long, Brakedown, BrakedownSpec, LinearCodes, Permutation},
+        code::{encode_bits, encode_bits_long, Permutation},
         expression::{Expression, Query, Rotation},
         hash::{Hash, Output},
         new_fields::{Mersenne127, Mersenne61},

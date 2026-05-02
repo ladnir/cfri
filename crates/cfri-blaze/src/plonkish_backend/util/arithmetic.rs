@@ -8,7 +8,7 @@ use halo2_curves::{
     pasta::{pallas, vesta},
 };
 use num_integer::Integer;
-use std::{borrow::Borrow, fmt::Debug, iter};
+use std::{borrow::Borrow, iter};
 
 mod bh;
 mod msm;
@@ -23,20 +23,7 @@ pub use halo2_curves::{
     },
     Coordinates, CurveAffine, CurveExt,
 };
-use halo2_proofs::halo2curves::pairing;
-use halo2_proofs::halo2curves::pairing::MillerLoopResult;
 pub use msm::{fixed_base_msm, variable_base_msm, window_size, window_table};
-
-pub trait MultiMillerLoop: pairing::MultiMillerLoop + Debug + Sync {
-    fn pairings_product_is_identity(terms: &[(&Self::G1Affine, &Self::G2Prepared)]) -> bool {
-        Self::multi_miller_loop(terms)
-            .final_exponentiation()
-            .is_identity()
-            .into()
-    }
-}
-
-impl<M> MultiMillerLoop for M where M: pairing::MultiMillerLoop + Debug + Sync {}
 
 pub trait TwoChainCurve: CurveAffine {
     type Secondary: TwoChainCurve<ScalarExt = Self::Base, Base = Self::ScalarExt, Secondary = Self>;

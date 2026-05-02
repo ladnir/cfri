@@ -4,7 +4,7 @@
 
 Owned research-code imports:
 
-- Blaze / BaseFold plonkish fork: `crates/cfri-blaze/src/plonkish_backend`
+- Blaze / BaseFold plonkish fork, trimmed to the active Blaze/BaseFold target plus support code: `crates/cfri-blaze/src/plonkish_backend`
 - PIP_FRI family implementations: `crates/cfri/src`
 - Original `han0110/plonkish` import, kept for reference after the repo correction: `third_party/plonkish_han0110`
 

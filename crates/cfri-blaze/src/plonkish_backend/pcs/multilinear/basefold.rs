@@ -11,10 +11,7 @@ use crate::plonkish_backend::{
     poly::{multilinear::MultilinearPolynomial, Polynomial},
     util::{
         arithmetic::{div_ceil, horner, inner_product, steps, Field, PrimeField},
-        code::{
-            binary_rs::{BinarySubspace, OnTheFlyTwiddleAccess, TwiddleAccess},
-            Brakedown, BrakedownSpec, LinearCodes,
-        },
+        code::binary_rs::{BinarySubspace, OnTheFlyTwiddleAccess, TwiddleAccess},
         expression::{Expression, Query, Rotation},
         hash::{Hash, Output},
         new_fields::{Mersenne127, Mersenne61},

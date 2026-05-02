@@ -2,7 +2,6 @@ use crate::plonkish_backend::util::arithmetic::Field;
 use std::{fmt::Debug, ops::AddAssign};
 
 pub mod multilinear;
-pub mod univariate;
 
 pub trait Polynomial<F: Field>: Clone + Debug + for<'a> AddAssign<(&'a F, &'a Self)> {
     type Point: Clone + Debug;

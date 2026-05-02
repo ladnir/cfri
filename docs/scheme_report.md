@@ -1,24 +1,27 @@
 # Polynomial Commitment Scheme Report
 
 This report summarizes the prover/verifier schemes currently present in the owned research-code
-imports under `crates/cfri`, `crates/cfri-blaze`, and the reference copy
-`third_party/plonkish_han0110`.
+imports under `crates/cfri`, the active Blaze/BaseFold target under `crates/cfri-blaze`, and the
+reference copy `third_party/plonkish_han0110`.
 It focuses on what each scheme is useful for, where it is weak, and what algebraic setting the
 implementation requires.
+
+Note: `crates/cfri-blaze` is intentionally trimmed to Blaze and BaseFold. Other plonkish schemes
+discussed below are historical/reference material unless they are listed as active in the table.
 
 ## Quick Inventory
 
 | Scheme | Present in | Polynomial type | Algebra / assumptions | Setup |
 | --- | --- | --- | --- | --- |
-| KZG | cfri-blaze, Han plonkish | univariate and multilinear variants | pairing-friendly curve scalar field; pairings | structured trusted setup |
+| KZG | Han plonkish reference only | univariate and multilinear variants | pairing-friendly curve scalar field; pairings | structured trusted setup |
 | Mercury | Han plonkish only | multilinear | pairing-friendly curve scalar field; KZG backend | structured trusted setup |
-| Gemini | cfri-blaze, Han plonkish | multilinear via univariate KZG | pairing-friendly curve scalar field | structured trusted setup |
-| Zeromorph | cfri-blaze, Han plonkish | multilinear via univariate KZG | pairing-friendly curve scalar field | structured trusted setup |
-| Zeromorph-FRI | cfri-blaze | multilinear via FRI backend | prime field plus hash/Merkle commitments | transparent |
-| IPA | cfri-blaze, Han plonkish | multilinear; Han also has univariate | prime-order elliptic curve group | transparent/hash-derived bases |
-| Hyrax | cfri-blaze, Han plonkish | multilinear; Han also has univariate | prime-order elliptic curve group | transparent/hash-derived bases |
-| Brakedown | cfri-blaze, Han plonkish | multilinear | prime field plus hash/Merkle commitments | transparent |
-| FRI | cfri-blaze and cfri | univariate | FFT-friendly prime field in spirit; implementation is `PrimeField` | transparent |
+| Gemini | Han plonkish reference only | multilinear via univariate KZG | pairing-friendly curve scalar field | structured trusted setup |
+| Zeromorph | Han plonkish reference only | multilinear via univariate KZG | pairing-friendly curve scalar field | structured trusted setup |
+| Zeromorph-FRI | removed from active cfri-blaze | multilinear via FRI backend | prime field plus hash/Merkle commitments | transparent |
+| IPA | Han plonkish reference only | multilinear; Han also has univariate | prime-order elliptic curve group | transparent/hash-derived bases |
+| Hyrax | Han plonkish reference only | multilinear; Han also has univariate | prime-order elliptic curve group | transparent/hash-derived bases |
+| Brakedown | Han plonkish reference only | multilinear | prime field plus hash/Merkle commitments | transparent |
+| FRI | cfri | univariate | FFT-friendly prime field in spirit; implementation is `PrimeField` | transparent |
 | BaseFold | cfri-blaze | multilinear | any sufficiently large prime field; local binary mode uses `B128` | transparent |
 | Blaze | cfri-blaze | multilinear over binary inputs / binary extension packing | binary word field plus `B128`, with BaseFold backend | transparent |
 | Virgo | cfri | multilinear / VPD-style | Arkworks `PrimeField`, hash/Merkle commitments | transparent |
@@ -39,8 +42,8 @@ also degree-bound and curve-specific.
 
 Implementation notes:
 
-- `UnivariateKzg<M: MultiMillerLoop>` exists in both plonkish copies.
-- `MultilinearKzg<M: MultiMillerLoop>` exists in both plonkish copies.
+- `UnivariateKzg<M: MultiMillerLoop>` exists in the Han plonkish reference copy.
+- `MultilinearKzg<M: MultiMillerLoop>` exists in the Han plonkish reference copy.
 - Tests instantiate `Bn256`, so the field is the scalar field of BN254/BN256.
 - Requires `MultiMillerLoop`, `G1Affine`, `G2Affine`, and scalar field compatibility.
 
@@ -80,7 +83,7 @@ its overhead profile changes; in this repo it is KZG-oriented.
 
 Implementation notes:
 
-- Present in both plonkish copies as `Gemini<UnivariateKzg<M>>`.
+- Present in the Han plonkish reference copy as `Gemini<UnivariateKzg<M>>`.
 - Tests instantiate `Gemini<UnivariateKzg<Bn256>>`.
 - Requires the scalar field of the pairing curve used by the KZG backend.
 
@@ -100,8 +103,8 @@ avoids trusted setup, but FRI-style backends have larger proofs and hash-heavy v
 
 Implementation notes:
 
-- `Zeromorph<UnivariateKzg<M>>` exists in both plonkish copies.
-- `ZeromorphFri<Fri<F, H>>` exists only in the Blaze fork.
+- `Zeromorph<UnivariateKzg<M>>` exists in the Han plonkish reference copy.
+- `ZeromorphFri<Fri<F, H>>` was removed from active `cfri-blaze`.
 - KZG version requires a pairing-friendly curve scalar field.
 - FRI version requires a `PrimeField` and hash/Merkle commitment backend.
 
@@ -122,7 +125,7 @@ unless pairings are unavailable or setup transparency dominates.
 
 Implementation notes:
 
-- `MultilinearIpa<C: CurveAffine>` exists in both plonkish copies.
+- `MultilinearIpa<C: CurveAffine>` exists in the Han plonkish reference copy.
 - `UnivariateIpa<C: CurveAffine>` exists only in Han plonkish.
 - Tests instantiate Pasta/Pallas-like `Affine` in the Han copy.
 - Requires a prime-order elliptic-curve group and scalar field; no pairing requirement.
@@ -141,7 +144,7 @@ for larger communication and more group work. It is not a hash-only/post-quantum
 
 Implementation notes:
 
-- `MultilinearHyrax<C: CurveAffine>` exists in both plonkish copies.
+- `MultilinearHyrax<C: CurveAffine>` exists in the Han plonkish reference copy.
 - `UnivariateHyrax<C: CurveAffine>` exists only in Han plonkish and internally uses univariate IPA.
 - Requires a prime-order elliptic-curve group and scalar field.
 
@@ -161,7 +164,7 @@ it is easy to benchmark a fast path while under-checking low-degree or proximity
 
 Implementation notes:
 
-- Present in both plonkish copies as `MultilinearBrakedown<F, H, S>`.
+- Present in the Han plonkish reference copy as `MultilinearBrakedown<F, H, S>`.
 - Requires `F: PrimeField`, a hash function, and a `BrakedownSpec`.
 - Tests instantiate `Fr` with Blake2s/Keccak variants depending on copy.
 
@@ -181,7 +184,7 @@ or reduction overhead.
 
 Implementation notes:
 
-- Present in the Blaze fork as univariate `Fri<F, H>`.
+- The old univariate `Fri<F, H>` plonkish module was removed from active `cfri-blaze`.
 - The implementation is generic over `F: PrimeField`, but practical FRI wants suitable roots of
 unity / domain structure.
 - The old large sweep test is currently ignored to keep default tests fast.
@@ -203,7 +206,7 @@ selection, basecode, and folding invariants.
 
 Implementation notes:
 
-- Present only in the Blaze fork as `Basefold<F, H, ExtParams>`.
+- Present in active `cfri-blaze` as `Basefold<F, H, ExtParams>`.
 - Requires `F: PrimeField` in the trait implementation.
 - The local code also supports a binary-code path using `B128` and `code_type = "binary_rs"`.
 - Parameters include repetition count, rate, basecode rounds, RS basecode flag, and code type.
@@ -225,7 +228,7 @@ or binary-code assumptions fail if the algebra is even slightly off.
 
 Implementation notes:
 
-- Present only in the Blaze fork.
+- Present in active `cfri-blaze`.
 - Uses `BlazeField` word types such as `Blazeu64`, conversion to/from `B128`, and internal
   `Basefold<B128, H, ...>` calls.
 - The implementation is not exposed as a clean `PolynomialCommitmentScheme` trait implementation

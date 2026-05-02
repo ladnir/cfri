@@ -11,7 +11,6 @@ use rand::RngCore;
 use std::fmt::Debug;
 
 pub mod multilinear;
-pub mod univariate;
 
 pub type Point<F, P> = <P as Polynomial<F>>::Point;
 

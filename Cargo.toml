@@ -1,5 +1,5 @@
 [workspace]
-members = ["crates/cfri", "crates/cfri-blaze"]
+members = ["crates/cfri"]
 resolver = "2"
 
 [patch.crates-io]

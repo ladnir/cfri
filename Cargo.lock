@@ -268,41 +268,29 @@ checksum = "9330f8b2ff13f34540b44e946ef35111825727b38d33286ef986142615121801"
 name = "cfri"
 version = "0.1.0"
 dependencies = [
+ "aes",
  "ark-ff",
  "ark-poly",
  "ark-serialize",
  "ark-std",
  "ark-test-curves",
- "blake3",
- "digest 0.9.0",
- "hex",
- "lazy_static",
- "log",
- "merlin",
- "rand",
- "rayon",
- "rs_merkle",
- "serde",
- "sha2 0.9.9",
-]
-
-[[package]]
-name = "cfri-blaze"
-version = "0.1.0"
-dependencies = [
- "aes",
- "ark-std",
  "bincode",
  "bitvec",
  "blake2",
  "blake2b_simd",
+ "blake3",
  "crossbeam",
  "ctr",
+ "digest 0.9.0",
  "ff",
  "generic-array",
  "halo2curves 0.4.0",
+ "hex",
  "hex-literal",
  "itertools 0.13.0",
+ "lazy_static",
+ "log",
+ "merlin",
  "num-bigint 0.4.6",
  "num-integer",
  "num-traits",
@@ -311,7 +299,9 @@ dependencies = [
  "rand",
  "rand_chacha",
  "rayon",
+ "rs_merkle",
  "serde",
+ "sha2 0.9.9",
  "sha3",
  "subtle",
  "threadpool",

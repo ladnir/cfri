@@ -11,21 +11,15 @@ function Invoke-CargoStep {
     param(
         [string]$Name,
         [string]$WorkingDirectory,
-        [string[]]$CargoArgs,
-        [string]$Toolchain
+        [string[]]$CargoArgs
     )
 
     $Executable = "cargo"
-    $PrefixArgs = @()
-    if ($Toolchain) {
-        $Executable = "rustup"
-        $PrefixArgs = @("run", $Toolchain, "cargo")
-    }
 
-    Write-Host "==> ${Name}: $Executable $(($PrefixArgs + $CargoArgs) -join ' ')"
+    Write-Host "==> ${Name}: $Executable $($CargoArgs -join ' ')"
     Push-Location $WorkingDirectory
     try {
-        & $Executable @($PrefixArgs + $CargoArgs)
+        & $Executable @CargoArgs
         if ($LASTEXITCODE -ne 0) {
             throw "$Name failed with exit code $LASTEXITCODE"
         }
@@ -43,9 +37,3 @@ Invoke-CargoStep `
     -Name "cfri core" `
     -WorkingDirectory $RepoRoot `
     -CargoArgs ($BuildArgs + @("-p", "cfri"))
-
-Invoke-CargoStep `
-    -Name "cfri Blaze imports" `
-    -WorkingDirectory $RepoRoot `
-    -CargoArgs ($BuildArgs + @("-p", "cfri-blaze")) `
-    -Toolchain "nightly"

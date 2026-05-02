@@ -67,7 +67,6 @@ use halo2_curves::bn256::{Bn256, Fr};
 use itertools::izip;
 
 use rayon::iter::IntoParallelIterator;
-use std::simd::i8x2;
 use std::time::Duration;
 use std::{collections::HashMap, iter, ops::Deref, time::Instant};
 
@@ -1697,17 +1696,6 @@ fn test_heap_allocation() {
     //let test_vec:Box<[u64]> = Box::new([0u64; psize]);
     // let test_vec_2:Box<[u64]> = Box::new([0u64;1 << 28]);
     // assert_eq!(test_vec[0], 1u64);
-}
-
-#[cfg(feature = "upstream-tests")]
-#[test]
-fn test_simd() {
-    let result = i8x2::from_slice(&[1, 3]);
-    let result2 = i8x2::from_slice(&[2, 1]);
-    let v = result.lt(&result2);
-    println!("result {:?}", result);
-    println!("result {:?}", result2);
-    println!("final {:?}", v);
 }
 
 fn blazefield_linear_combo<F: BlazeField>(

@@ -654,7 +654,7 @@ pub(crate) use zip_self;
 mod test {
     use crate::plonkish_backend::{
         poly::{
-            multilinear::{rotation_eval, zip_self, MultilinearPolynomial},
+            multilinear::{rotation_eval, MultilinearPolynomial},
             Polynomial,
         },
         util::{

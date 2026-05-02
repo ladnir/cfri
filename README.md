@@ -4,11 +4,11 @@
 
 Owned research-code imports:
 
-- Blaze / BaseFold plonkish fork, trimmed to the active Blaze/BaseFold target plus support code: `crates/cfri-blaze/src/plonkish_backend`
+- Blaze / BaseFold plonkish fork, trimmed to the active Blaze/BaseFold target plus support code: `crates/cfri/src/plonkish_backend`
 - PIP_FRI family implementations: `crates/cfri/src`
 - Original `han0110/plonkish` import, kept for reference after the repo correction: `third_party/plonkish_han0110`
 
-The implementations are now copied into the core crates so we can claim ownership and simplify them directly. The old third-party directories remain as references, but the normal build/test scripts target the owned source. Blaze still lives in a separate crate because it requires Rust nightly for `portable_simd`; the top-level scripts invoke nightly only for `cfri-blaze`:
+The implementations are now copied into the core crate so we can claim ownership and simplify them directly. The old third-party directories remain as references, but the normal build/test scripts target the owned source. The active Blaze/BaseFold code now builds on stable Rust:
 
 ```powershell
 .\scripts\build.ps1

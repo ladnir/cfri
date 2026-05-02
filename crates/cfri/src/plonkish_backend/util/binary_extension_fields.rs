@@ -2,8 +2,6 @@ use crate::plonkish_backend::util::avx_int_types::BlazeField;
 use crate::plonkish_backend::util::{arithmetic::Field, BigUint};
 use core::arch::x86_64::*;
 use core::fmt;
-use core::simd::u64x2;
-use core::simd::u8x16;
 use core::{
     iter::{Product, Sum},
     ops::{Add, AddAssign, Div, DivAssign, Mul, MulAssign, Neg, Sub, SubAssign},
@@ -13,8 +11,6 @@ use num_traits::Zero;
 use rand_chacha::ChaCha8Rng;
 use serde::Deserializer;
 use serde::Serializer;
-use std::simd::i64x2;
-use std::simd::Simd;
 
 use ff::{BatchInvert, PrimeFieldBits};
 use halo2_curves::ff::PrimeField;
@@ -104,15 +100,12 @@ impl Mul for B128 {
     #[allow(clippy::cast_possible_truncation)]
     fn mul(self, rhs: Self) -> Self::Output {
         unsafe {
-            let a: __m128i = __m128i::from(u64x2::from_array(self.value)); // _mm_lddqu_si128(&self.value.unwrap());
-            let b: __m128i = __m128i::from(u64x2::from_array(rhs.value)); // _mm_lddqu_si128(&rhs.value.unwrap());
+            let a = _mm_set_epi64x(self.value[1] as i64, self.value[0] as i64);
+            let b = _mm_set_epi64x(rhs.value[1] as i64, rhs.value[0] as i64);
 
             //hardcode modulus later
             //x
-            let modulus_vec: [i64; 2] = [0b10000111, 0];
-            let modulus_m128: *const __m128i = &__m128i::from(Simd::from(modulus_vec));
-
-            let modulus: __m128i = _mm_loadl_epi64(modulus_m128);
+            let modulus = _mm_cvtsi64_si128(0b10000111);
             let mut mul256_high: __m128i = _mm_clmulepi64_si128(a, b, 0x11);
 
             let mut mul256_low: __m128i = _mm_clmulepi64_si128(a, b, 0x00); /* low of both */
@@ -137,13 +130,11 @@ impl Mul for B128 {
             tmp = _mm_clmulepi64_si128(mul256_high, modulus, 0x00);
             mul256_low = _mm_xor_si128(mul256_low, tmp);
 
-            let value: *mut __m128i = &mut a.clone(); //TODO: check that this is correct
+            let mut value = [0u64; 2];
 
-            _mm_storeu_si128(value, mul256_low);
+            _mm_storeu_si128(value.as_mut_ptr() as *mut __m128i, mul256_low);
 
-            return Self {
-                value: *u64x2::from(*value).as_array(),
-            };
+            return Self { value };
         }
     }
 }

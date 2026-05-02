@@ -1,12 +1,12 @@
 # Polynomial Commitment Scheme Report
 
 This report summarizes the prover/verifier schemes currently present in the owned research-code
-imports under `crates/cfri`, the active Blaze/BaseFold target under `crates/cfri-blaze`, and the
+imports under `crates/cfri`, the active Blaze/BaseFold target under `crates/cfri/src/plonkish_backend`, and the
 reference copy `third_party/plonkish_han0110`.
 It focuses on what each scheme is useful for, where it is weak, and what algebraic setting the
 implementation requires.
 
-Note: `crates/cfri-blaze` is intentionally trimmed to Blaze and BaseFold. Other plonkish schemes
+Note: the active plonkish import is intentionally trimmed to Blaze and BaseFold. Other plonkish schemes
 discussed below are historical/reference material unless they are listed as active in the table.
 
 ## Quick Inventory
@@ -17,13 +17,13 @@ discussed below are historical/reference material unless they are listed as acti
 | Mercury | Han plonkish only | multilinear | pairing-friendly curve scalar field; KZG backend | structured trusted setup |
 | Gemini | Han plonkish reference only | multilinear via univariate KZG | pairing-friendly curve scalar field | structured trusted setup |
 | Zeromorph | Han plonkish reference only | multilinear via univariate KZG | pairing-friendly curve scalar field | structured trusted setup |
-| Zeromorph-FRI | removed from active cfri-blaze | multilinear via FRI backend | prime field plus hash/Merkle commitments | transparent |
+| Zeromorph-FRI | removed from active cfri plonkish import | multilinear via FRI backend | prime field plus hash/Merkle commitments | transparent |
 | IPA | Han plonkish reference only | multilinear; Han also has univariate | prime-order elliptic curve group | transparent/hash-derived bases |
 | Hyrax | Han plonkish reference only | multilinear; Han also has univariate | prime-order elliptic curve group | transparent/hash-derived bases |
 | Brakedown | Han plonkish reference only | multilinear | prime field plus hash/Merkle commitments | transparent |
 | FRI | cfri | univariate | FFT-friendly prime field in spirit; implementation is `PrimeField` | transparent |
-| BaseFold | cfri-blaze | multilinear | any sufficiently large prime field; local binary mode uses `B128` | transparent |
-| Blaze | cfri-blaze | multilinear over binary inputs / binary extension packing | binary word field plus `B128`, with BaseFold backend | transparent |
+| BaseFold | cfri | multilinear | any sufficiently large prime field; local binary mode uses `B128` | transparent |
+| Blaze | cfri | multilinear over binary inputs / binary extension packing | binary word field plus `B128`, with BaseFold backend | transparent |
 | Virgo | cfri | multilinear / VPD-style | Arkworks `PrimeField`, hash/Merkle commitments | transparent |
 | DeepFold | cfri | multilinear | Arkworks `PrimeField`, FRI/DEEP-FRI-style code proofs | transparent |
 | PolyFRIM | cfri | multivariate / one-to-many | Arkworks `PrimeField`, RS/FRI-style code proofs | transparent |
@@ -104,7 +104,7 @@ avoids trusted setup, but FRI-style backends have larger proofs and hash-heavy v
 Implementation notes:
 
 - `Zeromorph<UnivariateKzg<M>>` exists in the Han plonkish reference copy.
-- `ZeromorphFri<Fri<F, H>>` was removed from active `cfri-blaze`.
+- `ZeromorphFri<Fri<F, H>>` was removed from the active cfri plonkish import.
 - KZG version requires a pairing-friendly curve scalar field.
 - FRI version requires a `PrimeField` and hash/Merkle commitment backend.
 
@@ -184,7 +184,7 @@ or reduction overhead.
 
 Implementation notes:
 
-- The old univariate `Fri<F, H>` plonkish module was removed from active `cfri-blaze`.
+- The old univariate `Fri<F, H>` plonkish module was removed from the active cfri plonkish import.
 - The implementation is generic over `F: PrimeField`, but practical FRI wants suitable roots of
 unity / domain structure.
 - The old large sweep test is currently ignored to keep default tests fast.
@@ -206,7 +206,7 @@ selection, basecode, and folding invariants.
 
 Implementation notes:
 
-- Present in active `cfri-blaze` as `Basefold<F, H, ExtParams>`.
+- Present in active `cfri` as `Basefold<F, H, ExtParams>`.
 - Requires `F: PrimeField` in the trait implementation.
 - The local code also supports a binary-code path using `B128` and `code_type = "binary_rs"`.
 - Parameters include repetition count, rate, basecode rounds, RS basecode flag, and code type.
@@ -228,7 +228,7 @@ or binary-code assumptions fail if the algebra is even slightly off.
 
 Implementation notes:
 
-- Present in active `cfri-blaze`.
+- Present in active `cfri`.
 - Uses `BlazeField` word types such as `Blazeu64`, conversion to/from `B128`, and internal
   `Basefold<B128, H, ...>` calls.
 - The implementation is not exposed as a clean `PolynomialCommitmentScheme` trait implementation

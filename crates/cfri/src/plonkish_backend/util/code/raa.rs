@@ -1,6 +1,3 @@
-use crate::plonkish_backend::util::avx_int_types::{
-    u256::Blazeu256, u512::Blazeu512, u64x8::Blazeu64x8,
-};
 use crate::plonkish_backend::util::{
     arithmetic::div_ceil,
     avx_int_types::{u64::Blazeu64, BlazeField},
@@ -447,47 +444,10 @@ fn test_encode_bits_long_64(k: usize, col_size: usize) {
     assert!(codeword.iter().all(|row| row.len() == 1 << k));
 }
 
-fn test_encode_bits512(k: usize) {
-    // Sample permutations.
-    let mut rng = ChaCha8Rng::seed_from_u64(k as u64);
-    let p1 = Permutation::create(&mut rng, 1 << k);
-
-    // Encode one test message.
-    let test_message512 = Blazeu512::rand_vec(1 << (k - 2));
-    let mut timer = Duration::new(0, 0);
-    let codeword = encode_bits(test_message512, &p1, 4, &mut timer);
-    assert_eq!(codeword.len(), 1 << k);
-}
-
-fn test_encode_bits256(k: usize) {
-    // Sample permutations.
-    let mut rng = ChaCha8Rng::seed_from_u64(k as u64);
-    let p1 = Permutation::create(&mut rng, 1 << k);
-
-    // Encode one test message.
-    let test_message256 = Blazeu256::rand_vec(1 << (k - 2));
-    let mut timer = Duration::new(0, 0);
-    let codeword = encode_bits(test_message256, &p1, 4, &mut timer);
-    assert_eq!(codeword.len(), 1 << k);
-}
-
-fn test_encode_bits64x8(k: usize) {
-    // Sample permutations.
-    let mut rng = ChaCha8Rng::seed_from_u64(k as u64);
-    let p1 = Permutation::create(&mut rng, 1 << k);
-
-    // Encode one test message.
-    let test_message512 = Blazeu64x8::rand_vec(1 << (k - 2));
-    let mut timer = Duration::new(0, 0);
-    let codeword = encode_bits(test_message512, &p1, 4, &mut timer);
-    assert_eq!(codeword.len(), 1 << k);
-}
-
 #[cfg(feature = "upstream-tests")]
 #[test]
 fn test_encode() {
     test_encode_bits(6);
-    test_encode_bits256(6);
     // test_encode_bits(25);
     // test_encode_bits(28);
 }

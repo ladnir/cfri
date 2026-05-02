@@ -11,10 +11,7 @@ use serde::{Deserialize, Serialize};
 use std::marker::Send;
 use std::marker::Sync;
 
-pub mod u256;
-pub mod u512;
 pub mod u64;
-pub mod u64x8;
 pub trait BlazeField:
     Zero
     + BitXor<Output = Self>

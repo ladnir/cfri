@@ -38,4 +38,4 @@ The `point` argument on `commit` is temporary. A normal PCS commitment should no
 
 The facade intentionally stores some verifier-side public messages inside proof objects because the imported implementations currently pass those messages by mutating verifier structs during opening. Later cleanup should move those messages into explicit proof fields and make verification reconstruct its verifier state from `(VerifierKey, Commitment, Point, Value, Proof)`.
 
-Blaze/BaseFold currently lives in `crates/cfri-blaze` because it needs nightly. It should get the same concrete facade after the core `cfri` facade settles.
+Blaze/BaseFold now lives in `crates/cfri/src/plonkish_backend`, re-exported through `cfri::blaze`. It builds on stable Rust and should get the same concrete facade as the PiPFRI-family code.

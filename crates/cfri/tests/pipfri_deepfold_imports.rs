@@ -1,4 +1,18 @@
+use ark_ff::UniformRand;
+use ark_poly::{EvaluationDomain, GeneralEvaluationDomain};
 use cfri::pcs;
+use cfri::pip_fri::{
+    prover::Prover,
+    util::{
+        fiat_shamir::RandomOracle,
+        foldable_code::MultiplicativeFftCode,
+        helper::{Helper, MultilinearPolynomial},
+        interpolate_vecs_value::{get_sub_variable_num, get_tensor},
+        CODE_RATE, SECURITY_BITS,
+    },
+    verifier::Verifier,
+};
+use rand::{rngs::StdRng, SeedableRng};
 use std::panic::{catch_unwind, AssertUnwindSafe};
 
 fn assert_rejects_or_panics(verify: impl FnOnce() -> bool) {
@@ -34,6 +48,47 @@ fn pipfri_native_open_verify_small() {
             &proof,
         )
     });
+}
+
+#[test]
+fn pipfri_explicit_foldable_code_open_verify_small() {
+    let variable_num = 8;
+    let mut rng = StdRng::seed_from_u64(3);
+    let polynomial = MultilinearPolynomial::rand(variable_num);
+    let point = (0..variable_num)
+        .map(|_| pcs::Field::rand(&mut rng))
+        .collect::<Vec<_>>();
+    let value = polynomial.evaluate(&point);
+    let sub_variable_num = get_sub_variable_num(&polynomial);
+    let (sub_point, remaining_var) = point.split_at(sub_variable_num);
+    let tensor = get_tensor(&remaining_var.to_vec());
+
+    let mut cosets = vec![GeneralEvaluationDomain::new_coset(
+        1 << (sub_variable_num + CODE_RATE),
+        pcs::Field::rand(&mut rng),
+    )
+    .unwrap()];
+    for round in 1..sub_variable_num {
+        cosets.push(Helper::pow(&cosets[round - 1], 2));
+    }
+
+    let code = MultiplicativeFftCode::new(&cosets);
+    let oracle = RandomOracle::new(sub_variable_num, SECURITY_BITS / CODE_RATE);
+    let mut prover =
+        Prover::new_with_code(sub_variable_num, code.clone(), polynomial, &oracle, &tensor);
+    let commitment = prover.commit_polynomial();
+    let mut verifier = Verifier::new_with_code(
+        sub_variable_num,
+        commitment,
+        code,
+        &oracle,
+        &sub_point.to_vec(),
+        &tensor,
+    );
+    let (polynomial_proof, folding_proof, function_proof) =
+        prover.open(&sub_point.to_vec(), &mut verifier);
+
+    assert!(verifier.verify(&polynomial_proof, &folding_proof, &function_proof, value));
 }
 
 #[test]

@@ -6,14 +6,15 @@ use crate::pip_fri::util::interpolate_vecs_value::{
 pub use crate::pip_fri::util::merkle_tree::MERKLE_ROOT_SIZE;
 use crate::pip_fri::util::query_result::QueryResult;
 use crate::pip_fri::util::{
-    fiat_shamir::RandomOracle, helper::Helper, merkle_tree::MerkleTreeProver, CODE_RATE,
+    fiat_shamir::RandomOracle,
+    foldable_code::{FoldableCode, MultiplicativeFftCode},
+    helper::Helper,
+    merkle_tree::MerkleTreeProver,
+    CODE_RATE,
 };
 use ark_ff::PrimeField;
-use ark_poly::{EvaluationDomain, GeneralEvaluationDomain};
+use ark_poly::GeneralEvaluationDomain;
 use ark_std::{end_timer, start_timer};
-
-#[cfg(feature = "parallel")]
-use rayon::prelude::*;
 
 #[derive(Clone)]
 struct InterpolateValue<T: PrimeField> {
@@ -55,10 +56,10 @@ impl<T: PrimeField> InterpolateValue<T> {
 }
 
 #[derive(Clone)]
-pub struct Prover<T: PrimeField> {
+pub struct Prover<T: PrimeField, C: FoldableCode<T> = MultiplicativeFftCode<T>> {
     // round number for sub_polynomials
     pub total_round: usize,
-    pub interpolate_cosets: Vec<GeneralEvaluationDomain<T>>,
+    pub code: C,
     pub interpolate_initial_polynomials: InterpolateVecsValue<T>,
     interpolate_rlc_polynomial: Vec<T>,
     interpolate_tensor_polynomial: Vec<T>,
@@ -78,27 +79,32 @@ impl<T: PrimeField> Prover<T> {
         // the fixed combination to combine multiple sub polynomials
         tensor: &Vec<T>,
     ) -> Prover<T> {
+        Self::new_with_code(
+            total_round,
+            MultiplicativeFftCode::new(interpolate_cosets),
+            polynomial,
+            oracle,
+            tensor,
+        )
+    }
+}
+
+impl<T: PrimeField, C: FoldableCode<T>> Prover<T, C> {
+    pub fn new_with_code(
+        total_round: usize,
+        code: C,
+        polynomial: MultilinearPolynomial<T>,
+        // oracle has a random_linear_combination challenge
+        oracle: &RandomOracle<T>,
+        // the fixed combination to combine multiple sub polynomials
+        tensor: &Vec<T>,
+    ) -> Prover<T, C> {
         // Divide the polynomial into polynomials, and generate the rlc_poly and tensor_poly
         let poly_num = get_poly_num(&polynomial);
         let step = start_timer!(|| "NTT");
 
-        // #[cfg(feature = "parallel")]
-        // println!("You are using the parallel feature for poly commit");
-        #[cfg(feature = "parallel")]
-        let interpolation_sub_polynomials: Vec<Vec<T>> = polynomial
-            .chunks(poly_num)
-            .par_iter()
-            .map(|x| interpolate_cosets[0].fft(&x.coefficients()))
-            .collect();
-
-        // #[cfg(not(feature = "parallel"))]
-        // println!("You are not using the parallel feature for poly commit");
-        #[cfg(not(feature = "parallel"))]
-        let interpolation_sub_polynomials: Vec<Vec<T>> = polynomial
-            .chunks(poly_num)
-            .iter()
-            .map(|x| interpolate_cosets[0].fft(&x.coefficients()))
-            .collect();
+        let interpolation_sub_polynomials =
+            code.encode_multilinear_sub_polynomials(&polynomial, poly_num);
 
         end_timer!(step);
         // Compute the actual polynomial invoked into FRI
@@ -123,7 +129,7 @@ impl<T: PrimeField> Prover<T> {
 
         Prover {
             total_round,
-            interpolate_cosets: interpolate_cosets.clone(),
+            code,
             interpolate_initial_polynomials,
             // interpolate_polynomials,
             interpolate_rlc_polynomial: rlc_polynomial,
@@ -143,14 +149,14 @@ impl<T: PrimeField> Prover<T> {
     }
 
     // used for function recursive
-    fn fold(values: &Vec<T>, parameter: T, coset: &GeneralEvaluationDomain<T>) -> Vec<T> {
+    fn fold(&self, values: &Vec<T>, parameter: T, round: usize) -> Vec<T> {
         let len = values.len() / 2;
         let res = (0..len)
             .into_iter()
             .map(|i| {
                 let x = values[i];
                 let nx = values[i + len];
-                let new_v = (x + nx) + parameter * (x - nx) * coset.element(i).inverse().unwrap();
+                let new_v = (x + nx) + parameter * (x - nx) * self.code.fold_weight(round, i);
                 new_v * T::from_u64(2 as u64).unwrap().inverse().unwrap()
             })
             .collect();
@@ -165,14 +171,14 @@ impl<T: PrimeField> Prover<T> {
         let mut evaluation = None;
 
         for round in 0..self.total_round {
-            let next_evaluation = Self::fold(
+            let next_evaluation = self.fold(
                 if round == 0 {
                     &self.interpolate_tensor_polynomial
                 } else {
                     &self.functions[round - 1].value
                 },
                 sub_open_point[round],
-                &self.interpolate_cosets[round],
+                round,
             );
             if round < self.total_round - 1 {
                 self.functions.push(InterpolateValue::new(next_evaluation));
@@ -208,20 +214,18 @@ impl<T: PrimeField> Prover<T> {
         cur_challenge: T,
     ) -> Vec<T> {
         let mut res = vec![];
-        let len = self.interpolate_cosets[round].size();
+        let len = self.code.domain_size(round);
         let get_folding_value = if round == 0 {
             &self.interpolate_rlc_polynomial
         } else {
             &self.foldings[round - 1].value
         };
-        let coset = &self.interpolate_cosets[round];
         for i in 0..(len / 2) {
             if round == 0 {
                 assert_eq!(last_challenge, None);
                 let x = get_folding_value[i];
                 let nx = get_folding_value[i + len / 2];
-                let new_v =
-                    (x + nx) + cur_challenge * (x - nx) * coset.element(i).inverse().unwrap();
+                let new_v = (x + nx) + cur_challenge * (x - nx) * self.code.fold_weight(round, i);
                 res.push(new_v);
             } else {
                 let fv = &self.functions[round - 1].value;
@@ -232,7 +236,7 @@ impl<T: PrimeField> Prover<T> {
                 let phi_x = get_folding_value[i] + last_challenge_square * x;
                 let phi_nx = get_folding_value[i + len / 2] + last_challenge_square * nx;
                 let new_v = (phi_x + phi_nx)
-                    + cur_challenge * (phi_x - phi_nx) * coset.element(i).inverse().unwrap();
+                    + cur_challenge * (phi_x - phi_nx) * self.code.fold_weight(round, i);
                 res.push(new_v);
             }
         }
@@ -267,7 +271,7 @@ impl<T: PrimeField> Prover<T> {
         let mut leaf_indices = self.oracle.query_list.clone();
 
         for i in 0..self.total_round {
-            let len = self.interpolate_cosets[i].size();
+            let len = self.code.domain_size(i);
             leaf_indices = leaf_indices.iter_mut().map(|v| *v % (len >> 1)).collect();
             leaf_indices.sort();
             leaf_indices.dedup();

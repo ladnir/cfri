@@ -19,3 +19,11 @@ The right next step is to isolate PiPFRI's Merkle/query/FIAT-Shamir machinery fr
 `GeneralEvaluationDomain` arithmetic, then add a binary/additive-domain prover and verifier that
 accept `B128` evaluations. After that, Blaze can call the PiPFRI backend where it currently calls
 `BlazeBasefoldPcs`.
+
+Current status:
+
+- Non-ZK PiPFRI now has a `FoldableCode` backend seam.
+- `MultiplicativeFftCode` preserves the existing ark `PrimeField` / multiplicative FFT coset path.
+- The default `Prover<T>` and `Verifier<T>` types still use `MultiplicativeFftCode<T>`, so existing
+  Goldilocks callers keep working.
+- The ZK PiPFRI duplicate still has the old direct `GeneralEvaluationDomain` dependency.

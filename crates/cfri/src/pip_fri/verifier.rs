@@ -1,16 +1,17 @@
 use std::collections::HashMap;
 
 use crate::pip_fri::util::fiat_shamir::RandomOracle;
+use crate::pip_fri::util::foldable_code::{FoldableCode, MultiplicativeFftCode};
 use crate::pip_fri::util::interpolate_vecs_value::*;
 use crate::pip_fri::util::merkle_tree::MERKLE_ROOT_SIZE;
 use crate::pip_fri::util::{merkle_tree::MerkleTreeVerifier, query_result::QueryResult};
 use ark_ff::PrimeField;
-use ark_poly::{EvaluationDomain, GeneralEvaluationDomain};
+use ark_poly::GeneralEvaluationDomain;
 
 #[derive(Clone, Debug)]
-pub struct Verifier<T: PrimeField> {
+pub struct Verifier<T: PrimeField, C: FoldableCode<T> = MultiplicativeFftCode<T>> {
     total_round: usize,
-    interpolate_cosets: Vec<GeneralEvaluationDomain<T>>,
+    code: C,
     initial_proof: MerkleTreeVerifier,
     function_root: Vec<MerkleTreeVerifier>,
     folding_root: Vec<MerkleTreeVerifier>,
@@ -31,10 +32,32 @@ impl<T: PrimeField> Verifier<T> {
         open_point: &Vec<T>,
         combination: &Vec<T>,
     ) -> Self {
+        Self::new_with_code(
+            total_round,
+            commitment,
+            MultiplicativeFftCode::new(coset),
+            oracle,
+            open_point,
+            combination,
+        )
+    }
+}
+
+impl<T: PrimeField, C: FoldableCode<T>> Verifier<T, C> {
+    pub fn new_with_code(
+        total_round: usize,
+        // for rlc_polynomial
+        commitment: [u8; MERKLE_ROOT_SIZE],
+        code: C,
+        oracle: &RandomOracle<T>,
+        open_point: &Vec<T>,
+        combination: &Vec<T>,
+    ) -> Self {
+        let initial_leave_num = code.domain_size(0) / 2;
         Verifier {
             total_round,
-            interpolate_cosets: coset.clone(),
-            initial_proof: MerkleTreeVerifier::new(coset[0].size() / 2, &commitment),
+            code,
+            initial_proof: MerkleTreeVerifier::new(initial_leave_num, &commitment),
             function_root: vec![],
             folding_root: vec![],
             oracle: oracle.clone(),
@@ -84,7 +107,7 @@ impl<T: PrimeField> Verifier<T> {
     ) -> bool {
         let mut leaf_indices = self.oracle.query_list.clone();
         for i in 0..self.total_round {
-            let domain_size = self.interpolate_cosets[i].size();
+            let domain_size = self.code.domain_size(i);
             leaf_indices = leaf_indices
                 .iter_mut()
                 .map(|v| *v % (domain_size >> 1))
@@ -173,9 +196,7 @@ impl<T: PrimeField> Verifier<T> {
                     let phi_nx = p_nx + last_challenge_square * f_nx;
 
                     let new_v = (phi_x + phi_nx)
-                        + cur_challenge
-                            * (phi_x - phi_nx)
-                            * self.interpolate_cosets[i].element(*j).inverse().unwrap();
+                        + cur_challenge * (phi_x - phi_nx) * self.code.fold_weight(i, *j);
                     if i == self.total_round - 1 {
                         if new_v != self.final_value.unwrap() {
                             return false;
@@ -186,21 +207,15 @@ impl<T: PrimeField> Verifier<T> {
                 } else {
                     let x = get_folding_value[j];
                     let nx = get_folding_value[&(j + domain_size / 2)];
-                    let v = x
-                        + nx
-                        + cur_challenge
-                            * (x - nx)
-                            * self.interpolate_cosets[i].element(*j).inverse().unwrap();
+                    let v = x + nx + cur_challenge * (x - nx) * self.code.fold_weight(i, *j);
                     if v != folding_proof[i].proof_values[j] {
                         return false;
                     }
                 }
 
                 // verify function_proofs
-                let v = (f_x + f_nx)
-                    + self.open_point[i]
-                        * (f_x - f_nx)
-                        * self.interpolate_cosets[i].element(*j).inverse().unwrap();
+                let v =
+                    (f_x + f_nx) + self.open_point[i] * (f_x - f_nx) * self.code.fold_weight(i, *j);
                 if i < self.total_round - 1 {
                     if i != 0 {
                         assert_eq!(

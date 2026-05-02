@@ -11,6 +11,8 @@ use cfri::pip_fri::{
         CODE_RATE, SECURITY_BITS,
     },
     verifier::Verifier,
+    zkprover::ZKProver,
+    zkverifier::ZKVerifier,
 };
 use rand::{rngs::StdRng, SeedableRng};
 use std::panic::{catch_unwind, AssertUnwindSafe};
@@ -87,6 +89,43 @@ fn pipfri_explicit_foldable_code_open_verify_small() {
     );
     let (polynomial_proof, folding_proof, function_proof) =
         prover.open(&sub_point.to_vec(), &mut verifier);
+
+    assert!(verifier.verify(&polynomial_proof, &folding_proof, &function_proof, value));
+}
+
+#[test]
+fn zk_pipfri_explicit_foldable_code_open_verify_small() {
+    let variable_num = 8;
+    let mut rng = StdRng::seed_from_u64(4);
+    let polynomial = MultilinearPolynomial::rand(variable_num);
+    let point = (0..variable_num)
+        .map(|_| pcs::Field::rand(&mut rng))
+        .collect::<Vec<_>>();
+    let value = polynomial.evaluate(&point);
+    let sub_variable_num = get_sub_variable_num(&polynomial);
+    let (sub_point, remaining_var) = point.split_at(sub_variable_num);
+    let mut sub_point = sub_point.to_vec();
+    sub_point.push(pcs::Field::from(0_u64));
+    let tensor = get_tensor(&remaining_var.to_vec());
+
+    let total_round = sub_variable_num + 1;
+    let mut cosets = vec![GeneralEvaluationDomain::new_coset(
+        1 << (total_round + CODE_RATE),
+        pcs::Field::rand(&mut rng),
+    )
+    .unwrap()];
+    for round in 1..total_round {
+        cosets.push(Helper::pow(&cosets[round - 1], 2));
+    }
+
+    let code = MultiplicativeFftCode::new(&cosets);
+    let oracle = RandomOracle::new(total_round, SECURITY_BITS / CODE_RATE);
+    let mut prover =
+        ZKProver::new_with_code(total_round, code.clone(), polynomial, &oracle, &tensor);
+    let commitment = prover.commit_polynomial();
+    let mut verifier =
+        ZKVerifier::new_with_code(total_round, commitment, code, &oracle, &sub_point, &tensor);
+    let (polynomial_proof, folding_proof, function_proof) = prover.open(&sub_point, &mut verifier);
 
     assert!(verifier.verify(&polynomial_proof, &folding_proof, &function_proof, value));
 }

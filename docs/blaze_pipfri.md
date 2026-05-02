@@ -22,8 +22,10 @@ accept `B128` evaluations. After that, Blaze can call the PiPFRI backend where i
 
 Current status:
 
-- Non-ZK PiPFRI now has a `FoldableCode` backend seam.
+- PiPFRI now has a `FoldableCode` backend seam.
 - `MultiplicativeFftCode` preserves the existing ark `PrimeField` / multiplicative FFT coset path.
-- The default `Prover<T>` and `Verifier<T>` types still use `MultiplicativeFftCode<T>`, so existing
-  Goldilocks callers keep working.
-- The ZK PiPFRI duplicate still has the old direct `GeneralEvaluationDomain` dependency.
+- The shared engine is `Prover<T, Code, Mode>` and `Verifier<T, Code, Mode>`.
+- `Transparent` is the default mode for ordinary PiPFRI openings.
+- `Masked` is the hiding mode used by the compatibility `ZKProver` / `ZKVerifier` wrappers.
+- The old ZK duplicate implementation has been removed; the wrappers delegate to the shared masked
+  engine.

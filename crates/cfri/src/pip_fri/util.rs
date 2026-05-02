@@ -3,6 +3,7 @@ pub mod fiat_shamir;
 pub mod foldable_code;
 pub mod goldilocks;
 pub mod helper;
+pub mod hiding;
 pub mod interpolate_vecs_value;
 pub mod merkle_tree;
 pub mod query_result;

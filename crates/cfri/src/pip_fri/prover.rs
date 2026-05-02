@@ -9,6 +9,7 @@ use crate::pip_fri::util::{
     fiat_shamir::RandomOracle,
     foldable_code::{FoldableCode, MultiplicativeFftCode},
     helper::Helper,
+    hiding::{HidingMode, ModeMarker, Transparent},
     merkle_tree::MerkleTreeProver,
     CODE_RATE,
 };
@@ -56,17 +57,23 @@ impl<T: PrimeField> InterpolateValue<T> {
 }
 
 #[derive(Clone)]
-pub struct Prover<T: PrimeField, C: FoldableCode<T> = MultiplicativeFftCode<T>> {
+pub struct Prover<
+    T: PrimeField,
+    C: FoldableCode<T> = MultiplicativeFftCode<T>,
+    M: HidingMode<T> = Transparent,
+> {
     // round number for sub_polynomials
     pub total_round: usize,
     pub code: C,
     pub interpolate_initial_polynomials: InterpolateVecsValue<T>,
+    mode_state: M::ProverState,
     interpolate_rlc_polynomial: Vec<T>,
     interpolate_tensor_polynomial: Vec<T>,
     functions: Vec<InterpolateValue<T>>,
     foldings: Vec<InterpolateValue<T>>,
     pub oracle: RandomOracle<T>,
     final_value: Option<T>,
+    _mode: ModeMarker<M>,
 }
 
 impl<T: PrimeField> Prover<T> {
@@ -89,7 +96,7 @@ impl<T: PrimeField> Prover<T> {
     }
 }
 
-impl<T: PrimeField, C: FoldableCode<T>> Prover<T, C> {
+impl<T: PrimeField, C: FoldableCode<T>> Prover<T, C, Transparent> {
     pub fn new_with_code(
         total_round: usize,
         code: C,
@@ -98,46 +105,54 @@ impl<T: PrimeField, C: FoldableCode<T>> Prover<T, C> {
         oracle: &RandomOracle<T>,
         // the fixed combination to combine multiple sub polynomials
         tensor: &Vec<T>,
-    ) -> Prover<T, C> {
+    ) -> Prover<T, C, Transparent> {
+        Self::new_with_code_and_mode(total_round, code, polynomial, oracle, tensor)
+    }
+}
+
+impl<T: PrimeField, C: FoldableCode<T>, M: HidingMode<T>> Prover<T, C, M> {
+    pub fn new_with_code_and_mode(
+        total_round: usize,
+        code: C,
+        polynomial: MultilinearPolynomial<T>,
+        // oracle has a random_linear_combination challenge
+        oracle: &RandomOracle<T>,
+        // the fixed combination to combine multiple sub polynomials
+        tensor: &Vec<T>,
+    ) -> Prover<T, C, M> {
         // Divide the polynomial into polynomials, and generate the rlc_poly and tensor_poly
         let poly_num = get_poly_num(&polynomial);
         let step = start_timer!(|| "NTT");
 
-        let interpolation_sub_polynomials =
-            code.encode_multilinear_sub_polynomials(&polynomial, poly_num);
+        let encoded = M::encode_initial(
+            total_round,
+            &code,
+            &polynomial,
+            poly_num,
+            tensor,
+            oracle.rlc,
+        );
 
-        end_timer!(step);
-        // Compute the actual polynomial invoked into FRI
-
-        let step = start_timer!(|| "rlc");
-        let mut rlc_polynomial = interpolation_sub_polynomials[0].clone();
-        for i in interpolation_sub_polynomials.iter().skip(1) {
-            for j in 0..rlc_polynomial.len() {
-                rlc_polynomial[j] *= oracle.rlc;
-                rlc_polynomial[j] += i[j];
-            }
-        }
-        // Compute the tensor_polynomial, the actual polynomial invoked into function
-        let tensor_polynomial = Helper::linear_combine(tensor, &interpolation_sub_polynomials);
         end_timer!(step);
 
         // this step takes the majority of time
         let step = start_timer!(|| "Merkle tree");
-        let interpolate_initial_polynomials =
-            InterpolateVecsValue::new(interpolation_sub_polynomials);
+        let interpolate_initial_polynomials = InterpolateVecsValue::new(encoded.polynomials);
         end_timer!(step);
 
         Prover {
             total_round,
             code,
             interpolate_initial_polynomials,
+            mode_state: encoded.state,
             // interpolate_polynomials,
-            interpolate_rlc_polynomial: rlc_polynomial,
-            interpolate_tensor_polynomial: tensor_polynomial,
+            interpolate_rlc_polynomial: encoded.rlc_polynomial,
+            interpolate_tensor_polynomial: encoded.tensor_polynomial,
             functions: vec![],
             foldings: vec![],
             oracle: oracle.clone(),
             final_value: None,
+            _mode: ModeMarker::default(),
         }
     }
 
@@ -167,7 +182,7 @@ impl<T: PrimeField, C: FoldableCode<T>> Prover<T, C> {
     // function[0], function[1], ..., function[\mu - 2]
     // function[0] is f_1, and f_\mu is a constant
     // f_0 is a virtual polynomial as tensor_polynomial
-    pub fn commit_functions(&mut self, sub_open_point: &Vec<T>, verifier: &mut Verifier<T>) {
+    pub fn commit_functions(&mut self, sub_open_point: &Vec<T>, verifier: &mut Verifier<T, C, M>) {
         let mut evaluation = None;
 
         for round in 0..self.total_round {
@@ -190,10 +205,13 @@ impl<T: PrimeField, C: FoldableCode<T>> Prover<T, C> {
             let function = &self.functions[i];
             verifier.set_function(function.leave_num(), &function.commit());
         }
+        if let Some(mask_evaluation) = M::mask_evaluation(&self.mode_state, sub_open_point) {
+            verifier.set_mask_evaluation(mask_evaluation);
+        }
         verifier.set_evaluation(evaluation.unwrap());
     }
 
-    pub fn commit_foldings(&self, verifier: &mut Verifier<T>) {
+    pub fn commit_foldings(&self, verifier: &mut Verifier<T, C, M>) {
         for i in 0..(self.total_round - 1) {
             let interpolation = &self.foldings[i];
             verifier.receive_folding_root(interpolation.leave_num(), interpolation.commit());
@@ -289,7 +307,7 @@ impl<T: PrimeField, C: FoldableCode<T>> Prover<T, C> {
     pub fn open(
         &mut self,
         sub_open_point: &Vec<T>,
-        verifier: &mut Verifier<T>,
+        verifier: &mut Verifier<T, C, M>,
     ) -> (QueryVecsResult<T>, Vec<QueryResult<T>>, Vec<QueryResult<T>>) {
         self.commit_functions(&sub_open_point.to_vec(), verifier);
         self.prove();

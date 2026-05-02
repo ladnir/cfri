@@ -2,6 +2,7 @@ use std::collections::HashMap;
 
 use crate::pip_fri::util::fiat_shamir::RandomOracle;
 use crate::pip_fri::util::foldable_code::{FoldableCode, MultiplicativeFftCode};
+use crate::pip_fri::util::hiding::{HidingMode, ModeMarker, Transparent};
 use crate::pip_fri::util::interpolate_vecs_value::*;
 use crate::pip_fri::util::merkle_tree::MERKLE_ROOT_SIZE;
 use crate::pip_fri::util::{merkle_tree::MerkleTreeVerifier, query_result::QueryResult};
@@ -9,7 +10,11 @@ use ark_ff::PrimeField;
 use ark_poly::GeneralEvaluationDomain;
 
 #[derive(Clone, Debug)]
-pub struct Verifier<T: PrimeField, C: FoldableCode<T> = MultiplicativeFftCode<T>> {
+pub struct Verifier<
+    T: PrimeField,
+    C: FoldableCode<T> = MultiplicativeFftCode<T>,
+    M: HidingMode<T> = Transparent,
+> {
     total_round: usize,
     code: C,
     initial_proof: MerkleTreeVerifier,
@@ -18,8 +23,10 @@ pub struct Verifier<T: PrimeField, C: FoldableCode<T> = MultiplicativeFftCode<T>
     oracle: RandomOracle<T>,
     final_value: Option<T>,
     evaluation: Option<T>,
+    mask_evaluation: Option<T>,
     open_point: Vec<T>,
     combination: Vec<T>,
+    _mode: ModeMarker<M>,
 }
 
 impl<T: PrimeField> Verifier<T> {
@@ -43,7 +50,7 @@ impl<T: PrimeField> Verifier<T> {
     }
 }
 
-impl<T: PrimeField, C: FoldableCode<T>> Verifier<T, C> {
+impl<T: PrimeField, C: FoldableCode<T>> Verifier<T, C, Transparent> {
     pub fn new_with_code(
         total_round: usize,
         // for rlc_polynomial
@@ -52,7 +59,28 @@ impl<T: PrimeField, C: FoldableCode<T>> Verifier<T, C> {
         oracle: &RandomOracle<T>,
         open_point: &Vec<T>,
         combination: &Vec<T>,
-    ) -> Self {
+    ) -> Verifier<T, C, Transparent> {
+        Self::new_with_code_and_mode(
+            total_round,
+            commitment,
+            code,
+            oracle,
+            open_point,
+            combination,
+        )
+    }
+}
+
+impl<T: PrimeField, C: FoldableCode<T>, M: HidingMode<T>> Verifier<T, C, M> {
+    pub fn new_with_code_and_mode(
+        total_round: usize,
+        // for rlc_polynomial
+        commitment: [u8; MERKLE_ROOT_SIZE],
+        code: C,
+        oracle: &RandomOracle<T>,
+        open_point: &Vec<T>,
+        combination: &Vec<T>,
+    ) -> Verifier<T, C, M> {
         let initial_leave_num = code.domain_size(0) / 2;
         Verifier {
             total_round,
@@ -63,8 +91,10 @@ impl<T: PrimeField, C: FoldableCode<T>> Verifier<T, C> {
             oracle: oracle.clone(),
             final_value: None,
             evaluation: None,
+            mask_evaluation: None,
             open_point: open_point.clone(),
             combination: combination.clone(),
+            _mode: ModeMarker::default(),
         }
     }
 
@@ -74,6 +104,10 @@ impl<T: PrimeField, C: FoldableCode<T>> Verifier<T, C> {
 
     pub fn set_evaluation(&mut self, evaluation: T) {
         self.evaluation = Some(evaluation);
+    }
+
+    pub fn set_mask_evaluation(&mut self, mask_evaluation: T) {
+        self.mask_evaluation = Some(mask_evaluation);
     }
 
     pub fn set_function(&mut self, leave_number: usize, function_root: &[u8; MERKLE_ROOT_SIZE]) {
@@ -167,13 +201,8 @@ impl<T: PrimeField, C: FoldableCode<T>> Verifier<T, C> {
                     let f_x_values = &values_map[j];
                     let f_nx_values = &values_map[&(j + domain_size / 2)];
 
-                    let mut f_x_final = T::zero();
-                    let mut f_nx_final = T::zero();
-                    assert_eq!(f_x_values.len(), self.combination.len());
-                    for k in 0..f_x_values.len() {
-                        f_x_final += f_x_values[k] * self.combination[k];
-                        f_nx_final += f_nx_values[k] * self.combination[k];
-                    }
+                    let f_x_final = M::initial_function_value(f_x_values, &self.combination);
+                    let f_nx_final = M::initial_function_value(f_nx_values, &self.combination);
                     new_map.insert(*j, f_x_final);
                     new_map.insert(j + domain_size / 2, f_nx_final);
                 }
@@ -224,7 +253,9 @@ impl<T: PrimeField, C: FoldableCode<T>> Verifier<T, C> {
                         );
                     }
                 } else {
-                    assert_eq!(v, evaluation * T::from_u64(2 as u64).unwrap());
+                    let expected_eval =
+                        M::terminal_evaluation(evaluation, self.oracle.rlc, self.mask_evaluation);
+                    assert_eq!(v, expected_eval * T::from_u64(2 as u64).unwrap());
                     assert_eq!(v, self.evaluation.unwrap() * T::from_u64(2 as u64).unwrap());
                 }
             }

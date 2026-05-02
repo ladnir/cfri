@@ -1,7 +1,8 @@
 # Polynomial Commitment Scheme Report
 
-This report summarizes the prover/verifier schemes currently present in the vendored research
-code under `third_party/blaze/plonkish`, `third_party/plonkish_han0110`, and `third_party/pipfri`.
+This report summarizes the prover/verifier schemes currently present in the owned research-code
+imports under `crates/cfri`, `crates/cfri-blaze`, and the reference copy
+`third_party/plonkish_han0110`.
 It focuses on what each scheme is useful for, where it is weak, and what algebraic setting the
 implementation requires.
 
@@ -9,21 +10,21 @@ implementation requires.
 
 | Scheme | Present in | Polynomial type | Algebra / assumptions | Setup |
 | --- | --- | --- | --- | --- |
-| KZG | Blaze plonkish, Han plonkish | univariate and multilinear variants | pairing-friendly curve scalar field; pairings | structured trusted setup |
+| KZG | cfri-blaze, Han plonkish | univariate and multilinear variants | pairing-friendly curve scalar field; pairings | structured trusted setup |
 | Mercury | Han plonkish only | multilinear | pairing-friendly curve scalar field; KZG backend | structured trusted setup |
-| Gemini | Blaze plonkish, Han plonkish | multilinear via univariate KZG | pairing-friendly curve scalar field | structured trusted setup |
-| Zeromorph | Blaze plonkish, Han plonkish | multilinear via univariate KZG | pairing-friendly curve scalar field | structured trusted setup |
-| Zeromorph-FRI | Blaze plonkish only | multilinear via FRI backend | prime field plus hash/Merkle commitments | transparent |
-| IPA | Blaze plonkish, Han plonkish | multilinear; Han also has univariate | prime-order elliptic curve group | transparent/hash-derived bases |
-| Hyrax | Blaze plonkish, Han plonkish | multilinear; Han also has univariate | prime-order elliptic curve group | transparent/hash-derived bases |
-| Brakedown | Blaze plonkish, Han plonkish | multilinear | prime field plus hash/Merkle commitments | transparent |
-| FRI | Blaze plonkish only | univariate | FFT-friendly prime field in spirit; implementation is `PrimeField` | transparent |
-| BaseFold | Blaze plonkish only | multilinear | any sufficiently large prime field; local binary mode uses `B128` | transparent |
-| Blaze | Blaze plonkish only | multilinear over binary inputs / binary extension packing | binary word field plus `B128`, with BaseFold backend | transparent |
-| Virgo | PipFRI workspace | multilinear / VPD-style | Arkworks `PrimeField`, hash/Merkle commitments | transparent |
-| DeepFold | PipFRI workspace | multilinear | Arkworks `PrimeField`, FRI/DEEP-FRI-style code proofs | transparent |
-| PolyFRIM | PipFRI workspace | multivariate / one-to-many | Arkworks `PrimeField`, RS/FRI-style code proofs | transparent |
-| PIPFRI / DEPIPFRI | PipFRI workspace | multilinear | Arkworks `PrimeField`, FRI-style code proofs | transparent |
+| Gemini | cfri-blaze, Han plonkish | multilinear via univariate KZG | pairing-friendly curve scalar field | structured trusted setup |
+| Zeromorph | cfri-blaze, Han plonkish | multilinear via univariate KZG | pairing-friendly curve scalar field | structured trusted setup |
+| Zeromorph-FRI | cfri-blaze | multilinear via FRI backend | prime field plus hash/Merkle commitments | transparent |
+| IPA | cfri-blaze, Han plonkish | multilinear; Han also has univariate | prime-order elliptic curve group | transparent/hash-derived bases |
+| Hyrax | cfri-blaze, Han plonkish | multilinear; Han also has univariate | prime-order elliptic curve group | transparent/hash-derived bases |
+| Brakedown | cfri-blaze, Han plonkish | multilinear | prime field plus hash/Merkle commitments | transparent |
+| FRI | cfri-blaze and cfri | univariate | FFT-friendly prime field in spirit; implementation is `PrimeField` | transparent |
+| BaseFold | cfri-blaze | multilinear | any sufficiently large prime field; local binary mode uses `B128` | transparent |
+| Blaze | cfri-blaze | multilinear over binary inputs / binary extension packing | binary word field plus `B128`, with BaseFold backend | transparent |
+| Virgo | cfri | multilinear / VPD-style | Arkworks `PrimeField`, hash/Merkle commitments | transparent |
+| DeepFold | cfri | multilinear | Arkworks `PrimeField`, FRI/DEEP-FRI-style code proofs | transparent |
+| PolyFRIM | cfri | multivariate / one-to-many | Arkworks `PrimeField`, RS/FRI-style code proofs | transparent |
+| PIPFRI / DEPIPFRI | cfri | multilinear | Arkworks `PrimeField`, FRI-style code proofs | transparent |
 
 ## KZG
 
@@ -245,7 +246,7 @@ BaseFold/PIPFRI design target of very fast multilinear PCS proving.
 
 Implementation notes:
 
-- Present in `third_party/pipfri/virgo`.
+- Present in `crates/cfri/src/virgo`.
 - Generic over Arkworks `PrimeField`.
 - Uses hash/Merkle commitments and FRI-like query proofs.
 
@@ -265,7 +266,7 @@ needs careful tests around challenge derivation, query consistency, and folding 
 
 Implementation notes:
 
-- Present in `third_party/pipfri/deepfold`.
+- Present in `crates/cfri/src/deepfold`.
 - Generic over Arkworks `PrimeField`.
 - Uses Merkle query proofs over vectors of field elements.
 
@@ -284,7 +285,7 @@ SNARK integration. It also inherits the usual hash/code proof-size tradeoff.
 
 Implementation notes:
 
-- Present in `third_party/pipfri/polyfrim`.
+- Present in `crates/cfri/src/polyfrim`.
 - Generic over Arkworks `PrimeField`.
 - Uses Merkle commitments and interpolation/query helper layers.
 
@@ -305,7 +306,7 @@ trusted core dependency.
 
 Implementation notes:
 
-- Present in `third_party/pipfri/pip_fri` and `third_party/pipfri/de_pip_fri`.
+- Present in `crates/cfri/src/pip_fri` and `crates/cfri/src/de_pip_fri`.
 - Generic over Arkworks `PrimeField`.
 - The current tests cover small end-to-end open/verify paths; large proof-size experiments are
   ignored by default.

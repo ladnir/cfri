@@ -9,4 +9,5 @@ plonkish_backend = { path = "../../third_party/blaze/plonkish/plonkish_backend" 
 
 [dev-dependencies]
 blake2 = "0.10"
+num-traits = "0.2"
 rand_chacha = "0.3"

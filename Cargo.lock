@@ -382,6 +382,7 @@ name = "cfri-blaze"
 version = "0.1.0"
 dependencies = [
  "blake2",
+ "num-traits",
  "plonkish_backend",
  "rand_chacha",
 ]

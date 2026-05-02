@@ -5,15 +5,26 @@ edition = "2021"
 publish = false
 
 [dependencies]
+ark-ff = "0.4"
+ark-poly = "0.4"
+ark-serialize = { version = "0.4", features = ["derive"] }
+ark-std = "0.4"
+blake3 = "1.3"
 deepfold = { path = "../../third_party/pipfri/deepfold" }
 de_pip_fri = { path = "../../third_party/pipfri/de_pip_fri" }
 fri = { path = "../../third_party/pipfri/fri" }
-pip_fri = { path = "../../third_party/pipfri/pip_fri" }
+merlin = "3.0"
 polyfrim = { path = "../../third_party/pipfri/polyfrim" }
+rand = "0.8"
+rayon = { version = "1", optional = true }
+rs_merkle = "1.4"
+serde = { version = "1.0", features = ["derive"] }
 virgo = { path = "../../third_party/pipfri/virgo" }
 
+[features]
+parallel = ["rayon", "ark-ff/parallel", "ark-poly/parallel"]
+
 [dev-dependencies]
-ark-ff = "0.4"
-ark-poly = "0.4"
+ark-test-curves = { version = "0.4", features = ["bls12_381_curve"] }
+hex = "0.4"
 pipfri_utils = { package = "utils", path = "../../third_party/pipfri/utils" }
-rand = "0.8"

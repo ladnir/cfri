@@ -19,16 +19,20 @@ fn point(num_vars: usize) -> Vec<Goldilocks> {
 fn deepfold_flat_shape_open_verify_small() {
     let poly = poly(6);
     let point = point(poly.num_vars());
-    let proof = deepfold::prove(&poly, &point, &PcsConfig::default());
+    let params = deepfold::setup(poly.num_vars(), PcsConfig::default());
+    let (commitment, data) = deepfold::commit(&params, poly);
+    let proof = deepfold::open(&params, data, &point);
 
-    assert!(deepfold::verify(proof));
+    assert!(deepfold::verify(&params, commitment, &point, proof));
 }
 
 #[test]
 fn pipfri_flat_shape_open_verify_small() {
     let poly = poly(8);
     let point = point(poly.num_vars());
-    let proof = pipfri::prove(&poly, &point, &PcsConfig::default());
+    let params = pipfri::setup(poly.num_vars(), PcsConfig::default());
+    let (commitment, data) = pipfri::commit(&params, poly);
+    let proof = pipfri::open(&params, data, &commitment, &point);
 
     assert!(pipfri::verify(&proof));
 }

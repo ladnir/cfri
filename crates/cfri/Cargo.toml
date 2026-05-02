@@ -1,0 +1,15 @@
+[package]
+name = "cfri"
+version = "0.1.0"
+edition = "2021"
+publish = false
+
+[dependencies]
+deepfold = { path = "../../third_party/pipfri/deepfold" }
+pip_fri = { path = "../../third_party/pipfri/pip_fri" }
+
+[dev-dependencies]
+ark-ff = "0.4"
+ark-poly = "0.4"
+pipfri_utils = { package = "utils", path = "../../third_party/pipfri/utils" }
+rand = "0.8"

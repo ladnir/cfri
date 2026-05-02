@@ -40,6 +40,11 @@ if (-not $Run) {
 }
 
 Invoke-CargoStep `
+    -Name "cfri core tests" `
+    -WorkingDirectory $RepoRoot `
+    -CargoArgs (@("test", "-p", "cfri") + $TestSuffix)
+
+Invoke-CargoStep `
     -Name "Blaze / plonkish_backend tests" `
     -WorkingDirectory (Join-Path $RepoRoot "third_party/blaze/plonkish") `
     -CargoArgs (@("test", "-p", "plonkish_backend", "--lib") + $TestSuffix) `

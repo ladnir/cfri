@@ -40,6 +40,11 @@ if ($Release) {
 }
 
 Invoke-CargoStep `
+    -Name "cfri core" `
+    -WorkingDirectory $RepoRoot `
+    -CargoArgs ($BuildArgs + @("-p", "cfri"))
+
+Invoke-CargoStep `
     -Name "Blaze / plonkish_backend" `
     -WorkingDirectory (Join-Path $RepoRoot "third_party/blaze/plonkish") `
     -CargoArgs ($BuildArgs + @("-p", "plonkish_backend")) `

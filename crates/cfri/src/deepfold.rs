@@ -104,6 +104,7 @@ impl<T: PrimeField> DeepEval<T> {
     }
 }
 
+#[derive(Clone)]
 pub struct Commit<T: PrimeField> {
     merkle_root: [u8; MERKLE_ROOT_SIZE],
     deep: T,

@@ -19,6 +19,10 @@ The implementations are now copied into the core crates so we can claim ownershi
 
 Benchmarks are intentionally not part of the unified scripts.
 
+## API direction
+
+The owned implementations are being moved behind a small concrete PCS facade before deeper cleanup. The documented target is in [`docs/api.md`](docs/api.md). The important rule is that each scheme should expose the same simple `setup -> trim -> commit -> open -> verify` shape without adding a heavyweight generic composition layer.
+
 ## Bring-up notes
 
 - `scripts/build.ps1` passes on Windows against the owned core crates.

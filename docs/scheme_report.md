@@ -1,26 +1,26 @@
 # Polynomial Commitment Scheme Report
 
 This report summarizes the prover/verifier schemes currently present in the owned research-code
-imports under `crates/cfri`, the active Blaze/BaseFold target under `crates/cfri/src/plonkish_backend`, and the
-reference copy `third_party/plonkish_han0110`.
+imports under `crates/cfri` and the active Blaze/BaseFold target under
+`crates/cfri/src/backend/{blaze,basefold}.rs`.
 It focuses on what each scheme is useful for, where it is weak, and what algebraic setting the
 implementation requires.
 
-Note: the active plonkish import is intentionally trimmed to Blaze and BaseFold. Other plonkish schemes
-discussed below are historical/reference material unless they are listed as active in the table.
+Note: the old external reference tree has been removed. Schemes not listed as active are included
+only as design context and are not currently owned code in this repo.
 
 ## Quick Inventory
 
 | Scheme | Present in | Polynomial type | Algebra / assumptions | Setup |
 | --- | --- | --- | --- | --- |
-| KZG | Han plonkish reference only | univariate and multilinear variants | pairing-friendly curve scalar field; pairings | structured trusted setup |
-| Mercury | Han plonkish only | multilinear | pairing-friendly curve scalar field; KZG backend | structured trusted setup |
-| Gemini | Han plonkish reference only | multilinear via univariate KZG | pairing-friendly curve scalar field | structured trusted setup |
-| Zeromorph | Han plonkish reference only | multilinear via univariate KZG | pairing-friendly curve scalar field | structured trusted setup |
-| Zeromorph-FRI | removed from active cfri plonkish import | multilinear via FRI backend | prime field plus hash/Merkle commitments | transparent |
-| IPA | Han plonkish reference only | multilinear; Han also has univariate | prime-order elliptic curve group | transparent/hash-derived bases |
-| Hyrax | Han plonkish reference only | multilinear; Han also has univariate | prime-order elliptic curve group | transparent/hash-derived bases |
-| Brakedown | Han plonkish reference only | multilinear | prime field plus hash/Merkle commitments | transparent |
+| KZG | not currently owned | univariate and multilinear variants | pairing-friendly curve scalar field; pairings | structured trusted setup |
+| Mercury | not currently owned | multilinear | pairing-friendly curve scalar field; KZG backend | structured trusted setup |
+| Gemini | not currently owned | multilinear via univariate KZG | pairing-friendly curve scalar field | structured trusted setup |
+| Zeromorph | not currently owned | multilinear via univariate KZG | pairing-friendly curve scalar field | structured trusted setup |
+| Zeromorph-FRI | not currently owned | multilinear via FRI backend | prime field plus hash/Merkle commitments | transparent |
+| IPA | not currently owned | multilinear and univariate variants | prime-order elliptic curve group | transparent/hash-derived bases |
+| Hyrax | not currently owned | multilinear and univariate variants | prime-order elliptic curve group | transparent/hash-derived bases |
+| Brakedown | not currently owned | multilinear | prime field plus hash/Merkle commitments | transparent |
 | FRI | cfri | univariate | FFT-friendly prime field in spirit; implementation is `PrimeField` | transparent |
 | BaseFold | cfri | multilinear | any sufficiently large prime field; local binary mode uses `B128` | transparent |
 | Blaze | cfri | multilinear over binary inputs / binary extension packing | binary word field plus `B128`, with BaseFold backend | transparent |
@@ -42,9 +42,8 @@ also degree-bound and curve-specific.
 
 Implementation notes:
 
-- `UnivariateKzg<M: MultiMillerLoop>` exists in the Han plonkish reference copy.
-- `MultilinearKzg<M: MultiMillerLoop>` exists in the Han plonkish reference copy.
-- Tests instantiate `Bn256`, so the field is the scalar field of BN254/BN256.
+- Not currently owned in this repo.
+- Typical implementations instantiate `Bn256`, so the field is the scalar field of BN254/BN256.
 - Requires `MultiMillerLoop`, `G1Affine`, `G2Affine`, and scalar field compatibility.
 
 Associated paper: Kate, Zaverucha, and Goldberg, "Constant-Size Commitments to Polynomials and
@@ -63,9 +62,8 @@ multilinear KZG, its appeal is avoiding some prover FFT structure, not eliminati
 
 Implementation notes:
 
-- Present only in `third_party/plonkish_han0110`.
-- Implemented as `Mercury<UnivariateKzg<M>>`.
-- Tests instantiate `Mercury<UnivariateKzg<Bn256>>`.
+- Not currently owned in this repo.
+- Commonly implemented as `Mercury<UnivariateKzg<M>>`.
 - Requires a pairing-friendly curve and KZG backend.
 
 Associated paper: Eagen and Gabizon, "MERCURY: A multilinear Polynomial Commitment Scheme with
@@ -83,8 +81,8 @@ its overhead profile changes; in this repo it is KZG-oriented.
 
 Implementation notes:
 
-- Present in the Han plonkish reference copy as `Gemini<UnivariateKzg<M>>`.
-- Tests instantiate `Gemini<UnivariateKzg<Bn256>>`.
+- Not currently owned in this repo.
+- Commonly implemented as `Gemini<UnivariateKzg<M>>`.
 - Requires the scalar field of the pairing curve used by the KZG backend.
 
 Associated paper: Bootle et al., "Gemini: Elastic SNARKs for Diverse Environments" (IACR ePrint
@@ -103,8 +101,8 @@ avoids trusted setup, but FRI-style backends have larger proofs and hash-heavy v
 
 Implementation notes:
 
-- `Zeromorph<UnivariateKzg<M>>` exists in the Han plonkish reference copy.
-- `ZeromorphFri<Fri<F, H>>` was removed from the active cfri plonkish import.
+- Not currently owned in this repo.
+- Typical constructions include `Zeromorph<UnivariateKzg<M>>` and FRI-backed variants.
 - KZG version requires a pairing-friendly curve scalar field.
 - FRI version requires a `PrimeField` and hash/Merkle commitment backend.
 
@@ -125,9 +123,8 @@ unless pairings are unavailable or setup transparency dominates.
 
 Implementation notes:
 
-- `MultilinearIpa<C: CurveAffine>` exists in the Han plonkish reference copy.
-- `UnivariateIpa<C: CurveAffine>` exists only in Han plonkish.
-- Tests instantiate Pasta/Pallas-like `Affine` in the Han copy.
+- Not currently owned in this repo.
+- Typical implementations include multilinear and univariate variants over Pasta/Pallas-like curves.
 - Requires a prime-order elliptic-curve group and scalar field; no pairing requirement.
 
 Associated papers: Bootle et al.'s inner-product argument lineage and Bulletproofs; see
@@ -144,8 +141,8 @@ for larger communication and more group work. It is not a hash-only/post-quantum
 
 Implementation notes:
 
-- `MultilinearHyrax<C: CurveAffine>` exists in the Han plonkish reference copy.
-- `UnivariateHyrax<C: CurveAffine>` exists only in Han plonkish and internally uses univariate IPA.
+- Not currently owned in this repo.
+- Typical implementations include multilinear and univariate variants, with the latter often using univariate IPA internally.
 - Requires a prime-order elliptic-curve group and scalar field.
 
 Associated paper: Wahby, Tzialla, shelat, Thaler, and Walfish, "Doubly-efficient zkSNARKs without
@@ -164,7 +161,7 @@ it is easy to benchmark a fast path while under-checking low-degree or proximity
 
 Implementation notes:
 
-- Present in the Han plonkish reference copy as `MultilinearBrakedown<F, H, S>`.
+- Not currently owned in this repo.
 - Requires `F: PrimeField`, a hash function, and a `BrakedownSpec`.
 - Tests instantiate `Fr` with Blake2s/Keccak variants depending on copy.
 
@@ -184,7 +181,7 @@ or reduction overhead.
 
 Implementation notes:
 
-- The old univariate `Fri<F, H>` plonkish module was removed from the active cfri plonkish import.
+- The old univariate `Fri<F, H>` module is not currently owned here.
 - The implementation is generic over `F: PrimeField`, but practical FRI wants suitable roots of
 unity / domain structure.
 - The old large sweep test is currently ignored to keep default tests fast.
@@ -232,7 +229,7 @@ Implementation notes:
 - Uses `BlazeField` word types such as `Blazeu64`, conversion to/from `B128`, and internal
   `Basefold<B128, H, ...>` calls.
 - The implementation is not exposed as a clean `PolynomialCommitmentScheme` trait implementation
-  in the same way as the other plonkish PCS modules; it is a standalone API plus tests.
+  in the same way as the other PCS modules; it is a standalone API plus tests.
 
 Associated paper: "Blaze: Fast SNARKs from Interleaved RAA Codes" (IACR ePrint 2024/1609).
 

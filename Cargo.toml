@@ -6,3 +6,6 @@ resolver = "2"
 ark-ff = { git = "https://github.com/zhaowenlan1779/algebra", branch = "optimize" }
 ark-serialize = { git = "https://github.com/zhaowenlan1779/algebra", branch = "optimize" }
 ark-relations = { git = "https://github.com/zhaowenlan1779/snark", branch = "optimize" }
+
+[profile.release]
+lto = "fat"

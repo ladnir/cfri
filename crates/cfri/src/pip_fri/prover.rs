@@ -14,8 +14,14 @@ use crate::pip_fri::util::{
     CODE_RATE,
 };
 use ark_ff::PrimeField;
-use ark_poly::GeneralEvaluationDomain;
+use ark_poly::{EvaluationDomain, GeneralEvaluationDomain};
 use ark_std::{end_timer, start_timer};
+
+#[cfg(feature = "parallel")]
+use rayon::prelude::*;
+
+#[cfg(feature = "parallel")]
+const MIN_PARALLEL_PROVER_ENCODING_WORK: usize = 1 << 14;
 
 #[derive(Clone)]
 struct InterpolateValue<T: PrimeField> {
@@ -86,13 +92,61 @@ impl<T: PrimeField> Prover<T> {
         // the fixed combination to combine multiple sub polynomials
         tensor: &Vec<T>,
     ) -> Prover<T> {
-        Self::new_with_code(
+        let poly_num = get_poly_num(&polynomial);
+        let step = start_timer!(|| "NTT");
+
+        let chunks = polynomial.chunks(poly_num);
+        #[cfg(feature = "parallel")]
+        let interpolation_sub_polynomials: Vec<Vec<T>> =
+            if polynomial.coefficients().len() >= MIN_PARALLEL_PROVER_ENCODING_WORK {
+                chunks
+                    .par_iter()
+                    .map(|chunk| interpolate_cosets[0].fft(chunk.coefficients()))
+                    .collect()
+            } else {
+                chunks
+                    .iter()
+                    .map(|chunk| interpolate_cosets[0].fft(chunk.coefficients()))
+                    .collect()
+            };
+
+        #[cfg(not(feature = "parallel"))]
+        let interpolation_sub_polynomials: Vec<Vec<T>> = chunks
+            .iter()
+            .map(|chunk| interpolate_cosets[0].fft(chunk.coefficients()))
+            .collect();
+
+        end_timer!(step);
+
+        let step = start_timer!(|| "rlc");
+        let mut rlc_polynomial = interpolation_sub_polynomials[0].clone();
+        for polynomial in interpolation_sub_polynomials.iter().skip(1) {
+            for j in 0..rlc_polynomial.len() {
+                rlc_polynomial[j] *= oracle.rlc;
+                rlc_polynomial[j] += polynomial[j];
+            }
+        }
+        let tensor_polynomial = Helper::linear_combine(tensor, &interpolation_sub_polynomials);
+        end_timer!(step);
+
+        let step = start_timer!(|| "Merkle tree");
+        let interpolate_initial_polynomials =
+            InterpolateVecsValue::new(interpolation_sub_polynomials);
+        end_timer!(step);
+
+        Prover {
             total_round,
-            MultiplicativeFftCode::new(interpolate_cosets),
-            polynomial,
-            oracle,
-            tensor,
-        )
+            code: MultiplicativeFftCode::new(interpolate_cosets),
+            interpolate_initial_polynomials,
+            mode_state: (),
+            interpolate_rlc_polynomial: rlc_polynomial,
+            interpolate_tensor_polynomial: tensor_polynomial,
+            functions: vec![],
+            foldings: vec![],
+            oracle: oracle.clone(),
+            final_value: None,
+            _mode: ModeMarker::default(),
+        }
     }
 }
 

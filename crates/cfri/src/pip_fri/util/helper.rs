@@ -67,7 +67,7 @@ impl<T: PrimeField> Helper<T> {
         result
     }
 
-    pub fn linear_combine(weights: &Vec<T>, vectors: &Vec<Vec<T>>) -> Vec<T> {
+    pub fn linear_combine(weights: &[T], vectors: &[Vec<T>]) -> Vec<T> {
         if vectors.is_empty() || weights.is_empty() || vectors[0].is_empty() {
             return vec![];
         }

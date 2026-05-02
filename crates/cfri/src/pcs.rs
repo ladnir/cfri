@@ -8,7 +8,7 @@ use rand::{rngs::StdRng, SeedableRng};
 use crate::pip_fri::util::{
     fiat_shamir::RandomOracle,
     goldilocks::Goldilocks,
-    helper::{Helper, MultilinearPolynomial},
+    helper::{nearest_power_of_two, Helper, MultilinearPolynomial},
     interpolate_vecs_value::{get_sub_variable_num, get_tensor, QueryVecsResult},
     merkle_tree::MERKLE_ROOT_SIZE,
     query_result::QueryResult,
@@ -166,7 +166,7 @@ pub mod pip_fri {
 
     #[derive(Clone)]
     pub struct VerifierKey {
-        _params: Params,
+        params: Params,
     }
 
     #[derive(Clone)]
@@ -197,7 +197,7 @@ pub mod pip_fri {
                 params: params.clone(),
             },
             VerifierKey {
-                _params: params.clone(),
+                params: params.clone(),
             },
         )
     }
@@ -258,12 +258,41 @@ pub mod pip_fri {
     }
 
     pub fn verify(
-        _vk: &VerifierKey,
-        _commitment: &Commitment,
-        _point: &[Field],
+        vk: &VerifierKey,
+        commitment: &Commitment,
+        point: &[Field],
         value: Field,
         proof: &Proof,
     ) -> bool {
+        if point.len() != vk.params.variable_num {
+            return false;
+        }
+
+        let poly_num = nearest_power_of_two(vk.params.variable_num * 4);
+        if proof.polynomial.vecs_length != poly_num {
+            return false;
+        }
+
+        let poly_num_log = poly_num.trailing_zeros() as usize;
+        let Some(sub_variable_num) = vk.params.variable_num.checked_sub(poly_num_log) else {
+            return false;
+        };
+        let Some(poly_len) = 1usize.checked_shl(vk.params.variable_num as u32) else {
+            return false;
+        };
+        if poly_num > poly_len {
+            return false;
+        }
+
+        let (sub_point, remaining_var) = point.split_at(sub_variable_num);
+        let tensor = get_tensor(&remaining_var.to_vec());
+        if !proof
+            .verifier
+            .public_inputs_match(&commitment.0, sub_point, &tensor)
+        {
+            return false;
+        }
+
         proof
             .verifier
             .verify(&proof.polynomial, &proof.folding, &proof.function, value)

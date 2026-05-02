@@ -1,14 +1,14 @@
 use blake2::Blake2s256;
-use cfri::blaze::{Basefold, BasefoldExtParams, MultilinearPolynomial};
-use cfri::plonkish_backend::util::arithmetic::Field;
-use cfri::plonkish_backend::{
+use cfri::backend::arithmetic::Field;
+use cfri::backend::{
     halo2_curves::bn256::Fr,
     pcs::PolynomialCommitmentScheme,
-    util::transcript::{
+    transcript::{
         Blake2sTranscript, FieldTranscript, FieldTranscriptRead, FieldTranscriptWrite,
         InMemoryTranscript,
     },
 };
+use cfri::blaze::{Basefold, BasefoldExtParams, HidingBasefold, MultilinearPolynomial};
 use rand_chacha::{rand_core::SeedableRng, ChaCha8Rng};
 use std::panic::{catch_unwind, AssertUnwindSafe};
 
@@ -38,8 +38,9 @@ impl BasefoldExtParams for SmallRandomCode {
 }
 
 type Pcs = Basefold<Fr, Blake2s256, SmallRandomCode>;
+type HidingPcs = HidingBasefold<Fr, Blake2s256, SmallRandomCode>;
 
-fn assert_rejects_or_panics(verify: impl FnOnce() -> Result<(), cfri::plonkish_backend::Error>) {
+fn assert_rejects_or_panics(verify: impl FnOnce() -> Result<(), cfri::backend::Error>) {
     let result = catch_unwind(AssertUnwindSafe(verify));
     assert!(result.map(|valid| valid.is_err()).unwrap_or(true));
 }
@@ -79,6 +80,45 @@ fn basefold_native_commit_open_verify_small() {
         point[0] += Fr::ONE;
         let eval = transcript.read_field_element().unwrap();
         Pcs::verify(&vp, &comm, &point, &eval, &mut transcript)
+    };
+    assert_rejects_or_panics(invalid);
+}
+
+#[test]
+fn hiding_basefold_native_commit_open_verify_small() {
+    let num_vars = 3;
+    let poly_size = 1 << num_vars;
+    let mut rng = ChaCha8Rng::from_seed([11; 32]);
+    let param = HidingPcs::setup(poly_size, 1, &mut rng).unwrap();
+    let (pp, vp) = HidingPcs::trim(&param, poly_size, 1).unwrap();
+
+    let poly = MultilinearPolynomial::rand(num_vars, &mut rng);
+    let proof = {
+        let mut transcript = Blake2sTranscript::new(());
+        let comm = HidingPcs::commit_and_write(&pp, &poly, &mut transcript).unwrap();
+        let point = transcript.squeeze_challenges(num_vars);
+        let eval = poly.evaluate(&point);
+        transcript.write_field_element(&eval).unwrap();
+        HidingPcs::open(&pp, &poly, &comm, &point, &eval, &mut transcript).unwrap();
+        transcript.into_proof()
+    };
+
+    let result = {
+        let mut transcript = Blake2sTranscript::from_proof((), proof.as_slice());
+        let comm = HidingPcs::read_commitment(&vp, &mut transcript).unwrap();
+        let point = transcript.squeeze_challenges(num_vars);
+        let eval = transcript.read_field_element().unwrap();
+        HidingPcs::verify(&vp, &comm, &point, &eval, &mut transcript)
+    };
+    assert!(result.is_ok());
+
+    let invalid = || {
+        let mut transcript = Blake2sTranscript::from_proof((), proof.as_slice());
+        let comm = HidingPcs::read_commitment(&vp, &mut transcript).unwrap();
+        let mut point = transcript.squeeze_challenges(num_vars);
+        point[0] += Fr::ONE;
+        let eval = transcript.read_field_element().unwrap();
+        HidingPcs::verify(&vp, &comm, &point, &eval, &mut transcript)
     };
     assert_rejects_or_panics(invalid);
 }

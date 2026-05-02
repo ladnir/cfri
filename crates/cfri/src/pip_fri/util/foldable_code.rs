@@ -5,6 +5,9 @@ use ark_poly::{EvaluationDomain, GeneralEvaluationDomain};
 #[cfg(feature = "parallel")]
 use rayon::prelude::*;
 
+#[cfg(feature = "parallel")]
+const MIN_PARALLEL_ENCODING_WORK: usize = 1 << 14;
+
 pub trait FoldableCode<T: PrimeField>: Clone + Sync {
     fn encode_sub_polynomial(&self, coefficients: &[T]) -> Vec<T>;
 
@@ -17,23 +20,20 @@ pub trait FoldableCode<T: PrimeField>: Clone + Sync {
         polynomial: &MultilinearPolynomial<T>,
         poly_num: usize,
     ) -> Vec<Vec<T>> {
+        let chunks = polynomial.chunks(poly_num);
+
         #[cfg(feature = "parallel")]
-        {
-            polynomial
-                .chunks(poly_num)
+        if polynomial.coefficients().len() >= MIN_PARALLEL_ENCODING_WORK {
+            return chunks
                 .par_iter()
                 .map(|chunk| self.encode_sub_polynomial(chunk.coefficients()))
-                .collect()
+                .collect();
         }
 
-        #[cfg(not(feature = "parallel"))]
-        {
-            polynomial
-                .chunks(poly_num)
-                .iter()
-                .map(|chunk| self.encode_sub_polynomial(chunk.coefficients()))
-                .collect()
-        }
+        chunks
+            .iter()
+            .map(|chunk| self.encode_sub_polynomial(chunk.coefficients()))
+            .collect()
     }
 }
 

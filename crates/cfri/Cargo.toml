@@ -42,7 +42,7 @@ subtle = "2"
 threadpool = "1"
 
 [features]
-default = ["parallel", "sanity-check"]
+default = ["sanity-check"]
 benchmark = ["parallel"]
 parallel = ["ark-ff/parallel", "ark-poly/parallel"]
 sanity-check = []

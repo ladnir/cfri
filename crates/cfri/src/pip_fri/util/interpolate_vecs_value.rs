@@ -113,24 +113,19 @@ impl<T: PrimeField> QueryVecsResult<T> {
         leaf_indices: &Vec<usize>,
         merkle_verifier: &MerkleTreeVerifier,
     ) -> bool {
-        let leaves: Vec<Vec<u8>> = leaf_indices
-            .iter()
-            .map(|x| {
-                Helper::<T>::to_bytes_vec(
-                    &[
-                        self.proof_values.get(x).unwrap().clone(),
-                        self.proof_values
-                            .get(&(x + merkle_verifier.leave_number))
-                            .unwrap()
-                            .clone(),
-                    ]
-                    .concat(),
-                )
-            })
-            .collect();
-        let res = merkle_verifier.verify(self.proof_bytes.clone(), leaf_indices, &leaves);
-        assert!(res);
-        res
+        let mut leaves = Vec::with_capacity(leaf_indices.len());
+        for x in leaf_indices {
+            let Some(left) = self.proof_values.get(x) else {
+                return false;
+            };
+            let Some(right) = self.proof_values.get(&(x + merkle_verifier.leave_number)) else {
+                return false;
+            };
+            leaves.push(Helper::<T>::to_bytes_vec(
+                &[left.clone(), right.clone()].concat(),
+            ));
+        }
+        merkle_verifier.verify(self.proof_bytes.clone(), leaf_indices, &leaves)
     }
 
     pub fn combine_proof_values(

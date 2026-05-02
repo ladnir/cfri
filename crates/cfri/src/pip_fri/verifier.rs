@@ -132,6 +132,17 @@ impl<T: PrimeField, C: FoldableCode<T>, M: HidingMode<T>> Verifier<T, C, M> {
         self.final_value = Some(value);
     }
 
+    pub fn public_inputs_match(
+        &self,
+        commitment: &[u8; MERKLE_ROOT_SIZE],
+        open_point: &[T],
+        combination: &[T],
+    ) -> bool {
+        self.initial_proof.merkle_root == *commitment
+            && self.open_point == open_point
+            && self.combination == combination
+    }
+
     pub fn verify(
         &self,
         polynomial_proof: &QueryVecsResult<T>,
@@ -150,10 +161,22 @@ impl<T: PrimeField, C: FoldableCode<T>, M: HidingMode<T>> Verifier<T, C, M> {
             leaf_indices.dedup();
 
             if i == 0 {
-                polynomial_proof.verify_merkle_tree(&leaf_indices, &self.initial_proof);
+                if !polynomial_proof.verify_merkle_tree(&leaf_indices, &self.initial_proof) {
+                    return false;
+                }
             } else {
-                function_proof[i - 1].verify_merkle_tree(&leaf_indices, &self.function_root[i - 1]);
-                folding_proof[i - 1].verify_merkle_tree(&leaf_indices, &self.folding_root[i - 1]);
+                let Some(function_root) = self.function_root.get(i - 1) else {
+                    return false;
+                };
+                let Some(folding_root) = self.folding_root.get(i - 1) else {
+                    return false;
+                };
+                if !function_proof[i - 1].verify_merkle_tree(&leaf_indices, function_root) {
+                    return false;
+                }
+                if !folding_proof[i - 1].verify_merkle_tree(&leaf_indices, folding_root) {
+                    return false;
+                }
             }
 
             let last_challenge = if i == 0 {
@@ -170,12 +193,18 @@ impl<T: PrimeField, C: FoldableCode<T>, M: HidingMode<T>> Verifier<T, C, M> {
                 let values_map = &polynomial_proof.proof_values;
                 let mut new_map: HashMap<usize, T> = HashMap::new();
                 for j in &leaf_indices {
-                    let f_x_values = &values_map[j];
-                    let f_nx_values = &values_map[&(j + domain_size / 2)];
+                    let Some(f_x_values) = values_map.get(j) else {
+                        return false;
+                    };
+                    let Some(f_nx_values) = values_map.get(&(j + domain_size / 2)) else {
+                        return false;
+                    };
 
                     let mut f_x_final = f_x_values[0];
                     let mut f_nx_final = f_nx_values[0];
-                    assert_eq!(f_x_values.len(), f_nx_values.len());
+                    if f_x_values.len() != f_nx_values.len() {
+                        return false;
+                    }
                     for k in 1..f_x_values.len() {
                         f_x_final *= self.oracle.rlc;
                         f_x_final += f_x_values[k];
@@ -198,8 +227,12 @@ impl<T: PrimeField, C: FoldableCode<T>, M: HidingMode<T>> Verifier<T, C, M> {
                 let values_map = &polynomial_proof.proof_values;
                 let mut new_map: HashMap<usize, T> = HashMap::new();
                 for j in &leaf_indices {
-                    let f_x_values = &values_map[j];
-                    let f_nx_values = &values_map[&(j + domain_size / 2)];
+                    let Some(f_x_values) = values_map.get(j) else {
+                        return false;
+                    };
+                    let Some(f_nx_values) = values_map.get(&(j + domain_size / 2)) else {
+                        return false;
+                    };
 
                     let f_x_final = M::initial_function_value(f_x_values, &self.combination);
                     let f_nx_final = M::initial_function_value(f_nx_values, &self.combination);
@@ -213,12 +246,20 @@ impl<T: PrimeField, C: FoldableCode<T>, M: HidingMode<T>> Verifier<T, C, M> {
 
             for j in &leaf_indices {
                 // verifier folding proofs
-                let f_x = function_values[j];
-                let f_nx = function_values[&(j + domain_size / 2)];
+                let Some(&f_x) = function_values.get(j) else {
+                    return false;
+                };
+                let Some(&f_nx) = function_values.get(&(j + domain_size / 2)) else {
+                    return false;
+                };
 
                 if i != 0 {
-                    let p_x = get_folding_value[j];
-                    let p_nx = get_folding_value[&(j + domain_size / 2)];
+                    let Some(&p_x) = get_folding_value.get(j) else {
+                        return false;
+                    };
+                    let Some(&p_nx) = get_folding_value.get(&(j + domain_size / 2)) else {
+                        return false;
+                    };
 
                     let last_challenge_square = last_challenge.unwrap().pow([2 as u64]);
                     let phi_x = p_x + last_challenge_square * f_x;
@@ -227,17 +268,32 @@ impl<T: PrimeField, C: FoldableCode<T>, M: HidingMode<T>> Verifier<T, C, M> {
                     let new_v = (phi_x + phi_nx)
                         + cur_challenge * (phi_x - phi_nx) * self.code.fold_weight(i, *j);
                     if i == self.total_round - 1 {
-                        if new_v != self.final_value.unwrap() {
+                        let Some(final_value) = self.final_value else {
+                            return false;
+                        };
+                        if new_v != final_value {
                             return false;
                         }
-                    } else if new_v != folding_proof[i].proof_values[j] {
-                        return false;
+                    } else {
+                        let Some(&expected) = folding_proof[i].proof_values.get(j) else {
+                            return false;
+                        };
+                        if new_v != expected {
+                            return false;
+                        }
                     }
                 } else {
-                    let x = get_folding_value[j];
-                    let nx = get_folding_value[&(j + domain_size / 2)];
+                    let Some(&x) = get_folding_value.get(j) else {
+                        return false;
+                    };
+                    let Some(&nx) = get_folding_value.get(&(j + domain_size / 2)) else {
+                        return false;
+                    };
                     let v = x + nx + cur_challenge * (x - nx) * self.code.fold_weight(i, *j);
-                    if v != folding_proof[i].proof_values[j] {
+                    let Some(&expected) = folding_proof[i].proof_values.get(j) else {
+                        return false;
+                    };
+                    if v != expected {
                         return false;
                     }
                 }
@@ -247,16 +303,25 @@ impl<T: PrimeField, C: FoldableCode<T>, M: HidingMode<T>> Verifier<T, C, M> {
                     (f_x + f_nx) + self.open_point[i] * (f_x - f_nx) * self.code.fold_weight(i, *j);
                 if i < self.total_round - 1 {
                     if i != 0 {
-                        assert_eq!(
-                            v,
-                            function_proof[i].proof_values[j] * T::from_u64(2 as u64).unwrap()
-                        );
+                        let Some(&expected) = function_proof[i].proof_values.get(j) else {
+                            return false;
+                        };
+                        if v != expected * T::from_u64(2 as u64).unwrap() {
+                            return false;
+                        }
                     }
                 } else {
                     let expected_eval =
                         M::terminal_evaluation(evaluation, self.oracle.rlc, self.mask_evaluation);
-                    assert_eq!(v, expected_eval * T::from_u64(2 as u64).unwrap());
-                    assert_eq!(v, self.evaluation.unwrap() * T::from_u64(2 as u64).unwrap());
+                    if v != expected_eval * T::from_u64(2 as u64).unwrap() {
+                        return false;
+                    }
+                    let Some(verifier_eval) = self.evaluation else {
+                        return false;
+                    };
+                    if v != verifier_eval * T::from_u64(2 as u64).unwrap() {
+                        return false;
+                    }
                 }
             }
         }

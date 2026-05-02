@@ -68,7 +68,9 @@ impl MerkleTreeVerifier {
         indices: &Vec<usize>,
         leaves: &Vec<Vec<u8>>,
     ) -> bool {
-        let proof = MerkleProof::<Blake3Algorithm>::try_from(proof_bytes).unwrap();
+        let Ok(proof) = MerkleProof::<Blake3Algorithm>::try_from(proof_bytes) else {
+            return false;
+        };
         let leaves_to_prove: Vec<[u8; MERKLE_ROOT_SIZE]> =
             leaves.iter().map(|x| Blake3Algorithm::hash(x)).collect();
         proof.verify(

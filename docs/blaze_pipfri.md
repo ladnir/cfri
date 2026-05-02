@@ -29,3 +29,20 @@ Current status:
 - `Masked` is the hiding mode used by the compatibility `ZKProver` / `ZKVerifier` wrappers.
 - The old ZK duplicate implementation has been removed; the wrappers delegate to the shared masked
   engine.
+
+BaseFold now also has the same conceptual hiding shape through `HidingBasefold`. It commits with one
+extra multilinear variable:
+
+```text
+F(x, t) = f(x) + t * r(x)
+```
+
+Openings are still public openings of `f(z)`: the prover opens `F(z, 0)`, so the verifier API keeps
+the original point length and evaluation. The underlying BaseFold instance sees one more variable.
+This keeps the ordinary `Basefold` hot path unchanged and makes hiding an explicit opt-in type.
+
+Blaze has matching opt-in entry points: `setup_with_hiding`, `trim_with_hiding`,
+`commit_and_write_with_hiding`, `open_with_hiding`, and `verify_with_hiding`. They extend each
+Blaze row with a random masked half and open at `t = 0`. This gives the same algebraic shape at the
+Blaze boundary while avoiding a second backend-level hiding pass when Blaze is composed with a
+transparent backend.

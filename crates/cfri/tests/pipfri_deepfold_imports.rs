@@ -15,11 +15,8 @@ use cfri::pip_fri::{
     zkverifier::ZKVerifier,
 };
 use rand::{rngs::StdRng, SeedableRng};
-use std::panic::{catch_unwind, AssertUnwindSafe};
-
-fn assert_rejects_or_panics(verify: impl FnOnce() -> bool) {
-    let result = catch_unwind(AssertUnwindSafe(verify));
-    assert!(result.map(|valid| !valid).unwrap_or(true));
+fn assert_rejects(verify: impl FnOnce() -> bool) {
+    assert!(!verify());
 }
 
 #[test]
@@ -41,7 +38,7 @@ fn pipfri_native_open_verify_small() {
         value,
         &proof
     ));
-    assert_rejects_or_panics(|| {
+    assert_rejects(|| {
         pcs::pip_fri::verify(
             &vk,
             &commitment,
@@ -50,6 +47,17 @@ fn pipfri_native_open_verify_small() {
             &proof,
         )
     });
+    let mut wrong_commitment = commitment.clone();
+    wrong_commitment.0[0] ^= 1;
+    assert_rejects(|| pcs::pip_fri::verify(&vk, &wrong_commitment, &point, value, &proof));
+
+    let mut wrong_sub_point = point.clone();
+    wrong_sub_point[0] += pcs::Field::from(1_u64);
+    assert_rejects(|| pcs::pip_fri::verify(&vk, &commitment, &wrong_sub_point, value, &proof));
+
+    let mut wrong_tensor_point = point.clone();
+    *wrong_tensor_point.last_mut().unwrap() += pcs::Field::from(1_u64);
+    assert_rejects(|| pcs::pip_fri::verify(&vk, &commitment, &wrong_tensor_point, value, &proof));
 }
 
 #[test]

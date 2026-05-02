@@ -7,6 +7,9 @@ use std::{fmt::Debug, marker::PhantomData};
 #[cfg(feature = "parallel")]
 use rayon::prelude::*;
 
+#[cfg(feature = "parallel")]
+const MIN_PARALLEL_MASKED_ENCODING_WORK: usize = 1 << 14;
+
 #[derive(Clone)]
 pub struct EncodedInitial<T: PrimeField, S> {
     pub polynomials: Vec<Vec<T>>,
@@ -50,7 +53,7 @@ impl<T: PrimeField> HidingMode<T> for Transparent {
     ) -> EncodedInitial<T, Self::ProverState> {
         let polynomials = code.encode_multilinear_sub_polynomials(polynomial, poly_num);
         let rlc_polynomial = random_linear_combination(&polynomials, rlc);
-        let tensor_polynomial = Helper::linear_combine(&tensor.to_vec(), &polynomials);
+        let tensor_polynomial = Helper::linear_combine(tensor, &polynomials);
         EncodedInitial {
             polynomials,
             rlc_polynomial,
@@ -90,23 +93,37 @@ impl<T: PrimeField> HidingMode<T> for Masked {
         tensor: &[T],
         rlc: T,
     ) -> EncodedInitial<T, Self::ProverState> {
+        let chunks = polynomial.chunks(poly_num);
         #[cfg(feature = "parallel")]
-        let mut polynomials: Vec<Vec<T>> = polynomial
-            .chunks(poly_num)
-            .par_iter()
-            .map(|chunk| {
-                let mut rng = rand::thread_rng();
-                let coefficients = chunk.coefficients();
-                let mut combined = Vec::with_capacity(coefficients.len() * 2);
-                combined.extend_from_slice(coefficients);
-                combined.extend((0..coefficients.len()).map(|_| T::rand(&mut rng)));
-                code.encode_sub_polynomial(&combined)
-            })
-            .collect();
+        let mut polynomials: Vec<Vec<T>> =
+            if polynomial.coefficients().len() >= MIN_PARALLEL_MASKED_ENCODING_WORK {
+                chunks
+                    .par_iter()
+                    .map(|chunk| {
+                        let mut rng = rand::thread_rng();
+                        let coefficients = chunk.coefficients();
+                        let mut combined = Vec::with_capacity(coefficients.len() * 2);
+                        combined.extend_from_slice(coefficients);
+                        combined.extend((0..coefficients.len()).map(|_| T::rand(&mut rng)));
+                        code.encode_sub_polynomial(&combined)
+                    })
+                    .collect()
+            } else {
+                chunks
+                    .iter()
+                    .map(|chunk| {
+                        let mut rng = rand::thread_rng();
+                        let coefficients = chunk.coefficients();
+                        let mut combined = Vec::with_capacity(coefficients.len() * 2);
+                        combined.extend_from_slice(coefficients);
+                        combined.extend((0..coefficients.len()).map(|_| T::rand(&mut rng)));
+                        code.encode_sub_polynomial(&combined)
+                    })
+                    .collect()
+            };
 
         #[cfg(not(feature = "parallel"))]
-        let mut polynomials: Vec<Vec<T>> = polynomial
-            .chunks(poly_num)
+        let mut polynomials: Vec<Vec<T>> = chunks
             .iter()
             .map(|chunk| {
                 let mut rng = rand::thread_rng();
@@ -127,7 +144,7 @@ impl<T: PrimeField> HidingMode<T> for Masked {
             *acc += mask;
         }
 
-        let tensor_polynomial = Helper::linear_combine(&tensor.to_vec(), &polynomials)
+        let tensor_polynomial = Helper::linear_combine(tensor, &polynomials)
             .iter()
             .zip(mask_evals.iter())
             .map(|(&value, &mask)| value + rlc * mask)

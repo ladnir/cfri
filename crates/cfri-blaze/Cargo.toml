@@ -1,0 +1,12 @@
+[package]
+name = "cfri-blaze"
+version = "0.1.0"
+edition = "2021"
+publish = false
+
+[dependencies]
+plonkish_backend = { path = "../../third_party/blaze/plonkish/plonkish_backend" }
+
+[dev-dependencies]
+blake2 = "0.10"
+rand_chacha = "0.3"

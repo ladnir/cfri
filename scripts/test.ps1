@@ -45,6 +45,12 @@ Invoke-CargoStep `
     -CargoArgs (@("test", "-p", "cfri") + $TestSuffix)
 
 Invoke-CargoStep `
+    -Name "cfri Blaze import tests" `
+    -WorkingDirectory $RepoRoot `
+    -CargoArgs (@("test", "-p", "cfri-blaze") + $TestSuffix) `
+    -Toolchain "nightly"
+
+Invoke-CargoStep `
     -Name "Blaze / plonkish_backend tests" `
     -WorkingDirectory (Join-Path $RepoRoot "third_party/blaze/plonkish") `
     -CargoArgs (@("test", "-p", "plonkish_backend", "--lib") + $TestSuffix) `

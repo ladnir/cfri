@@ -45,6 +45,12 @@ Invoke-CargoStep `
     -CargoArgs ($BuildArgs + @("-p", "cfri"))
 
 Invoke-CargoStep `
+    -Name "cfri Blaze imports" `
+    -WorkingDirectory $RepoRoot `
+    -CargoArgs ($BuildArgs + @("-p", "cfri-blaze")) `
+    -Toolchain "nightly"
+
+Invoke-CargoStep `
     -Name "Blaze / plonkish_backend" `
     -WorkingDirectory (Join-Path $RepoRoot "third_party/blaze/plonkish") `
     -CargoArgs ($BuildArgs + @("-p", "plonkish_backend")) `

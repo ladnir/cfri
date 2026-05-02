@@ -1,11 +1,7 @@
 use ark_ff::UniformRand;
 use ark_poly::{EvaluationDomain, GeneralEvaluationDomain};
 use cfri::pip_fri::util as owned_util;
-use cfri::{imported::deepfold, pip_fri};
-use pipfri_utils::{
-    goldilocks::Goldilocks as UpstreamGoldilocks,
-    helper::{Helper as UpstreamHelper, MultilinearPolynomial as UpstreamMultilinearPolynomial},
-};
+use cfri::{deepfold, pip_fri};
 use rand::{rngs::StdRng, SeedableRng};
 use std::panic::{catch_unwind, AssertUnwindSafe};
 
@@ -84,19 +80,25 @@ fn pipfri_native_open_verify_small() {
 fn deepfold_native_open_verify_small() {
     let variable_num = 6;
     let step = 1;
-    let polynomial = UpstreamMultilinearPolynomial::<UpstreamGoldilocks>::rand(variable_num);
+    let polynomial =
+        owned_util::helper::MultilinearPolynomial::<owned_util::goldilocks::Goldilocks>::rand(
+            variable_num,
+        );
     let mut interpolate_cosets = vec![GeneralEvaluationDomain::new_coset(
-        1 << (variable_num + pipfri_utils::CODE_RATE),
-        UpstreamGoldilocks::from(1_u64),
+        1 << (variable_num + owned_util::CODE_RATE),
+        owned_util::goldilocks::Goldilocks::from(1_u64),
     )
     .unwrap()];
     for i in 1..=variable_num {
-        interpolate_cosets.push(UpstreamHelper::pow(&interpolate_cosets[i - 1], 2));
+        interpolate_cosets.push(owned_util::helper::Helper::pow(
+            &interpolate_cosets[i - 1],
+            2,
+        ));
     }
 
     let oracle = deepfold::prover::RandomOracle::new(
         variable_num,
-        pipfri_utils::SECURITY_BITS / pipfri_utils::CODE_RATE,
+        owned_util::SECURITY_BITS / owned_util::CODE_RATE,
     );
     let prover =
         deepfold::prover::Prover::new(variable_num, &interpolate_cosets, polynomial, &oracle, step);

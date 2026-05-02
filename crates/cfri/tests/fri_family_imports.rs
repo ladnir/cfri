@@ -3,14 +3,14 @@ use ark_poly::{
     polynomial::{univariate::DensePolynomial as UnivariatePolynomial, Polynomial},
     DenseUVPolynomial, EvaluationDomain, GeneralEvaluationDomain,
 };
-use cfri::imported::{de_pip_fri, fri, polyfrim, virgo};
-use pipfri_utils::{
+use cfri::pip_fri::util::{
     fiat_shamir::RandomOracle,
     goldilocks::Goldilocks,
     helper::{Helper, MultilinearPolynomial},
     interpolate_vecs_value::{get_sub_variable_num, get_tensor},
     CODE_RATE, SECURITY_BITS,
 };
+use cfri::{de_pip_fri, fri, polyfrim, virgo};
 use rand::{rngs::StdRng, SeedableRng};
 use std::panic::{catch_unwind, AssertUnwindSafe};
 

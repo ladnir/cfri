@@ -1,9 +1,7 @@
+pub mod de_network;
+pub mod de_pip_fri;
+pub mod deepfold;
+pub mod fri;
 pub mod pip_fri;
-
-pub mod imported {
-    pub use de_pip_fri;
-    pub use deepfold;
-    pub use fri;
-    pub use polyfrim;
-    pub use virgo;
-}
+pub mod polyfrim;
+pub mod virgo;

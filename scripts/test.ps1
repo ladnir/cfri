@@ -55,8 +55,3 @@ Invoke-CargoStep `
     -WorkingDirectory (Join-Path $RepoRoot "third_party/blaze/plonkish") `
     -CargoArgs (@("test", "-p", "plonkish_backend", "--lib") + $TestSuffix) `
     -Toolchain "nightly"
-
-Invoke-CargoStep `
-    -Name "PIP_FRI workspace tests" `
-    -WorkingDirectory (Join-Path $RepoRoot "third_party/pipfri") `
-    -CargoArgs (@("test", "--workspace") + $TestSuffix)

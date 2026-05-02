@@ -1,6 +1,5 @@
 pub mod prover;
 pub mod test;
-pub mod util;
 pub mod verifier;
 pub mod zkprover;
 pub mod zktest;

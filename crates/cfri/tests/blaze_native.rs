@@ -8,9 +8,7 @@ use num_traits::Zero;
 use rand_chacha::{rand_core::SeedableRng, ChaCha8Rng};
 use std::panic::{catch_unwind, AssertUnwindSafe};
 
-fn assert_rejects_or_panics(
-    verify: impl FnOnce() -> Result<(), cfri::plonkish_backend::Error>,
-) {
+fn assert_rejects_or_panics(verify: impl FnOnce() -> Result<(), cfri::plonkish_backend::Error>) {
     let result = catch_unwind(AssertUnwindSafe(verify));
     assert!(result.map(|valid| valid.is_err()).unwrap_or(true));
 }

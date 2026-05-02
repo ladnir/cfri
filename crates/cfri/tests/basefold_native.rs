@@ -39,9 +39,7 @@ impl BasefoldExtParams for SmallRandomCode {
 
 type Pcs = Basefold<Fr, Blake2s256, SmallRandomCode>;
 
-fn assert_rejects_or_panics(
-    verify: impl FnOnce() -> Result<(), cfri::plonkish_backend::Error>,
-) {
+fn assert_rejects_or_panics(verify: impl FnOnce() -> Result<(), cfri::plonkish_backend::Error>) {
     let result = catch_unwind(AssertUnwindSafe(verify));
     assert!(result.map(|valid| valid.is_err()).unwrap_or(true));
 }

@@ -120,6 +120,34 @@ pub struct BlazeVerifierParam {
 }
 
 const BASEFOLD_RATE: usize = 1;
+
+#[derive(Clone, Debug)]
+pub struct BlazeBasefoldParams;
+
+impl BasefoldExtParams for BlazeBasefoldParams {
+    fn get_reps() -> usize {
+        402
+    }
+
+    fn get_rate() -> usize {
+        BASEFOLD_RATE
+    }
+
+    fn get_basecode_rounds() -> usize {
+        0
+    }
+
+    fn get_rs_basecode() -> bool {
+        false
+    }
+
+    fn get_code_type() -> String {
+        "random".to_string()
+    }
+}
+
+pub type BlazeBasefoldPcs<H> = Basefold<B128, H, BlazeBasefoldParams>;
+
 #[derive(Clone, Debug, Serialize, Deserialize)]
 #[serde(bound(serialize = "F: Serialize", deserialize = "F: DeserializeOwned"))]
 pub struct BlazeCommitment<F: BlazeField, H: Hash> {
@@ -171,44 +199,18 @@ pub fn setup<H: Hash>(
     let num_vars = log2_strict(poly_size);
     let mut rng: ChaCha8Rng = ChaCha8Rng::from_entropy(); //TODO - use RngCore instead so it can be passed in
     let permutation = Permutation::create(&mut rng, (poly_size * (1 << log_rate)));
-    //todo: make sure this is correct
-
-    #[derive(Debug)]
-    pub struct Five {};
-    impl BasefoldExtParams for Five {
-        fn get_reps() -> usize {
-            return 402;
-        }
-
-        fn get_rate() -> usize {
-            return BASEFOLD_RATE;
-        }
-
-        fn get_basecode_rounds() -> usize {
-            return 0;
-        }
-        fn get_rs_basecode() -> bool {
-            false
-        }
-
-        fn get_code_type() -> String {
-            "random".to_string()
-        }
-    }
-    //todo: make sure this is correct
-    type Pcs<H> = Basefold<B128, H, Five>;
     let log_num_chunks = 1;
     //TODO: how is poly size determined?
     let split_params = {
         let mut rng = OsRng;
         let poly_size = 1 << (num_vars + 3 - log_num_chunks);
-        Pcs::<H>::setup(poly_size, 1, &mut rng).unwrap()
+        BlazeBasefoldPcs::<H>::setup(poly_size, 1, &mut rng).unwrap()
     };
 
     let reg_basefold_params = {
         let mut rng = OsRng;
         let poly_size = 1 << (num_vars + 2);
-        Pcs::<H>::setup(poly_size, 1, &mut rng).unwrap()
+        BlazeBasefoldPcs::<H>::setup(poly_size, 1, &mut rng).unwrap()
     };
     BlazeParams {
         split_basefold_params: split_params,
@@ -229,33 +231,9 @@ pub fn trim<H: Hash>(
     batch_size: usize,
 ) -> (BlazeProverParam, BlazeVerifierParam) {
     let log_num_rows = log2_strict(param.num_rows);
-
-    type Pcs<H> = Basefold<B128, H, Five>;
-    #[derive(Debug)]
-    pub struct Five {};
-    impl BasefoldExtParams for Five {
-        fn get_reps() -> usize {
-            return 402;
-        }
-
-        fn get_rate() -> usize {
-            return BASEFOLD_RATE;
-        }
-
-        fn get_basecode_rounds() -> usize {
-            return 0;
-        }
-        fn get_rs_basecode() -> bool {
-            false
-        }
-
-        fn get_code_type() -> String {
-            "random".to_string()
-        }
-    }
     let num_vars = log2_strict(poly_size);
 
-    let (pp, vp) = Pcs::<H>::trim(
+    let (pp, vp) = BlazeBasefoldPcs::<H>::trim(
         &param.split_basefold_params,
         1 << (param.num_vars - param.log_num_chunks + 3),
         0,
@@ -263,9 +241,10 @@ pub fn trim<H: Hash>(
     .ok()
     .unwrap();
 
-    let (ppp, pvp) = Pcs::<H>::trim(&param.reg_basefold_params, 1 << ((param.num_vars) + 2), 0)
-        .ok()
-        .unwrap();
+    let (ppp, pvp) =
+        BlazeBasefoldPcs::<H>::trim(&param.reg_basefold_params, 1 << ((param.num_vars) + 2), 0)
+            .ok()
+            .unwrap();
     (
         BlazeProverParam {
             split_basefold_prover_param: pp,
@@ -557,29 +536,6 @@ pub fn open<F: BlazeField, H: Hash>(
     blazetranscript: &mut impl TranscriptWrite<CommitmentChunk<H>, F>,
     b128transcript: &mut impl TranscriptWrite<CommitmentChunk<H>, B128>,
 ) -> Result<B128, Error> {
-    type Pcs<H> = Basefold<B128, H, Five>;
-    #[derive(Debug)]
-    pub struct Five {};
-    impl BasefoldExtParams for Five {
-        fn get_reps() -> usize {
-            return 402;
-        }
-
-        fn get_rate() -> usize {
-            return BASEFOLD_RATE;
-        }
-
-        fn get_basecode_rounds() -> usize {
-            return 0;
-        }
-        fn get_rs_basecode() -> bool {
-            false
-        }
-
-        fn get_code_type() -> String {
-            "binary_rs".to_string()
-        }
-    }
     let row_size = comm.bh_evals[0].len();
     let col_size = comm.bh_evals.len();
     let num_vars_per_row = log2_strict(row_size);
@@ -642,12 +598,13 @@ pub fn open<F: BlazeField, H: Hash>(
     //batch commit to folded_poly_b128, u1,u2,u3,u4,u5
     let now = Instant::now();
 
-    let raa_commitments: Vec<BasefoldCommitment<B128, H>> = Pcs::batch_commit_and_write(
-        &pp.split_basefold_prover_param,
-        &split_polys,
-        b128transcript,
-    )
-    .unwrap(); //ONE TRNASCRIPT WRITE
+    let raa_commitments: Vec<BasefoldCommitment<B128, H>> =
+        BlazeBasefoldPcs::batch_commit_and_write(
+            &pp.split_basefold_prover_param,
+            &split_polys,
+            b128transcript,
+        )
+        .unwrap(); //ONE TRNASCRIPT WRITE
 
     println!("commitments {:?}", now.elapsed());
 
@@ -684,12 +641,13 @@ pub fn open<F: BlazeField, H: Hash>(
     );
     println!("build perms {:?}", now.elapsed());
     let now = Instant::now();
-    let perm_commitments: Vec<BasefoldCommitment<B128, H>> = Pcs::batch_commit_and_write(
-        &pp.split_basefold_prover_param,
-        &split_binding,
-        b128transcript,
-    )
-    .unwrap(); //TWO TRANSCRIPT WRITES
+    let perm_commitments: Vec<BasefoldCommitment<B128, H>> =
+        BlazeBasefoldPcs::batch_commit_and_write(
+            &pp.split_basefold_prover_param,
+            &split_binding,
+            b128transcript,
+        )
+        .unwrap(); //TWO TRANSCRIPT WRITES
     println!("perm batch commitments {:?}", now.elapsed());
 
     let rand_point = b128transcript.squeeze_challenges(pp.reg_basefold_prover_param.num_vars);
@@ -777,7 +735,7 @@ pub fn open<F: BlazeField, H: Hash>(
 
     let now = Instant::now();
     //now do batch opening THIS IS A TRANSCRIPT WRITE
-    Pcs::batch_open(
+    BlazeBasefoldPcs::batch_open(
         &pp.split_basefold_prover_param,
         &polys,
         commitments,
@@ -987,31 +945,8 @@ pub fn verify<F: BlazeField, H: Hash>(
     b128transcript: &mut impl TranscriptRead<CommitmentChunk<H>, B128>,
     blazetranscript: &mut impl TranscriptRead<CommitmentChunk<H>, F>,
 ) -> Result<(), Error> {
-    #[derive(Debug)]
-    pub struct Five {};
-    impl BasefoldExtParams for Five {
-        fn get_reps() -> usize {
-            return 402;
-        }
-
-        fn get_rate() -> usize {
-            return BASEFOLD_RATE;
-        }
-
-        fn get_basecode_rounds() -> usize {
-            return 0;
-        }
-        fn get_rs_basecode() -> bool {
-            false
-        }
-
-        fn get_code_type() -> String {
-            "binary_rs".to_string()
-        }
-    }
     let transcript_point = b128transcript.squeeze_challenges(vp.num_vars);
     check_transcript_point(&transcript_point, point)?;
-    type Pcs<H> = Basefold<B128, H, Five>;
     //read the blaze commitment root
     let blaze_root = blazetranscript.read_commitment();
 
@@ -1037,7 +972,7 @@ pub fn verify<F: BlazeField, H: Hash>(
     let num_raa_comms = 3 * num_split_chunks;
     let num_perm_comms = 4 * num_split_chunks;
 
-    let basefold_comms1 = Pcs::<H>::read_commitments(
+    let basefold_comms1 = BlazeBasefoldPcs::<H>::read_commitments(
         &vp.split_basefold_verifier_param,
         num_raa_comms,
         b128transcript,
@@ -1049,7 +984,7 @@ pub fn verify<F: BlazeField, H: Hash>(
         b128transcript.squeeze_challenge(),
     );
 
-    let basefold_comms2 = Pcs::<H>::read_commitments(
+    let basefold_comms2 = BlazeBasefoldPcs::<H>::read_commitments(
         &vp.split_basefold_verifier_param,
         num_perm_comms,
         b128transcript,
@@ -1097,7 +1032,7 @@ pub fn verify<F: BlazeField, H: Hash>(
 
     //create points and create eval
     let now = Instant::now();
-    Pcs::<H>::batch_verify(
+    BlazeBasefoldPcs::<H>::batch_verify(
         &vp.split_basefold_verifier_param,
         basefold_comms,
         &points,
@@ -1350,39 +1285,15 @@ fn test_perm() {
 #[cfg(feature = "upstream-tests")]
 #[test]
 fn test_basefold_binary() {
-    use crate::plonkish_backend::pcs::multilinear::basefold::Basefold;
     use crate::plonkish_backend::pcs::PolynomialCommitmentScheme;
     use crate::plonkish_backend::poly::multilinear::MultilinearPolynomial;
     use crate::plonkish_backend::util::binary_extension_fields::B128;
     use crate::plonkish_backend::util::new_fields::Mersenne127;
     use crate::plonkish_backend::util::transcript::Blake2sTranscript;
     use blake2::Blake2s256;
-    type Pcs = Basefold<B128, Blake2s256, Five>;
+    type Pcs = BlazeBasefoldPcs<Blake2s256>;
 
     // rayon::ThreadPoolBuilder::new().num_threads(1).build_global().unwrap();
-    #[derive(Debug)]
-    pub struct Five {}
-
-    impl BasefoldExtParams for Five {
-        fn get_reps() -> usize {
-            return 402;
-        }
-
-        fn get_rate() -> usize {
-            return BASEFOLD_RATE;
-        }
-
-        fn get_basecode_rounds() -> usize {
-            return 0;
-        }
-        fn get_rs_basecode() -> bool {
-            false
-        }
-
-        fn get_code_type() -> String {
-            "random".to_string()
-        }
-    }
     let num_vars = 3;
 
     // Setup
@@ -1426,9 +1337,8 @@ fn test_basefold_binary() {
 #[cfg(feature = "upstream-tests")]
 #[test]
 fn test_batch_basefold_binary() {
-    use crate::plonkish_backend::pcs::multilinear::{
-        basefold::Basefold,
-        test::{run_batch_commit_open_verify, run_commit_open_verify},
+    use crate::plonkish_backend::pcs::multilinear::test::{
+        run_batch_commit_open_verify, run_commit_open_verify,
     };
     use crate::plonkish_backend::pcs::PolynomialCommitmentScheme;
     use crate::plonkish_backend::poly::multilinear::MultilinearPolynomial;
@@ -1436,30 +1346,7 @@ fn test_batch_basefold_binary() {
     use crate::plonkish_backend::util::new_fields::Mersenne127;
     use crate::plonkish_backend::util::transcript::Blake2sTranscript;
     use blake2::Blake2s256;
-    type Pcs = Basefold<B128, Blake2s256, Five>;
-    #[derive(Debug)]
-    pub struct Five {}
-
-    impl BasefoldExtParams for Five {
-        fn get_reps() -> usize {
-            return 402;
-        }
-
-        fn get_rate() -> usize {
-            return BASEFOLD_RATE;
-        }
-
-        fn get_basecode_rounds() -> usize {
-            return 0;
-        }
-        fn get_rs_basecode() -> bool {
-            false
-        }
-
-        fn get_code_type() -> String {
-            "random".to_string()
-        }
-    }
+    type Pcs = BlazeBasefoldPcs<Blake2s256>;
 
     run_batch_commit_open_verify::<_, Pcs, Blake2sTranscript<_>>();
 }

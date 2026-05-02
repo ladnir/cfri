@@ -38,4 +38,4 @@ The `point` argument on `commit` is temporary. A normal PCS commitment should no
 
 The facade intentionally stores some verifier-side public messages inside proof objects because the imported implementations currently pass those messages by mutating verifier structs during opening. Later cleanup should move those messages into explicit proof fields and make verification reconstruct its verifier state from `(VerifierKey, Commitment, Point, Value, Proof)`.
 
-Blaze/BaseFold now lives in `crates/cfri/src/plonkish_backend`, re-exported through `cfri::blaze`. It builds on stable Rust and should get the same concrete facade as the PiPFRI-family code.
+Blaze/BaseFold now lives in `crates/cfri/src/plonkish_backend`, re-exported through `cfri::blaze`. It builds on stable Rust. The current concrete backend slot is named `BlazeBasefoldPcs`; `Blaze<PipFri>` is not a valid alias yet because the imported PiPFRI implementation is an ark prime-field, multiplicative-FFT PCS, while Blaze's backend commitments are over `B128`/`GF(2^128)`. Enabling that combination requires a PiPFRI backend over the binary/additive field model, not just a type alias.

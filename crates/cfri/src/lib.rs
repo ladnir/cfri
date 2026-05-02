@@ -11,7 +11,7 @@ pub mod virgo;
 
 pub mod blaze {
     pub use crate::plonkish_backend::{
-        pcs::multilinear::blaze,
+        pcs::multilinear::blaze::{self, BlazeBasefoldParams, BlazeBasefoldPcs},
         pcs::multilinear::{Basefold, BasefoldExtParams},
         poly::multilinear::MultilinearPolynomial,
         util::{

@@ -5,11 +5,11 @@ edition = "2021"
 publish = false
 
 [dependencies]
-deepfold = { path = "../../third_party/pipfri/deepfold" }
-pip_fri = { path = "../../third_party/pipfri/pip_fri" }
-
-[dev-dependencies]
 ark-ff = "0.4"
 ark-poly = "0.4"
+deepfold = { path = "../../third_party/pipfri/deepfold" }
+pip_fri = { path = "../../third_party/pipfri/pip_fri" }
 pipfri_utils = { package = "utils", path = "../../third_party/pipfri/utils" }
+
+[dev-dependencies]
 rand = "0.8"

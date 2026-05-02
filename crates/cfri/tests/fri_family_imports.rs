@@ -12,6 +12,12 @@ use pipfri_utils::{
     CODE_RATE, SECURITY_BITS,
 };
 use rand::{rngs::StdRng, SeedableRng};
+use std::panic::{catch_unwind, AssertUnwindSafe};
+
+fn assert_rejects_or_panics(verify: impl FnOnce() -> bool) {
+    let result = catch_unwind(AssertUnwindSafe(verify));
+    assert!(result.map(|valid| !valid).unwrap_or(true));
+}
 
 fn multilinear_cosets(variable_num: usize) -> Vec<GeneralEvaluationDomain<Goldilocks>> {
     let mut cosets = vec![GeneralEvaluationDomain::new_coset(
@@ -50,6 +56,7 @@ fn fri_native_open_verify_small() {
 
     assert!(!proof.is_empty());
     assert!(verifier.verify(&proof, eval));
+    assert_rejects_or_panics(|| verifier.verify(&proof, eval + Goldilocks::from(1_u64)));
 }
 
 #[test]
@@ -83,6 +90,13 @@ fn polyfrim_native_open_verify_small() {
     assert!(!folding_proof.is_empty());
     assert!(!function_proof.is_empty());
     assert!(verifier.verify(&folding_proof, &function_proof, eval));
+    assert_rejects_or_panics(|| {
+        verifier.verify(
+            &folding_proof,
+            &function_proof,
+            eval + Goldilocks::from(1_u64),
+        )
+    });
 }
 
 #[test]
@@ -129,6 +143,14 @@ fn de_pip_fri_native_open_verify_small() {
     assert!(!folding_proof.is_empty());
     assert!(!function_proof.is_empty());
     assert!(verifier.verify(&polynomial_proof, &folding_proof, &function_proof, eval));
+    assert_rejects_or_panics(|| {
+        verifier.verify(
+            &polynomial_proof,
+            &folding_proof,
+            &function_proof,
+            eval + Goldilocks::from(1_u64),
+        )
+    });
 }
 
 #[test]
@@ -169,4 +191,12 @@ fn virgo_native_open_verify_small() {
     assert!(!folding_proofs.is_empty());
     assert!(!function_proofs.is_empty());
     assert!(verifier.verify(eval, &folding_proofs, &v_values, &function_proofs));
+    assert_rejects_or_panics(|| {
+        verifier.verify(
+            eval + Goldilocks::from(1_u64),
+            &folding_proofs,
+            &v_values,
+            &function_proofs,
+        )
+    });
 }

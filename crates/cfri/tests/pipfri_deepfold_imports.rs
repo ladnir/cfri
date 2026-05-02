@@ -9,6 +9,12 @@ use pipfri_utils::{
     CODE_RATE, SECURITY_BITS,
 };
 use rand::{rngs::StdRng, SeedableRng};
+use std::panic::{catch_unwind, AssertUnwindSafe};
+
+fn assert_rejects_or_panics(verify: impl FnOnce() -> bool) {
+    let result = catch_unwind(AssertUnwindSafe(verify));
+    assert!(result.map(|valid| !valid).unwrap_or(true));
+}
 
 #[test]
 fn pipfri_native_open_verify_small() {
@@ -57,6 +63,14 @@ fn pipfri_native_open_verify_small() {
     let (polynomial_proof, folding_proof, function_proof) =
         prover.open(&sub_open_point.to_vec(), &mut verifier);
     assert!(verifier.verify(&polynomial_proof, &folding_proof, &function_proof, eval));
+    assert_rejects_or_panics(|| {
+        verifier.verify(
+            &polynomial_proof,
+            &folding_proof,
+            &function_proof,
+            eval + Goldilocks::from(1_u64),
+        )
+    });
 }
 
 #[test]

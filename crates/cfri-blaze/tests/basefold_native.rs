@@ -1,5 +1,6 @@
 use blake2::Blake2s256;
 use cfri_blaze::imported::{Basefold, BasefoldExtParams, MultilinearPolynomial};
+use plonkish_backend::util::arithmetic::Field;
 use plonkish_backend::{
     halo2_curves::bn256::Fr,
     pcs::PolynomialCommitmentScheme,
@@ -9,6 +10,7 @@ use plonkish_backend::{
     },
 };
 use rand_chacha::{rand_core::SeedableRng, ChaCha8Rng};
+use std::panic::{catch_unwind, AssertUnwindSafe};
 
 #[derive(Debug)]
 struct SmallRandomCode;
@@ -37,6 +39,11 @@ impl BasefoldExtParams for SmallRandomCode {
 
 type Pcs = Basefold<Fr, Blake2s256, SmallRandomCode>;
 
+fn assert_rejects_or_panics(verify: impl FnOnce() -> Result<(), plonkish_backend::Error>) {
+    let result = catch_unwind(AssertUnwindSafe(verify));
+    assert!(result.map(|valid| valid.is_err()).unwrap_or(true));
+}
+
 #[test]
 fn basefold_native_commit_open_verify_small() {
     let num_vars = 3;
@@ -64,4 +71,14 @@ fn basefold_native_commit_open_verify_small() {
         Pcs::verify(&vp, &comm, &point, &eval, &mut transcript)
     };
     assert!(result.is_ok());
+
+    let invalid = || {
+        let mut transcript = Blake2sTranscript::from_proof((), proof.as_slice());
+        let comm = Pcs::read_commitment(&vp, &mut transcript).unwrap();
+        let mut point = transcript.squeeze_challenges(num_vars);
+        point[0] += Fr::ONE;
+        let eval = transcript.read_field_element().unwrap();
+        Pcs::verify(&vp, &comm, &point, &eval, &mut transcript)
+    };
+    assert_rejects_or_panics(invalid);
 }

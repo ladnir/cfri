@@ -6,7 +6,11 @@ publish = false
 
 [dependencies]
 deepfold = { path = "../../third_party/pipfri/deepfold" }
+de_pip_fri = { path = "../../third_party/pipfri/de_pip_fri" }
+fri = { path = "../../third_party/pipfri/fri" }
 pip_fri = { path = "../../third_party/pipfri/pip_fri" }
+polyfrim = { path = "../../third_party/pipfri/polyfrim" }
+virgo = { path = "../../third_party/pipfri/virgo" }
 
 [dev-dependencies]
 ark-ff = "0.4"

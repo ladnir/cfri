@@ -54,4 +54,8 @@ pub trait BlazeField:
     fn to_b128_vec(data: Vec<Self>) -> B128 {
         todo!()
     }
+
+    fn pack_pair_to_b128(lhs: Self, rhs: Self) -> B128 {
+        Self::to_b128_vec(vec![lhs, rhs])
+    }
 }

@@ -81,6 +81,12 @@ impl BlazeField for Blazeu64 {
             value: [data[0].value, data[1].value],
         }
     }
+
+    fn pack_pair_to_b128(lhs: Self, rhs: Self) -> B128 {
+        B128 {
+            value: [lhs.value, rhs.value],
+        }
+    }
 }
 #[cfg(feature = "upstream-tests")]
 #[test]

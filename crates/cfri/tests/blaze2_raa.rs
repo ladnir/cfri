@@ -1,6 +1,10 @@
 use blake2::Blake2s256;
 use cfri::backend::{
-    blaze2::{fold_packed_query_pair, Blaze2RaaCommitment, Blaze2RaaQuery},
+    arithmetic::Field,
+    blaze2::{
+        fold_packed_query_pair, fold_packed_rows_into, pack_interleaved_rows,
+        pack_interleaved_rows_into, Blaze2RaaCommitment, Blaze2RaaQuery,
+    },
     blaze_transcript::BlazeBlake2sTranscript,
     code::PackedRaaCode,
     hash::Blake2s,
@@ -27,7 +31,7 @@ fn packed_rows(rows: &[Vec<Blazeu64>]) -> Vec<Vec<B128>> {
             pair[0]
                 .iter()
                 .zip(pair[1].iter())
-                .map(|(lhs, rhs)| Blazeu64::to_b128_vec(vec![*lhs, *rhs]))
+                .map(|(lhs, rhs)| Blazeu64::pack_pair_to_b128(*lhs, *rhs))
                 .collect::<Vec<_>>()
         })
         .collect::<Vec<_>>()
@@ -114,17 +118,62 @@ fn blaze2_raa_rejects_malformed_query_value_count() {
 }
 
 #[test]
+fn blaze2_interleaving_pack_into_matches_allocating_pack() {
+    let rows = rows(4, 8);
+    let expected = packed_rows(&rows);
+    let actual = pack_interleaved_rows(&rows).unwrap();
+    assert_eq!(actual, expected);
+
+    let mut out = vec![vec![B128::ZERO; 8]; 2];
+    pack_interleaved_rows_into(&rows, &mut out).unwrap();
+    assert_eq!(out, expected);
+}
+
+#[test]
+fn blaze2_interleaving_fold_into_matches_manual_linear_combination() {
+    let rows = rows(4, 8);
+    let packed = pack_interleaved_rows(&rows).unwrap();
+    let challenges = vec![B128::from(17), B128::from(39)];
+    let mut folded = vec![B128::ZERO; 8];
+    fold_packed_rows_into(&packed, &challenges, &mut folded).unwrap();
+
+    for col in 0..8 {
+        assert_eq!(
+            folded[col],
+            challenges[0] * packed[0][col] + challenges[1] * packed[1][col]
+        );
+    }
+}
+
+#[test]
+fn blaze2_interleaving_rejects_bad_shapes() {
+    let odd_rows = rows(3, 8);
+    assert!(pack_interleaved_rows(&odd_rows).is_err());
+
+    let mut ragged_rows = rows(4, 8);
+    ragged_rows[2].pop();
+    assert!(pack_interleaved_rows(&ragged_rows).is_err());
+
+    let rows = rows(4, 8);
+    let mut bad_out = vec![vec![B128::ZERO; 7]; 2];
+    assert!(pack_interleaved_rows_into(&rows, &mut bad_out).is_err());
+
+    let packed = pack_interleaved_rows(&rows).unwrap();
+    let mut folded = vec![B128::ZERO; 8];
+    assert!(fold_packed_rows_into(&packed, &[B128::from(1)], &mut folded).is_err());
+}
+
+#[test]
 fn blaze2_raa_folded_query_matches_encoded_folded_rows() {
     let mut rng = ChaCha8Rng::from_seed([6; 32]);
     let code = PackedRaaCode::new(8, 4, &mut rng);
     let rows = rows(4, 8);
     let comm =
         Blaze2RaaCommitment::<Blazeu64, Blake2s256>::commit_rows(code.clone(), &rows).unwrap();
-    let packed = packed_rows(&rows);
+    let packed = pack_interleaved_rows(&rows).unwrap();
     let challenges = vec![B128::from(17), B128::from(39)];
-    let folded_message = (0..code.message_len())
-        .map(|col| challenges[0] * packed[0][col] + challenges[1] * packed[1][col])
-        .collect::<Vec<_>>();
+    let mut folded_message = vec![B128::ZERO; code.message_len()];
+    fold_packed_rows_into(&packed, &challenges, &mut folded_message).unwrap();
     let folded_codeword = code.encode_row(&folded_message);
 
     for index in [0usize, 1, 6, 17, 30, 31] {

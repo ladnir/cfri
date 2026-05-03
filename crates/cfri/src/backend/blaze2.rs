@@ -208,10 +208,66 @@ pub fn fold_packed_query_pair<F: BlazeField>(
     let mut right = B128::ZERO;
     for (packed_row, challenge) in challenges.iter().enumerate() {
         let offset = packed_row * 4;
-        left += *challenge * F::to_b128_vec(vec![values[offset], values[offset + 2]]);
-        right += *challenge * F::to_b128_vec(vec![values[offset + 1], values[offset + 3]]);
+        left += *challenge * F::pack_pair_to_b128(values[offset], values[offset + 2]);
+        right += *challenge * F::pack_pair_to_b128(values[offset + 1], values[offset + 3]);
     }
     Ok((left, right))
+}
+
+pub fn pack_interleaved_rows<F: BlazeField>(rows: &[Vec<F>]) -> Result<Vec<Vec<B128>>, Error> {
+    let (packed_rows, row_len) = validate_interleaved_rows(rows)?;
+    let mut packed = vec![vec![B128::ZERO; row_len]; packed_rows];
+    pack_interleaved_rows_into(rows, &mut packed)?;
+    Ok(packed)
+}
+
+pub fn pack_interleaved_rows_into<F: BlazeField>(
+    rows: &[Vec<F>],
+    packed: &mut [Vec<B128>],
+) -> Result<(), Error> {
+    let (packed_rows, row_len) = validate_interleaved_rows(rows)?;
+    if packed.len() != packed_rows || !packed.iter().all(|row| row.len() == row_len) {
+        return Err(Error::InvalidPcsOpen(
+            "Blaze2 packed row output has incompatible shape".to_string(),
+        ));
+    }
+
+    packed
+        .par_iter_mut()
+        .zip(rows.par_chunks_exact(2))
+        .for_each(|(out, pair)| {
+            for col in 0..row_len {
+                out[col] = F::pack_pair_to_b128(pair[0][col], pair[1][col]);
+            }
+        });
+    Ok(())
+}
+
+pub fn fold_packed_rows_into(
+    packed_rows: &[Vec<B128>],
+    challenges: &[B128],
+    out: &mut [B128],
+) -> Result<(), Error> {
+    let row_len = validate_packed_rows(packed_rows)?;
+    if challenges.len() != packed_rows.len() {
+        return Err(Error::InvalidPcsOpen(
+            "Blaze2 packed fold challenge count does not match row count".to_string(),
+        ));
+    }
+    if out.len() != row_len {
+        return Err(Error::InvalidPcsOpen(
+            "Blaze2 packed fold output has incompatible length".to_string(),
+        ));
+    }
+
+    out.par_iter_mut().enumerate().for_each(|(col, folded)| {
+        let mut acc = B128::ZERO;
+        for row in 0..packed_rows.len() {
+            acc += challenges[row] * packed_rows[row][col];
+        }
+        *folded = acc;
+    });
+    Ok(())
 }
 
 fn validate_message_rows<F: BlazeField>(rows: &[Vec<F>], row_len: usize) -> Result<(), Error> {
@@ -226,6 +282,46 @@ fn validate_message_rows<F: BlazeField>(rows: &[Vec<F>], row_len: usize) -> Resu
         ));
     }
     Ok(())
+}
+
+fn validate_interleaved_rows<F: BlazeField>(rows: &[Vec<F>]) -> Result<(usize, usize), Error> {
+    if rows.is_empty() || rows.len() & 1 != 0 {
+        return Err(Error::InvalidPcsOpen(
+            "Blaze2 interleaving expects a non-empty even number of rows".to_string(),
+        ));
+    }
+    let row_len = rows[0].len();
+    if row_len == 0 || !row_len.is_power_of_two() {
+        return Err(Error::InvalidPcsOpen(
+            "Blaze2 interleaving row length must be a non-empty power of two".to_string(),
+        ));
+    }
+    if !rows.iter().all(|row| row.len() == row_len) {
+        return Err(Error::InvalidPcsOpen(
+            "Blaze2 interleaving rows have incompatible lengths".to_string(),
+        ));
+    }
+    Ok((rows.len() >> 1, row_len))
+}
+
+fn validate_packed_rows(rows: &[Vec<B128>]) -> Result<usize, Error> {
+    if rows.is_empty() {
+        return Err(Error::InvalidPcsOpen(
+            "Blaze2 packed fold expects at least one row".to_string(),
+        ));
+    }
+    let row_len = rows[0].len();
+    if row_len == 0 || !row_len.is_power_of_two() {
+        return Err(Error::InvalidPcsOpen(
+            "Blaze2 packed fold row length must be a non-empty power of two".to_string(),
+        ));
+    }
+    if !rows.iter().all(|row| row.len() == row_len) {
+        return Err(Error::InvalidPcsOpen(
+            "Blaze2 packed fold rows have incompatible lengths".to_string(),
+        ));
+    }
+    Ok(row_len)
 }
 
 fn validate_query_index(index: usize, codeword_len: usize) -> Result<(), Error> {

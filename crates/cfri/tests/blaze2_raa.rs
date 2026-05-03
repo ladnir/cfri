@@ -2,9 +2,9 @@ use blake2::Blake2s256;
 use cfri::backend::{
     arithmetic::Field,
     blaze2::{
-        evaluate_multilinear, evaluate_packed_rows_at_point_into, fold_packed_query_pair,
-        fold_packed_rows_into, pack_interleaved_rows, pack_interleaved_rows_into,
-        Blaze2RaaCommitment, Blaze2RaaQuery,
+        build_raa_trace, build_raa_trace_into, check_raa_trace_at, evaluate_multilinear,
+        evaluate_packed_rows_at_point_into, fold_packed_query_pair, fold_packed_rows_into,
+        pack_interleaved_rows, pack_interleaved_rows_into, Blaze2RaaCommitment, Blaze2RaaQuery,
     },
     blaze_transcript::BlazeBlake2sTranscript,
     code::PackedRaaCode,
@@ -216,8 +216,113 @@ fn blaze2_multilinear_eval_rejects_bad_shapes() {
 }
 
 #[test]
-fn blaze2_raa_folded_query_matches_encoded_folded_rows() {
+fn blaze2_raa_trace_matches_encoder_and_spot_checks_all_positions() {
     let mut rng = ChaCha8Rng::from_seed([6; 32]);
+    let code = PackedRaaCode::new(8, 4, &mut rng);
+    let rows = rows(4, 8);
+    let packed = pack_interleaved_rows(&rows).unwrap();
+    let challenges = vec![B128::from(17), B128::from(39)];
+    let mut folded_message = vec![B128::ZERO; code.message_len()];
+    fold_packed_rows_into(&packed, &challenges, &mut folded_message).unwrap();
+
+    let trace = build_raa_trace(&code, &folded_message).unwrap();
+    assert_eq!(trace.u5, code.encode_row(&folded_message));
+    for index in 0..code.codeword_len() {
+        check_raa_trace_at(&code, &folded_message, &trace, index).unwrap();
+    }
+}
+
+#[test]
+fn blaze2_raa_trace_into_matches_allocating_builder() {
+    let mut rng = ChaCha8Rng::from_seed([7; 32]);
+    let code = PackedRaaCode::new(8, 4, &mut rng);
+    let message = (0..code.message_len())
+        .map(|i| B128::from((i as u64 + 1) * 11))
+        .collect::<Vec<_>>();
+    let expected = build_raa_trace(&code, &message).unwrap();
+    let mut actual = expected.clone();
+    actual.u2.fill(B128::ZERO);
+    actual.u3.fill(B128::ZERO);
+    actual.u4.fill(B128::ZERO);
+    actual.u5.fill(B128::ZERO);
+
+    build_raa_trace_into(&code, &message, &mut actual).unwrap();
+    assert_eq!(actual, expected);
+}
+
+#[test]
+fn blaze2_raa_spot_checks_reject_bad_repetition_layer() {
+    let mut rng = ChaCha8Rng::from_seed([8; 32]);
+    let code = PackedRaaCode::new(8, 4, &mut rng);
+    let message = (0..code.message_len())
+        .map(|i| B128::from((i as u64 + 1) * 13))
+        .collect::<Vec<_>>();
+    let mut trace = build_raa_trace(&code, &message).unwrap();
+    trace.u2[5] += B128::ONE;
+
+    assert!(check_raa_trace_at(&code, &message, &trace, 5).is_err());
+}
+
+#[test]
+fn blaze2_raa_spot_checks_reject_bad_first_accumulator_layer() {
+    let mut rng = ChaCha8Rng::from_seed([9; 32]);
+    let code = PackedRaaCode::new(8, 4, &mut rng);
+    let message = (0..code.message_len())
+        .map(|i| B128::from((i as u64 + 1) * 17))
+        .collect::<Vec<_>>();
+    let mut trace = build_raa_trace(&code, &message).unwrap();
+    trace.u3[6] += B128::ONE;
+
+    assert!(check_raa_trace_at(&code, &message, &trace, 6).is_err());
+}
+
+#[test]
+fn blaze2_raa_spot_checks_reject_bad_second_permutation_layer() {
+    let mut rng = ChaCha8Rng::from_seed([10; 32]);
+    let code = PackedRaaCode::new(8, 4, &mut rng);
+    let message = (0..code.message_len())
+        .map(|i| B128::from((i as u64 + 1) * 19))
+        .collect::<Vec<_>>();
+    let mut trace = build_raa_trace(&code, &message).unwrap();
+    trace.u4[7] += B128::ONE;
+
+    assert!(check_raa_trace_at(&code, &message, &trace, 7).is_err());
+}
+
+#[test]
+fn blaze2_raa_spot_checks_reject_bad_second_accumulator_layer() {
+    let mut rng = ChaCha8Rng::from_seed([11; 32]);
+    let code = PackedRaaCode::new(8, 4, &mut rng);
+    let message = (0..code.message_len())
+        .map(|i| B128::from((i as u64 + 1) * 23))
+        .collect::<Vec<_>>();
+    let mut trace = build_raa_trace(&code, &message).unwrap();
+    trace.u5[8] += B128::ONE;
+
+    assert!(check_raa_trace_at(&code, &message, &trace, 8).is_err());
+}
+
+#[test]
+fn blaze2_raa_trace_rejects_bad_shapes() {
+    let mut rng = ChaCha8Rng::from_seed([12; 32]);
+    let code = PackedRaaCode::new(8, 4, &mut rng);
+    let mut message = (0..code.message_len())
+        .map(|i| B128::from((i as u64 + 1) * 29))
+        .collect::<Vec<_>>();
+    message.pop();
+    assert!(build_raa_trace(&code, &message).is_err());
+
+    let message = (0..code.message_len())
+        .map(|i| B128::from((i as u64 + 1) * 31))
+        .collect::<Vec<_>>();
+    let mut trace = build_raa_trace(&code, &message).unwrap();
+    trace.u4.pop();
+    assert!(check_raa_trace_at(&code, &message, &trace, 0).is_err());
+}
+
+#[test]
+fn blaze2_raa_folded_query_matches_encoded_folded_rows() {
+    let mut rng = ChaCha8Rng::from_seed([13; 32]);
     let code = PackedRaaCode::new(8, 4, &mut rng);
     let rows = rows(4, 8);
     let comm =

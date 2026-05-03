@@ -36,6 +36,14 @@ pub struct Blaze2RaaQuery<F: BlazeField, H: Hash> {
     pub path: Vec<Output<H>>,
 }
 
+#[derive(Clone, Debug, PartialEq, Eq)]
+pub struct Blaze2RaaTrace {
+    pub u2: Vec<B128>,
+    pub u3: Vec<B128>,
+    pub u4: Vec<B128>,
+    pub u5: Vec<B128>,
+}
+
 impl<F: BlazeField, H: Hash> PartialEq for Blaze2RaaQuery<F, H> {
     fn eq(&self, other: &Self) -> bool {
         self.index == other.index && self.values == other.values && self.path == other.path
@@ -320,6 +328,90 @@ pub fn evaluate_packed_rows_at_point_into(
     Ok(())
 }
 
+pub fn build_raa_trace(code: &PackedRaaCode, message: &[B128]) -> Result<Blaze2RaaTrace, Error> {
+    let len = validate_raa_message(code, message)?;
+    let mut trace = Blaze2RaaTrace {
+        u2: vec![B128::ZERO; len],
+        u3: vec![B128::ZERO; len],
+        u4: vec![B128::ZERO; len],
+        u5: vec![B128::ZERO; len],
+    };
+    build_raa_trace_into(code, message, &mut trace)?;
+    Ok(trace)
+}
+
+pub fn build_raa_trace_into(
+    code: &PackedRaaCode,
+    message: &[B128],
+    trace: &mut Blaze2RaaTrace,
+) -> Result<(), Error> {
+    let len = validate_raa_message(code, message)?;
+    validate_raa_trace_shape(trace, len)?;
+
+    let permutation = code.permutation();
+    for i in 0..len {
+        trace.u2[i] = message[permutation.permutation1[i] / code.rate()];
+    }
+
+    prefix_accumulate_into(&trace.u2, &mut trace.u3);
+
+    for i in 0..len {
+        trace.u4[i] = trace.u3[permutation.permutation2[i]];
+    }
+
+    prefix_accumulate_into(&trace.u4, &mut trace.u5);
+    Ok(())
+}
+
+pub fn check_raa_trace_at(
+    code: &PackedRaaCode,
+    message: &[B128],
+    trace: &Blaze2RaaTrace,
+    index: usize,
+) -> Result<(), Error> {
+    let len = validate_raa_message(code, message)?;
+    validate_raa_trace_shape(trace, len)?;
+    validate_query_index(index, len)?;
+
+    let permutation = code.permutation();
+    let expected_u2 = message[permutation.permutation1[index] / code.rate()];
+    if trace.u2[index] != expected_u2 {
+        return Err(Error::InvalidPcsOpen(
+            "Blaze2 RAA spot check failed repetition/permutation layer".to_string(),
+        ));
+    }
+
+    let expected_u3 = if index == 0 {
+        trace.u2[0]
+    } else {
+        trace.u3[index - 1] + trace.u2[index]
+    };
+    if trace.u3[index] != expected_u3 {
+        return Err(Error::InvalidPcsOpen(
+            "Blaze2 RAA spot check failed first accumulator layer".to_string(),
+        ));
+    }
+
+    if trace.u4[index] != trace.u3[permutation.permutation2[index]] {
+        return Err(Error::InvalidPcsOpen(
+            "Blaze2 RAA spot check failed second permutation layer".to_string(),
+        ));
+    }
+
+    let expected_u5 = if index == 0 {
+        trace.u4[0]
+    } else {
+        trace.u5[index - 1] + trace.u4[index]
+    };
+    if trace.u5[index] != expected_u5 {
+        return Err(Error::InvalidPcsOpen(
+            "Blaze2 RAA spot check failed second accumulator layer".to_string(),
+        ));
+    }
+
+    Ok(())
+}
+
 fn validate_message_rows<F: BlazeField>(rows: &[Vec<F>], row_len: usize) -> Result<(), Error> {
     if rows.is_empty() {
         return Err(Error::InvalidPcsOpen(
@@ -332,6 +424,38 @@ fn validate_message_rows<F: BlazeField>(rows: &[Vec<F>], row_len: usize) -> Resu
         ));
     }
     Ok(())
+}
+
+fn validate_raa_message(code: &PackedRaaCode, message: &[B128]) -> Result<usize, Error> {
+    if message.len() != code.message_len() {
+        return Err(Error::InvalidPcsOpen(format!(
+            "Blaze2 RAA message has {} entries but code expects {}",
+            message.len(),
+            code.message_len()
+        )));
+    }
+    Ok(code.codeword_len())
+}
+
+fn validate_raa_trace_shape(trace: &Blaze2RaaTrace, len: usize) -> Result<(), Error> {
+    if trace.u2.len() != len
+        || trace.u3.len() != len
+        || trace.u4.len() != len
+        || trace.u5.len() != len
+    {
+        return Err(Error::InvalidPcsOpen(
+            "Blaze2 RAA trace has incompatible word lengths".to_string(),
+        ));
+    }
+    Ok(())
+}
+
+fn prefix_accumulate_into(input: &[B128], out: &mut [B128]) {
+    let mut acc = B128::ZERO;
+    for (dst, value) in out.iter_mut().zip(input) {
+        acc += *value;
+        *dst = acc;
+    }
 }
 
 fn validate_interleaved_rows<F: BlazeField>(rows: &[Vec<F>]) -> Result<(usize, usize), Error> {

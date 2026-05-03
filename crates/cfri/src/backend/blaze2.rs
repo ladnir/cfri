@@ -110,8 +110,8 @@ use crate::backend::{
     code::PackedRaaCode,
     hash::{Blake2s, Hash, Output},
     systematic_basefold::{
-        Blaze2BaseFoldBackendParams, Blaze2BaseFoldPrequeryPublic, Blaze2BaseFoldQueryProof,
-        HolographicQuerySchedule, TopQuery,
+        Blaze2BaseFoldBackendParams, Blaze2BaseFoldOpenRequest, Blaze2BaseFoldPrequeryPublic,
+        Blaze2BaseFoldQueryProof, HolographicQuerySchedule, TopQuery,
     },
     transcript::{TranscriptRead, TranscriptWrite},
     Deserialize, DeserializeOwned, Error, Serialize,
@@ -1547,7 +1547,12 @@ pub fn prove_blaze2_basefold_opening<H: Blaze2HashSpec>(
     let folded_codeword = packed_code.encode_row(&folded_message);
     let (backend_prequery, backend_state) =
         params.prove_prequery::<H>(&folded_codeword, &auxiliary_values)?;
-    let schedule = params.sample_query_schedule(&mut transcript, &backend_prequery)?;
+    let backend_request = Blaze2BaseFoldOpenRequest {
+        col_point: &claim.col_point,
+        folded_eval,
+    };
+    let schedule =
+        params.sample_query_schedule(&mut transcript, &backend_prequery, &backend_request)?;
 
     let mut queries = Vec::with_capacity(schedule.input_queries().len());
     let mut top_queries = Vec::with_capacity(schedule.input_queries().len());
@@ -1561,7 +1566,13 @@ pub fn prove_blaze2_basefold_opening<H: Blaze2HashSpec>(
     }
 
     let backend_proof = params.open_query_proof(&backend_state, &schedule)?;
-    params.verify_query_proof(&backend_prequery, &schedule, &backend_proof, &top_queries)?;
+    params.verify_query_proof(
+        &backend_prequery,
+        &backend_request,
+        &schedule,
+        &backend_proof,
+        &top_queries,
+    )?;
 
     Ok(Blaze2BaseFoldOpeningProof {
         row_evals,
@@ -1675,7 +1686,12 @@ pub fn verify_blaze2_basefold_opening<H: Blaze2HashSpec>(
     squeeze_blaze2_opening_folding_challenges(&mut transcript, &mut folding_challenges);
     let expected_folded_eval = inner_product_b128(&proof.row_evals, &folding_challenges);
     absorb_blaze2_opening_folded_eval(&mut transcript, &expected_folded_eval);
-    let schedule = params.sample_query_schedule(&mut transcript, &proof.backend_prequery)?;
+    let backend_request = Blaze2BaseFoldOpenRequest {
+        col_point: &claim.col_point,
+        folded_eval: expected_folded_eval,
+    };
+    let schedule =
+        params.sample_query_schedule(&mut transcript, &proof.backend_prequery, &backend_request)?;
     if proof.queries.len() != schedule.input_queries().len() {
         return Err(Error::InvalidPcsOpen(format!(
             "Blaze2 BaseFold proof has {} outer queries but backend schedule expects {}",
@@ -1701,6 +1717,7 @@ pub fn verify_blaze2_basefold_opening<H: Blaze2HashSpec>(
     )?;
     params.verify_query_proof(
         &proof.backend_prequery,
+        &backend_request,
         &schedule,
         &proof.backend_proof,
         &top_queries,

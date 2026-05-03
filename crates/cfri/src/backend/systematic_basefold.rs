@@ -190,6 +190,12 @@ pub struct AuxiliaryOracleQueryProof<H: Hash> {
     pub queries: Vec<AuxiliaryOracleQuery<H>>,
 }
 
+#[derive(Clone, Copy, Debug)]
+pub struct Blaze2BaseFoldOpenRequest<'a> {
+    pub col_point: &'a [B128],
+    pub folded_eval: B128,
+}
+
 #[derive(Clone, Debug, Eq, PartialEq)]
 pub struct Blaze2BaseFoldPrequeryPublic<H: Hash> {
     pub compiler_parity: CompilerParityPublicCommitment<H>,
@@ -505,8 +511,11 @@ impl Blaze2BaseFoldBackendParams {
         &self,
         transcript: &mut CfriTranscript<H, S>,
         prequery: &Blaze2BaseFoldPrequeryPublic<H>,
+        request: &Blaze2BaseFoldOpenRequest<'_>,
     ) -> Result<HolographicQuerySchedule, Error> {
+        validate_blaze2_basefold_open_request(self, request)?;
         absorb_blaze2_basefold_backend_spec(transcript, self.spec());
+        absorb_blaze2_basefold_open_request(transcript, request);
         absorb_blaze2_basefold_prequery_public(transcript, prequery);
         let mut schedule = HolographicQuerySchedule::sample(
             transcript,
@@ -550,10 +559,12 @@ impl Blaze2BaseFoldBackendParams {
     pub fn verify_query_proof<H: Hash>(
         &self,
         prequery: &Blaze2BaseFoldPrequeryPublic<H>,
+        request: &Blaze2BaseFoldOpenRequest<'_>,
         schedule: &HolographicQuerySchedule,
         proof: &Blaze2BaseFoldQueryProof<H>,
         top_queries: &[TopQuery<B128>],
     ) -> Result<(), Error> {
+        validate_blaze2_basefold_open_request(self, request)?;
         schedule.validate_top_queries(top_queries)?;
         proof.compiler_parity.verify(
             &prequery.compiler_parity,
@@ -1428,6 +1439,16 @@ pub fn absorb_blaze2_basefold_backend_spec<H: Hash, S>(
     absorb_usize(transcript, spec.auxiliary_oracle_len);
 }
 
+pub fn absorb_blaze2_basefold_open_request<H: Hash, S>(
+    transcript: &mut CfriTranscript<H, S>,
+    request: &Blaze2BaseFoldOpenRequest<'_>,
+) {
+    transcript.absorb("blaze2-basefold-open-request-v1");
+    absorb_usize(transcript, request.col_point.len());
+    transcript.absorb_slice(request.col_point);
+    transcript.absorb(&request.folded_eval);
+}
+
 pub fn absorb_compiler_parity_public_commitment<H: Hash, S>(
     transcript: &mut CfriTranscript<H, S>,
     public: &CompilerParityPublicCommitment<H>,
@@ -1708,6 +1729,20 @@ fn validate_message_and_parity_output_at_round(
         return Err(Error::InvalidPcsOpen(format!(
             "systematic RFC parity output has length {}, expected {parity_len}",
             out.len()
+        )));
+    }
+    Ok(())
+}
+
+fn validate_blaze2_basefold_open_request(
+    params: &Blaze2BaseFoldBackendParams,
+    request: &Blaze2BaseFoldOpenRequest<'_>,
+) -> Result<(), Error> {
+    let expected_col_point_len = log2_strict(params.praa.packed().message_len());
+    if request.col_point.len() != expected_col_point_len {
+        return Err(Error::InvalidPcsOpen(format!(
+            "Blaze2 BaseFold opening column point has {} coordinates, expected {expected_col_point_len}",
+            request.col_point.len()
         )));
     }
     Ok(())
@@ -2586,6 +2621,17 @@ mod tests {
         (folded_codeword, auxiliary)
     }
 
+    fn make_request_point(params: &Blaze2BaseFoldBackendParams, offset: u64) -> Vec<B128> {
+        message(log2_strict(params.praa().packed().message_len()), offset)
+    }
+
+    fn open_request<'a>(col_point: &'a [B128]) -> Blaze2BaseFoldOpenRequest<'a> {
+        Blaze2BaseFoldOpenRequest {
+            col_point,
+            folded_eval: B128::ONE,
+        }
+    }
+
     fn explicit_schedule(layout: &SystematicAugmentedRfcLayout) -> HolographicQuerySchedule {
         HolographicQuerySchedule {
             input_queries: vec![
@@ -3011,9 +3057,11 @@ mod tests {
             params.spec().auxiliary_oracle_len
         );
 
+        let request_point = make_request_point(&params, 7);
+        let request = open_request(&request_point);
         let mut transcript = CfriTranscript::<Blake2s>::new();
         let schedule = params
-            .sample_query_schedule(&mut transcript, &prequery)
+            .sample_query_schedule(&mut transcript, &prequery, &request)
             .unwrap();
         let proof = params.open_query_proof(&state, &schedule).unwrap();
         let top_queries = schedule
@@ -3026,20 +3074,20 @@ mod tests {
             .collect::<Vec<_>>();
 
         params
-            .verify_query_proof(&prequery, &schedule, &proof, &top_queries)
+            .verify_query_proof(&prequery, &request, &schedule, &proof, &top_queries)
             .unwrap();
 
         let mut bad_top_queries = top_queries.clone();
         bad_top_queries[0].index ^= 1;
         assert!(params
-            .verify_query_proof(&prequery, &schedule, &proof, &bad_top_queries)
+            .verify_query_proof(&prequery, &request, &schedule, &proof, &bad_top_queries)
             .is_err());
 
         let mut bad_proof = proof;
         if let Some(query) = bad_proof.compiler_parity.queries.first_mut() {
             query.value += B128::ONE;
             assert!(params
-                .verify_query_proof(&prequery, &schedule, &bad_proof, &top_queries)
+                .verify_query_proof(&prequery, &request, &schedule, &bad_proof, &top_queries)
                 .is_err());
         }
     }
@@ -3052,6 +3100,8 @@ mod tests {
         let (prequery, state) = params
             .prove_prequery::<Blake2s>(&folded_codeword, &auxiliary)
             .unwrap();
+        let request_point = make_request_point(&params, 11);
+        let request = open_request(&request_point);
         let schedule = explicit_schedule(params.compiler_code().layout());
         let proof = params.open_query_proof(&state, &schedule).unwrap();
         let top_queries = schedule
@@ -3069,31 +3119,43 @@ mod tests {
             params.compiler_code().layout().num_rounds()
         );
         params
-            .verify_query_proof(&prequery, &schedule, &proof, &top_queries)
+            .verify_query_proof(&prequery, &request, &schedule, &proof, &top_queries)
             .unwrap();
 
         let mut tampered_value = proof.clone();
         tampered_value.compiler_parity_folds.paths[0].steps[0].folded_value += B128::ONE;
         assert!(params
-            .verify_query_proof(&prequery, &schedule, &tampered_value, &top_queries)
+            .verify_query_proof(
+                &prequery,
+                &request,
+                &schedule,
+                &tampered_value,
+                &top_queries
+            )
             .is_err());
 
         let mut tampered_path = proof.clone();
         tampered_path.compiler_parity_folds.paths[0].steps[0].left_path[0][0] ^= 1;
         assert!(params
-            .verify_query_proof(&prequery, &schedule, &tampered_path, &top_queries)
+            .verify_query_proof(&prequery, &request, &schedule, &tampered_path, &top_queries)
             .is_err());
 
         let mut tampered_root = prequery.clone();
         tampered_root.folded_parity_layers[0].root[0] ^= 1;
         assert!(params
-            .verify_query_proof(&tampered_root, &schedule, &proof, &top_queries)
+            .verify_query_proof(&tampered_root, &request, &schedule, &proof, &top_queries)
             .is_err());
 
         let mut tampered_terminal = prequery;
         tampered_terminal.terminal_codeword[0] += B128::ONE;
         assert!(params
-            .verify_query_proof(&tampered_terminal, &schedule, &proof, &top_queries)
+            .verify_query_proof(
+                &tampered_terminal,
+                &request,
+                &schedule,
+                &proof,
+                &top_queries
+            )
             .is_err());
     }
 
@@ -3105,6 +3167,8 @@ mod tests {
         let (prequery, state) = params
             .prove_prequery::<Blake2s>(&folded_codeword, &auxiliary)
             .unwrap();
+        let request_point = make_request_point(&params, 13);
+        let request = open_request(&request_point);
         let schedule = explicit_schedule(params.compiler_code().layout());
         let proof = params.open_query_proof(&state, &schedule).unwrap();
         let top_queries = schedule
@@ -3122,19 +3186,19 @@ mod tests {
             3
         );
         params
-            .verify_query_proof(&prequery, &schedule, &proof, &top_queries)
+            .verify_query_proof(&prequery, &request, &schedule, &proof, &top_queries)
             .unwrap();
 
         let mut tampered = proof.clone();
         tampered.auxiliary.as_mut().unwrap().queries[0].value += B128::ONE;
         assert!(params
-            .verify_query_proof(&prequery, &schedule, &tampered, &top_queries)
+            .verify_query_proof(&prequery, &request, &schedule, &tampered, &top_queries)
             .is_err());
 
         let mut missing = proof;
         missing.auxiliary = None;
         assert!(params
-            .verify_query_proof(&prequery, &schedule, &missing, &top_queries)
+            .verify_query_proof(&prequery, &request, &schedule, &missing, &top_queries)
             .is_err());
     }
 
@@ -3145,6 +3209,8 @@ mod tests {
         let (prequery, state) = params
             .prove_prequery::<Blake2s>(&folded_codeword, &auxiliary)
             .unwrap();
+        let request_point = make_request_point(&params, 17);
+        let request = open_request(&request_point);
 
         let len = params.praa().packed().codeword_len();
         let mut schedule = HolographicQuerySchedule {
@@ -3179,19 +3245,19 @@ mod tests {
         let proof = params.open_query_proof(&state, &schedule).unwrap();
         assert_eq!(proof.auxiliary.as_ref().unwrap().queries.len(), 5);
         params
-            .verify_query_proof(&prequery, &schedule, &proof, &[])
+            .verify_query_proof(&prequery, &request, &schedule, &proof, &[])
             .unwrap();
 
         let mut tampered_accumulator = proof.clone();
         tampered_accumulator.auxiliary.as_mut().unwrap().queries[2].value += B128::ONE;
         assert!(params
-            .verify_query_proof(&prequery, &schedule, &tampered_accumulator, &[])
+            .verify_query_proof(&prequery, &request, &schedule, &tampered_accumulator, &[])
             .is_err());
 
         let mut tampered_permutation = proof;
         tampered_permutation.auxiliary.as_mut().unwrap().queries[4].value += B128::ONE;
         assert!(params
-            .verify_query_proof(&prequery, &schedule, &tampered_permutation, &[])
+            .verify_query_proof(&prequery, &request, &schedule, &tampered_permutation, &[])
             .is_err());
     }
 
@@ -3206,9 +3272,11 @@ mod tests {
             .unwrap();
         assert!(prequery.auxiliary.is_none());
 
+        let request_point = make_request_point(&params, 19);
+        let request = open_request(&request_point);
         let mut transcript = CfriTranscript::<Blake2s>::new();
         let schedule = params
-            .sample_query_schedule(&mut transcript, &prequery)
+            .sample_query_schedule(&mut transcript, &prequery, &request)
             .unwrap();
         let proof = params.open_query_proof(&state, &schedule).unwrap();
         assert!(proof.auxiliary.is_none());
@@ -3226,13 +3294,27 @@ mod tests {
         let (prequery, _) = params
             .prove_prequery::<Blake2s>(&folded_codeword, &auxiliary)
             .unwrap();
+        let request_point = make_request_point(&params, 23);
+        let request = open_request(&request_point);
 
         let mut lhs = CfriTranscript::<Blake2s>::new();
-        let lhs_schedule = params.sample_query_schedule(&mut lhs, &prequery).unwrap();
+        let lhs_schedule = params
+            .sample_query_schedule(&mut lhs, &prequery, &request)
+            .unwrap();
 
         let mut rhs = CfriTranscript::<Blake2s>::new();
-        let rhs_schedule = params.sample_query_schedule(&mut rhs, &prequery).unwrap();
+        let rhs_schedule = params
+            .sample_query_schedule(&mut rhs, &prequery, &request)
+            .unwrap();
         assert_eq!(lhs_schedule, rhs_schedule);
+
+        let changed_request_point = make_request_point(&params, 29);
+        let changed_request = open_request(&changed_request_point);
+        let mut changed = CfriTranscript::<Blake2s>::new();
+        let changed_schedule = params
+            .sample_query_schedule(&mut changed, &prequery, &changed_request)
+            .unwrap();
+        assert_ne!(lhs_schedule, changed_schedule);
 
         let changed_folded_codeword = message(params.compiler_code().layout().message_len(), 101);
         let (changed_prequery, _) = params
@@ -3240,7 +3322,7 @@ mod tests {
             .unwrap();
         let mut changed = CfriTranscript::<Blake2s>::new();
         let changed_schedule = params
-            .sample_query_schedule(&mut changed, &changed_prequery)
+            .sample_query_schedule(&mut changed, &changed_prequery, &request)
             .unwrap();
         assert_ne!(lhs_schedule, changed_schedule);
 
@@ -3250,7 +3332,7 @@ mod tests {
             .unwrap();
         let mut changed = CfriTranscript::<Blake2s>::new();
         let changed_schedule = params
-            .sample_query_schedule(&mut changed, &changed_prequery)
+            .sample_query_schedule(&mut changed, &changed_prequery, &request)
             .unwrap();
         assert_ne!(lhs_schedule, changed_schedule);
 
@@ -3259,7 +3341,7 @@ mod tests {
         let changed_params = Blaze2BaseFoldBackendParams::new(changed_spec).unwrap();
         let mut changed = CfriTranscript::<Blake2s>::new();
         let changed_schedule = changed_params
-            .sample_query_schedule(&mut changed, &prequery)
+            .sample_query_schedule(&mut changed, &prequery, &request)
             .unwrap();
         assert_ne!(lhs_schedule, changed_schedule);
         assert_eq!(

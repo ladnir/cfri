@@ -1542,15 +1542,15 @@ pub fn prove_blaze2_basefold_opening<H: Blaze2HashSpec>(
     }
     absorb_blaze2_opening_folded_eval(&mut transcript, &folded_eval);
 
-    let auxiliary_values =
-        blaze2_basefold_auxiliary_oracle(packed_code, &folded_message, auxiliary_oracle, params)?;
-    let folded_codeword = packed_code.encode_row(&folded_message);
-    let (backend_prequery, backend_state) =
-        params.prove_prequery::<H>(&folded_codeword, &auxiliary_values)?;
     let backend_request = Blaze2BaseFoldOpenRequest {
         col_point: &claim.col_point,
         folded_eval,
     };
+    let auxiliary_values =
+        blaze2_basefold_auxiliary_oracle(packed_code, &folded_message, auxiliary_oracle, params)?;
+    let folded_codeword = packed_code.encode_row(&folded_message);
+    let (backend_prequery, backend_state) =
+        params.prove_prequery::<H>(&folded_codeword, &auxiliary_values, &backend_request)?;
     let schedule =
         params.sample_query_schedule(&mut transcript, &backend_prequery, &backend_request)?;
 

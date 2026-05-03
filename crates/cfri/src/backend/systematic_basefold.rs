@@ -464,6 +464,7 @@ impl Blaze2BaseFoldBackendParams {
         &self,
         folded_codeword: &[B128],
         auxiliary_oracle: &[B128],
+        request: &Blaze2BaseFoldOpenRequest<'_>,
     ) -> Result<
         (
             Blaze2BaseFoldPrequeryPublic<H>,
@@ -471,6 +472,7 @@ impl Blaze2BaseFoldBackendParams {
         ),
         Error,
     > {
+        validate_blaze2_basefold_open_request(self, request)?;
         validate_auxiliary_oracle_shape(self.spec.auxiliary_oracle_len, auxiliary_oracle)?;
         let compiler_parity = self.compiler_code.commit_parity(folded_codeword)?;
         let auxiliary = if self.spec.auxiliary_oracle_len == 0 {
@@ -485,6 +487,7 @@ impl Blaze2BaseFoldBackendParams {
             folded_codeword,
             &compiler_parity.public(),
             auxiliary.as_ref().map(AuxiliaryOracleCommitment::public),
+            request,
         )?;
         let public = Blaze2BaseFoldPrequeryPublic {
             compiler_parity: compiler_parity.public(),
@@ -574,7 +577,7 @@ impl Blaze2BaseFoldBackendParams {
         proof.compiler_parity_folds.verify(
             prequery,
             self.compiler_code(),
-            &fold_challenges_from_prequery(self.spec(), prequery)?,
+            &fold_challenges_from_prequery(self.spec(), prequery, request)?,
             schedule,
         )?;
         verify_auxiliary_query_proof(
@@ -635,6 +638,7 @@ impl Blaze2BaseFoldBackendParams {
         message: &[B128],
         compiler_parity: &CompilerParityPublicCommitment<H>,
         auxiliary: Option<AuxiliaryOraclePublicCommitment<H>>,
+        request: &Blaze2BaseFoldOpenRequest<'_>,
     ) -> Result<
         (
             Vec<CompilerParityCommitment<H>>,
@@ -659,6 +663,7 @@ impl Blaze2BaseFoldBackendParams {
             self.spec(),
             compiler_parity,
             auxiliary.as_ref(),
+            request,
         );
 
         let mut physical_layers = Vec::with_capacity(layout.num_rounds() + 1);
@@ -1487,9 +1492,11 @@ fn absorb_blaze2_basefold_fold_chain_prefix<H: Hash, S>(
     spec: &Blaze2BaseFoldBackendSpec,
     compiler_parity: &CompilerParityPublicCommitment<H>,
     auxiliary: Option<&AuxiliaryOraclePublicCommitment<H>>,
+    request: &Blaze2BaseFoldOpenRequest<'_>,
 ) {
     transcript.absorb("blaze2-basefold-fold-chain-v1");
     absorb_blaze2_basefold_backend_spec(transcript, spec);
+    absorb_blaze2_basefold_open_request(transcript, request);
     absorb_compiler_parity_public_commitment(transcript, compiler_parity);
     match auxiliary {
         Some(auxiliary) => {
@@ -1806,6 +1813,7 @@ fn validate_query_schedule_spec(
 fn fold_challenges_from_prequery<H: Hash>(
     spec: &Blaze2BaseFoldBackendSpec,
     prequery: &Blaze2BaseFoldPrequeryPublic<H>,
+    request: &Blaze2BaseFoldOpenRequest<'_>,
 ) -> Result<Vec<B128>, Error> {
     let layout = SystematicAugmentedRfcLayout::new(spec.compiler_code.clone())?;
     if prequery.folded_parity_layers.len() != layout.num_rounds() {
@@ -1820,6 +1828,7 @@ fn fold_challenges_from_prequery<H: Hash>(
         spec,
         &prequery.compiler_parity,
         prequery.auxiliary.as_ref(),
+        request,
     );
     let mut challenges = Vec::with_capacity(layout.num_rounds());
     for round in 0..layout.num_rounds() {
@@ -3029,8 +3038,10 @@ mod tests {
     fn backend_prequery_round_trips_through_scheduled_queries() {
         let params = Blaze2BaseFoldBackendParams::new(blaze2_backend_spec()).unwrap();
         let (folded_codeword, auxiliary) = folded_codeword_and_auxiliary(&params, 41);
+        let request_point = make_request_point(&params, 7);
+        let request = open_request(&request_point);
         let (prequery, state) = params
-            .prove_prequery::<Blake2s>(&folded_codeword, &auxiliary)
+            .prove_prequery::<Blake2s>(&folded_codeword, &auxiliary, &request)
             .unwrap();
 
         assert_eq!(
@@ -3057,8 +3068,6 @@ mod tests {
             params.spec().auxiliary_oracle_len
         );
 
-        let request_point = make_request_point(&params, 7);
-        let request = open_request(&request_point);
         let mut transcript = CfriTranscript::<Blake2s>::new();
         let schedule = params
             .sample_query_schedule(&mut transcript, &prequery, &request)
@@ -3097,11 +3106,11 @@ mod tests {
         let params = Blaze2BaseFoldBackendParams::new(blaze2_backend_spec()).unwrap();
         let folded_codeword = message(params.compiler_code().layout().message_len(), 149);
         let auxiliary = message(params.spec().auxiliary_oracle_len, 151);
-        let (prequery, state) = params
-            .prove_prequery::<Blake2s>(&folded_codeword, &auxiliary)
-            .unwrap();
         let request_point = make_request_point(&params, 11);
         let request = open_request(&request_point);
+        let (prequery, state) = params
+            .prove_prequery::<Blake2s>(&folded_codeword, &auxiliary, &request)
+            .unwrap();
         let schedule = explicit_schedule(params.compiler_code().layout());
         let proof = params.open_query_proof(&state, &schedule).unwrap();
         let top_queries = schedule
@@ -3121,6 +3130,12 @@ mod tests {
         params
             .verify_query_proof(&prequery, &request, &schedule, &proof, &top_queries)
             .unwrap();
+
+        let changed_request_point = make_request_point(&params, 113);
+        let changed_request = open_request(&changed_request_point);
+        assert!(params
+            .verify_query_proof(&prequery, &changed_request, &schedule, &proof, &top_queries)
+            .is_err());
 
         let mut tampered_value = proof.clone();
         tampered_value.compiler_parity_folds.paths[0].steps[0].folded_value += B128::ONE;
@@ -3164,11 +3179,11 @@ mod tests {
         let params = Blaze2BaseFoldBackendParams::new(blaze2_backend_spec()).unwrap();
         let folded_codeword = message(params.compiler_code().layout().message_len(), 61);
         let auxiliary = message(params.spec().auxiliary_oracle_len, 73);
-        let (prequery, state) = params
-            .prove_prequery::<Blake2s>(&folded_codeword, &auxiliary)
-            .unwrap();
         let request_point = make_request_point(&params, 13);
         let request = open_request(&request_point);
+        let (prequery, state) = params
+            .prove_prequery::<Blake2s>(&folded_codeword, &auxiliary, &request)
+            .unwrap();
         let schedule = explicit_schedule(params.compiler_code().layout());
         let proof = params.open_query_proof(&state, &schedule).unwrap();
         let top_queries = schedule
@@ -3206,11 +3221,11 @@ mod tests {
     fn backend_auxiliary_local_relations_are_checked() {
         let params = Blaze2BaseFoldBackendParams::new(blaze2_backend_spec()).unwrap();
         let (folded_codeword, auxiliary) = folded_codeword_and_auxiliary(&params, 89);
-        let (prequery, state) = params
-            .prove_prequery::<Blake2s>(&folded_codeword, &auxiliary)
-            .unwrap();
         let request_point = make_request_point(&params, 17);
         let request = open_request(&request_point);
+        let (prequery, state) = params
+            .prove_prequery::<Blake2s>(&folded_codeword, &auxiliary, &request)
+            .unwrap();
 
         let len = params.praa().packed().codeword_len();
         let mut schedule = HolographicQuerySchedule {
@@ -3267,13 +3282,13 @@ mod tests {
         spec.auxiliary_oracle_len = 0;
         let params = Blaze2BaseFoldBackendParams::new(spec).unwrap();
         let folded_codeword = message(params.compiler_code().layout().message_len(), 67);
+        let request_point = make_request_point(&params, 19);
+        let request = open_request(&request_point);
         let (prequery, state) = params
-            .prove_prequery::<Blake2s>(&folded_codeword, &[])
+            .prove_prequery::<Blake2s>(&folded_codeword, &[], &request)
             .unwrap();
         assert!(prequery.auxiliary.is_none());
 
-        let request_point = make_request_point(&params, 19);
-        let request = open_request(&request_point);
         let mut transcript = CfriTranscript::<Blake2s>::new();
         let schedule = params
             .sample_query_schedule(&mut transcript, &prequery, &request)
@@ -3282,7 +3297,7 @@ mod tests {
         assert!(proof.auxiliary.is_none());
 
         assert!(params
-            .prove_prequery::<Blake2s>(&folded_codeword, &[B128::ONE])
+            .prove_prequery::<Blake2s>(&folded_codeword, &[B128::ONE], &request)
             .is_err());
     }
 
@@ -3291,11 +3306,11 @@ mod tests {
         let params = Blaze2BaseFoldBackendParams::new(blaze2_backend_spec()).unwrap();
         let folded_codeword = message(params.compiler_code().layout().message_len(), 43);
         let auxiliary = message(params.spec().auxiliary_oracle_len, 59);
-        let (prequery, _) = params
-            .prove_prequery::<Blake2s>(&folded_codeword, &auxiliary)
-            .unwrap();
         let request_point = make_request_point(&params, 23);
         let request = open_request(&request_point);
+        let (prequery, _) = params
+            .prove_prequery::<Blake2s>(&folded_codeword, &auxiliary, &request)
+            .unwrap();
 
         let mut lhs = CfriTranscript::<Blake2s>::new();
         let lhs_schedule = params
@@ -3310,6 +3325,17 @@ mod tests {
 
         let changed_request_point = make_request_point(&params, 29);
         let changed_request = open_request(&changed_request_point);
+        let (changed_request_prequery, _) = params
+            .prove_prequery::<Blake2s>(&folded_codeword, &auxiliary, &changed_request)
+            .unwrap();
+        assert!(
+            prequery.terminal_codeword != changed_request_prequery.terminal_codeword
+                || prequery
+                    .folded_parity_layers
+                    .iter()
+                    .zip(&changed_request_prequery.folded_parity_layers)
+                    .any(|(lhs, rhs)| lhs.root.as_slice() != rhs.root.as_slice())
+        );
         let mut changed = CfriTranscript::<Blake2s>::new();
         let changed_schedule = params
             .sample_query_schedule(&mut changed, &prequery, &changed_request)
@@ -3318,7 +3344,7 @@ mod tests {
 
         let changed_folded_codeword = message(params.compiler_code().layout().message_len(), 101);
         let (changed_prequery, _) = params
-            .prove_prequery::<Blake2s>(&changed_folded_codeword, &auxiliary)
+            .prove_prequery::<Blake2s>(&changed_folded_codeword, &auxiliary, &request)
             .unwrap();
         let mut changed = CfriTranscript::<Blake2s>::new();
         let changed_schedule = params
@@ -3328,7 +3354,7 @@ mod tests {
 
         let changed_auxiliary = message(params.spec().auxiliary_oracle_len, 211);
         let (changed_prequery, _) = params
-            .prove_prequery::<Blake2s>(&folded_codeword, &changed_auxiliary)
+            .prove_prequery::<Blake2s>(&folded_codeword, &changed_auxiliary, &request)
             .unwrap();
         let mut changed = CfriTranscript::<Blake2s>::new();
         let changed_schedule = params

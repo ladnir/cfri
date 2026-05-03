@@ -1326,6 +1326,26 @@ fn blaze2_basefold_opening_rejects_bad_outer_column() {
 }
 
 #[test]
+fn blaze2_basefold_opening_rejects_row_eval_folded_eval_mismatch() {
+    let (_, _, packed, commitment, claim, _) = opening_fixture(56);
+    let params = blaze2_basefold_backend_params(56, 4, 7);
+    let mut proof =
+        prove_blaze2_basefold_opening(&params, &packed, &commitment, &claim, &[]).unwrap();
+
+    let delta = B128::ONE;
+    proof.row_evals[0] += claim.row_point[0] * delta;
+    proof.row_evals[1] += delta;
+
+    let mut scratch = vec![B128::ZERO; proof.row_evals.len()];
+    assert_eq!(
+        evaluate_multilinear(&proof.row_evals, &claim.row_point, &mut scratch).unwrap(),
+        claim.value,
+        "test mutation must preserve the outer row-evaluation claim"
+    );
+    assert!(verify_blaze2_basefold_opening(&params, &commitment.public(), &claim, &proof).is_err());
+}
+
+#[test]
 fn blaze2_basefold_opening_derives_configured_auxiliary_trace() {
     let (_, _, packed, commitment, claim, _) = opening_fixture(54);
     let auxiliary_len = blaze2_code_spec(54).praa_codeword_len * 3;

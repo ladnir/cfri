@@ -2,8 +2,9 @@ use blake2::Blake2s256;
 use cfri::backend::{
     arithmetic::Field,
     blaze2::{
-        fold_packed_query_pair, fold_packed_rows_into, pack_interleaved_rows,
-        pack_interleaved_rows_into, Blaze2RaaCommitment, Blaze2RaaQuery,
+        evaluate_multilinear, evaluate_packed_rows_at_point_into, fold_packed_query_pair,
+        fold_packed_rows_into, pack_interleaved_rows, pack_interleaved_rows_into,
+        Blaze2RaaCommitment, Blaze2RaaQuery,
     },
     blaze_transcript::BlazeBlake2sTranscript,
     code::PackedRaaCode,
@@ -161,6 +162,57 @@ fn blaze2_interleaving_rejects_bad_shapes() {
     let packed = pack_interleaved_rows(&rows).unwrap();
     let mut folded = vec![B128::ZERO; 8];
     assert!(fold_packed_rows_into(&packed, &[B128::from(1)], &mut folded).is_err());
+}
+
+#[test]
+fn blaze2_multilinear_eval_matches_z_to_a_formula_small() {
+    let values = vec![B128::from(3), B128::from(5), B128::from(7), B128::from(11)];
+    let point = vec![B128::from(13), B128::from(17)];
+    let mut scratch = vec![B128::ZERO; values.len()];
+    let eval = evaluate_multilinear(&values, &point, &mut scratch).unwrap();
+
+    assert_eq!(
+        eval,
+        values[0] + point[0] * values[2] + point[1] * values[1] + point[0] * point[1] * values[3]
+    );
+}
+
+#[test]
+fn blaze2_packed_row_evals_match_individual_multilinear_evals() {
+    let rows = rows(4, 8);
+    let packed = pack_interleaved_rows(&rows).unwrap();
+    let point = vec![B128::from(2), B128::from(3), B128::from(5)];
+    let mut row_evals = vec![B128::ZERO; packed.len()];
+    let mut scratch = vec![B128::ZERO; packed[0].len()];
+    evaluate_packed_rows_at_point_into(&packed, &point, &mut row_evals, &mut scratch).unwrap();
+
+    let mut expected_scratch = vec![B128::ZERO; packed[0].len()];
+    for row in 0..packed.len() {
+        assert_eq!(
+            row_evals[row],
+            evaluate_multilinear(&packed[row], &point, &mut expected_scratch).unwrap()
+        );
+    }
+}
+
+#[test]
+fn blaze2_multilinear_eval_rejects_bad_shapes() {
+    let values = vec![B128::from(3), B128::from(5), B128::from(7)];
+    let point = vec![B128::from(13)];
+    let mut scratch = vec![B128::ZERO; values.len()];
+    assert!(evaluate_multilinear(&values, &point, &mut scratch).is_err());
+
+    let values = vec![B128::from(3), B128::from(5), B128::from(7), B128::from(11)];
+    let mut short_scratch = vec![B128::ZERO; values.len() - 1];
+    assert!(evaluate_multilinear(&values, &point, &mut short_scratch).is_err());
+
+    let rows = rows(4, 8);
+    let packed = pack_interleaved_rows(&rows).unwrap();
+    let mut row_evals = vec![B128::ZERO; packed.len()];
+    let mut scratch = vec![B128::ZERO; packed[0].len()];
+    assert!(
+        evaluate_packed_rows_at_point_into(&packed, &point, &mut row_evals, &mut scratch).is_err()
+    );
 }
 
 #[test]

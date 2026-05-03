@@ -7,7 +7,7 @@ use crate::backend::{
     transcript::{TranscriptRead, TranscriptWrite},
     Deserialize, DeserializeOwned, Error, Serialize,
 };
-use crate::plonky2_util::log2_strict;
+use crate::plonky2_util::{log2_strict, reverse_index_bits_in_place};
 use rayon::prelude::*;
 use sha3::digest::{FixedOutputReset, Update};
 use std::slice;
@@ -270,6 +270,56 @@ pub fn fold_packed_rows_into(
     Ok(())
 }
 
+pub fn evaluate_multilinear(
+    values: &[B128],
+    point: &[B128],
+    scratch: &mut [B128],
+) -> Result<B128, Error> {
+    validate_multilinear_eval_shape(values, point, scratch)?;
+    scratch.copy_from_slice(values);
+    reverse_index_bits_in_place(scratch);
+
+    let mut active_len = values.len();
+    for challenge in point {
+        let half = active_len >> 1;
+        for idx in 0..half {
+            scratch[idx] = scratch[idx << 1] + *challenge * scratch[(idx << 1) + 1];
+        }
+        active_len = half;
+    }
+    Ok(scratch[0])
+}
+
+pub fn evaluate_packed_rows_at_point_into(
+    packed_rows: &[Vec<B128>],
+    point: &[B128],
+    out: &mut [B128],
+    scratch: &mut [B128],
+) -> Result<(), Error> {
+    let row_len = validate_packed_rows(packed_rows)?;
+    if point.len() != log2_strict(row_len) {
+        return Err(Error::InvalidPcsOpen(format!(
+            "Blaze2 packed row evaluation point has {} coordinates for row length {row_len}",
+            point.len()
+        )));
+    }
+    if out.len() != packed_rows.len() {
+        return Err(Error::InvalidPcsOpen(
+            "Blaze2 packed row evaluation output count does not match row count".to_string(),
+        ));
+    }
+    if scratch.len() != row_len {
+        return Err(Error::InvalidPcsOpen(
+            "Blaze2 packed row evaluation scratch has incompatible length".to_string(),
+        ));
+    }
+
+    for (eval, row) in out.iter_mut().zip(packed_rows) {
+        *eval = evaluate_multilinear(row, point, scratch)?;
+    }
+    Ok(())
+}
+
 fn validate_message_rows<F: BlazeField>(rows: &[Vec<F>], row_len: usize) -> Result<(), Error> {
     if rows.is_empty() {
         return Err(Error::InvalidPcsOpen(
@@ -322,6 +372,32 @@ fn validate_packed_rows(rows: &[Vec<B128>]) -> Result<usize, Error> {
         ));
     }
     Ok(row_len)
+}
+
+fn validate_multilinear_eval_shape(
+    values: &[B128],
+    point: &[B128],
+    scratch: &[B128],
+) -> Result<(), Error> {
+    if values.is_empty() || !values.len().is_power_of_two() {
+        return Err(Error::InvalidPcsOpen(
+            "Blaze2 multilinear evaluation expects a non-empty power-of-two value vector"
+                .to_string(),
+        ));
+    }
+    if point.len() != log2_strict(values.len()) {
+        return Err(Error::InvalidPcsOpen(format!(
+            "Blaze2 multilinear evaluation point has {} coordinates for {} values",
+            point.len(),
+            values.len()
+        )));
+    }
+    if scratch.len() != values.len() {
+        return Err(Error::InvalidPcsOpen(
+            "Blaze2 multilinear evaluation scratch has incompatible length".to_string(),
+        ));
+    }
+    Ok(())
 }
 
 fn validate_query_index(index: usize, codeword_len: usize) -> Result<(), Error> {

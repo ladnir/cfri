@@ -1,7 +1,7 @@
 # Proof Size: Paper Budget vs Current Implementation
 
 This compares the paper-first proof-size accounting in `docs/proof_size_accounting.md` to the
-current implementation transcript.
+implementation transcripts.
 
 Current measured command:
 
@@ -9,14 +9,14 @@ Current measured command:
 cargo test --release -p cfri --test perf_baseline current_release_performance_baseline -- --ignored --nocapture --test-threads=1
 ```
 
-Current measured proof sizes:
+Measured legacy transcript proof sizes:
 
 | Scheme | Parameters | Current bytes |
 | --- | --- | ---: |
 | BaseFold transparent | `num_vars=10`, `poly_len=1024`, `Q=5`, `log_rate=1` | 12,096 |
 | BaseFold hiding | `num_vars=10`, `poly_len=1024`, `Q=5`, `log_rate=1` | 14,144 |
-| Blaze transparent | `num_vars=8`, `poly_len=256`, `rows=64`, `Q_RAA=16` | 5,404,240 |
-| Blaze hiding | `num_vars=8`, `poly_len=256`, `rows=64`, `Q_RAA=16` | 6,048,352 |
+| Legacy Blaze transparent | `num_vars=8`, `poly_len=256`, `rows=64`, `Q_RAA=16` | 5,404,240 |
+| Legacy Blaze hiding | `num_vars=8`, `poly_len=256`, `rows=64`, `Q_RAA=16` | 6,048,352 |
 
 ## BaseFold
 
@@ -39,9 +39,9 @@ The current BaseFold transcript now uses the paper-style carrying convention for
 the first layer sends both leaf values, and each lower folded layer sends only the sibling value.
 Merkle openings are also sibling-only and do not send the public/final root back to the verifier.
 
-## Blaze
+## Legacy Blaze
 
-For the current transparent Blaze baseline, the implementation accounting also matches the measured
+For the legacy transparent Blaze baseline, the implementation accounting also matches the measured
 `5,404,240` bytes:
 
 | Component | Bytes |
@@ -80,7 +80,7 @@ sumcheck transcripts. This is a correctness check, not a proof-size component.
 
 BaseFold is now in the right proof-size family for this transcript shape.
 
-Blaze is not currently in the paper proof-size family. The paper budget is:
+Legacy Blaze is not in the paper proof-size family. The paper budget is:
 
 ```text
 Blaze ~= one smaller BaseFold proof
@@ -89,7 +89,7 @@ Blaze ~= one smaller BaseFold proof
        + small scalar/vector overhead
 ```
 
-The implementation instead does:
+The legacy implementation instead does:
 
 ```text
 Blaze ~= two large BaseFold batch openings
@@ -98,10 +98,39 @@ Blaze ~= two large BaseFold batch openings
        + outer RAA column paths/leaves
 ```
 
-For the current small baseline, a paper-shaped proof with the same outer `Q_RAA=16` should be on
+For the small baseline above, a paper-shaped proof with the same outer `Q_RAA=16` should be on
 the order of one BaseFold backend proof plus tens of KB of Blaze column data. The current proof is
 5.4 MB because batch opening still multiplies Merkle paths by the number of committed/evaluated
 polynomials. The immediate duplication inside each BaseFold opening and inside the outer Blaze
 Merkle openings is fixed, and the padded zero RAA chunks are no longer committed/opened. The
 remaining cleanup target is Blaze's use of two large BaseFold batch openings instead of the paper's
 single reduced claim plus RAA column openings.
+
+## Blaze2
+
+`crates/cfri/src/backend/blaze2.rs` is the paper-shaped rewrite path. Its production opening proof
+contains only:
+
+| Component | Count |
+| --- | ---: |
+| Row-evaluation vector `u` | `t` field elements |
+| Folded-message backend commitment/evaluation/proof | delegated to the backend |
+| Interleaved RAA queried columns | `Q_RAA` columns, each `t` field elements |
+| Interleaved column Merkle paths | `Q_RAA * log2(n / t)` hashes |
+
+The public RAA code description is not proof data. The transcript binds the RAA shape and a compact
+32-byte code seed, so the verifier and prover agree on the public random code without hashing or
+sending the full permutation tables in the proof.
+
+For `B128`, the Blaze-specific byte budget before the backend proof is:
+
+```text
+blaze2_outer_bytes =
+    t * 16
+  + Q_RAA * (t * 16 + log2(n / t) * 32)
+  + 16
+  + backend_commitment_bytes
+```
+
+The final `16` is the folded evaluation. The backend proof itself must separately match its own
+paper accounting. Test-only exhaustive backends are intentionally not proof-size meaningful.

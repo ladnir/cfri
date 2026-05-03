@@ -1,22 +1,29 @@
 use blake2::Blake2s256;
 use cfri::backend::{
-    arithmetic::Field,
+    arithmetic::{Field, PrimeField},
     blaze2::{
-        build_raa_aux_trace, build_raa_trace, build_raa_trace_into, check_raa_folded_codeword_link,
-        check_raa_trace_at, evaluate_multilinear, evaluate_packed_rows_at_point_into,
+        absorb_blaze2_opening_folded_eval, absorb_blaze2_opening_public,
+        absorb_blaze2_opening_row_evals, build_raa_aux_trace, build_raa_trace,
+        build_raa_trace_into, check_raa_folded_codeword_link, check_raa_trace_at,
+        evaluate_multilinear, evaluate_packed_matrix_at_point,
+        evaluate_packed_matrix_at_point_into, evaluate_packed_rows_at_point_into,
         fold_interleaved_column, fold_packed_query_pair, fold_packed_rows_into,
-        pack_interleaved_rows, pack_interleaved_rows_into, verify_raa_aux_trace_spot_query,
-        verify_raa_trace_spot_query, Blaze2InterleavedCodewordCommitment,
-        Blaze2InterleavedColumnQuery, Blaze2RaaAuxTrace, Blaze2RaaAuxTraceCommitment,
-        Blaze2RaaCommitment, Blaze2RaaQuery, Blaze2RaaTrace, Blaze2RaaTraceCommitment,
-        Blaze2RaaTraceSpotQuery,
+        pack_interleaved_rows, pack_interleaved_rows_into, prove_blaze2_opening,
+        squeeze_blaze2_opening_folding_challenges, squeeze_blaze2_opening_query_indices,
+        verify_blaze2_opening, verify_raa_aux_trace_spot_query, verify_raa_trace_spot_query,
+        Blaze2CodeSeed, Blaze2FoldedMessageBackend, Blaze2FoldedMessageOpenRequest,
+        Blaze2InterleavedCodewordCommitment, Blaze2InterleavedColumnQuery, Blaze2OpeningClaim,
+        Blaze2OpeningProof, Blaze2RaaAuxTrace, Blaze2RaaAuxTraceCommitment, Blaze2RaaCommitment,
+        Blaze2RaaQuery, Blaze2RaaTrace, Blaze2RaaTraceCommitment, Blaze2RaaTraceSpotQuery,
     },
     blaze_transcript::BlazeBlake2sTranscript,
     code::PackedRaaCode,
-    hash::{Blake2s, Hash},
+    hash::{Blake2s, Hash, Output},
     transcript::InMemoryTranscript as _,
+    Error,
 };
 use cfri::blaze::{BlazeField, Blazeu64, B128};
+use cfri::transcript::Transcript as CfriTranscript;
 use rand_chacha::{rand_core::SeedableRng, ChaCha8Rng};
 
 fn rows(num_rows: usize, row_len: usize) -> Vec<Vec<Blazeu64>> {
@@ -41,6 +48,113 @@ fn packed_rows(rows: &[Vec<Blazeu64>]) -> Vec<Vec<B128>> {
                 .collect::<Vec<_>>()
         })
         .collect::<Vec<_>>()
+}
+
+#[derive(Clone, Debug, PartialEq, Eq)]
+struct ExhaustiveFoldedMessageBackend;
+
+#[derive(Clone, Debug, PartialEq, Eq)]
+struct ExhaustiveFoldedMessageState {
+    message: Vec<B128>,
+}
+
+#[derive(Clone, Debug, PartialEq, Eq)]
+struct ExhaustiveFoldedMessageProof {
+    message: Vec<B128>,
+}
+
+impl Blaze2FoldedMessageBackend for ExhaustiveFoldedMessageBackend {
+    type Commitment = Output<Blake2s256>;
+    type ProverState = ExhaustiveFoldedMessageState;
+    type Proof = ExhaustiveFoldedMessageProof;
+
+    fn commit(message: &[B128]) -> Result<(Self::Commitment, Self::ProverState), Error> {
+        Ok((
+            exhaustive_folded_message_commitment(message),
+            ExhaustiveFoldedMessageState {
+                message: message.to_vec(),
+            },
+        ))
+    }
+
+    fn absorb_commitment<H: Hash, S>(
+        transcript: &mut CfriTranscript<H, S>,
+        commitment: &Self::Commitment,
+    ) {
+        transcript.absorb(commitment);
+    }
+
+    fn open(
+        state: &Self::ProverState,
+        request: &Blaze2FoldedMessageOpenRequest<'_>,
+    ) -> Result<Self::Proof, Error> {
+        let proof = ExhaustiveFoldedMessageProof {
+            message: state.message.clone(),
+        };
+        let encoded = request.code.encode_row(&state.message);
+        let input_values = request
+            .input_indices
+            .iter()
+            .map(|&index| encoded[index])
+            .collect::<Vec<_>>();
+        Self::verify(
+            &exhaustive_folded_message_commitment(&state.message),
+            &proof,
+            state.message.len(),
+            request,
+            &input_values,
+        )?;
+        Ok(proof)
+    }
+
+    fn verify(
+        commitment: &Self::Commitment,
+        proof: &Self::Proof,
+        message_len: usize,
+        request: &Blaze2FoldedMessageOpenRequest<'_>,
+        input_values: &[B128],
+    ) -> Result<(), Error> {
+        if proof.message.len() != message_len {
+            return Err(Error::InvalidPcsOpen(
+                "test folded-message backend proof has wrong message length".to_string(),
+            ));
+        }
+        if exhaustive_folded_message_commitment(&proof.message) != *commitment {
+            return Err(Error::InvalidPcsOpen(
+                "test folded-message backend commitment mismatch".to_string(),
+            ));
+        }
+        let mut scratch = vec![B128::ZERO; message_len];
+        let proof_eval = evaluate_multilinear(&proof.message, request.col_point, &mut scratch)?;
+        if proof_eval != request.folded_eval {
+            return Err(Error::InvalidPcsOpen(
+                "test folded-message backend evaluation mismatch".to_string(),
+            ));
+        }
+        if input_values.len() != request.input_indices.len() {
+            return Err(Error::InvalidPcsOpen(
+                "test folded-message backend input value count mismatch".to_string(),
+            ));
+        }
+        let encoded = request.code.encode_row(&proof.message);
+        for (&index, &value) in request.input_indices.iter().zip(input_values) {
+            if encoded[index] != value {
+                return Err(Error::InvalidPcsOpen(
+                    "test folded-message backend input oracle mismatch".to_string(),
+                ));
+            }
+        }
+        Ok(())
+    }
+}
+
+fn exhaustive_folded_message_commitment(message: &[B128]) -> Output<Blake2s256> {
+    let mut bytes = Vec::with_capacity(16 + message.len() * 16);
+    bytes.extend_from_slice(&(message.len() as u64).to_le_bytes());
+    for value in message {
+        bytes.extend_from_slice(value.to_repr().as_ref());
+    }
+    Blake2s256::digest(bytes)
 }
 
 fn raa_trace_fixture(seed: u8) -> (PackedRaaCode, Vec<B128>, Blaze2RaaTrace) {
@@ -86,6 +200,155 @@ fn paper_column_openings<H: Hash>(
         queries.push(commitment.query(index - 1).unwrap());
     }
     queries
+}
+
+fn opening_fixture(
+    seed: u8,
+) -> (
+    PackedRaaCode,
+    Blaze2CodeSeed,
+    Vec<Vec<B128>>,
+    Blaze2InterleavedCodewordCommitment<Blake2s256>,
+    Blaze2OpeningClaim,
+    usize,
+) {
+    let code_seed = Blaze2CodeSeed([seed; 32]);
+    let mut rng = ChaCha8Rng::from_seed(code_seed.0);
+    let code = PackedRaaCode::new(8, 4, &mut rng);
+    let rows = rows(4, 8);
+    let packed = pack_interleaved_rows(&rows).unwrap();
+    let codeword_rows = code.encode_rows(&packed);
+    let commitment =
+        Blaze2InterleavedCodewordCommitment::<Blake2s256>::commit_codeword_rows(&codeword_rows)
+            .unwrap();
+    let row_point = vec![B128::from(3 + seed as u64)];
+    let col_point = vec![
+        B128::from(5 + seed as u64),
+        B128::from(9 + seed as u64),
+        B128::from(13 + seed as u64),
+    ];
+    let value = evaluate_packed_matrix_at_point(&packed, &row_point, &col_point).unwrap();
+    let claim = Blaze2OpeningClaim {
+        row_point,
+        col_point,
+        value,
+    };
+    let num_queries = 4;
+    (code, code_seed, packed, commitment, claim, num_queries)
+}
+
+fn audit_blaze2_opening_against_witness<H: Hash, B: Blaze2FoldedMessageBackend>(
+    code: &PackedRaaCode,
+    code_seed: &Blaze2CodeSeed,
+    packed: &[Vec<B128>],
+    commitment: &Blaze2InterleavedCodewordCommitment<H>,
+    claim: &Blaze2OpeningClaim,
+    proof: &Blaze2OpeningProof<H, B>,
+    num_queries: usize,
+) -> Result<(), Error> {
+    if proof.queries.len() != num_queries {
+        return Err(Error::InvalidPcsOpen(
+            "test audit: proof query count mismatch".to_string(),
+        ));
+    }
+
+    let row_len = code.message_len();
+    let num_rows = packed.len();
+    let mut row_evals = vec![B128::ZERO; num_rows];
+    let mut scratch = vec![B128::ZERO; row_len.max(num_rows)];
+    let value = evaluate_packed_matrix_at_point_into(
+        packed,
+        &claim.row_point,
+        &claim.col_point,
+        &mut row_evals,
+        &mut scratch,
+    )?;
+    if value != claim.value {
+        return Err(Error::InvalidPcsOpen(
+            "test audit: claim does not match witness".to_string(),
+        ));
+    }
+    if proof.row_evals != row_evals {
+        return Err(Error::InvalidPcsOpen(
+            "test audit: row evaluations do not match witness".to_string(),
+        ));
+    }
+
+    let public = commitment.public();
+    let mut transcript = CfriTranscript::<H>::new();
+    absorb_blaze2_opening_public(
+        &mut transcript,
+        code,
+        code_seed,
+        &public,
+        claim,
+        num_queries,
+    );
+    absorb_blaze2_opening_row_evals(&mut transcript, &row_evals);
+
+    let mut folding_challenges = vec![B128::ZERO; num_rows];
+    squeeze_blaze2_opening_folding_challenges(&mut transcript, &mut folding_challenges);
+
+    let mut folded_message = vec![B128::ZERO; row_len];
+    fold_packed_rows_into(packed, &folding_challenges, &mut folded_message)?;
+    let folded_eval =
+        evaluate_multilinear(&folded_message, &claim.col_point, &mut scratch[..row_len])?;
+    if proof.folded_message.eval != folded_eval {
+        return Err(Error::InvalidPcsOpen(
+            "test audit: folded evaluation does not match witness fold".to_string(),
+        ));
+    }
+
+    B::absorb_commitment(&mut transcript, &proof.folded_message.commitment);
+    absorb_blaze2_opening_folded_eval(&mut transcript, &proof.folded_message.eval);
+
+    let mut query_indices = vec![0usize; num_queries];
+    squeeze_blaze2_opening_query_indices(&mut transcript, code.codeword_len(), &mut query_indices)?;
+
+    let folded_codeword = code.encode_row(&folded_message);
+    for (query, &expected_index) in proof.queries.iter().zip(&query_indices) {
+        let current = &query.column_opening;
+        current.authenticate(
+            commitment.root(),
+            commitment.num_rows(),
+            code.codeword_len(),
+        )?;
+        if current.index != expected_index {
+            return Err(Error::InvalidPcsOpen(
+                "test audit: interleaved column index mismatch".to_string(),
+            ));
+        }
+        if fold_interleaved_column(current, &folding_challenges)? != folded_codeword[expected_index]
+        {
+            return Err(Error::InvalidPcsOpen(
+                "test audit: interleaved column does not match folded codeword".to_string(),
+            ));
+        }
+    }
+
+    Ok(())
+}
+
+fn exhaustive_backend_blaze2_outer_bytes(
+    proof: &Blaze2OpeningProof<Blake2s256, ExhaustiveFoldedMessageBackend>,
+) -> usize {
+    const B128_BYTES: usize = 16;
+    proof.row_evals.len() * B128_BYTES
+        + proof.folded_message.eval.to_repr().as_ref().len()
+        + proof.folded_message.commitment.len()
+        + proof
+            .queries
+            .iter()
+            .map(|query| {
+                query.column_opening.values.len() * B128_BYTES
+                    + query
+                        .column_opening
+                        .path
+                        .iter()
+                        .map(|digest| digest.len())
+                        .sum::<usize>()
+            })
+            .sum::<usize>()
 }
 
 fn tamper_opened_trace_value<H: Hash>(
@@ -611,6 +874,343 @@ fn blaze2_paper_raa_aux_trace_rejects_missing_previous_column() {
             &challenges,
         )
         .is_err());
+}
+
+#[test]
+fn blaze2_opening_verifies_row_fold_and_raa_boundaries() {
+    let (code, code_seed, packed, commitment, claim, num_queries) = opening_fixture(30);
+    let proof = prove_blaze2_opening::<_, ExhaustiveFoldedMessageBackend>(
+        &code,
+        &code_seed,
+        &packed,
+        &commitment,
+        &claim,
+        num_queries,
+    )
+    .unwrap();
+    let public = commitment.public();
+
+    assert_eq!(proof.row_evals.len(), commitment.num_rows());
+    assert_eq!(proof.queries.len(), num_queries);
+    audit_blaze2_opening_against_witness::<_, ExhaustiveFoldedMessageBackend>(
+        &code,
+        &code_seed,
+        &packed,
+        &commitment,
+        &claim,
+        &proof,
+        num_queries,
+    )
+    .unwrap();
+    verify_blaze2_opening::<_, ExhaustiveFoldedMessageBackend>(
+        &code,
+        &code_seed,
+        &public,
+        &claim,
+        &proof,
+        num_queries,
+    )
+    .unwrap();
+}
+
+#[test]
+fn blaze2_opening_outer_proof_size_matches_paper_accounting() {
+    let (code, code_seed, packed, commitment, claim, num_queries) = opening_fixture(43);
+    let proof = prove_blaze2_opening::<_, ExhaustiveFoldedMessageBackend>(
+        &code,
+        &code_seed,
+        &packed,
+        &commitment,
+        &claim,
+        num_queries,
+    )
+    .unwrap();
+
+    let t = commitment.num_rows();
+    let field_bytes = 16;
+    let hash_bytes = 32;
+    let path_len = code.codeword_len().trailing_zeros() as usize;
+    let expected = t * field_bytes
+        + field_bytes
+        + hash_bytes
+        + num_queries * (t * field_bytes + path_len * hash_bytes);
+
+    assert_eq!(
+        exhaustive_backend_blaze2_outer_bytes(&proof),
+        expected,
+        "Blaze2 outer proof must be u + folded commitment/eval + Q_RAA opened columns and paths"
+    );
+}
+
+#[test]
+fn blaze2_opening_rejects_bad_claim_value() {
+    let (code, code_seed, packed, commitment, mut claim, num_queries) = opening_fixture(31);
+    let proof = prove_blaze2_opening::<_, ExhaustiveFoldedMessageBackend>(
+        &code,
+        &code_seed,
+        &packed,
+        &commitment,
+        &claim,
+        num_queries,
+    )
+    .unwrap();
+    claim.value += B128::ONE;
+
+    assert!(verify_blaze2_opening::<_, ExhaustiveFoldedMessageBackend>(
+        &code,
+        &code_seed,
+        &commitment.public(),
+        &claim,
+        &proof,
+        num_queries,
+    )
+    .is_err());
+}
+
+#[test]
+fn blaze2_opening_rejects_bad_row_eval_vector() {
+    let (code, code_seed, packed, commitment, claim, num_queries) = opening_fixture(32);
+    let mut proof = prove_blaze2_opening::<_, ExhaustiveFoldedMessageBackend>(
+        &code,
+        &code_seed,
+        &packed,
+        &commitment,
+        &claim,
+        num_queries,
+    )
+    .unwrap();
+    proof.row_evals[0] += B128::ONE;
+
+    assert!(verify_blaze2_opening::<_, ExhaustiveFoldedMessageBackend>(
+        &code,
+        &code_seed,
+        &commitment.public(),
+        &claim,
+        &proof,
+        num_queries,
+    )
+    .is_err());
+}
+
+#[test]
+fn blaze2_opening_rejects_bad_input_column_opening() {
+    let (code, code_seed, packed, commitment, claim, num_queries) = opening_fixture(33);
+    let mut proof = prove_blaze2_opening::<_, ExhaustiveFoldedMessageBackend>(
+        &code,
+        &code_seed,
+        &packed,
+        &commitment,
+        &claim,
+        num_queries,
+    )
+    .unwrap();
+    proof.queries[0].column_opening.values[0] += B128::ONE;
+
+    assert!(verify_blaze2_opening::<_, ExhaustiveFoldedMessageBackend>(
+        &code,
+        &code_seed,
+        &commitment.public(),
+        &claim,
+        &proof,
+        num_queries,
+    )
+    .is_err());
+}
+
+#[test]
+fn blaze2_opening_rejects_bad_folded_message_eval() {
+    let (code, code_seed, packed, commitment, claim, num_queries) = opening_fixture(40);
+    let mut proof = prove_blaze2_opening::<_, ExhaustiveFoldedMessageBackend>(
+        &code,
+        &code_seed,
+        &packed,
+        &commitment,
+        &claim,
+        num_queries,
+    )
+    .unwrap();
+    proof.folded_message.eval += B128::ONE;
+
+    assert!(verify_blaze2_opening::<_, ExhaustiveFoldedMessageBackend>(
+        &code,
+        &code_seed,
+        &commitment.public(),
+        &claim,
+        &proof,
+        num_queries,
+    )
+    .is_err());
+}
+
+#[test]
+fn blaze2_opening_rejects_bad_folded_message_backend_commitment() {
+    let (code, code_seed, packed, commitment, claim, num_queries) = opening_fixture(41);
+    let mut proof = prove_blaze2_opening::<_, ExhaustiveFoldedMessageBackend>(
+        &code,
+        &code_seed,
+        &packed,
+        &commitment,
+        &claim,
+        num_queries,
+    )
+    .unwrap();
+    proof.folded_message.commitment[0] ^= 1;
+
+    assert!(verify_blaze2_opening::<_, ExhaustiveFoldedMessageBackend>(
+        &code,
+        &code_seed,
+        &commitment.public(),
+        &claim,
+        &proof,
+        num_queries,
+    )
+    .is_err());
+}
+
+#[test]
+fn blaze2_opening_rejects_bad_folded_message_backend_proof() {
+    let (code, code_seed, packed, commitment, claim, num_queries) = opening_fixture(42);
+    let mut proof = prove_blaze2_opening::<_, ExhaustiveFoldedMessageBackend>(
+        &code,
+        &code_seed,
+        &packed,
+        &commitment,
+        &claim,
+        num_queries,
+    )
+    .unwrap();
+    proof.folded_message.backend_proof.message[0] += B128::ONE;
+
+    assert!(verify_blaze2_opening::<_, ExhaustiveFoldedMessageBackend>(
+        &code,
+        &code_seed,
+        &commitment.public(),
+        &claim,
+        &proof,
+        num_queries,
+    )
+    .is_err());
+}
+
+#[test]
+fn blaze2_opening_rejects_query_index_not_sampled_by_transcript() {
+    let (code, code_seed, packed, commitment, claim, num_queries) = opening_fixture(38);
+    let mut proof = prove_blaze2_opening::<_, ExhaustiveFoldedMessageBackend>(
+        &code,
+        &code_seed,
+        &packed,
+        &commitment,
+        &claim,
+        num_queries,
+    )
+    .unwrap();
+    proof.queries.swap(0, 1);
+
+    assert!(verify_blaze2_opening::<_, ExhaustiveFoldedMessageBackend>(
+        &code,
+        &code_seed,
+        &commitment.public(),
+        &claim,
+        &proof,
+        num_queries,
+    )
+    .is_err());
+}
+
+#[test]
+fn blaze2_opening_rejects_truncated_query_count() {
+    let (code, code_seed, packed, commitment, claim, num_queries) = opening_fixture(39);
+    let mut proof = prove_blaze2_opening::<_, ExhaustiveFoldedMessageBackend>(
+        &code,
+        &code_seed,
+        &packed,
+        &commitment,
+        &claim,
+        num_queries,
+    )
+    .unwrap();
+    proof.queries.pop();
+
+    assert!(verify_blaze2_opening::<_, ExhaustiveFoldedMessageBackend>(
+        &code,
+        &code_seed,
+        &commitment.public(),
+        &claim,
+        &proof,
+        num_queries - 1,
+    )
+    .is_err());
+}
+
+#[test]
+fn blaze2_opening_rejects_bad_committed_codeword_column() {
+    let (code, code_seed, packed, commitment, claim, num_queries) = opening_fixture(34);
+    let proof = prove_blaze2_opening::<_, ExhaustiveFoldedMessageBackend>(
+        &code,
+        &code_seed,
+        &packed,
+        &commitment,
+        &claim,
+        num_queries,
+    )
+    .unwrap();
+
+    let mut bad_codeword_rows = code.encode_rows(&packed);
+    for row in &mut bad_codeword_rows {
+        for value in row {
+            *value = B128::ZERO;
+        }
+    }
+    let bad_commitment =
+        Blaze2InterleavedCodewordCommitment::<Blake2s256>::commit_codeword_rows(&bad_codeword_rows)
+            .unwrap();
+    let bad_proof = prove_blaze2_opening::<_, ExhaustiveFoldedMessageBackend>(
+        &code,
+        &code_seed,
+        &packed,
+        &bad_commitment,
+        &claim,
+        num_queries,
+    )
+    .unwrap();
+
+    assert!(
+        audit_blaze2_opening_against_witness::<_, ExhaustiveFoldedMessageBackend>(
+            &code,
+            &code_seed,
+            &packed,
+            &bad_commitment,
+            &claim,
+            &bad_proof,
+            num_queries,
+        )
+        .is_err()
+    );
+    verify_blaze2_opening::<_, ExhaustiveFoldedMessageBackend>(
+        &code,
+        &code_seed,
+        &commitment.public(),
+        &claim,
+        &proof,
+        num_queries,
+    )
+    .unwrap();
+}
+
+#[test]
+fn blaze2_opening_prover_rejects_claim_not_matching_rows() {
+    let (code, code_seed, packed, commitment, mut claim, num_queries) = opening_fixture(35);
+    claim.value += B128::ONE;
+
+    assert!(prove_blaze2_opening::<_, ExhaustiveFoldedMessageBackend>(
+        &code,
+        &code_seed,
+        &packed,
+        &commitment,
+        &claim,
+        num_queries
+    )
+    .is_err());
 }
 
 #[test]

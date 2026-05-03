@@ -66,6 +66,21 @@
 //! c_star = sum_i rho_i c_i
 //! ```
 //!
+//! The row-evaluation vector is bound to the folded message by the scalar
+//! equation
+//!
+//! ```text
+//! m_star(z_col) = sum_i rho_i e_i
+//! ```
+//!
+//! Because `rho` is sampled after `e` is transcript-bound, this is the
+//! reduction from the original matrix opening to one folded-message opening.
+//! The inner backend is responsible for proving the folded PRAA relation:
+//! `m_star(z_col)` equals the folded evaluation and the queried values of
+//! `PRAA(m_star)` match the input-oracle values supplied by Blaze2. Blaze2
+//! supplies those input-oracle values by opening one interleaved codeword
+//! column per backend query.
+//!
 //! Since packed RAA is linear, `c_star = PRAA(m_star)`. The RAA checks are run
 //! for this single folded instance:
 //!
@@ -83,10 +98,11 @@
 //! v5[j] = c_star[j] = sum_i rho_i c_i[j]
 //! ```
 //!
-//! Current implementation note: `Blaze2InterleavedCodewordCommitment` and
-//! `Blaze2RaaAuxTraceCommitment` are the paper-shaped RAA path. The older
-//! `Blaze2RaaTraceCommitment` commits `u2/u3/u4/u5` and remains as scaffolding
-//! for local RAA tests while we replace it with the column-derived `u5` checks.
+//! Current implementation note: `Blaze2OpeningProof` must only carry the
+//! interleaved codeword column openings and the folded-message backend proof.
+//! The auxiliary RAA trace types below are independent test/reference
+//! machinery for auditing the RAA algebra; they are not part of the Blaze2
+//! opening proof shape.
 use crate::backend::{
     arithmetic::Field,
     avx_int_types::BlazeField,
@@ -97,6 +113,7 @@ use crate::backend::{
     Deserialize, DeserializeOwned, Error, Serialize,
 };
 use crate::plonky2_util::{log2_strict, reverse_index_bits_in_place};
+use crate::transcript::Transcript as CfriTranscript;
 use rayon::prelude::*;
 use sha3::digest::{FixedOutputReset, Update};
 use std::slice;
@@ -205,6 +222,69 @@ pub struct Blaze2RaaAuxTraceSpotQuery<H: Hash> {
 }
 
 #[derive(Clone, Debug, PartialEq, Eq)]
+pub struct Blaze2OpeningClaim {
+    pub row_point: Vec<B128>,
+    pub col_point: Vec<B128>,
+    pub value: B128,
+}
+
+#[derive(Clone, Copy, Debug, PartialEq, Eq)]
+pub struct Blaze2CodeSeed(pub [u8; 32]);
+
+#[derive(Clone, Debug)]
+pub struct Blaze2OpeningQuery<H: Hash> {
+    pub column_opening: Blaze2InterleavedColumnQuery<H>,
+}
+
+#[derive(Clone, Copy, Debug)]
+pub struct Blaze2FoldedMessageOpenRequest<'a> {
+    pub code: &'a PackedRaaCode,
+    pub col_point: &'a [B128],
+    pub folded_eval: B128,
+    pub input_indices: &'a [usize],
+}
+
+#[derive(Clone, Debug)]
+pub struct Blaze2FoldedMessageProof<B: Blaze2FoldedMessageBackend> {
+    pub commitment: B::Commitment,
+    pub eval: B128,
+    pub backend_proof: B::Proof,
+}
+
+#[derive(Clone, Debug)]
+pub struct Blaze2OpeningProof<H: Hash, B: Blaze2FoldedMessageBackend> {
+    pub row_evals: Vec<B128>,
+    pub folded_message: Blaze2FoldedMessageProof<B>,
+    pub queries: Vec<Blaze2OpeningQuery<H>>,
+}
+
+pub trait Blaze2FoldedMessageBackend {
+    type Commitment: Clone + std::fmt::Debug + PartialEq + Eq;
+    type ProverState;
+    type Proof: Clone + std::fmt::Debug + PartialEq + Eq;
+
+    fn commit(message: &[B128]) -> Result<(Self::Commitment, Self::ProverState), Error>;
+
+    fn absorb_commitment<H: Hash, S>(
+        transcript: &mut CfriTranscript<H, S>,
+        commitment: &Self::Commitment,
+    );
+
+    fn open(
+        state: &Self::ProverState,
+        request: &Blaze2FoldedMessageOpenRequest<'_>,
+    ) -> Result<Self::Proof, Error>;
+
+    fn verify(
+        commitment: &Self::Commitment,
+        proof: &Self::Proof,
+        message_len: usize,
+        request: &Blaze2FoldedMessageOpenRequest<'_>,
+        input_values: &[B128],
+    ) -> Result<(), Error>;
+}
+
+#[derive(Clone, Debug, PartialEq, Eq)]
 pub struct Blaze2RaaTrace {
     pub u2: Vec<B128>,
     pub u3: Vec<B128>,
@@ -259,6 +339,34 @@ impl<H: Hash> PartialEq for Blaze2RaaAuxTraceSpotQuery<H> {
 }
 
 impl<H: Hash> Eq for Blaze2RaaAuxTraceSpotQuery<H> {}
+
+impl<B: Blaze2FoldedMessageBackend> PartialEq for Blaze2FoldedMessageProof<B> {
+    fn eq(&self, other: &Self) -> bool {
+        self.commitment == other.commitment
+            && self.eval == other.eval
+            && self.backend_proof == other.backend_proof
+    }
+}
+
+impl<B: Blaze2FoldedMessageBackend> Eq for Blaze2FoldedMessageProof<B> {}
+
+impl<H: Hash> PartialEq for Blaze2OpeningQuery<H> {
+    fn eq(&self, other: &Self) -> bool {
+        self.column_opening == other.column_opening
+    }
+}
+
+impl<H: Hash> Eq for Blaze2OpeningQuery<H> {}
+
+impl<H: Hash, B: Blaze2FoldedMessageBackend> PartialEq for Blaze2OpeningProof<H, B> {
+    fn eq(&self, other: &Self) -> bool {
+        self.row_evals == other.row_evals
+            && self.folded_message == other.folded_message
+            && self.queries == other.queries
+    }
+}
+
+impl<H: Hash, B: Blaze2FoldedMessageBackend> Eq for Blaze2OpeningProof<H, B> {}
 
 impl<F: BlazeField, H: Hash> Blaze2RaaCommitment<F, H> {
     pub fn commit_rows(code: PackedRaaCode, rows: &[Vec<F>]) -> Result<Self, Error> {
@@ -926,6 +1034,301 @@ pub fn evaluate_packed_rows_at_point_into(
     Ok(())
 }
 
+pub fn evaluate_packed_matrix_at_point_into(
+    packed_rows: &[Vec<B128>],
+    row_point: &[B128],
+    col_point: &[B128],
+    row_evals: &mut [B128],
+    scratch: &mut [B128],
+) -> Result<B128, Error> {
+    let row_len = validate_packed_rows(packed_rows)?;
+    let num_rows = packed_rows.len();
+    if !num_rows.is_power_of_two() {
+        return Err(Error::InvalidPcsOpen(
+            "Blaze2 opening expects a power-of-two number of packed rows".to_string(),
+        ));
+    }
+    if row_point.len() != log2_strict(num_rows) {
+        return Err(Error::InvalidPcsOpen(format!(
+            "Blaze2 opening row point has {} coordinates for {num_rows} packed rows",
+            row_point.len()
+        )));
+    }
+    if row_evals.len() != num_rows {
+        return Err(Error::InvalidPcsOpen(
+            "Blaze2 opening row evaluation output has incompatible length".to_string(),
+        ));
+    }
+    let scratch_len = row_len.max(num_rows);
+    if scratch.len() != scratch_len {
+        return Err(Error::InvalidPcsOpen(format!(
+            "Blaze2 opening scratch has {} entries but needs {scratch_len}",
+            scratch.len()
+        )));
+    }
+
+    evaluate_packed_rows_at_point_into(packed_rows, col_point, row_evals, &mut scratch[..row_len])?;
+    evaluate_multilinear(row_evals, row_point, &mut scratch[..num_rows])
+}
+
+pub fn evaluate_packed_matrix_at_point(
+    packed_rows: &[Vec<B128>],
+    row_point: &[B128],
+    col_point: &[B128],
+) -> Result<B128, Error> {
+    let row_len = validate_packed_rows(packed_rows)?;
+    let num_rows = packed_rows.len();
+    let mut row_evals = vec![B128::ZERO; num_rows];
+    let mut scratch = vec![B128::ZERO; row_len.max(num_rows)];
+    evaluate_packed_matrix_at_point_into(
+        packed_rows,
+        row_point,
+        col_point,
+        &mut row_evals,
+        &mut scratch,
+    )
+}
+
+pub fn absorb_blaze2_opening_public<H: Hash, S>(
+    transcript: &mut CfriTranscript<H, S>,
+    code: &PackedRaaCode,
+    code_seed: &Blaze2CodeSeed,
+    commitment: &Blaze2InterleavedCodewordPublicCommitment<H>,
+    claim: &Blaze2OpeningClaim,
+    num_queries: usize,
+) {
+    transcript.absorb("cfri-blaze2-opening-v1");
+    absorb_packed_raa_code(transcript, code, code_seed);
+    absorb_usize(transcript, num_queries);
+    absorb_usize(transcript, commitment.codeword_len());
+    absorb_usize(transcript, commitment.num_rows());
+    transcript.absorb(commitment.root());
+    transcript.absorb_slice(&claim.row_point);
+    transcript.absorb_slice(&claim.col_point);
+    transcript.absorb(&claim.value);
+}
+
+pub fn absorb_blaze2_opening_row_evals<H: Hash, S>(
+    transcript: &mut CfriTranscript<H, S>,
+    row_evals: &[B128],
+) {
+    transcript.absorb("blaze2-opening-row-evals");
+    transcript.absorb_slice(row_evals);
+}
+
+pub fn squeeze_blaze2_opening_folding_challenges<H: Hash, S>(
+    transcript: &mut CfriTranscript<H, S>,
+    out: &mut [B128],
+) {
+    transcript.absorb("blaze2-opening-folding-challenges");
+    transcript.squeeze_into(out);
+}
+
+pub fn absorb_blaze2_opening_folded_eval<H: Hash, S>(
+    transcript: &mut CfriTranscript<H, S>,
+    folded_eval: &B128,
+) {
+    transcript.absorb("blaze2-opening-folded-eval");
+    transcript.absorb(folded_eval);
+}
+
+pub fn squeeze_blaze2_opening_query_indices<H: Hash, S>(
+    transcript: &mut CfriTranscript<H, S>,
+    codeword_len: usize,
+    out: &mut [usize],
+) -> Result<(), Error> {
+    validate_query_index(0, codeword_len)?;
+    if out.is_empty() {
+        return Err(Error::InvalidPcsOpen(
+            "Blaze2 opening transcript expects at least one query".to_string(),
+        ));
+    }
+
+    transcript.absorb("blaze2-opening-query-indices");
+    for index in out {
+        *index = squeeze_query_index(transcript, codeword_len);
+    }
+    Ok(())
+}
+
+pub fn prove_blaze2_opening<H: Hash, B: Blaze2FoldedMessageBackend>(
+    code: &PackedRaaCode,
+    code_seed: &Blaze2CodeSeed,
+    packed_rows: &[Vec<B128>],
+    codeword_commitment: &Blaze2InterleavedCodewordCommitment<H>,
+    claim: &Blaze2OpeningClaim,
+    num_queries: usize,
+) -> Result<Blaze2OpeningProof<H, B>, Error> {
+    validate_blaze2_opening_inputs(
+        code,
+        packed_rows,
+        codeword_commitment.codeword_len(),
+        codeword_commitment.num_rows(),
+        claim,
+    )?;
+    if num_queries == 0 {
+        return Err(Error::InvalidPcsOpen(
+            "Blaze2 opening proof expects at least one query".to_string(),
+        ));
+    }
+
+    let row_len = code.message_len();
+    let num_rows = packed_rows.len();
+    let mut row_evals = vec![B128::ZERO; num_rows];
+    let mut eval_scratch = vec![B128::ZERO; row_len.max(num_rows)];
+    let value = evaluate_packed_matrix_at_point_into(
+        packed_rows,
+        &claim.row_point,
+        &claim.col_point,
+        &mut row_evals,
+        &mut eval_scratch,
+    )?;
+    if value != claim.value {
+        return Err(Error::InvalidPcsOpen(
+            "Blaze2 opening claim does not match witness rows".to_string(),
+        ));
+    }
+
+    let public_commitment = codeword_commitment.public();
+    let mut transcript = CfriTranscript::<H>::new();
+    absorb_blaze2_opening_public(
+        &mut transcript,
+        code,
+        code_seed,
+        &public_commitment,
+        claim,
+        num_queries,
+    );
+    absorb_blaze2_opening_row_evals(&mut transcript, &row_evals);
+
+    let mut folding_challenges = vec![B128::ZERO; num_rows];
+    squeeze_blaze2_opening_folding_challenges(&mut transcript, &mut folding_challenges);
+
+    let mut folded_message = vec![B128::ZERO; row_len];
+    fold_packed_rows_into(packed_rows, &folding_challenges, &mut folded_message)?;
+    let folded_eval = evaluate_multilinear(
+        &folded_message,
+        &claim.col_point,
+        &mut eval_scratch[..row_len],
+    )?;
+    let expected_folded_eval = inner_product_b128(&row_evals, &folding_challenges);
+    if folded_eval != expected_folded_eval {
+        return Err(Error::InvalidPcsOpen(
+            "Blaze2 folded message evaluation does not match row-evaluation fold".to_string(),
+        ));
+    }
+    let (folded_commitment, folded_state) = B::commit(&folded_message)?;
+    B::absorb_commitment(&mut transcript, &folded_commitment);
+    absorb_blaze2_opening_folded_eval(&mut transcript, &folded_eval);
+
+    let mut query_indices = vec![0usize; num_queries];
+    squeeze_blaze2_opening_query_indices(&mut transcript, code.codeword_len(), &mut query_indices)?;
+
+    let mut queries = Vec::with_capacity(query_indices.len());
+    for &index in &query_indices {
+        validate_query_index(index, code.codeword_len())?;
+        queries.push(Blaze2OpeningQuery {
+            column_opening: codeword_commitment.query(index)?,
+        });
+    }
+    let folded_request = Blaze2FoldedMessageOpenRequest {
+        code,
+        col_point: &claim.col_point,
+        folded_eval,
+        input_indices: &query_indices,
+    };
+    let backend_proof = B::open(&folded_state, &folded_request)?;
+
+    Ok(Blaze2OpeningProof {
+        row_evals,
+        folded_message: Blaze2FoldedMessageProof {
+            commitment: folded_commitment,
+            eval: folded_eval,
+            backend_proof,
+        },
+        queries,
+    })
+}
+
+pub fn verify_blaze2_opening<H: Hash, B: Blaze2FoldedMessageBackend>(
+    code: &PackedRaaCode,
+    code_seed: &Blaze2CodeSeed,
+    commitment: &Blaze2InterleavedCodewordPublicCommitment<H>,
+    claim: &Blaze2OpeningClaim,
+    proof: &Blaze2OpeningProof<H, B>,
+    num_queries: usize,
+) -> Result<(), Error> {
+    validate_blaze2_opening_public(
+        code,
+        commitment.codeword_len(),
+        commitment.num_rows(),
+        claim,
+        proof,
+        num_queries,
+    )?;
+
+    let mut transcript = CfriTranscript::<H>::new();
+    absorb_blaze2_opening_public(
+        &mut transcript,
+        code,
+        code_seed,
+        commitment,
+        claim,
+        num_queries,
+    );
+    absorb_blaze2_opening_row_evals(&mut transcript, &proof.row_evals);
+    let mut folding_challenges = vec![B128::ZERO; proof.row_evals.len()];
+    squeeze_blaze2_opening_folding_challenges(&mut transcript, &mut folding_challenges);
+    let expected_folded_eval = inner_product_b128(&proof.row_evals, &folding_challenges);
+    if proof.folded_message.eval != expected_folded_eval {
+        return Err(Error::InvalidPcsOpen(
+            "Blaze2 folded message evaluation does not match row-evaluation fold".to_string(),
+        ));
+    }
+    B::absorb_commitment(&mut transcript, &proof.folded_message.commitment);
+    absorb_blaze2_opening_folded_eval(&mut transcript, &proof.folded_message.eval);
+    let mut query_indices = vec![0usize; num_queries];
+    squeeze_blaze2_opening_query_indices(&mut transcript, code.codeword_len(), &mut query_indices)?;
+
+    let mut scratch = vec![B128::ZERO; proof.row_evals.len()];
+    let claim_value = evaluate_multilinear(&proof.row_evals, &claim.row_point, &mut scratch)?;
+    if claim_value != claim.value {
+        return Err(Error::InvalidPcsOpen(
+            "Blaze2 opening row evaluation invariant failed".to_string(),
+        ));
+    }
+
+    let mut input_values = Vec::with_capacity(query_indices.len());
+    for (query, expected_index) in proof.queries.iter().zip(&query_indices) {
+        authenticate_blaze2_opening_column(
+            commitment.root(),
+            &query.column_opening,
+            commitment.num_rows(),
+            code.codeword_len(),
+            *expected_index,
+        )?;
+        input_values.push(fold_interleaved_column(
+            &query.column_opening,
+            &folding_challenges,
+        )?);
+    }
+
+    let folded_request = Blaze2FoldedMessageOpenRequest {
+        code,
+        col_point: &claim.col_point,
+        folded_eval: proof.folded_message.eval,
+        input_indices: &query_indices,
+    };
+    B::verify(
+        &proof.folded_message.commitment,
+        &proof.folded_message.backend_proof,
+        code.message_len(),
+        &folded_request,
+        &input_values,
+    )?;
+    Ok(())
+}
+
 pub fn build_raa_aux_trace(
     code: &PackedRaaCode,
     message: &[B128],
@@ -1241,6 +1644,98 @@ fn validate_b128_rows(rows: &[Vec<B128>]) -> Result<usize, Error> {
     Ok(row_len)
 }
 
+fn validate_blaze2_opening_inputs(
+    code: &PackedRaaCode,
+    packed_rows: &[Vec<B128>],
+    codeword_len: usize,
+    num_committed_rows: usize,
+    claim: &Blaze2OpeningClaim,
+) -> Result<(), Error> {
+    let row_len = validate_packed_rows(packed_rows)?;
+    validate_blaze2_opening_shape(
+        code,
+        row_len,
+        packed_rows.len(),
+        codeword_len,
+        num_committed_rows,
+        claim,
+    )
+}
+
+fn validate_blaze2_opening_public<H: Hash, B: Blaze2FoldedMessageBackend>(
+    code: &PackedRaaCode,
+    codeword_len: usize,
+    num_committed_rows: usize,
+    claim: &Blaze2OpeningClaim,
+    proof: &Blaze2OpeningProof<H, B>,
+    num_queries: usize,
+) -> Result<(), Error> {
+    if proof.queries.is_empty() {
+        return Err(Error::InvalidPcsOpen(
+            "Blaze2 opening proof has no queries".to_string(),
+        ));
+    }
+    if proof.queries.len() != num_queries {
+        return Err(Error::InvalidPcsOpen(format!(
+            "Blaze2 opening proof has {} queries but verifier expects {num_queries}",
+            proof.queries.len()
+        )));
+    }
+    validate_blaze2_opening_shape(
+        code,
+        code.message_len(),
+        proof.row_evals.len(),
+        codeword_len,
+        num_committed_rows,
+        claim,
+    )
+}
+
+fn validate_blaze2_opening_shape(
+    code: &PackedRaaCode,
+    row_len: usize,
+    num_rows: usize,
+    codeword_len: usize,
+    num_committed_rows: usize,
+    claim: &Blaze2OpeningClaim,
+) -> Result<(), Error> {
+    if row_len != code.message_len() {
+        return Err(Error::InvalidPcsOpen(format!(
+            "Blaze2 opening message row has {row_len} entries but code expects {}",
+            code.message_len()
+        )));
+    }
+    if codeword_len != code.codeword_len() {
+        return Err(Error::InvalidPcsOpen(format!(
+            "Blaze2 opening commitment has codeword length {codeword_len} but code expects {}",
+            code.codeword_len()
+        )));
+    }
+    if num_rows == 0 || !num_rows.is_power_of_two() {
+        return Err(Error::InvalidPcsOpen(
+            "Blaze2 opening expects a non-empty power-of-two number of packed rows".to_string(),
+        ));
+    }
+    if num_committed_rows != num_rows {
+        return Err(Error::InvalidPcsOpen(format!(
+            "Blaze2 opening commitment has {num_committed_rows} rows but proof uses {num_rows}"
+        )));
+    }
+    if claim.row_point.len() != log2_strict(num_rows) {
+        return Err(Error::InvalidPcsOpen(format!(
+            "Blaze2 opening row point has {} coordinates for {num_rows} packed rows",
+            claim.row_point.len()
+        )));
+    }
+    if claim.col_point.len() != log2_strict(row_len) {
+        return Err(Error::InvalidPcsOpen(format!(
+            "Blaze2 opening column point has {} coordinates for {row_len} message columns",
+            claim.col_point.len()
+        )));
+    }
+    Ok(())
+}
+
 fn validate_raa_message(code: &PackedRaaCode, message: &[B128]) -> Result<usize, Error> {
     if message.len() != code.message_len() {
         return Err(Error::InvalidPcsOpen(format!(
@@ -1337,6 +1832,21 @@ fn authenticate_column_queries<H: Hash>(
     Ok(())
 }
 
+fn authenticate_blaze2_opening_column<H: Hash>(
+    root: &Output<H>,
+    query: &Blaze2InterleavedColumnQuery<H>,
+    num_rows: usize,
+    codeword_len: usize,
+    expected_index: usize,
+) -> Result<(), Error> {
+    if query.index != expected_index {
+        return Err(Error::InvalidPcsOpen(
+            "Blaze2 opening column index does not match transcript".to_string(),
+        ));
+    }
+    query.authenticate(root, num_rows, codeword_len)
+}
+
 fn authenticate_trace_spot_queries<H: Hash>(
     root: &Output<H>,
     opening: &Blaze2RaaTraceSpotQuery<H>,
@@ -1428,6 +1938,30 @@ fn inner_product_b128(lhs: &[B128], rhs: &[B128]) -> B128 {
         acc += lhs[i] * rhs[i];
     }
     acc
+}
+
+fn absorb_packed_raa_code<H: Hash, S>(
+    transcript: &mut CfriTranscript<H, S>,
+    code: &PackedRaaCode,
+    code_seed: &Blaze2CodeSeed,
+) {
+    transcript.absorb("packed-raa-code");
+    absorb_usize(transcript, code.rate());
+    absorb_usize(transcript, code.message_len());
+    absorb_usize(transcript, code.codeword_len());
+    transcript.absorb(&code_seed.0);
+}
+
+fn absorb_usize<H: Hash, S>(transcript: &mut CfriTranscript<H, S>, value: usize) {
+    transcript.absorb(&(value as u64).to_le_bytes());
+}
+
+fn squeeze_query_index<H: Hash, S>(
+    transcript: &mut CfriTranscript<H, S>,
+    codeword_len: usize,
+) -> usize {
+    let challenge: B128 = transcript.squeeze();
+    (challenge.value[0] as usize) & (codeword_len - 1)
 }
 
 fn push_unique_pair_start(opened_pair_starts: &mut Vec<usize>, index: usize) {

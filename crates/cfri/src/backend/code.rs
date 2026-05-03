@@ -2,7 +2,7 @@ pub mod binary_rs;
 mod raa;
 pub use raa::{
     encode_bits, encode_bits_long, encode_bits_ser, repetition_code_long, serial_accumulator_long,
-    Permutation,
+    PackedRaaCode, Permutation, RaaSymbol,
 };
 
 pub trait LinearCodes<F>: Sync + Send {

@@ -1,6 +1,8 @@
+use crate::backend::arithmetic::Field;
 use crate::backend::{
     arithmetic::div_ceil,
     avx_int_types::{u64::Blazeu64, BlazeField},
+    binary_extension_fields::B128,
 };
 use ff::{BatchInvert, PrimeField, PrimeFieldBits};
 use num_traits::Zero;
@@ -15,6 +17,32 @@ use std::time::{Duration, Instant};
 
 use rayon::prelude::*;
 use std::collections::HashMap;
+
+pub trait RaaSymbol: Copy + Send + Sync + Default + PartialEq + 'static {
+    fn zero() -> Self;
+
+    fn add_assign(&mut self, rhs: Self);
+}
+
+impl<F: BlazeField> RaaSymbol for F {
+    fn zero() -> Self {
+        F::zero()
+    }
+
+    fn add_assign(&mut self, rhs: Self) {
+        *self = *self ^ rhs;
+    }
+}
+
+impl RaaSymbol for B128 {
+    fn zero() -> Self {
+        B128::ZERO
+    }
+
+    fn add_assign(&mut self, rhs: Self) {
+        *self += rhs;
+    }
+}
 
 #[derive(Clone, Debug, Serialize, Deserialize)]
 pub struct Permutation {
@@ -161,6 +189,88 @@ impl Permutation {
         new_inputs
     }
 }
+
+#[derive(Clone, Debug, Serialize, Deserialize)]
+pub struct PackedRaaCode {
+    rate: usize,
+    permutation: Permutation,
+}
+
+impl PackedRaaCode {
+    pub fn new(message_len: usize, rate: usize, rng: &mut ChaCha8Rng) -> Self {
+        assert!(message_len.is_power_of_two());
+        assert!(rate.is_power_of_two());
+        assert!(message_len > 0);
+        assert!(rate > 0);
+        Self {
+            rate,
+            permutation: Permutation::create(rng, message_len * rate),
+        }
+    }
+
+    pub fn from_parts(rate: usize, permutation: Permutation) -> Self {
+        assert!(rate.is_power_of_two());
+        assert!(rate > 0);
+        assert_eq!(
+            permutation.permutation1.len(),
+            permutation.permutation2.len()
+        );
+        assert_eq!(permutation.permutation1.len() % rate, 0);
+        Self { rate, permutation }
+    }
+
+    pub fn rate(&self) -> usize {
+        self.rate
+    }
+
+    pub fn codeword_len(&self) -> usize {
+        self.permutation.permutation1.len()
+    }
+
+    pub fn message_len(&self) -> usize {
+        self.codeword_len() / self.rate
+    }
+
+    pub fn permutation(&self) -> &Permutation {
+        &self.permutation
+    }
+
+    pub fn encode_row<S: RaaSymbol>(&self, message: &[S]) -> Vec<S> {
+        let mut out = Vec::new();
+        let mut scratch = Vec::new();
+        self.encode_row_into(message, &mut out, &mut scratch);
+        out
+    }
+
+    pub fn encode_row_into<S: RaaSymbol>(
+        &self,
+        message: &[S],
+        out: &mut Vec<S>,
+        scratch: &mut Vec<S>,
+    ) {
+        assert_eq!(message.len(), self.message_len());
+        let codeword_len = self.codeword_len();
+        scratch.resize(codeword_len, S::zero());
+        out.resize(codeword_len, S::zero());
+
+        for i in 0..codeword_len {
+            scratch[i] = message[self.permutation.permutation1[i] / self.rate];
+        }
+        serial_accumulator_symbols(scratch);
+
+        for i in 0..codeword_len {
+            out[i] = scratch[self.permutation.permutation2[i]];
+        }
+        serial_accumulator_symbols(out);
+    }
+
+    pub fn encode_rows<S: RaaSymbol>(&self, rows: &[Vec<S>]) -> Vec<Vec<S>> {
+        rows.par_iter()
+            .map(|row| self.encode_row(row))
+            .collect::<Vec<_>>()
+    }
+}
+
 #[cfg(feature = "upstream-tests")]
 #[test]
 fn test_puncture() {
@@ -186,6 +296,14 @@ fn serial_accumulator<F: BlazeField>(mut input: &mut Vec<F>) {
     for i in 0..input.len() {
         input[i] = input[i] ^ prev_value;
         prev_value = input[i];
+    }
+}
+
+fn serial_accumulator_symbols<S: RaaSymbol>(input: &mut [S]) {
+    let mut prev_value = S::zero();
+    for value in input {
+        value.add_assign(prev_value);
+        prev_value = *value;
     }
 }
 
@@ -436,6 +554,85 @@ fn encode_bits_ser_matches_explicit_long_raa_chain() {
         .collect::<Vec<_>>();
 
     assert_eq!(encoded, explicit);
+}
+
+#[test]
+fn packed_raa_code_matches_legacy_encode_bits_ser() {
+    let mut rng = ChaCha8Rng::seed_from_u64(0xbaa5);
+    let rate = 4;
+    let permutation = Permutation::create(&mut rng, 32);
+    let code = PackedRaaCode::from_parts(rate, permutation.clone());
+    let row = (0..8)
+        .map(|i| Blazeu64 {
+            value: 0x100 + i as u64,
+        })
+        .collect::<Vec<_>>();
+
+    assert_eq!(
+        code.encode_row(&row),
+        encode_bits_ser(row, &permutation, rate)
+    );
+}
+
+#[test]
+fn packed_raa_code_is_linear_over_packed_b128() {
+    let mut rng = ChaCha8Rng::seed_from_u64(0x1234);
+    let code = PackedRaaCode::new(8, 4, &mut rng);
+    let lhs = (0..8)
+        .map(|i| B128::from((7 * i + 1) as u64))
+        .collect::<Vec<_>>();
+    let rhs = (0..8)
+        .map(|i| B128::from((5 * i + 3) as u64))
+        .collect::<Vec<_>>();
+    let sum = lhs
+        .iter()
+        .zip(rhs.iter())
+        .map(|(lhs, rhs)| *lhs + *rhs)
+        .collect::<Vec<_>>();
+
+    let enc_lhs = code.encode_row(&lhs);
+    let enc_rhs = code.encode_row(&rhs);
+    let enc_sum = code.encode_row(&sum);
+    let combined = enc_lhs
+        .iter()
+        .zip(enc_rhs.iter())
+        .map(|(lhs, rhs)| *lhs + *rhs)
+        .collect::<Vec<_>>();
+
+    assert_eq!(combined, enc_sum);
+}
+
+#[test]
+fn packed_raa_code_commutes_with_blazeu64_packing() {
+    let mut rng = ChaCha8Rng::seed_from_u64(0xface);
+    let rate = 4;
+    let permutation = Permutation::create(&mut rng, 32);
+    let code = PackedRaaCode::from_parts(rate, permutation.clone());
+    let row0 = (0..8)
+        .map(|i| Blazeu64 {
+            value: 0x10 + i as u64,
+        })
+        .collect::<Vec<_>>();
+    let row1 = (0..8)
+        .map(|i| Blazeu64 {
+            value: 0x80 + (3 * i) as u64,
+        })
+        .collect::<Vec<_>>();
+    let packed = row0
+        .iter()
+        .zip(row1.iter())
+        .map(|(a, b)| Blazeu64::to_b128_vec(vec![*a, *b]))
+        .collect::<Vec<_>>();
+
+    let encoded0 = encode_bits_ser(row0, &permutation, rate);
+    let encoded1 = encode_bits_ser(row1, &permutation, rate);
+    let packed_encoded = encoded0
+        .iter()
+        .zip(encoded1.iter())
+        .map(|(a, b)| Blazeu64::to_b128_vec(vec![*a, *b]))
+        .collect::<Vec<_>>();
+
+    assert_eq!(code.encode_row(&packed), packed_encoded);
 }
 pub fn encode_bits_long<F: BlazeField>(
     message: &Vec<Vec<F>>,

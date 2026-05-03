@@ -1658,6 +1658,24 @@ impl HolographicQuerySchedule {
         &self.raa_auxiliary_queries
     }
 
+    pub fn auxiliary_proof_query_count(&self) -> usize {
+        self.proof_queries
+            .iter()
+            .filter(|query| query.domain == BackendProofQueryDomain::Auxiliary)
+            .count()
+    }
+
+    pub fn expected_auxiliary_query_proof_count(&self) -> usize {
+        self.auxiliary_proof_query_count()
+            + 3 * self.raa_final_queries.len()
+            + usize::from(!self.raa_final_queries.is_empty())
+            + self
+                .raa_auxiliary_queries
+                .iter()
+                .map(RaaAuxiliaryLocalQuery::extra_count)
+                .sum::<usize>()
+    }
+
     pub fn attach_raa_auxiliary_local_queries(
         &mut self,
         code: &PackedRaaCode,
@@ -2254,19 +2272,7 @@ fn validate_auxiliary_query_index(index: usize, len: usize) -> Result<(), Error>
 }
 
 fn expected_auxiliary_query_proof_count(schedule: &HolographicQuerySchedule) -> usize {
-    schedule
-        .proof_queries()
-        .iter()
-        .filter(|query| query.domain == BackendProofQueryDomain::Auxiliary)
-        .count()
-        + schedule.raa_final_queries().len()
-        + 2 * schedule.raa_final_queries().len()
-        + usize::from(!schedule.raa_final_queries().is_empty())
-        + schedule
-            .raa_auxiliary_queries()
-            .iter()
-            .map(RaaAuxiliaryLocalQuery::extra_count)
-            .sum::<usize>()
+    schedule.expected_auxiliary_query_proof_count()
 }
 
 fn verify_auxiliary_query_proof<H: Hash>(

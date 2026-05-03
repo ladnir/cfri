@@ -1330,6 +1330,16 @@ fn blaze2_basefold_opening_verifies_with_typed_backend_schedule() {
         proof.backend_proof.compiler_parity.queries.len(),
         compiler_parity_query_count
     );
+    assert_eq!(
+        proof
+            .backend_proof
+            .auxiliary
+            .as_ref()
+            .unwrap()
+            .queries
+            .len(),
+        schedule.expected_auxiliary_query_proof_count()
+    );
     verify_blaze2_basefold_opening(&params, &commitment.public(), &claim, &proof).unwrap();
 }
 
@@ -1368,11 +1378,7 @@ fn blaze2_basefold_outer_shape_matches_paper_after_field_byte_correction() {
         .iter()
         .filter(|query| query.domain == BackendProofQueryDomain::CompilerParity)
         .count();
-    let auxiliary_query_count = schedule
-        .proof_queries()
-        .iter()
-        .filter(|query| query.domain == BackendProofQueryDomain::Auxiliary)
-        .count();
+    let auxiliary_query_count = schedule.auxiliary_proof_query_count();
     assert_eq!(
         compiler_parity_query_count + auxiliary_query_count,
         q_backend_proof,
@@ -1383,16 +1389,16 @@ fn blaze2_basefold_outer_shape_matches_paper_after_field_byte_correction() {
         compiler_parity_query_count,
         "compiler-parity openings match their subset of the backend proof schedule"
     );
-    assert!(
+    assert_eq!(
         proof
             .backend_proof
             .auxiliary
             .as_ref()
             .unwrap()
             .queries
-            .len()
-            >= auxiliary_query_count + 3 * schedule.raa_final_queries().len() + 1,
-        "auxiliary proof carries scheduled relation openings plus explicit eval-accumulator checks"
+            .len(),
+        schedule.expected_auxiliary_query_proof_count(),
+        "auxiliary proof carries exactly the schedule-required relation and eval-accumulator openings"
     );
     assert_eq!(
         proof.backend_prequery.folded_parity_layers.len(),

@@ -8,20 +8,24 @@ use cfri::backend::{
         evaluate_multilinear, evaluate_packed_matrix_at_point,
         evaluate_packed_matrix_at_point_into, evaluate_packed_rows_at_point_into,
         fold_interleaved_column, fold_packed_query_pair, fold_packed_rows_into,
-        pack_interleaved_rows, pack_interleaved_rows_into, prove_blaze2_opening,
-        prove_blaze2_opening_with_code_spec, squeeze_blaze2_opening_folding_challenges,
-        squeeze_blaze2_opening_query_indices, verify_blaze2_opening,
+        pack_interleaved_rows, pack_interleaved_rows_into, prove_blaze2_basefold_opening,
+        prove_blaze2_opening, prove_blaze2_opening_with_code_spec,
+        squeeze_blaze2_opening_folding_challenges, squeeze_blaze2_opening_query_indices,
+        verify_blaze2_basefold_opening, verify_blaze2_opening,
         verify_blaze2_opening_with_code_spec, verify_raa_aux_trace_spot_query,
-        verify_raa_trace_spot_query, Blaze2Code, Blaze2CodeSeed, Blaze2CodeSpec, Blaze2FieldId,
-        Blaze2FoldedMessageBackend, Blaze2FoldedMessageOpenRequest, Blaze2HashId,
-        Blaze2InterleavedCodewordCommitment, Blaze2InterleavedColumnQuery, Blaze2LeafLayout,
-        Blaze2OpeningClaim, Blaze2OpeningProof, Blaze2PackingLayout, Blaze2RaaAuxTrace,
-        Blaze2RaaAuxTraceCommitment, Blaze2RaaCommitment, Blaze2RaaQuery, Blaze2RaaTrace,
-        Blaze2RaaTraceCommitment, Blaze2RaaTraceSpotQuery, RaaVariant,
+        verify_raa_trace_spot_query, Blaze2BaseFoldOpeningProof, Blaze2Code, Blaze2CodeSeed,
+        Blaze2CodeSpec, Blaze2FieldId, Blaze2FoldedMessageBackend, Blaze2FoldedMessageOpenRequest,
+        Blaze2HashId, Blaze2InterleavedCodewordCommitment, Blaze2InterleavedColumnQuery,
+        Blaze2LeafLayout, Blaze2OpeningClaim, Blaze2OpeningProof, Blaze2PackingLayout,
+        Blaze2RaaAuxTrace, Blaze2RaaAuxTraceCommitment, Blaze2RaaCommitment, Blaze2RaaQuery,
+        Blaze2RaaTrace, Blaze2RaaTraceCommitment, Blaze2RaaTraceSpotQuery, RaaVariant,
     },
     blaze_transcript::BlazeBlake2sTranscript,
     code::PackedRaaCode,
     hash::{Blake2s, Hash, Output},
+    systematic_basefold::{
+        Blaze2BaseFoldBackendParams, Blaze2BaseFoldBackendSpec, SystematicFoldableCodeSpec,
+    },
     transcript::InMemoryTranscript as _,
     Error,
 };
@@ -255,6 +259,32 @@ fn blaze2_code_spec(seed: u8) -> Blaze2CodeSpec {
     }
 }
 
+fn blaze2_basefold_backend_params(
+    seed: u8,
+    q_raa_input: usize,
+    q_backend_proof: usize,
+) -> Blaze2BaseFoldBackendParams {
+    let praa = blaze2_code_spec(seed);
+    let compiler_message_len = praa.praa_codeword_len;
+    let parity_expansion_factor = 1;
+    Blaze2BaseFoldBackendParams::new(Blaze2BaseFoldBackendSpec {
+        praa,
+        compiler_code: SystematicFoldableCodeSpec {
+            version: 1,
+            compiler_message_len,
+            compiler_systematic_len: compiler_message_len,
+            compiler_parity_len: compiler_message_len * parity_expansion_factor,
+            compiler_codeword_len: compiler_message_len * (parity_expansion_factor + 1),
+            parity_expansion_factor,
+            seed: [seed ^ 0xa5; 32],
+        },
+        q_raa_input,
+        q_backend_proof,
+        auxiliary_oracle_len: 0,
+    })
+    .unwrap()
+}
+
 fn audit_blaze2_opening_against_witness<H: Hash, B: Blaze2FoldedMessageBackend>(
     code: &PackedRaaCode,
     code_seed: &Blaze2CodeSeed,
@@ -366,6 +396,61 @@ fn exhaustive_backend_blaze2_outer_bytes_with_field_bytes(
                         .sum::<usize>()
             })
             .sum::<usize>()
+}
+
+fn blaze2_basefold_outer_bytes_with_field_bytes(
+    proof: &Blaze2BaseFoldOpeningProof<Blake2s256>,
+    field_bytes: usize,
+) -> usize {
+    let backend_prequery_bytes = proof.backend_prequery.compiler_parity.root.len()
+        + proof
+            .backend_prequery
+            .auxiliary
+            .as_ref()
+            .map(|auxiliary| auxiliary.root.len())
+            .unwrap_or(0);
+    proof.row_evals.len() * field_bytes
+        + backend_prequery_bytes
+        + proof
+            .queries
+            .iter()
+            .map(|query| {
+                query.column_opening.values.len() * field_bytes
+                    + query
+                        .column_opening
+                        .path
+                        .iter()
+                        .map(|digest| digest.len())
+                        .sum::<usize>()
+            })
+            .sum::<usize>()
+}
+
+fn blaze2_basefold_backend_query_bytes_with_field_bytes(
+    proof: &Blaze2BaseFoldOpeningProof<Blake2s256>,
+    field_bytes: usize,
+) -> usize {
+    proof
+        .backend_proof
+        .compiler_parity
+        .queries
+        .iter()
+        .map(|query| field_bytes + query.path.iter().map(|digest| digest.len()).sum::<usize>())
+        .sum::<usize>()
+        + proof
+            .backend_proof
+            .auxiliary
+            .as_ref()
+            .map(|auxiliary| {
+                auxiliary
+                    .queries
+                    .iter()
+                    .map(|query| {
+                        field_bytes + query.path.iter().map(|digest| digest.len()).sum::<usize>()
+                    })
+                    .sum::<usize>()
+            })
+            .unwrap_or(0)
 }
 
 fn tamper_opened_trace_value<H: Hash>(
@@ -1114,6 +1199,79 @@ fn blaze2_outer_proof_matches_paper_shape_after_field_byte_correction() {
         expected,
         "after the allowed 16-to-8 byte field correction, Blaze2 outer proof shape must be row evals + one backend commitment + Q_RAA opened columns and paths"
     );
+}
+
+#[test]
+fn blaze2_basefold_opening_verifies_with_typed_backend_schedule() {
+    let (_, _, packed, commitment, claim, _) = opening_fixture(50);
+    let q_raa_input = 4;
+    let q_backend_proof = 7;
+    let params = blaze2_basefold_backend_params(50, q_raa_input, q_backend_proof);
+    let proof = prove_blaze2_basefold_opening(&params, &packed, &commitment, &claim, &[]).unwrap();
+
+    assert_eq!(proof.queries.len(), q_raa_input);
+    assert_eq!(
+        proof.backend_proof.compiler_parity.queries.len(),
+        q_backend_proof
+    );
+    verify_blaze2_basefold_opening(&params, &commitment.public(), &claim, &proof).unwrap();
+}
+
+#[test]
+fn blaze2_basefold_outer_shape_matches_paper_after_field_byte_correction() {
+    let (_, _, packed, commitment, claim, _) = opening_fixture(51);
+    let q_raa_input = 4;
+    let q_backend_proof = 9;
+    let params = blaze2_basefold_backend_params(51, q_raa_input, q_backend_proof);
+    let proof = prove_blaze2_basefold_opening(&params, &packed, &commitment, &claim, &[]).unwrap();
+
+    let t = commitment.num_rows();
+    let paper_field_bytes = 8;
+    let hash_bytes = 32;
+    let outer_path_len = params.praa().packed().codeword_len().trailing_zeros() as usize;
+    let backend_prequery_bytes = hash_bytes;
+    let expected_outer = t * paper_field_bytes
+        + backend_prequery_bytes
+        + q_raa_input * (t * paper_field_bytes + outer_path_len * hash_bytes);
+
+    assert_eq!(
+        blaze2_basefold_outer_bytes_with_field_bytes(&proof, paper_field_bytes),
+        expected_outer,
+        "systematic BaseFold integration must keep the Blaze outer proof at row evals + backend prequery roots + exactly Q_RAA opened columns"
+    );
+    assert_eq!(
+        proof.queries.len(),
+        q_raa_input,
+        "backend proof queries must not create extra Blaze input-column openings"
+    );
+    assert_eq!(
+        proof.backend_proof.compiler_parity.queries.len(),
+        q_backend_proof,
+        "backend proof query count is separate from Q_RAA input openings"
+    );
+    assert!(blaze2_basefold_backend_query_bytes_with_field_bytes(&proof, paper_field_bytes) > 0);
+}
+
+#[test]
+fn blaze2_basefold_opening_rejects_tampered_backend_prequery() {
+    let (_, _, packed, commitment, claim, _) = opening_fixture(52);
+    let params = blaze2_basefold_backend_params(52, 4, 7);
+    let mut proof =
+        prove_blaze2_basefold_opening(&params, &packed, &commitment, &claim, &[]).unwrap();
+    proof.backend_prequery.compiler_parity.root[0] ^= 1;
+
+    assert!(verify_blaze2_basefold_opening(&params, &commitment.public(), &claim, &proof).is_err());
+}
+
+#[test]
+fn blaze2_basefold_opening_rejects_bad_outer_column() {
+    let (_, _, packed, commitment, claim, _) = opening_fixture(53);
+    let params = blaze2_basefold_backend_params(53, 4, 7);
+    let mut proof =
+        prove_blaze2_basefold_opening(&params, &packed, &commitment, &claim, &[]).unwrap();
+    proof.queries[0].column_opening.values[0] += B128::ONE;
+
+    assert!(verify_blaze2_basefold_opening(&params, &commitment.public(), &claim, &proof).is_err());
 }
 
 #[test]

@@ -114,7 +114,7 @@ contains only:
 | Component | Count |
 | --- | ---: |
 | Row-evaluation vector `u` | `t` field elements |
-| Folded-message backend commitment/evaluation/proof | delegated to the backend |
+| Folded-message backend prequery commitment/proof | delegated to the backend |
 | Interleaved RAA queried columns | `Q_RAA` columns, each `t` field elements |
 | Interleaved column Merkle paths | `Q_RAA * log2(n / t)` hashes |
 
@@ -135,3 +135,18 @@ The folded evaluation is derived by the verifier from the row-evaluation vector 
 challenges. It is transcript-bound before query sampling, but it is not serialized proof data. The
 backend proof itself must separately match its own paper accounting. Test-only exhaustive backends
 are intentionally not proof-size meaningful.
+
+The systematic BaseFold integration path now samples a typed backend schedule. Its Blaze-facing
+outer term is guarded as:
+
+```text
+blaze2_systematic_basefold_outer_bytes =
+    t * field_bytes
+  + backend_prequery_commitment_bytes
+  + Q_RAA * (t * field_bytes + log2(n / t) * hash_bytes)
+```
+
+`Q_backend_proof` contributes to the backend proof term, not to extra interleaved RAA column
+openings. The current implementation authenticates the systematic input columns and
+backend-authenticated parity/proof-query oracles on the shared schedule; the remaining work is the
+full recursive BaseFold/RMLE core proof inside that backend term.

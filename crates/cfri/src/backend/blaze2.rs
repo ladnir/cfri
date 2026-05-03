@@ -109,6 +109,10 @@ use crate::backend::{
     binary_extension_fields::B128,
     code::PackedRaaCode,
     hash::{Blake2s, Hash, Output},
+    systematic_basefold::{
+        Blaze2BaseFoldBackendParams, Blaze2BaseFoldPrequeryPublic, Blaze2BaseFoldQueryProof,
+        HolographicQuerySchedule, TopQuery,
+    },
     transcript::{TranscriptRead, TranscriptWrite},
     Deserialize, DeserializeOwned, Error, Serialize,
 };
@@ -318,6 +322,14 @@ pub struct Blaze2FoldedMessageProof<B: Blaze2FoldedMessageBackend> {
 pub struct Blaze2OpeningProof<H: Hash, B: Blaze2FoldedMessageBackend> {
     pub row_evals: Vec<B128>,
     pub folded_message: Blaze2FoldedMessageProof<B>,
+    pub queries: Vec<Blaze2OpeningQuery<H>>,
+}
+
+#[derive(Clone, Debug, PartialEq, Eq)]
+pub struct Blaze2BaseFoldOpeningProof<H: Hash> {
+    pub row_evals: Vec<B128>,
+    pub backend_prequery: Blaze2BaseFoldPrequeryPublic<H>,
+    pub backend_proof: Blaze2BaseFoldQueryProof<H>,
     pub queries: Vec<Blaze2OpeningQuery<H>>,
 }
 
@@ -1466,6 +1478,97 @@ pub fn prove_blaze2_opening_with_code_spec<H: Blaze2HashSpec, B: Blaze2FoldedMes
     })
 }
 
+pub fn prove_blaze2_basefold_opening<H: Blaze2HashSpec>(
+    params: &Blaze2BaseFoldBackendParams,
+    packed_rows: &[Vec<B128>],
+    codeword_commitment: &Blaze2InterleavedCodewordCommitment<H>,
+    claim: &Blaze2OpeningClaim,
+    auxiliary_oracle: &[B128],
+) -> Result<Blaze2BaseFoldOpeningProof<H>, Error> {
+    let code = params.praa();
+    validate_blaze2_code_hash::<H>(code.spec())?;
+    let packed_code = code.packed();
+    validate_blaze2_opening_inputs(
+        packed_code,
+        packed_rows,
+        codeword_commitment.codeword_len(),
+        codeword_commitment.num_rows(),
+        claim,
+    )?;
+
+    let row_len = packed_code.message_len();
+    let num_rows = packed_rows.len();
+    let mut row_evals = vec![B128::ZERO; num_rows];
+    let mut eval_scratch = vec![B128::ZERO; row_len.max(num_rows)];
+    let value = evaluate_packed_matrix_at_point_into(
+        packed_rows,
+        &claim.row_point,
+        &claim.col_point,
+        &mut row_evals,
+        &mut eval_scratch,
+    )?;
+    if value != claim.value {
+        return Err(Error::InvalidPcsOpen(
+            "Blaze2 opening claim does not match witness rows".to_string(),
+        ));
+    }
+
+    let public_commitment = codeword_commitment.public();
+    let mut transcript = CfriTranscript::<H>::new();
+    absorb_blaze2_opening_public_with_code_spec(
+        &mut transcript,
+        code,
+        &public_commitment,
+        claim,
+        params.spec().q_raa_input,
+    );
+    absorb_blaze2_opening_row_evals(&mut transcript, &row_evals);
+
+    let mut folding_challenges = vec![B128::ZERO; num_rows];
+    squeeze_blaze2_opening_folding_challenges(&mut transcript, &mut folding_challenges);
+
+    let mut folded_message = vec![B128::ZERO; row_len];
+    fold_packed_rows_into(packed_rows, &folding_challenges, &mut folded_message)?;
+    let folded_eval = evaluate_multilinear(
+        &folded_message,
+        &claim.col_point,
+        &mut eval_scratch[..row_len],
+    )?;
+    let expected_folded_eval = inner_product_b128(&row_evals, &folding_challenges);
+    if folded_eval != expected_folded_eval {
+        return Err(Error::InvalidPcsOpen(
+            "Blaze2 folded message evaluation does not match row-evaluation fold".to_string(),
+        ));
+    }
+    absorb_blaze2_opening_folded_eval(&mut transcript, &folded_eval);
+
+    let folded_codeword = packed_code.encode_row(&folded_message);
+    let (backend_prequery, backend_state) =
+        params.prove_prequery::<H>(&folded_codeword, auxiliary_oracle)?;
+    let schedule = params.sample_query_schedule(&mut transcript, &backend_prequery)?;
+
+    let mut queries = Vec::with_capacity(schedule.input_queries().len());
+    let mut top_queries = Vec::with_capacity(schedule.input_queries().len());
+    for input_query in schedule.input_queries() {
+        let column_opening = codeword_commitment.query(input_query.logical_index)?;
+        top_queries.push(TopQuery {
+            index: input_query.logical_index,
+            value: fold_interleaved_column(&column_opening, &folding_challenges)?,
+        });
+        queries.push(Blaze2OpeningQuery { column_opening });
+    }
+
+    let backend_proof = params.open_query_proof(&backend_state, &schedule)?;
+    params.verify_query_proof(&backend_prequery, &schedule, &backend_proof, &top_queries)?;
+
+    Ok(Blaze2BaseFoldOpeningProof {
+        row_evals,
+        backend_prequery,
+        backend_proof,
+        queries,
+    })
+}
+
 pub fn verify_blaze2_opening<H: Hash, B: Blaze2FoldedMessageBackend>(
     code: &PackedRaaCode,
     code_seed: &Blaze2CodeSeed,
@@ -1536,6 +1639,69 @@ pub fn verify_blaze2_opening<H: Hash, B: Blaze2FoldedMessageBackend>(
         code.message_len(),
         &folded_request,
         &input_values,
+    )?;
+    Ok(())
+}
+
+pub fn verify_blaze2_basefold_opening<H: Blaze2HashSpec>(
+    params: &Blaze2BaseFoldBackendParams,
+    commitment: &Blaze2InterleavedCodewordPublicCommitment<H>,
+    claim: &Blaze2OpeningClaim,
+    proof: &Blaze2BaseFoldOpeningProof<H>,
+) -> Result<(), Error> {
+    let code = params.praa();
+    validate_blaze2_code_hash::<H>(code.spec())?;
+    let packed_code = code.packed();
+    validate_blaze2_basefold_opening_public(
+        params,
+        commitment.codeword_len(),
+        commitment.num_rows(),
+        claim,
+        proof,
+    )?;
+
+    let mut transcript = CfriTranscript::<H>::new();
+    absorb_blaze2_opening_public_with_code_spec(
+        &mut transcript,
+        code,
+        commitment,
+        claim,
+        params.spec().q_raa_input,
+    );
+    absorb_blaze2_opening_row_evals(&mut transcript, &proof.row_evals);
+    let mut folding_challenges = vec![B128::ZERO; proof.row_evals.len()];
+    squeeze_blaze2_opening_folding_challenges(&mut transcript, &mut folding_challenges);
+    let expected_folded_eval = inner_product_b128(&proof.row_evals, &folding_challenges);
+    absorb_blaze2_opening_folded_eval(&mut transcript, &expected_folded_eval);
+    let schedule = params.sample_query_schedule(&mut transcript, &proof.backend_prequery)?;
+    if proof.queries.len() != schedule.input_queries().len() {
+        return Err(Error::InvalidPcsOpen(format!(
+            "Blaze2 BaseFold proof has {} outer queries but backend schedule expects {}",
+            proof.queries.len(),
+            schedule.input_queries().len()
+        )));
+    }
+
+    let mut scratch = vec![B128::ZERO; proof.row_evals.len()];
+    let claim_value = evaluate_multilinear(&proof.row_evals, &claim.row_point, &mut scratch)?;
+    if claim_value != claim.value {
+        return Err(Error::InvalidPcsOpen(
+            "Blaze2 opening row evaluation invariant failed".to_string(),
+        ));
+    }
+
+    let top_queries = authenticate_blaze2_basefold_outer_queries(
+        commitment,
+        packed_code,
+        &schedule,
+        &proof.queries,
+        &folding_challenges,
+    )?;
+    params.verify_query_proof(
+        &proof.backend_prequery,
+        &schedule,
+        &proof.backend_proof,
+        &top_queries,
     )?;
     Ok(())
 }
@@ -1951,6 +2117,35 @@ fn validate_blaze2_opening_inputs(
     )
 }
 
+fn validate_blaze2_basefold_opening_public<H: Hash>(
+    params: &Blaze2BaseFoldBackendParams,
+    codeword_len: usize,
+    num_committed_rows: usize,
+    claim: &Blaze2OpeningClaim,
+    proof: &Blaze2BaseFoldOpeningProof<H>,
+) -> Result<(), Error> {
+    if proof.queries.is_empty() {
+        return Err(Error::InvalidPcsOpen(
+            "Blaze2 BaseFold opening proof has no outer queries".to_string(),
+        ));
+    }
+    if proof.queries.len() != params.spec().q_raa_input {
+        return Err(Error::InvalidPcsOpen(format!(
+            "Blaze2 BaseFold opening proof has {} outer queries but backend expects {}",
+            proof.queries.len(),
+            params.spec().q_raa_input
+        )));
+    }
+    validate_blaze2_opening_shape(
+        params.praa().packed(),
+        params.praa().packed().message_len(),
+        proof.row_evals.len(),
+        codeword_len,
+        num_committed_rows,
+        claim,
+    )
+}
+
 fn validate_blaze2_opening_public<H: Hash, B: Blaze2FoldedMessageBackend>(
     code: &PackedRaaCode,
     codeword_len: usize,
@@ -2119,6 +2314,38 @@ fn authenticate_column_queries<H: Hash>(
         seen_indices.push(query.index);
     }
     Ok(())
+}
+
+fn authenticate_blaze2_basefold_outer_queries<H: Hash>(
+    commitment: &Blaze2InterleavedCodewordPublicCommitment<H>,
+    code: &PackedRaaCode,
+    schedule: &HolographicQuerySchedule,
+    queries: &[Blaze2OpeningQuery<H>],
+    folding_challenges: &[B128],
+) -> Result<Vec<TopQuery<B128>>, Error> {
+    if queries.len() != schedule.input_queries().len() {
+        return Err(Error::InvalidPcsOpen(format!(
+            "Blaze2 BaseFold outer query count {} does not match backend input query count {}",
+            queries.len(),
+            schedule.input_queries().len()
+        )));
+    }
+
+    let mut top_queries = Vec::with_capacity(queries.len());
+    for (query, expected) in queries.iter().zip(schedule.input_queries()) {
+        authenticate_blaze2_opening_column(
+            commitment.root(),
+            &query.column_opening,
+            commitment.num_rows(),
+            code.codeword_len(),
+            expected.logical_index,
+        )?;
+        top_queries.push(TopQuery {
+            index: expected.logical_index,
+            value: fold_interleaved_column(&query.column_opening, folding_challenges)?,
+        });
+    }
+    Ok(top_queries)
 }
 
 fn authenticate_blaze2_opening_column<H: Hash>(

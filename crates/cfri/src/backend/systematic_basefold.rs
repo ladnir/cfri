@@ -1670,7 +1670,7 @@ impl HolographicQuerySchedule {
         &self.raa_auxiliary_queries
     }
 
-    pub fn auxiliary_proof_query_count(&self) -> usize {
+    pub fn relation_auxiliary_proof_query_count(&self) -> usize {
         self.proof_queries
             .iter()
             .filter(|query| query.domain == BackendProofQueryDomain::RelationAuxiliary)
@@ -1678,7 +1678,7 @@ impl HolographicQuerySchedule {
     }
 
     pub fn expected_auxiliary_query_proof_count(&self) -> usize {
-        self.auxiliary_proof_query_count()
+        self.relation_auxiliary_proof_query_count()
             + 3 * self.raa_final_queries.len()
             + usize::from(!self.raa_final_queries.is_empty())
             + self

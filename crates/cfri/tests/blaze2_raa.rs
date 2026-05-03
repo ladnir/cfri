@@ -1379,9 +1379,9 @@ fn blaze2_basefold_outer_shape_matches_paper_after_field_byte_correction() {
         .iter()
         .filter(|query| query.domain == BackendProofQueryDomain::CompilerParity)
         .count();
-    let auxiliary_query_count = schedule.auxiliary_proof_query_count();
+    let relation_auxiliary_query_count = schedule.relation_auxiliary_proof_query_count();
     assert_eq!(
-        compiler_parity_query_count + auxiliary_query_count,
+        compiler_parity_query_count + relation_auxiliary_query_count,
         q_backend_proof,
         "typed backend proof schedule has exactly Q_backend entries"
     );

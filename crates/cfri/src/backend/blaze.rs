@@ -507,10 +507,56 @@ fn interpolate_coefficients<F: PrimeField>(points: &[F], evals: &[F]) -> Vec<F> 
     coeffs
 }
 
-fn boolean_suffix<F: PrimeField>(index: usize, len: usize) -> Vec<F> {
-    (0..len)
-        .map(|bit| F::from(((index >> bit) & 1) as u64))
-        .collect()
+fn fill_boolean_suffix<F: PrimeField>(point: &mut Vec<F>, index: usize, len: usize) {
+    point.extend((0..len).map(|bit| F::from(((index >> bit) & 1) as u64)));
+}
+
+fn blaze_product_selector(point: &[B128], relation_vars: usize) -> B128 {
+    point[relation_vars..]
+        .iter()
+        .enumerate()
+        .fold(B128::ONE, |acc, (idx, value)| {
+            if idx == 0 {
+                acc * (B128::ONE - *value)
+            } else {
+                acc * *value
+            }
+        })
+}
+
+fn fill_blaze_product_terminal_points(
+    point: &[B128],
+    level: usize,
+    left_point: &mut Vec<B128>,
+    right_point: &mut Vec<B128>,
+    parent_point: &mut Vec<B128>,
+) {
+    let num_vars = point.len();
+    let relation_vars = num_vars - level - 1;
+
+    left_point.clear();
+    left_point.push(B128::ZERO);
+    left_point.extend_from_slice(&point[..relation_vars]);
+    if level > 0 {
+        left_point.push(B128::ZERO);
+        left_point.extend(iter::repeat(B128::ONE).take(level - 1));
+    }
+    debug_assert_eq!(left_point.len(), num_vars);
+
+    right_point.clear();
+    right_point.push(B128::ONE);
+    right_point.extend_from_slice(&point[..relation_vars]);
+    if level > 0 {
+        right_point.push(B128::ZERO);
+        right_point.extend(iter::repeat(B128::ONE).take(level - 1));
+    }
+    debug_assert_eq!(right_point.len(), num_vars);
+
+    parent_point.clear();
+    parent_point.extend_from_slice(&point[..relation_vars]);
+    parent_point.push(B128::ZERO);
+    parent_point.extend(iter::repeat(B128::ONE).take(level));
+    debug_assert_eq!(parent_point.len(), num_vars);
 }
 
 fn permutation_product_expression(
@@ -542,6 +588,38 @@ fn permutation_product_expression(
         .sum()
 }
 
+fn permutation_product_expression_with_scratch(
+    split_binding: &[MultilinearPolynomial<B128>],
+    num_split_chunks: usize,
+    coeffs: &[B128],
+    point: &[B128],
+    left_point: &mut Vec<B128>,
+    right_point: &mut Vec<B128>,
+    parent_point: &mut Vec<B128>,
+) -> B128 {
+    debug_assert_eq!(num_split_chunks, 2);
+    debug_assert_eq!(split_binding.len(), coeffs.len() * num_split_chunks);
+    let num_vars = point.len();
+    let mut result = B128::ZERO;
+
+    for level in 0..num_vars {
+        let relation_vars = num_vars - level - 1;
+        let selector = blaze_product_selector(point, relation_vars);
+        fill_blaze_product_terminal_points(point, level, left_point, right_point, parent_point);
+        let child_chunk = usize::from(level != 0);
+
+        for (tree_idx, coeff) in coeffs.iter().enumerate() {
+            let tree_offset = tree_idx * num_split_chunks;
+            let left = split_binding[tree_offset + child_chunk].evaluate(left_point);
+            let right = split_binding[tree_offset + child_chunk].evaluate(right_point);
+            let parent = split_binding[tree_offset + 1].evaluate(parent_point);
+            result += *coeff * selector * (parent - left * right);
+        }
+    }
+
+    result
+}
+
 fn permutation_product_sum_check<H: Hash>(
     split_binding: &[MultilinearPolynomial<B128>],
     num_split_chunks: usize,
@@ -556,29 +634,41 @@ fn permutation_product_sum_check<H: Hash>(
 
     for round in 0..num_rounds {
         let remaining = num_rounds - round - 1;
-        let round_eval = |challenge: B128| {
-            (0..(1usize << remaining))
-                .into_par_iter()
-                .map(|suffix_index| {
+        let oracle_evals = (0..(1usize << remaining))
+            .into_par_iter()
+            .map(|suffix_index| {
+                let mut evals = [B128::ZERO; 4];
+                let mut left_point = Vec::with_capacity(num_rounds);
+                let mut right_point = Vec::with_capacity(num_rounds);
+                let mut parent_point = Vec::with_capacity(num_rounds);
+                for (eval, challenge) in evals.iter_mut().zip(interpolation_points.iter()) {
                     let mut point = Vec::with_capacity(num_rounds);
                     point.extend_from_slice(&challenges);
-                    point.push(challenge);
-                    point.extend(boolean_suffix::<B128>(suffix_index, remaining));
-                    eq_poly.evaluate(&point)
-                        * permutation_product_expression(
+                    point.push(*challenge);
+                    fill_boolean_suffix(&mut point, suffix_index, remaining);
+                    *eval = eq_poly.evaluate(&point)
+                        * permutation_product_expression_with_scratch(
                             split_binding,
                             num_split_chunks,
                             coeffs,
                             &point,
-                        )
-                })
-                .sum::<B128>()
-        };
-
-        let oracle_evals = interpolation_points
-            .iter()
-            .map(|point| round_eval(*point))
-            .collect::<Vec<_>>();
+                            &mut left_point,
+                            &mut right_point,
+                            &mut parent_point,
+                        );
+                }
+                evals
+            })
+            .reduce(
+                || [B128::ZERO; 4],
+                |mut acc, evals| {
+                    for (acc, eval) in acc.iter_mut().zip(evals.iter()) {
+                        *acc += *eval;
+                    }
+                    acc
+                },
+            )
+            .to_vec();
         let oracle = interpolate_coefficients(&interpolation_points, &oracle_evals);
         let _ = transcript.write_field_elements(&oracle);
         challenges.push(transcript.squeeze_challenge());

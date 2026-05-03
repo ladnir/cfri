@@ -19,9 +19,43 @@ Sources:
 | `N_i` | BaseFold oracle length at layer `i` | `N_i = expansion * k0 * 2^i` |
 | `Q_BF` | BaseFold query repetitions | chosen so `(1 - delta + gamma * D)^Q_BF` is at most `2^-lambda` |
 | `Q_RAA` | Blaze RAA/interleaving query repetitions | `ceil(lambda / -log2(1 - delta_RAA / 3))` |
+| `k_praa` | per-row PRAA message length | Blaze Section 8.2 `k` |
+| `n_praa` | per-row PRAA codeword length and compiler systematic length | Blaze Section 8.2 `n/t` |
+| `N_comp` | compiler-code codeword length for `C_sys(c_star)` | `n_praa + parity_len` |
 
 The formulas below separate "field payload" from "hash authentication". For these transparent
 schemes the Merkle authentication paths are usually the dominant term.
+
+## Holographic/Systematic BaseFold Model
+
+The target BaseFold backend is holographic. It runs over a systematic compiler code:
+
+```text
+C_sys(y) = (y || parity(y))
+```
+
+The systematic part `y` may be authenticated outside the backend. The parity/proof-oracle parts are
+authenticated by the BaseFold backend proof. This is the accounting model used by Blaze's
+MLIOP-to-IOPP compiler: `y = c_star` is supplied by Blaze column openings, while the
+non-systematic compiler-code part and auxiliary oracles live in the backend proof.
+
+For Phase 1, the accepted concrete compiler code is systematic-augmented RFC:
+
+```text
+C_sys(m) = (m, E_RFC(m))
+N_comp = k_comp + n_rfc
+c_parity = n_rfc / k_comp
+c_parity in {1, 3, 7, 15, ...}
+rate_parity = 1 / c_parity
+rate_sys = k_comp / N_comp = 1 / (1 + c_parity)
+delta_sys >= (n_rfc / N_comp) * delta_rfc
+          = (c_parity / (1 + c_parity)) * delta_rfc
+```
+
+The `c_parity` restriction keeps `N_comp = (1 + c_parity) * k_comp` power-of-two when `k_comp` is
+power-of-two, which lets the first implementation reuse the existing power-of-two folding
+infrastructure. The distance penalty is real. Query counts for the backend must use `delta_sys`,
+not the old RFC distance alone.
 
 ## BaseFold PCS Proof Contents
 
@@ -29,7 +63,8 @@ From BaseFold Protocol 4, a single evaluation proof contains:
 
 1. Sumcheck messages `h_D, ..., h_1`.
 2. Commitments to the folded proof oracles `pi_{D-1}, ..., pi_0`.
-3. Query openings proving folding consistency between adjacent oracle layers.
+3. Query openings proving folding consistency between adjacent oracle layers, split by whether the
+   queried entry is systematic input, parity, or auxiliary proof-oracle data.
 4. A terminal check that `pi_0` is a valid base-code codeword.
 
 The initial root for `pi_D = Enc_D(f)` is the polynomial commitment, so it is public input rather
@@ -40,9 +75,10 @@ than part of the opening proof.
 | Component | Count | Unit bytes | Total bytes | Notes |
 | --- | ---: | ---: | ---: | --- |
 | Sumcheck degree-2 polynomials | `3 * D` | `field_bytes` | `=3*D*field_bytes` | Each `h_i(X)` is degree 2, so three field elements. |
-| Folded oracle Merkle roots | `D - 1` or `D` | `hash_bytes` | `=(D-final_clear)*hash_bytes` | If `pi_0` is sent in the clear, roots are only for `pi_{D-1}..pi_1`; otherwise include `pi_0`. |
+| Systematic input root | wrapper-dependent | `hash_bytes` | wrapper-dependent | Standalone BaseFold owns this; Blaze supplies it via the interleaved PRAA commitment instead. |
+| Parity/proof-oracle Merkle roots | `D - 1` or `D` plus auxiliary roots | `hash_bytes` | `=(D-final_clear+aux_roots)*hash_bytes` | Roots for backend-authenticated parity and proof oracles. |
 | Final base codeword | `N_0` | `field_bytes` | `=N_0*field_bytes` | Usually cheaper than committing when `N_0` is tiny. |
-| Query leaf values, optimized path reuse | `Q_BF * (D + 1)` | `field_bytes` | `=Q_BF*(D+1)*field_bytes` | Top layer needs both children; lower layers need only the sibling value because the folded value is carried down. |
+| Query leaf values, optimized path reuse | schedule-dependent | `field_bytes` | explicit schedule sum | Top systematic values may be externally authenticated; parity/proof-oracle values are backend-authenticated. Within each folding path, carried-value reuse still applies. |
 | Query leaf values, literal no reuse | `2 * Q_BF * D` | `field_bytes` | `=2*Q_BF*D*field_bytes` | Useful as a red-flag upper bound. |
 | Query Merkle authentication | `Q_BF * sum_{i=1..D} log2(N_i)` | `hash_bytes` | `=Q_BF*SUM(LOG2(N_i))*hash_bytes` | Paper verifier cost is `O(Q_BF * D)` Merkle path checks, each path length `O(D)`. |
 | Optional transcript/check scalars | `O(D)` | `field_bytes` | small | Usually already covered by sumcheck or derived by Fiat-Shamir. |
@@ -50,7 +86,7 @@ than part of the opening proof.
 For the common `k0 = 1`, `N_i = expansion * 2^i`. If the expansion is 2, then
 `sum_{i=1..D} log2(N_i) = D*(D+3)/2`.
 
-So the dominant BaseFold size is:
+For the old monolithic standalone model, the dominant BaseFold size was:
 
 ```text
 basefold_bytes ~= Q_BF * sum_{i=1..D} log2(N_i) * hash_bytes
@@ -59,6 +95,22 @@ basefold_bytes ~= Q_BF * sum_{i=1..D} log2(N_i) * hash_bytes
                + folded_roots
                + final_codeword
 ```
+
+For the target holographic model, subtract systematic input authentication supplied by an external
+commitment and add parity/proof-oracle authentication according to the typed query schedule:
+
+```text
+holographic_basefold_bytes ~=
+    backend_roots
+  + final_codeword
+  + sumcheck_bytes
+  + systematic_opening_bytes_owned_by_wrapper
+  + parity_and_aux_query_values
+  + parity_and_aux_merkle_paths
+```
+
+For Blaze, `systematic_opening_bytes_owned_by_wrapper` is zero inside the backend term because
+systematic `c_star` openings are counted in the Blaze outer term.
 
 The BaseFold paper gives the protocol and asymptotics, while its exact figure data for standalone
 PCS proof size is plotted visually. The Blaze paper's Figure 4 reports BaseFold proof sizes of about
@@ -72,7 +124,8 @@ claim to a smaller BaseFold claim.
 From Blaze Section 8.2, for a polynomial with `t * k` coefficients:
 
 1. The proof opens a constant number of `t`-length columns of the interleaved code.
-2. The proof includes a BaseFold proof on a smaller witness size, written in the paper as `n / t`.
+2. The proof includes a BaseFold/compiler proof whose systematic input length is the smaller
+   witness/input length, written in the paper as `n / t`.
 3. The proof includes Merkle paths for the queried interleaved-code columns.
 
 For the RAA query count, the paper sets distance `delta_RAA = 0.19` and targets 100 bits:
@@ -100,14 +153,14 @@ the same proof over GF(2^128), this row becomes `1059 * 16 * t`.
 | Interleaving/evaluation vector | `t` or `2 * t` | `field_bytes` | `=t*field_bytes` or `=2*t*field_bytes` | Lemma 6.1 has `2t + cc(k)` non-oracle communication; Section 8.2 folds this into "constant number of columns". |
 | RAA queried columns | `Q_RAA * t` | `field_bytes` | `=Q_RAA*t*field_bytes` | Explicit paper row: `1059 * 8 * t` bytes. |
 | RAA column Merkle paths | `Q_RAA * log2(n / t)` | `hash_bytes` | `=Q_RAA*LOG2(n/t)*hash_bytes` | Section 8.2 says 1059 paths for a tree with `n/t` leaves. |
-| Inner BaseFold proof | `1` | `basefold_bytes(n/t)` | `=basefold_bytes(n/t)` | This is smaller than BaseFold on the original witness. |
+| Inner BaseFold proof | `1` | `holographic_basefold_bytes(k_comp=n/t, N_comp)` | `=holographic_basefold_bytes(...)` | Backend term for `C_sys(c_star)`, excluding Blaze-authenticated systematic openings. |
 | Small scalar overhead | `O(log n)` | `field_bytes` | small | From the MLIOP/IOPP and batching reductions. |
 | Commitment roots | constant plus inner roots | `hash_bytes` | small | Public commitment root is not counted as opening proof unless the benchmark includes it. |
 
 Dominant Blaze size:
 
 ```text
-blaze_bytes ~= basefold_bytes(n / t)
+blaze_bytes ~= holographic_basefold_bytes(k_comp = n / t, N_comp)
              + Q_RAA * t * field_bytes
              + Q_RAA * log2(n / t) * hash_bytes
              + O(t * field_bytes + log(n) * field_bytes + hash_bytes * log(n/t))
@@ -167,7 +220,7 @@ protocol effect. The useful conclusion is that the standalone BaseFold row is co
 
 For Blaze, the author's benchmark source uses a fixed row length `2^21` and varies the number of
 rows. The paper formula says the incremental Blaze term is `Q_RAA * 8 * t` bytes, with `Q_RAA =
-1059`, plus a BaseFold/Merkle-path component. Fitting that component as a constant `0.477 MB`
+1059`, plus a holographic BaseFold/compiler component. Fitting that component as a constant `0.477 MB`
 and solving for the effective opened-column count gives:
 
 | Variables | Paper MB | Effective `t` | Model MB | Error |
@@ -191,8 +244,18 @@ For proof-size regression accounting, the implementation should be measured agai
 component budgets:
 
 1. BaseFold should have one chain of folded oracle commitments, sumcheck messages, and query
-   decommitments. It should not commit to a fresh full-size object inside each query.
+   decommitments over a systematic/holographic compiler code. It should not commit to a fresh
+   full-size object inside each query.
 2. Blaze should add `Q_RAA` column openings and `Q_RAA` column Merkle paths, then delegate the
-   reduced claim to one smaller BaseFold proof.
+   reduced claim to one smaller holographic BaseFold/compiler proof.
 3. Any proof-size term proportional to `Q_RAA * t * log(n/t)` field elements, `Q_RAA * n`, or a full
    row-combination vector is not part of the paper Blaze proof shape.
+4. The implementation must keep PRAA and compiler-code lengths separate:
+
+```text
+k_praa      = per-row PRAA message length
+n_praa      = per-row PRAA codeword length = compiler systematic length
+N_comp      = compiler systematic length + compiler parity length
+Q_RAA       = exact number of Blaze-authenticated compiler-systematic input queries
+Q_backend   = separate backend proof-query count
+```

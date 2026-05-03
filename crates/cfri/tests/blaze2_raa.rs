@@ -311,14 +311,8 @@ fn audit_blaze2_opening_against_witness<H: Hash, B: Blaze2FoldedMessageBackend>(
     fold_packed_rows_into(packed, &folding_challenges, &mut folded_message)?;
     let folded_eval =
         evaluate_multilinear(&folded_message, &claim.col_point, &mut scratch[..row_len])?;
-    if proof.folded_message.eval != folded_eval {
-        return Err(Error::InvalidPcsOpen(
-            "test audit: folded evaluation does not match witness fold".to_string(),
-        ));
-    }
-
     B::absorb_commitment(&mut transcript, &proof.folded_message.commitment);
-    absorb_blaze2_opening_folded_eval(&mut transcript, &proof.folded_message.eval);
+    absorb_blaze2_opening_folded_eval(&mut transcript, &folded_eval);
 
     let mut query_indices = vec![0usize; num_queries];
     squeeze_blaze2_opening_query_indices(&mut transcript, code.codeword_len(), &mut query_indices)?;
@@ -350,15 +344,20 @@ fn audit_blaze2_opening_against_witness<H: Hash, B: Blaze2FoldedMessageBackend>(
 fn exhaustive_backend_blaze2_outer_bytes(
     proof: &Blaze2OpeningProof<Blake2s256, ExhaustiveFoldedMessageBackend>,
 ) -> usize {
-    const B128_BYTES: usize = 16;
-    proof.row_evals.len() * B128_BYTES
-        + proof.folded_message.eval.to_repr().as_ref().len()
+    exhaustive_backend_blaze2_outer_bytes_with_field_bytes(proof, 16)
+}
+
+fn exhaustive_backend_blaze2_outer_bytes_with_field_bytes(
+    proof: &Blaze2OpeningProof<Blake2s256, ExhaustiveFoldedMessageBackend>,
+    field_bytes: usize,
+) -> usize {
+    proof.row_evals.len() * field_bytes
         + proof.folded_message.commitment.len()
         + proof
             .queries
             .iter()
             .map(|query| {
-                query.column_opening.values.len() * B128_BYTES
+                query.column_opening.values.len() * field_bytes
                     + query
                         .column_opening
                         .path
@@ -1078,15 +1077,42 @@ fn blaze2_opening_outer_proof_size_matches_paper_accounting() {
     let field_bytes = 16;
     let hash_bytes = 32;
     let path_len = code.codeword_len().trailing_zeros() as usize;
-    let expected = t * field_bytes
-        + field_bytes
-        + hash_bytes
-        + num_queries * (t * field_bytes + path_len * hash_bytes);
+    let expected =
+        t * field_bytes + hash_bytes + num_queries * (t * field_bytes + path_len * hash_bytes);
 
     assert_eq!(
         exhaustive_backend_blaze2_outer_bytes(&proof),
         expected,
         "Blaze2 outer proof must be u + folded commitment/eval + Q_RAA opened columns and paths"
+    );
+}
+
+#[test]
+fn blaze2_outer_proof_matches_paper_shape_after_field_byte_correction() {
+    let (code, code_seed, packed, commitment, claim, num_queries) = opening_fixture(49);
+    let proof = prove_blaze2_opening::<_, ExhaustiveFoldedMessageBackend>(
+        &code,
+        &code_seed,
+        &packed,
+        &commitment,
+        &claim,
+        num_queries,
+    )
+    .unwrap();
+
+    let t = commitment.num_rows();
+    let paper_field_bytes = 8;
+    let hash_bytes = 32;
+    let path_len = code.codeword_len().trailing_zeros() as usize;
+    let backend_commitment_bytes = hash_bytes;
+    let expected = t * paper_field_bytes
+        + backend_commitment_bytes
+        + num_queries * (t * paper_field_bytes + path_len * hash_bytes);
+
+    assert_eq!(
+        exhaustive_backend_blaze2_outer_bytes_with_field_bytes(&proof, paper_field_bytes),
+        expected,
+        "after the allowed 16-to-8 byte field correction, Blaze2 outer proof shape must be row evals + one backend commitment + Q_RAA opened columns and paths"
     );
 }
 
@@ -1166,9 +1192,9 @@ fn blaze2_opening_rejects_bad_input_column_opening() {
 }
 
 #[test]
-fn blaze2_opening_rejects_bad_folded_message_eval() {
+fn blaze2_opening_does_not_serialize_folded_message_eval() {
     let (code, code_seed, packed, commitment, claim, num_queries) = opening_fixture(40);
-    let mut proof = prove_blaze2_opening::<_, ExhaustiveFoldedMessageBackend>(
+    let proof = prove_blaze2_opening::<_, ExhaustiveFoldedMessageBackend>(
         &code,
         &code_seed,
         &packed,
@@ -1177,17 +1203,12 @@ fn blaze2_opening_rejects_bad_folded_message_eval() {
         num_queries,
     )
     .unwrap();
-    proof.folded_message.eval += B128::ONE;
 
-    assert!(verify_blaze2_opening::<_, ExhaustiveFoldedMessageBackend>(
-        &code,
-        &code_seed,
-        &commitment.public(),
-        &claim,
-        &proof,
-        num_queries,
-    )
-    .is_err());
+    let serialized = format!("{proof:?}");
+    assert!(
+        !serialized.contains("eval:"),
+        "folded_eval is derived by the verifier and must not be serialized as proof data"
+    );
 }
 
 #[test]

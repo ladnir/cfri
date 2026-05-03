@@ -311,7 +311,6 @@ pub struct Blaze2FoldedMessageOpenRequest<'a> {
 #[derive(Clone, Debug)]
 pub struct Blaze2FoldedMessageProof<B: Blaze2FoldedMessageBackend> {
     pub commitment: B::Commitment,
-    pub eval: B128,
     pub backend_proof: B::Proof,
 }
 
@@ -442,9 +441,7 @@ impl<H: Hash> Eq for Blaze2RaaAuxTraceSpotQuery<H> {}
 
 impl<B: Blaze2FoldedMessageBackend> PartialEq for Blaze2FoldedMessageProof<B> {
     fn eq(&self, other: &Self) -> bool {
-        self.commitment == other.commitment
-            && self.eval == other.eval
-            && self.backend_proof == other.backend_proof
+        self.commitment == other.commitment && self.backend_proof == other.backend_proof
     }
 }
 
@@ -1361,7 +1358,6 @@ pub fn prove_blaze2_opening<H: Hash, B: Blaze2FoldedMessageBackend>(
         row_evals,
         folded_message: Blaze2FoldedMessageProof {
             commitment: folded_commitment,
-            eval: folded_eval,
             backend_proof,
         },
         queries,
@@ -1464,7 +1460,6 @@ pub fn prove_blaze2_opening_with_code_spec<H: Blaze2HashSpec, B: Blaze2FoldedMes
         row_evals,
         folded_message: Blaze2FoldedMessageProof {
             commitment: folded_commitment,
-            eval: folded_eval,
             backend_proof,
         },
         queries,
@@ -1501,13 +1496,8 @@ pub fn verify_blaze2_opening<H: Hash, B: Blaze2FoldedMessageBackend>(
     let mut folding_challenges = vec![B128::ZERO; proof.row_evals.len()];
     squeeze_blaze2_opening_folding_challenges(&mut transcript, &mut folding_challenges);
     let expected_folded_eval = inner_product_b128(&proof.row_evals, &folding_challenges);
-    if proof.folded_message.eval != expected_folded_eval {
-        return Err(Error::InvalidPcsOpen(
-            "Blaze2 folded message evaluation does not match row-evaluation fold".to_string(),
-        ));
-    }
     B::absorb_commitment(&mut transcript, &proof.folded_message.commitment);
-    absorb_blaze2_opening_folded_eval(&mut transcript, &proof.folded_message.eval);
+    absorb_blaze2_opening_folded_eval(&mut transcript, &expected_folded_eval);
     let mut query_indices = vec![0usize; num_queries];
     squeeze_blaze2_opening_query_indices(&mut transcript, code.codeword_len(), &mut query_indices)?;
 
@@ -1537,7 +1527,7 @@ pub fn verify_blaze2_opening<H: Hash, B: Blaze2FoldedMessageBackend>(
     let folded_request = Blaze2FoldedMessageOpenRequest {
         code,
         col_point: &claim.col_point,
-        folded_eval: proof.folded_message.eval,
+        folded_eval: expected_folded_eval,
         input_indices: &query_indices,
     };
     B::verify(
@@ -1580,13 +1570,8 @@ pub fn verify_blaze2_opening_with_code_spec<H: Blaze2HashSpec, B: Blaze2FoldedMe
     let mut folding_challenges = vec![B128::ZERO; proof.row_evals.len()];
     squeeze_blaze2_opening_folding_challenges(&mut transcript, &mut folding_challenges);
     let expected_folded_eval = inner_product_b128(&proof.row_evals, &folding_challenges);
-    if proof.folded_message.eval != expected_folded_eval {
-        return Err(Error::InvalidPcsOpen(
-            "Blaze2 folded message evaluation does not match row-evaluation fold".to_string(),
-        ));
-    }
     B::absorb_commitment(&mut transcript, &proof.folded_message.commitment);
-    absorb_blaze2_opening_folded_eval(&mut transcript, &proof.folded_message.eval);
+    absorb_blaze2_opening_folded_eval(&mut transcript, &expected_folded_eval);
     let mut query_indices = vec![0usize; num_queries];
     squeeze_blaze2_opening_query_indices(
         &mut transcript,
@@ -1620,7 +1605,7 @@ pub fn verify_blaze2_opening_with_code_spec<H: Blaze2HashSpec, B: Blaze2FoldedMe
     let folded_request = Blaze2FoldedMessageOpenRequest {
         code: packed_code,
         col_point: &claim.col_point,
-        folded_eval: proof.folded_message.eval,
+        folded_eval: expected_folded_eval,
         input_indices: &query_indices,
     };
     B::verify(

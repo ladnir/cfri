@@ -128,9 +128,10 @@ For `B128`, the Blaze-specific byte budget before the backend proof is:
 blaze2_outer_bytes =
     t * 16
   + Q_RAA * (t * 16 + log2(n / t) * 32)
-  + 16
   + backend_commitment_bytes
 ```
 
-The final `16` is the folded evaluation. The backend proof itself must separately match its own
-paper accounting. Test-only exhaustive backends are intentionally not proof-size meaningful.
+The folded evaluation is derived by the verifier from the row-evaluation vector and folding
+challenges. It is transcript-bound before query sampling, but it is not serialized proof data. The
+backend proof itself must separately match its own paper accounting. Test-only exhaustive backends
+are intentionally not proof-size meaningful.

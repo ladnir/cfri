@@ -1342,6 +1342,21 @@ fn blaze2_basefold_opening_derives_configured_auxiliary_trace() {
     );
     verify_blaze2_basefold_opening(&params, &commitment.public(), &claim, &proof).unwrap();
 
+    let mut bad_relation = proof.clone();
+    bad_relation
+        .backend_proof
+        .auxiliary
+        .as_mut()
+        .unwrap()
+        .queries
+        .last_mut()
+        .unwrap()
+        .value += B128::ONE;
+    assert!(
+        verify_blaze2_basefold_opening(&params, &commitment.public(), &claim, &bad_relation)
+            .is_err()
+    );
+
     let bad_auxiliary = vec![B128::ONE; auxiliary_len];
     assert!(
         prove_blaze2_basefold_opening(&params, &packed, &commitment, &claim, &bad_auxiliary)

@@ -59,6 +59,14 @@ pub struct BackendProofQuery {
     pub physical_index: Option<usize>,
 }
 
+#[derive(Clone, Copy, Debug, Eq, PartialEq)]
+pub struct RaaFinalAccumulatorQuery {
+    pub index: usize,
+    pub current_input_query: usize,
+    pub previous_input_query: usize,
+    pub u4_auxiliary_index: usize,
+}
+
 #[derive(Clone, Debug)]
 pub struct CompilerParityCommitment<H: Hash> {
     values: Vec<B128>,
@@ -165,6 +173,7 @@ pub struct CompilerParityFoldStep<H: Hash> {
 pub struct HolographicQuerySchedule {
     input_queries: Vec<SystematicInputQuery>,
     proof_queries: Vec<BackendProofQuery>,
+    raa_final_queries: Vec<RaaFinalAccumulatorQuery>,
 }
 
 #[derive(Clone, Copy, Debug, Eq, PartialEq)]
@@ -482,6 +491,12 @@ impl Blaze2BaseFoldBackendParams {
             proof.auxiliary.as_ref(),
             self.spec.auxiliary_oracle_len,
             schedule,
+        )?;
+        verify_raa_final_accumulator_queries(
+            proof.auxiliary.as_ref(),
+            self.spec.auxiliary_oracle_len,
+            schedule,
+            top_queries,
         )
     }
 
@@ -1180,6 +1195,9 @@ impl<H: Hash> AuxiliaryOracleCommitment<H> {
                 queries.push(self.query(query.index)?);
             }
         }
+        for query in schedule.raa_final_queries() {
+            queries.push(self.query(query.u4_auxiliary_index)?);
+        }
         Ok(AuxiliaryOracleQueryProof { queries })
     }
 }
@@ -1238,7 +1256,8 @@ impl<H: Hash> AuxiliaryOracleQueryProof<H> {
             .proof_queries()
             .iter()
             .filter(|query| query.domain == BackendProofQueryDomain::Auxiliary)
-            .count();
+            .count()
+            + schedule.raa_final_queries().len();
         if self.queries.len() != expected_count {
             return Err(Error::InvalidPcsOpen(
                 "auxiliary oracle query proof count does not match schedule".to_string(),
@@ -1254,6 +1273,16 @@ impl<H: Hash> AuxiliaryOracleQueryProof<H> {
             if query.logical_index != expected.index {
                 return Err(Error::InvalidPcsOpen(
                     "auxiliary oracle query index does not match schedule".to_string(),
+                ));
+            }
+            query.authenticate(public)?;
+        }
+        for expected in schedule.raa_final_queries() {
+            let query = supplied.next().expect("query count checked above");
+            if query.logical_index != expected.u4_auxiliary_index {
+                return Err(Error::InvalidPcsOpen(
+                    "RAA final accumulator auxiliary query index does not match schedule"
+                        .to_string(),
                 ));
             }
             query.authenticate(public)?;
@@ -1379,12 +1408,38 @@ impl HolographicQuerySchedule {
         absorb_usize(transcript, spec.auxiliary_oracle_len);
 
         let mut input_queries = Vec::with_capacity(spec.q_raa_input);
-        for _ in 0..spec.q_raa_input {
-            let logical_index = squeeze_bounded_index(transcript, layout.systematic_len())?;
-            input_queries.push(SystematicInputQuery {
-                logical_index,
-                physical_index: layout.systematic_to_physical(logical_index)?,
-            });
+        let mut raa_final_queries = Vec::new();
+        if spec.auxiliary_oracle_len == 0 {
+            for _ in 0..spec.q_raa_input {
+                let logical_index = squeeze_bounded_index(transcript, layout.systematic_len())?;
+                input_queries.push(SystematicInputQuery {
+                    logical_index,
+                    physical_index: layout.systematic_to_physical(logical_index)?,
+                });
+            }
+        } else {
+            let spot_count = spec.q_raa_input >> 1;
+            raa_final_queries.reserve(spot_count);
+            let u4_offset = spec.auxiliary_oracle_len * 2 / 3;
+            for _ in 0..spot_count {
+                let index = squeeze_bounded_index(transcript, layout.systematic_len() - 1)? + 1;
+                let current_input_query = input_queries.len();
+                input_queries.push(SystematicInputQuery {
+                    logical_index: index,
+                    physical_index: layout.systematic_to_physical(index)?,
+                });
+                let previous_input_query = input_queries.len();
+                input_queries.push(SystematicInputQuery {
+                    logical_index: index - 1,
+                    physical_index: layout.systematic_to_physical(index - 1)?,
+                });
+                raa_final_queries.push(RaaFinalAccumulatorQuery {
+                    index,
+                    current_input_query,
+                    previous_input_query,
+                    u4_auxiliary_index: u4_offset + index,
+                });
+            }
         }
 
         let proof_domain_len = layout.parity_len() + spec.auxiliary_oracle_len;
@@ -1401,6 +1456,7 @@ impl HolographicQuerySchedule {
         Ok(Self {
             input_queries,
             proof_queries,
+            raa_final_queries,
         })
     }
 
@@ -1410,6 +1466,10 @@ impl HolographicQuerySchedule {
 
     pub fn proof_queries(&self) -> &[BackendProofQuery] {
         &self.proof_queries
+    }
+
+    pub fn raa_final_queries(&self) -> &[RaaFinalAccumulatorQuery] {
+        &self.raa_final_queries
     }
 
     pub fn validate_top_queries<T>(&self, top_queries: &[TopQuery<T>]) -> Result<(), Error> {
@@ -1505,6 +1565,12 @@ fn validate_blaze2_backend_spec(spec: &Blaze2BaseFoldBackendSpec) -> Result<(), 
             "auxiliary oracle length must be zero or the flattened PRAA auxiliary trace length {expected_auxiliary_len}"
         )));
     }
+    if spec.auxiliary_oracle_len != 0 && spec.q_raa_input & 1 != 0 {
+        return Err(Error::InvalidPcsParam(
+            "auxiliary-enabled Blaze2 BaseFold backend needs an even RAA input query count"
+                .to_string(),
+        ));
+    }
     Ok(())
 }
 
@@ -1550,9 +1616,27 @@ fn validate_query_schedule_spec(
             "systematic BaseFold schedule needs at least one input query".to_string(),
         ));
     }
+    if spec.auxiliary_oracle_len != 0 && spec.q_raa_input & 1 != 0 {
+        return Err(Error::InvalidPcsParam(
+            "auxiliary-enabled systematic BaseFold schedule needs an even RAA input query count"
+                .to_string(),
+        ));
+    }
+    if spec.auxiliary_oracle_len != 0 && spec.auxiliary_oracle_len != 3 * layout.systematic_len() {
+        return Err(Error::InvalidPcsParam(
+            "auxiliary-enabled systematic BaseFold schedule expects a flattened three-row RAA trace"
+                .to_string(),
+        ));
+    }
     if spec.q_backend_proof == 0 {
         return Err(Error::InvalidPcsParam(
             "systematic BaseFold schedule needs at least one backend proof query".to_string(),
+        ));
+    }
+    if spec.auxiliary_oracle_len != 0 && layout.systematic_len() < 2 {
+        return Err(Error::InvalidPcsParam(
+            "auxiliary-enabled systematic BaseFold schedule needs at least two systematic entries"
+                .to_string(),
         ));
     }
     if layout.systematic_len() == 0 {
@@ -1863,7 +1947,8 @@ fn verify_auxiliary_query_proof<H: Hash>(
         .proof_queries()
         .iter()
         .filter(|query| query.domain == BackendProofQueryDomain::Auxiliary)
-        .count();
+        .count()
+        + schedule.raa_final_queries().len();
     if auxiliary_oracle_len == 0 {
         if public.is_some() || proof.is_some() || expected_count != 0 {
             return Err(Error::InvalidPcsOpen(
@@ -1903,6 +1988,66 @@ fn verify_auxiliary_query_proof<H: Hash>(
         )
     })?;
     proof.verify(public, auxiliary_oracle_len, schedule)
+}
+
+fn verify_raa_final_accumulator_queries<H: Hash>(
+    proof: Option<&AuxiliaryOracleQueryProof<H>>,
+    auxiliary_oracle_len: usize,
+    schedule: &HolographicQuerySchedule,
+    top_queries: &[TopQuery<B128>],
+) -> Result<(), Error> {
+    if schedule.raa_final_queries().is_empty() {
+        return Ok(());
+    }
+    if auxiliary_oracle_len == 0 {
+        return Err(Error::InvalidPcsOpen(
+            "RAA final accumulator checks require an auxiliary oracle".to_string(),
+        ));
+    }
+    let proof = proof.ok_or_else(|| {
+        Error::InvalidPcsOpen(
+            "RAA final accumulator checks require auxiliary query openings".to_string(),
+        )
+    })?;
+
+    let final_auxiliary_offset = schedule
+        .proof_queries()
+        .iter()
+        .filter(|query| query.domain == BackendProofQueryDomain::Auxiliary)
+        .count();
+    for (relative_index, expected) in schedule.raa_final_queries().iter().enumerate() {
+        let current = top_queries
+            .get(expected.current_input_query)
+            .ok_or_else(|| Error::InvalidPcsOpen("missing current RAA input query".to_string()))?;
+        let previous = top_queries
+            .get(expected.previous_input_query)
+            .ok_or_else(|| Error::InvalidPcsOpen("missing previous RAA input query".to_string()))?;
+        if current.index != expected.index || previous.index + 1 != expected.index {
+            return Err(Error::InvalidPcsOpen(
+                "RAA final accumulator input queries do not match scheduled neighboring columns"
+                    .to_string(),
+            ));
+        }
+        let u4 = proof
+            .queries
+            .get(final_auxiliary_offset + relative_index)
+            .ok_or_else(|| {
+                Error::InvalidPcsOpen(
+                    "RAA final accumulator auxiliary opening is missing".to_string(),
+                )
+            })?;
+        if u4.logical_index != expected.u4_auxiliary_index {
+            return Err(Error::InvalidPcsOpen(
+                "RAA final accumulator auxiliary opening index does not match schedule".to_string(),
+            ));
+        }
+        if current.value != previous.value + u4.value {
+            return Err(Error::InvalidPcsOpen(
+                "RAA final accumulator relation failed".to_string(),
+            ));
+        }
+    }
+    Ok(())
 }
 
 fn merkelize_b128_padded<H: Hash>(values: &[B128]) -> Vec<Vec<Output<H>>> {
@@ -2057,8 +2202,8 @@ fn log2_strict(value: usize) -> usize {
 mod tests {
     use super::*;
     use crate::backend::blaze2::{
-        Blaze2CodeSeed, Blaze2FieldId, Blaze2HashId, Blaze2LeafLayout, Blaze2PackingLayout,
-        RaaVariant,
+        build_raa_aux_trace, Blaze2CodeSeed, Blaze2FieldId, Blaze2HashId, Blaze2LeafLayout,
+        Blaze2PackingLayout, RaaVariant,
     };
     use crate::backend::hash::Blake2s;
 
@@ -2077,9 +2222,9 @@ mod tests {
 
     fn schedule_spec() -> HolographicQueryScheduleSpec {
         HolographicQueryScheduleSpec {
-            q_raa_input: 5,
+            q_raa_input: 6,
             q_backend_proof: 7,
-            auxiliary_oracle_len: 11,
+            auxiliary_oracle_len: 48,
         }
     }
 
@@ -2112,10 +2257,25 @@ mod tests {
                 parity_expansion_factor: 3,
                 seed: [23; 32],
             },
-            q_raa_input: 5,
+            q_raa_input: 6,
             q_backend_proof: 7,
             auxiliary_oracle_len: 96,
         }
+    }
+
+    fn folded_codeword_and_auxiliary(
+        params: &Blaze2BaseFoldBackendParams,
+        offset: u64,
+    ) -> (Vec<B128>, Vec<B128>) {
+        let folded_message = message(params.praa().packed().message_len(), offset);
+        let folded_codeword = params.praa().packed().encode_row(&folded_message);
+        let trace = build_raa_aux_trace(params.praa().packed(), &folded_message).unwrap();
+        let mut auxiliary = Vec::with_capacity(params.spec().auxiliary_oracle_len);
+        auxiliary.extend_from_slice(&trace.u2);
+        auxiliary.extend_from_slice(&trace.u3);
+        auxiliary.extend_from_slice(&trace.u4);
+        assert_eq!(auxiliary.len(), params.spec().auxiliary_oracle_len);
+        (folded_codeword, auxiliary)
     }
 
     fn explicit_schedule(layout: &SystematicAugmentedRfcLayout) -> HolographicQuerySchedule {
@@ -2149,6 +2309,7 @@ mod tests {
                     ),
                 },
             ],
+            raa_final_queries: Vec::new(),
         }
     }
 
@@ -2512,8 +2673,7 @@ mod tests {
     #[test]
     fn backend_prequery_round_trips_through_scheduled_queries() {
         let params = Blaze2BaseFoldBackendParams::new(blaze2_backend_spec()).unwrap();
-        let folded_codeword = message(params.compiler_code().layout().message_len(), 41);
-        let auxiliary = message(params.spec().auxiliary_oracle_len, 53);
+        let (folded_codeword, auxiliary) = folded_codeword_and_auxiliary(&params, 41);
         let (prequery, state) = params
             .prove_prequery::<Blake2s>(&folded_codeword, &auxiliary)
             .unwrap();
@@ -2752,6 +2912,7 @@ mod tests {
 
         assert_eq!(schedule.input_queries().len(), spec.q_raa_input);
         assert_eq!(schedule.proof_queries().len(), spec.q_backend_proof);
+        assert_eq!(schedule.raa_final_queries().len(), spec.q_raa_input >> 1);
         for query in schedule.input_queries() {
             assert!(query.logical_index < layout.systematic_len());
             assert_eq!(
@@ -2785,6 +2946,18 @@ mod tests {
                     assert_eq!(query.physical_index, None);
                 }
             }
+        }
+        for query in schedule.raa_final_queries() {
+            assert_eq!(
+                schedule.input_queries()[query.current_input_query].logical_index,
+                query.index
+            );
+            assert_eq!(
+                schedule.input_queries()[query.previous_input_query].logical_index + 1,
+                query.index
+            );
+            assert!(query.u4_auxiliary_index >= spec.auxiliary_oracle_len * 2 / 3);
+            assert!(query.u4_auxiliary_index < spec.auxiliary_oracle_len);
         }
     }
 

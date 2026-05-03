@@ -1748,12 +1748,17 @@ fn validate_blaze2_backend_spec(spec: &Blaze2BaseFoldBackendSpec) -> Result<(), 
         ));
     }
     let expected_auxiliary_len = spec.praa.praa_codeword_len * RAA_AUX_ROW_COUNT;
-    if spec.auxiliary_oracle_len != 0 && spec.auxiliary_oracle_len != expected_auxiliary_len {
+    if spec.auxiliary_oracle_len == 0 {
         return Err(Error::InvalidPcsParam(format!(
-            "auxiliary oracle length must be zero or the flattened PRAA auxiliary/evaluation trace length {expected_auxiliary_len}"
+            "Blaze2 BaseFold backend needs the flattened PRAA auxiliary/evaluation trace length {expected_auxiliary_len}"
         )));
     }
-    if spec.auxiliary_oracle_len != 0 && spec.q_raa_input & 1 != 0 {
+    if spec.auxiliary_oracle_len != expected_auxiliary_len {
+        return Err(Error::InvalidPcsParam(format!(
+            "auxiliary oracle length must be the flattened PRAA auxiliary/evaluation trace length {expected_auxiliary_len}"
+        )));
+    }
+    if spec.q_raa_input & 1 != 0 {
         return Err(Error::InvalidPcsParam(
             "auxiliary-enabled Blaze2 BaseFold backend needs an even RAA input query count"
                 .to_string(),
@@ -1848,7 +1853,7 @@ fn validate_query_schedule_spec(
             "systematic query domain must be non-empty".to_string(),
         ));
     }
-    if layout.parity_len() + spec.auxiliary_oracle_len == 0 {
+    if layout.parity_len() + raa_relation_auxiliary_len(spec.auxiliary_oracle_len) == 0 {
         return Err(Error::InvalidPcsParam(
             "backend proof query domain must be non-empty".to_string(),
         ));
@@ -2067,7 +2072,7 @@ fn proof_query_from_sampled_index(
     auxiliary_oracle_len: usize,
     sampled_index: usize,
 ) -> Result<BackendProofQuery, Error> {
-    let proof_domain_len = layout.parity_len() + auxiliary_oracle_len;
+    let proof_domain_len = layout.parity_len() + raa_relation_auxiliary_len(auxiliary_oracle_len);
     if sampled_index >= proof_domain_len {
         return Err(Error::InvalidPcsParam(format!(
             "proof query index {sampled_index} is outside proof query domain {proof_domain_len}"
@@ -2883,6 +2888,10 @@ mod tests {
         let mut spec = blaze2_backend_spec();
         spec.q_raa_input = 0;
         assert!(Blaze2BaseFoldBackendParams::new(spec).is_err());
+
+        let mut spec = blaze2_backend_spec();
+        spec.auxiliary_oracle_len = 0;
+        assert!(Blaze2BaseFoldBackendParams::new(spec).is_err());
     }
 
     #[test]
@@ -3418,26 +3427,30 @@ mod tests {
 
     #[test]
     fn backend_prequery_validates_auxiliary_shape() {
-        let mut spec = blaze2_backend_spec();
-        spec.auxiliary_oracle_len = 0;
-        let params = Blaze2BaseFoldBackendParams::new(spec).unwrap();
-        let folded_codeword = message(params.compiler_code().layout().message_len(), 67);
+        let params = Blaze2BaseFoldBackendParams::new(blaze2_backend_spec()).unwrap();
         let request_point = make_request_point(&params, 19);
-        let request = open_request(&request_point);
+        let (folded_codeword, auxiliary, folded_eval) =
+            folded_codeword_and_auxiliary(&params, 67, &request_point);
+        let request = open_request_with_eval(&request_point, folded_eval);
         let (prequery, state) = params
-            .prove_prequery::<Blake2s>(&folded_codeword, &[], &request)
+            .prove_prequery::<Blake2s>(&folded_codeword, &auxiliary, &request)
             .unwrap();
-        assert!(prequery.auxiliary.is_none());
+        assert!(prequery.auxiliary.is_some());
 
         let mut transcript = CfriTranscript::<Blake2s>::new();
         let schedule = params
             .sample_query_schedule(&mut transcript, &prequery, &request)
             .unwrap();
         let proof = params.open_query_proof(&state, &schedule).unwrap();
-        assert!(proof.auxiliary.is_none());
+        assert!(proof.auxiliary.is_some());
 
         assert!(params
-            .prove_prequery::<Blake2s>(&folded_codeword, &[B128::ONE], &request)
+            .prove_prequery::<Blake2s>(&folded_codeword, &[], &request)
+            .is_err());
+        let mut wrong_len = auxiliary.clone();
+        wrong_len.pop();
+        assert!(params
+            .prove_prequery::<Blake2s>(&folded_codeword, &wrong_len, &request)
             .is_err());
     }
 

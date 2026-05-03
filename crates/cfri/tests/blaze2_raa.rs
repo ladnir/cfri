@@ -264,7 +264,13 @@ fn blaze2_basefold_backend_params(
     q_raa_input: usize,
     q_backend_proof: usize,
 ) -> Blaze2BaseFoldBackendParams {
-    blaze2_basefold_backend_params_with_auxiliary_len(seed, q_raa_input, q_backend_proof, 0)
+    let auxiliary_oracle_len = blaze2_code_spec(seed).praa_codeword_len * 4;
+    blaze2_basefold_backend_params_with_auxiliary_len(
+        seed,
+        q_raa_input,
+        q_backend_proof,
+        auxiliary_oracle_len,
+    )
 }
 
 fn blaze2_basefold_backend_params_with_auxiliary_len(
@@ -1275,10 +1281,9 @@ fn blaze2_basefold_opening_verifies_with_typed_backend_schedule() {
     let proof = prove_blaze2_basefold_opening(&params, &packed, &commitment, &claim, &[]).unwrap();
 
     assert_eq!(proof.queries.len(), q_raa_input);
-    assert_eq!(
-        proof.backend_proof.compiler_parity.queries.len(),
-        q_backend_proof
-    );
+    assert!(proof.backend_prequery.auxiliary.is_some());
+    assert!(proof.backend_proof.auxiliary.is_some());
+    assert!(proof.backend_proof.compiler_parity.queries.len() <= q_backend_proof);
     verify_blaze2_basefold_opening(&params, &commitment.public(), &claim, &proof).unwrap();
 }
 
@@ -1295,6 +1300,7 @@ fn blaze2_basefold_outer_shape_matches_paper_after_field_byte_correction() {
     let hash_bytes = 32;
     let outer_path_len = params.praa().packed().codeword_len().trailing_zeros() as usize;
     let backend_prequery_bytes = (1 + params.compiler_code().layout().num_rounds()) * hash_bytes
+        + hash_bytes
         + (params.compiler_code().layout().parity_expansion_factor() + 1) * paper_field_bytes;
     let expected_outer = t * paper_field_bytes
         + backend_prequery_bytes
@@ -1310,10 +1316,9 @@ fn blaze2_basefold_outer_shape_matches_paper_after_field_byte_correction() {
         q_raa_input,
         "backend proof queries must not create extra Blaze input-column openings"
     );
-    assert_eq!(
-        proof.backend_proof.compiler_parity.queries.len(),
-        q_backend_proof,
-        "backend proof query count is separate from Q_RAA input openings"
+    assert!(
+        proof.backend_proof.compiler_parity.queries.len() <= q_backend_proof,
+        "compiler-parity openings are a subset of the backend proof schedule"
     );
     assert_eq!(
         proof.backend_prequery.folded_parity_layers.len(),

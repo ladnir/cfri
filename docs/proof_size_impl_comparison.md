@@ -148,8 +148,9 @@ blaze2_systematic_basefold_outer_bytes =
 
 `Q_backend_proof` contributes to the backend proof term, not to extra interleaved RAA column
 openings. `backend_prequery_commitment_bytes` currently includes the compiler parity root, internal
-folded parity-layer roots, and the clear terminal base codeword. The backend proof authenticates
-scheduled compiler-parity queries and checks their parity fold paths against those roots; the final
-layer is checked against the terminal systematic-augmented base codeword. Auxiliary/proof-oracle
-query bytes also remain inside the backend term. The remaining work is the full RMLE/sumcheck checks
-inside that backend term.
+folded parity-layer roots, the auxiliary proof-oracle root, and the clear terminal base codeword.
+The backend proof authenticates scheduled compiler-parity queries and checks their parity fold paths
+against those roots; the final layer is checked against the terminal systematic-augmented base
+codeword. Auxiliary/proof-oracle query bytes also remain inside the backend term. The remaining work
+is replacing the accumulator-oracle folded-eval binding with the final RMLE/sumcheck object inside
+that backend term.

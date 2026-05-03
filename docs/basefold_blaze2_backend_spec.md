@@ -449,6 +449,7 @@ pub struct Blaze2BaseFoldBackendSpec {
     pub compiler_code: SystematicFoldableCodeSpec,
     pub q_raa_input: usize,
     pub q_backend_proof: usize,
+    pub auxiliary_oracle_len: usize,
 }
 
 pub struct Blaze2Code {
@@ -473,7 +474,14 @@ compiler_code.compiler_systematic_len + compiler_code.compiler_parity_len
 compiler_code.compiler_parity_len
     == compiler_code.compiler_message_len * compiler_code.parity_expansion_factor
 compiler_code.parity_expansion_factor + 1 is a power of two
+auxiliary_oracle_len == praa_codeword_len * backend_auxiliary_row_count
 ```
+
+For the current Blaze2 BaseFold backend, `backend_auxiliary_row_count = 4`: the three PRAA relation
+rows plus the request-dependent evaluation accumulator row. `auxiliary_oracle_len = 0` is not an
+accepted Blaze2 backend configuration, because it skips the folded-relation and `folded_eval`
+binding checks. A standalone/generic scheduler may still model a no-auxiliary query domain for
+isolated tests, but the Blaze2 backend constructor must reject it.
 
 For the initial transparent Blaze2 path, `praa_message_len`, `praa_codeword_len`,
 `compiler_message_len`, `compiler_codeword_len`, and `t` must be non-zero powers of two unless an

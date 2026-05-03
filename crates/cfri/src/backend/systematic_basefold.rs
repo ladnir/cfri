@@ -482,27 +482,35 @@ impl SystematicAugmentedRfcCode {
     }
 
     pub fn encode_parity_into(&self, message: &[B128], out: &mut [B128]) -> Result<(), Error> {
-        validate_message_and_parity_output(self.layout(), message, out)?;
+        self.encode_parity_at_round_into(0, message, out)
+    }
+
+    pub fn encode_parity_at_round_into(
+        &self,
+        round: usize,
+        message: &[B128],
+        out: &mut [B128],
+    ) -> Result<(), Error> {
+        validate_message_and_parity_output_at_round(self.layout(), round, message, out)?;
 
         let parity_expansion_factor = self.layout.parity_expansion_factor();
+        let base_multipliers = &self.parity_fold_table[0];
+        debug_assert_eq!(base_multipliers.len(), parity_expansion_factor);
         for (chunk, &value) in out.chunks_exact_mut(parity_expansion_factor).zip(message) {
-            chunk.fill(value);
+            for (dst, &multiplier) in chunk.iter_mut().zip(base_multipliers) {
+                *dst = value * multiplier;
+            }
         }
 
-        let mut chunk_len = parity_expansion_factor;
-        for level in &self.parity_fold_table {
-            let half_chunk_len = chunk_len;
-            chunk_len <<= 1;
-            debug_assert_eq!(level.len(), half_chunk_len);
+        let mut half_chunk_len = parity_expansion_factor;
+        while half_chunk_len < out.len() {
+            let chunk_len = half_chunk_len << 1;
             for chunk in out.chunks_exact_mut(chunk_len) {
                 for j in 0..half_chunk_len {
-                    let left = chunk[j];
-                    let right = chunk[j + half_chunk_len];
-                    let t = level[j];
-                    chunk[j + half_chunk_len] = left + right * (t + B128::ONE);
-                    chunk[j] = left + right * t;
+                    chunk[j + half_chunk_len] += chunk[j];
                 }
             }
+            half_chunk_len = chunk_len;
         }
         Ok(())
     }
@@ -536,22 +544,86 @@ impl SystematicAugmentedRfcCode {
         out: &mut [B128],
         parity_scratch: &mut [B128],
     ) -> Result<(), Error> {
-        if out.len() != self.layout.codeword_len() {
+        self.encode_physical_codeword_at_round_into(0, message, out, parity_scratch)
+    }
+
+    pub fn encode_physical_codeword_at_round_into(
+        &self,
+        round: usize,
+        message: &[B128],
+        out: &mut [B128],
+        parity_scratch: &mut [B128],
+    ) -> Result<(), Error> {
+        let message_len = self.layout.message_len_at_round(round)?;
+        let codeword_len = message_len * (self.layout.parity_expansion_factor() + 1);
+        if out.len() != codeword_len {
             return Err(Error::InvalidPcsOpen(format!(
-                "physical codeword output has length {}, expected {}",
-                out.len(),
-                self.layout.codeword_len()
+                "physical codeword output has length {}, expected {codeword_len}",
+                out.len()
             )));
         }
-        self.encode_parity_into(message, parity_scratch)?;
+        if message.len() != message_len {
+            return Err(Error::InvalidPcsOpen(format!(
+                "systematic RFC message has length {}, expected {message_len}",
+                message.len()
+            )));
+        }
+        let parity_len = message_len * self.layout.parity_expansion_factor();
+        if parity_scratch.len() != parity_len {
+            return Err(Error::InvalidPcsOpen(format!(
+                "physical codeword parity scratch has length {}, expected {parity_len}",
+                parity_scratch.len()
+            )));
+        }
+        self.encode_parity_at_round_into(round, message, parity_scratch)?;
 
+        let parity_expansion_factor = self.layout.parity_expansion_factor();
         for (logical_index, &value) in message.iter().enumerate() {
-            let physical_index = self.layout.systematic_to_physical(logical_index)?;
+            let physical_index =
+                systematic_to_physical(logical_index, message_len, parity_expansion_factor);
             out[physical_index] = value;
         }
         for (logical_index, &value) in parity_scratch.iter().enumerate() {
-            let physical_index = self.layout.parity_to_physical(logical_index)?;
+            let physical_index =
+                parity_to_physical(logical_index, message_len, parity_expansion_factor);
             out[physical_index] = value;
+        }
+        Ok(())
+    }
+
+    pub fn fold_physical_codeword_round_into(
+        &self,
+        round: usize,
+        current: &[B128],
+        alpha: B128,
+        out: &mut [B128],
+    ) -> Result<(), Error> {
+        let message_len = self.layout.message_len_at_round(round)?;
+        let current_len = message_len * (self.layout.parity_expansion_factor() + 1);
+        let folded_len = current_len >> 1;
+        if current.len() != current_len {
+            return Err(Error::InvalidPcsOpen(format!(
+                "current physical codeword has length {}, expected {current_len}",
+                current.len()
+            )));
+        }
+        if out.len() != folded_len {
+            return Err(Error::InvalidPcsOpen(format!(
+                "folded physical codeword output has length {}, expected {folded_len}",
+                out.len(),
+            )));
+        }
+        for (output_index, folded) in out.iter_mut().enumerate() {
+            let pair = self.layout.fold_pair(round, output_index)?;
+            let address = self.layout.physical_to_logical_at_round(round, pair.left)?;
+            *folded = match address.part {
+                CodewordPart::Systematic => {
+                    fold_systematic_pair(current[pair.left], current[pair.right], alpha)
+                }
+                CodewordPart::Parity => {
+                    fold_rfc_parity_pair(current[pair.left], current[pair.right], alpha)
+                }
+            };
         }
         Ok(())
     }
@@ -1045,23 +1117,24 @@ fn validate_blaze2_backend_spec(spec: &Blaze2BaseFoldBackendSpec) -> Result<(), 
     Ok(())
 }
 
-fn validate_message_and_parity_output(
+fn validate_message_and_parity_output_at_round(
     layout: &SystematicAugmentedRfcLayout,
+    round: usize,
     message: &[B128],
     out: &[B128],
 ) -> Result<(), Error> {
-    if message.len() != layout.message_len() {
+    let message_len = layout.message_len_at_round(round)?;
+    let parity_len = message_len * layout.parity_expansion_factor();
+    if message.len() != message_len {
         return Err(Error::InvalidPcsOpen(format!(
-            "systematic RFC message has length {}, expected {}",
-            message.len(),
-            layout.message_len()
+            "systematic RFC message has length {}, expected {message_len}",
+            message.len()
         )));
     }
-    if out.len() != layout.parity_len() {
+    if out.len() != parity_len {
         return Err(Error::InvalidPcsOpen(format!(
-            "systematic RFC parity output has length {}, expected {}",
-            out.len(),
-            layout.parity_len()
+            "systematic RFC parity output has length {}, expected {parity_len}",
+            out.len()
         )));
     }
     Ok(())
@@ -1170,9 +1243,10 @@ fn build_parity_fold_table(layout: &SystematicAugmentedRfcLayout) -> Vec<Vec<B12
     let mut transcript = CfriTranscript::<Blake2s>::new();
     absorb_systematic_foldable_code_spec(&mut transcript, layout.spec());
 
-    let mut table = Vec::with_capacity(layout.num_rounds());
+    let num_levels = layout.num_rounds().max(1);
+    let mut table = Vec::with_capacity(num_levels);
     let mut level_len = layout.parity_expansion_factor();
-    for level_index in 0..layout.num_rounds() {
+    for level_index in 0..num_levels {
         transcript.absorb("systematic-basefold-parity-fold-level");
         absorb_usize(&mut transcript, level_index);
         absorb_usize(&mut transcript, level_len);
@@ -1708,6 +1782,66 @@ mod tests {
             .encode_parity_into(&lhs_message, &mut changed)
             .unwrap();
         assert_ne!(lhs, changed);
+    }
+
+    #[test]
+    fn encoded_codeword_is_closed_under_round_folds() {
+        for (message_len, parity_expansion_factor) in [(1, 3), (2, 3), (8, 3), (16, 7)] {
+            let code = SystematicAugmentedRfcCode::new(
+                layout(message_len, parity_expansion_factor).spec().clone(),
+            )
+            .unwrap();
+            let mut current_message = message(code.layout().message_len(), 11);
+            let mut current_codeword = vec![B128::ZERO; code.layout().codeword_len()];
+            let mut parity_scratch = vec![B128::ZERO; code.layout().parity_len()];
+            code.encode_physical_codeword_into(
+                &current_message,
+                &mut current_codeword,
+                &mut parity_scratch,
+            )
+            .unwrap();
+
+            for round in 0..code.layout().num_rounds() {
+                let alpha = B128::from(101 + round as u64 * 17);
+                let half_message_len = current_message.len() >> 1;
+                let next_message = (0..half_message_len)
+                    .map(|index| {
+                        fold_systematic_pair(
+                            current_message[index],
+                            current_message[index + half_message_len],
+                            alpha,
+                        )
+                    })
+                    .collect::<Vec<_>>();
+
+                let mut folded_codeword = vec![B128::ZERO; current_codeword.len() >> 1];
+                code.fold_physical_codeword_round_into(
+                    round,
+                    &current_codeword,
+                    alpha,
+                    &mut folded_codeword,
+                )
+                .unwrap();
+
+                let next_parity_len = next_message.len() * code.layout().parity_expansion_factor();
+                let mut expected = vec![B128::ZERO; folded_codeword.len()];
+                let mut expected_parity = vec![B128::ZERO; next_parity_len];
+                code.encode_physical_codeword_at_round_into(
+                    round + 1,
+                    &next_message,
+                    &mut expected,
+                    &mut expected_parity,
+                )
+                .unwrap();
+
+                assert_eq!(
+                    folded_codeword, expected,
+                    "message_len={message_len} parity_expansion_factor={parity_expansion_factor} round={round} fold must produce the next encoded codeword"
+                );
+                current_message = next_message;
+                current_codeword = folded_codeword;
+            }
+        }
     }
 
     #[test]

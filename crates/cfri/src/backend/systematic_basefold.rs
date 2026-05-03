@@ -63,7 +63,7 @@ pub enum SystematicFoldRule {
 #[derive(Clone, Copy, Debug, Eq, PartialEq)]
 pub enum BackendProofQueryDomain {
     CompilerParity,
-    Auxiliary,
+    RelationAuxiliary,
 }
 
 #[derive(Clone, Copy, Debug, Eq, PartialEq)]
@@ -564,7 +564,7 @@ impl Blaze2BaseFoldBackendParams {
                 let has_auxiliary_queries = schedule
                     .proof_queries()
                     .iter()
-                    .any(|query| query.domain == BackendProofQueryDomain::Auxiliary);
+                    .any(|query| query.domain == BackendProofQueryDomain::RelationAuxiliary);
                 if has_auxiliary_queries {
                     return Err(Error::InvalidPcsOpen(
                         "backend schedule contains auxiliary queries but no auxiliary oracle is committed"
@@ -1316,7 +1316,7 @@ impl<H: Hash> AuxiliaryOracleCommitment<H> {
     ) -> Result<AuxiliaryOracleQueryProof<H>, Error> {
         let mut queries = Vec::new();
         for query in schedule.proof_queries() {
-            if query.domain == BackendProofQueryDomain::Auxiliary {
+            if query.domain == BackendProofQueryDomain::RelationAuxiliary {
                 queries.push(self.query(query.index)?);
             }
         }
@@ -1400,7 +1400,7 @@ impl<H: Hash> AuxiliaryOracleQueryProof<H> {
 
         let mut supplied = self.queries.iter();
         for expected in schedule.proof_queries() {
-            if expected.domain != BackendProofQueryDomain::Auxiliary {
+            if expected.domain != BackendProofQueryDomain::RelationAuxiliary {
                 continue;
             }
             let query = supplied.next().expect("query count checked above");
@@ -1673,7 +1673,7 @@ impl HolographicQuerySchedule {
     pub fn auxiliary_proof_query_count(&self) -> usize {
         self.proof_queries
             .iter()
-            .filter(|query| query.domain == BackendProofQueryDomain::Auxiliary)
+            .filter(|query| query.domain == BackendProofQueryDomain::RelationAuxiliary)
             .count()
     }
 
@@ -2125,7 +2125,7 @@ fn proof_query_from_sampled_index(
         })
     } else {
         Ok(BackendProofQuery {
-            domain: BackendProofQueryDomain::Auxiliary,
+            domain: BackendProofQueryDomain::RelationAuxiliary,
             index: sampled_index - layout.parity_len(),
             physical_index: None,
         })
@@ -2139,7 +2139,7 @@ fn build_raa_auxiliary_local_queries(
     let mut queries = Vec::new();
     let mut auxiliary_ordinal = 0usize;
     for query in proof_queries {
-        if query.domain != BackendProofQueryDomain::Auxiliary {
+        if query.domain != BackendProofQueryDomain::RelationAuxiliary {
             continue;
         }
         if let Some(local_query) =
@@ -2363,7 +2363,7 @@ fn verify_raa_final_accumulator_queries<H: Hash>(
     let final_auxiliary_offset = schedule
         .proof_queries()
         .iter()
-        .filter(|query| query.domain == BackendProofQueryDomain::Auxiliary)
+        .filter(|query| query.domain == BackendProofQueryDomain::RelationAuxiliary)
         .count();
     let eval_weights = raa_codeword_eval_weights(code, request.col_point)?;
     for (relative_index, expected) in schedule.raa_final_queries().iter().enumerate() {
@@ -2479,7 +2479,7 @@ fn verify_raa_auxiliary_local_queries<H: Hash>(
     let scheduled_auxiliary_count = schedule
         .proof_queries()
         .iter()
-        .filter(|query| query.domain == BackendProofQueryDomain::Auxiliary)
+        .filter(|query| query.domain == BackendProofQueryDomain::RelationAuxiliary)
         .count();
     let mut extra_offset = scheduled_auxiliary_count
         + 3 * schedule.raa_final_queries().len()
@@ -2831,7 +2831,7 @@ mod tests {
                     physical_index: Some(layout.parity_to_physical(0).unwrap()),
                 },
                 BackendProofQuery {
-                    domain: BackendProofQueryDomain::Auxiliary,
+                    domain: BackendProofQueryDomain::RelationAuxiliary,
                     index: 3,
                     physical_index: None,
                 },
@@ -3409,12 +3409,12 @@ mod tests {
             input_queries: Vec::new(),
             proof_queries: vec![
                 BackendProofQuery {
-                    domain: BackendProofQueryDomain::Auxiliary,
+                    domain: BackendProofQueryDomain::RelationAuxiliary,
                     index: len + 3,
                     physical_index: None,
                 },
                 BackendProofQuery {
-                    domain: BackendProofQueryDomain::Auxiliary,
+                    domain: BackendProofQueryDomain::RelationAuxiliary,
                     index: 2 * len + 5,
                     physical_index: None,
                 },
@@ -3596,7 +3596,7 @@ mod tests {
                         }
                     );
                 }
-                BackendProofQueryDomain::Auxiliary => {
+                BackendProofQueryDomain::RelationAuxiliary => {
                     assert!(query.index < spec.auxiliary_oracle_len);
                     assert_eq!(query.physical_index, None);
                 }
@@ -3643,7 +3643,7 @@ mod tests {
         );
 
         let auxiliary = proof_query_from_sampled_index(&layout, 11, layout.parity_len()).unwrap();
-        assert_eq!(auxiliary.domain, BackendProofQueryDomain::Auxiliary);
+        assert_eq!(auxiliary.domain, BackendProofQueryDomain::RelationAuxiliary);
         assert_eq!(auxiliary.index, 0);
         assert_eq!(auxiliary.physical_index, None);
     }

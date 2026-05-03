@@ -108,12 +108,13 @@ use crate::backend::{
     avx_int_types::BlazeField,
     binary_extension_fields::B128,
     code::PackedRaaCode,
-    hash::{Hash, Output},
+    hash::{Blake2s, Hash, Output},
     transcript::{TranscriptRead, TranscriptWrite},
     Deserialize, DeserializeOwned, Error, Serialize,
 };
 use crate::plonky2_util::{log2_strict, reverse_index_bits_in_place};
 use crate::transcript::Transcript as CfriTranscript;
+use rand_chacha::{rand_core::SeedableRng, ChaCha8Rng};
 use rayon::prelude::*;
 use sha3::digest::{FixedOutputReset, Update};
 use std::slice;
@@ -228,8 +229,71 @@ pub struct Blaze2OpeningClaim {
     pub value: B128,
 }
 
-#[derive(Clone, Copy, Debug, PartialEq, Eq)]
+#[derive(Clone, Copy, Debug, Serialize, Deserialize, PartialEq, Eq)]
 pub struct Blaze2CodeSeed(pub [u8; 32]);
+
+#[derive(Clone, Copy, Debug, Serialize, Deserialize, PartialEq, Eq)]
+#[repr(u32)]
+pub enum Blaze2FieldId {
+    B128,
+}
+
+#[derive(Clone, Copy, Debug, Serialize, Deserialize, PartialEq, Eq)]
+#[repr(u32)]
+pub enum Blaze2HashId {
+    Blake2s,
+    Blake2s256,
+}
+
+pub trait Blaze2HashSpec: Hash {
+    const BLAZE2_HASH_ID: Blaze2HashId;
+}
+
+impl Blaze2HashSpec for Blake2s {
+    const BLAZE2_HASH_ID: Blaze2HashId = Blaze2HashId::Blake2s;
+}
+
+impl Blaze2HashSpec for blake2::Blake2s256 {
+    const BLAZE2_HASH_ID: Blaze2HashId = Blaze2HashId::Blake2s256;
+}
+
+#[derive(Clone, Copy, Debug, Serialize, Deserialize, PartialEq, Eq)]
+#[repr(u32)]
+pub enum RaaVariant {
+    PackedPrefixAccumulator,
+}
+
+#[derive(Clone, Copy, Debug, Serialize, Deserialize, PartialEq, Eq)]
+#[repr(u32)]
+pub enum Blaze2PackingLayout {
+    PackedInterleavedRows,
+}
+
+#[derive(Clone, Copy, Debug, Serialize, Deserialize, PartialEq, Eq)]
+#[repr(u32)]
+pub enum Blaze2LeafLayout {
+    InterleavedColumn,
+}
+
+#[derive(Clone, Debug, Serialize, Deserialize, PartialEq, Eq)]
+pub struct Blaze2CodeSpec {
+    pub version: u32,
+    pub field_id: Blaze2FieldId,
+    pub hash_id: Blaze2HashId,
+    pub raa_variant: RaaVariant,
+    pub packing: Blaze2PackingLayout,
+    pub leaf_layout: Blaze2LeafLayout,
+    pub praa_message_len: usize,
+    pub praa_expansion_factor: usize,
+    pub praa_codeword_len: usize,
+    pub seed: Blaze2CodeSeed,
+}
+
+#[derive(Clone, Debug)]
+pub struct Blaze2Code {
+    spec: Blaze2CodeSpec,
+    packed: PackedRaaCode,
+}
 
 #[derive(Clone, Debug)]
 pub struct Blaze2OpeningQuery<H: Hash> {
@@ -290,6 +354,42 @@ pub struct Blaze2RaaTrace {
     pub u3: Vec<B128>,
     pub u4: Vec<B128>,
     pub u5: Vec<B128>,
+}
+
+impl Blaze2Code {
+    pub fn new(spec: Blaze2CodeSpec) -> Result<Self, Error> {
+        validate_blaze2_code_spec(&spec)?;
+        let mut rng = ChaCha8Rng::from_seed(spec.seed.0);
+        let packed =
+            PackedRaaCode::new(spec.praa_message_len, spec.praa_expansion_factor, &mut rng);
+        debug_assert_eq!(packed.codeword_len(), spec.praa_codeword_len);
+        Ok(Self { spec, packed })
+    }
+
+    pub fn spec(&self) -> &Blaze2CodeSpec {
+        &self.spec
+    }
+
+    pub fn packed(&self) -> &PackedRaaCode {
+        &self.packed
+    }
+}
+
+pub fn absorb_blaze2_code_spec<H: Hash, S>(
+    transcript: &mut CfriTranscript<H, S>,
+    spec: &Blaze2CodeSpec,
+) {
+    transcript.absorb("blaze2-code-spec-v1");
+    absorb_usize(transcript, spec.version as usize);
+    absorb_usize(transcript, spec.field_id as usize);
+    absorb_usize(transcript, spec.hash_id as usize);
+    absorb_usize(transcript, spec.raa_variant as usize);
+    absorb_usize(transcript, spec.packing as usize);
+    absorb_usize(transcript, spec.leaf_layout as usize);
+    absorb_usize(transcript, spec.praa_message_len);
+    absorb_usize(transcript, spec.praa_expansion_factor);
+    absorb_usize(transcript, spec.praa_codeword_len);
+    transcript.absorb(&spec.seed.0);
 }
 
 impl<F: BlazeField, H: Hash> PartialEq for Blaze2RaaQuery<F, H> {
@@ -1108,6 +1208,24 @@ pub fn absorb_blaze2_opening_public<H: Hash, S>(
     transcript.absorb(&claim.value);
 }
 
+pub fn absorb_blaze2_opening_public_with_code_spec<H: Hash, S>(
+    transcript: &mut CfriTranscript<H, S>,
+    code: &Blaze2Code,
+    commitment: &Blaze2InterleavedCodewordPublicCommitment<H>,
+    claim: &Blaze2OpeningClaim,
+    num_queries: usize,
+) {
+    transcript.absorb("cfri-blaze2-opening-code-spec-v1");
+    absorb_blaze2_code_spec(transcript, code.spec());
+    absorb_usize(transcript, num_queries);
+    absorb_usize(transcript, commitment.codeword_len());
+    absorb_usize(transcript, commitment.num_rows());
+    transcript.absorb(commitment.root());
+    transcript.absorb_slice(&claim.row_point);
+    transcript.absorb_slice(&claim.col_point);
+    transcript.absorb(&claim.value);
+}
+
 pub fn absorb_blaze2_opening_row_evals<H: Hash, S>(
     transcript: &mut CfriTranscript<H, S>,
     row_evals: &[B128],
@@ -1250,6 +1368,109 @@ pub fn prove_blaze2_opening<H: Hash, B: Blaze2FoldedMessageBackend>(
     })
 }
 
+pub fn prove_blaze2_opening_with_code_spec<H: Blaze2HashSpec, B: Blaze2FoldedMessageBackend>(
+    code: &Blaze2Code,
+    packed_rows: &[Vec<B128>],
+    codeword_commitment: &Blaze2InterleavedCodewordCommitment<H>,
+    claim: &Blaze2OpeningClaim,
+    num_queries: usize,
+) -> Result<Blaze2OpeningProof<H, B>, Error> {
+    validate_blaze2_code_hash::<H>(code.spec())?;
+    let packed_code = code.packed();
+    validate_blaze2_opening_inputs(
+        packed_code,
+        packed_rows,
+        codeword_commitment.codeword_len(),
+        codeword_commitment.num_rows(),
+        claim,
+    )?;
+    if num_queries == 0 {
+        return Err(Error::InvalidPcsOpen(
+            "Blaze2 opening proof expects at least one query".to_string(),
+        ));
+    }
+
+    let row_len = packed_code.message_len();
+    let num_rows = packed_rows.len();
+    let mut row_evals = vec![B128::ZERO; num_rows];
+    let mut eval_scratch = vec![B128::ZERO; row_len.max(num_rows)];
+    let value = evaluate_packed_matrix_at_point_into(
+        packed_rows,
+        &claim.row_point,
+        &claim.col_point,
+        &mut row_evals,
+        &mut eval_scratch,
+    )?;
+    if value != claim.value {
+        return Err(Error::InvalidPcsOpen(
+            "Blaze2 opening claim does not match witness rows".to_string(),
+        ));
+    }
+
+    let public_commitment = codeword_commitment.public();
+    let mut transcript = CfriTranscript::<H>::new();
+    absorb_blaze2_opening_public_with_code_spec(
+        &mut transcript,
+        code,
+        &public_commitment,
+        claim,
+        num_queries,
+    );
+    absorb_blaze2_opening_row_evals(&mut transcript, &row_evals);
+
+    let mut folding_challenges = vec![B128::ZERO; num_rows];
+    squeeze_blaze2_opening_folding_challenges(&mut transcript, &mut folding_challenges);
+
+    let mut folded_message = vec![B128::ZERO; row_len];
+    fold_packed_rows_into(packed_rows, &folding_challenges, &mut folded_message)?;
+    let folded_eval = evaluate_multilinear(
+        &folded_message,
+        &claim.col_point,
+        &mut eval_scratch[..row_len],
+    )?;
+    let expected_folded_eval = inner_product_b128(&row_evals, &folding_challenges);
+    if folded_eval != expected_folded_eval {
+        return Err(Error::InvalidPcsOpen(
+            "Blaze2 folded message evaluation does not match row-evaluation fold".to_string(),
+        ));
+    }
+    let (folded_commitment, folded_state) = B::commit(&folded_message)?;
+    B::absorb_commitment(&mut transcript, &folded_commitment);
+    absorb_blaze2_opening_folded_eval(&mut transcript, &folded_eval);
+
+    let mut query_indices = vec![0usize; num_queries];
+    squeeze_blaze2_opening_query_indices(
+        &mut transcript,
+        packed_code.codeword_len(),
+        &mut query_indices,
+    )?;
+
+    let mut queries = Vec::with_capacity(query_indices.len());
+    for &index in &query_indices {
+        validate_query_index(index, packed_code.codeword_len())?;
+        queries.push(Blaze2OpeningQuery {
+            column_opening: codeword_commitment.query(index)?,
+        });
+    }
+    let folded_request = Blaze2FoldedMessageOpenRequest {
+        code: packed_code,
+        col_point: &claim.col_point,
+        folded_eval,
+        input_indices: &query_indices,
+    };
+    let backend_proof = B::open(&folded_state, &folded_request)?;
+
+    Ok(Blaze2OpeningProof {
+        row_evals,
+        folded_message: Blaze2FoldedMessageProof {
+            commitment: folded_commitment,
+            eval: folded_eval,
+            backend_proof,
+        },
+        queries,
+    })
+}
+
 pub fn verify_blaze2_opening<H: Hash, B: Blaze2FoldedMessageBackend>(
     code: &PackedRaaCode,
     code_seed: &Blaze2CodeSeed,
@@ -1323,6 +1544,89 @@ pub fn verify_blaze2_opening<H: Hash, B: Blaze2FoldedMessageBackend>(
         &proof.folded_message.commitment,
         &proof.folded_message.backend_proof,
         code.message_len(),
+        &folded_request,
+        &input_values,
+    )?;
+    Ok(())
+}
+
+pub fn verify_blaze2_opening_with_code_spec<H: Blaze2HashSpec, B: Blaze2FoldedMessageBackend>(
+    code: &Blaze2Code,
+    commitment: &Blaze2InterleavedCodewordPublicCommitment<H>,
+    claim: &Blaze2OpeningClaim,
+    proof: &Blaze2OpeningProof<H, B>,
+    num_queries: usize,
+) -> Result<(), Error> {
+    validate_blaze2_code_hash::<H>(code.spec())?;
+    let packed_code = code.packed();
+    validate_blaze2_opening_public(
+        packed_code,
+        commitment.codeword_len(),
+        commitment.num_rows(),
+        claim,
+        proof,
+        num_queries,
+    )?;
+
+    let mut transcript = CfriTranscript::<H>::new();
+    absorb_blaze2_opening_public_with_code_spec(
+        &mut transcript,
+        code,
+        commitment,
+        claim,
+        num_queries,
+    );
+    absorb_blaze2_opening_row_evals(&mut transcript, &proof.row_evals);
+    let mut folding_challenges = vec![B128::ZERO; proof.row_evals.len()];
+    squeeze_blaze2_opening_folding_challenges(&mut transcript, &mut folding_challenges);
+    let expected_folded_eval = inner_product_b128(&proof.row_evals, &folding_challenges);
+    if proof.folded_message.eval != expected_folded_eval {
+        return Err(Error::InvalidPcsOpen(
+            "Blaze2 folded message evaluation does not match row-evaluation fold".to_string(),
+        ));
+    }
+    B::absorb_commitment(&mut transcript, &proof.folded_message.commitment);
+    absorb_blaze2_opening_folded_eval(&mut transcript, &proof.folded_message.eval);
+    let mut query_indices = vec![0usize; num_queries];
+    squeeze_blaze2_opening_query_indices(
+        &mut transcript,
+        packed_code.codeword_len(),
+        &mut query_indices,
+    )?;
+
+    let mut scratch = vec![B128::ZERO; proof.row_evals.len()];
+    let claim_value = evaluate_multilinear(&proof.row_evals, &claim.row_point, &mut scratch)?;
+    if claim_value != claim.value {
+        return Err(Error::InvalidPcsOpen(
+            "Blaze2 opening row evaluation invariant failed".to_string(),
+        ));
+    }
+
+    let mut input_values = Vec::with_capacity(query_indices.len());
+    for (query, expected_index) in proof.queries.iter().zip(&query_indices) {
+        authenticate_blaze2_opening_column(
+            commitment.root(),
+            &query.column_opening,
+            commitment.num_rows(),
+            packed_code.codeword_len(),
+            *expected_index,
+        )?;
+        input_values.push(fold_interleaved_column(
+            &query.column_opening,
+            &folding_challenges,
+        )?);
+    }
+
+    let folded_request = Blaze2FoldedMessageOpenRequest {
+        code: packed_code,
+        col_point: &claim.col_point,
+        folded_eval: proof.folded_message.eval,
+        input_indices: &query_indices,
+    };
+    B::verify(
+        &proof.folded_message.commitment,
+        &proof.folded_message.backend_proof,
+        packed_code.message_len(),
         &folded_request,
         &input_values,
     )?;
@@ -2023,6 +2327,51 @@ fn validate_packed_rows(rows: &[Vec<B128>]) -> Result<usize, Error> {
         ));
     }
     Ok(row_len)
+}
+
+fn validate_blaze2_code_spec(spec: &Blaze2CodeSpec) -> Result<(), Error> {
+    if spec.version == 0 {
+        return Err(Error::InvalidPcsParam(
+            "Blaze2 code spec version must be nonzero".to_string(),
+        ));
+    }
+    if spec.praa_message_len == 0 || !spec.praa_message_len.is_power_of_two() {
+        return Err(Error::InvalidPcsParam(
+            "Blaze2 PRAA message length must be a nonzero power of two".to_string(),
+        ));
+    }
+    if spec.praa_expansion_factor == 0 || !spec.praa_expansion_factor.is_power_of_two() {
+        return Err(Error::InvalidPcsParam(
+            "Blaze2 PRAA expansion factor must be a nonzero power of two".to_string(),
+        ));
+    }
+    let expected_codeword_len = spec
+        .praa_message_len
+        .checked_mul(spec.praa_expansion_factor)
+        .ok_or_else(|| {
+            Error::InvalidPcsParam("Blaze2 PRAA codeword length overflows usize".to_string())
+        })?;
+    if spec.praa_codeword_len != expected_codeword_len {
+        return Err(Error::InvalidPcsParam(
+            "Blaze2 PRAA codeword length must equal message length times expansion factor"
+                .to_string(),
+        ));
+    }
+    if spec.praa_codeword_len < 2 || !spec.praa_codeword_len.is_power_of_two() {
+        return Err(Error::InvalidPcsParam(
+            "Blaze2 PRAA codeword length must be a power of two at least two".to_string(),
+        ));
+    }
+    Ok(())
+}
+
+fn validate_blaze2_code_hash<H: Blaze2HashSpec>(spec: &Blaze2CodeSpec) -> Result<(), Error> {
+    if spec.hash_id != H::BLAZE2_HASH_ID {
+        return Err(Error::InvalidPcsParam(
+            "Blaze2 code spec hash id does not match proof hash".to_string(),
+        ));
+    }
+    Ok(())
 }
 
 fn validate_multilinear_eval_shape(

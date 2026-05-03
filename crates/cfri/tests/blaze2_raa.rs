@@ -9,12 +9,15 @@ use cfri::backend::{
         evaluate_packed_matrix_at_point_into, evaluate_packed_rows_at_point_into,
         fold_interleaved_column, fold_packed_query_pair, fold_packed_rows_into,
         pack_interleaved_rows, pack_interleaved_rows_into, prove_blaze2_opening,
-        squeeze_blaze2_opening_folding_challenges, squeeze_blaze2_opening_query_indices,
-        verify_blaze2_opening, verify_raa_aux_trace_spot_query, verify_raa_trace_spot_query,
-        Blaze2CodeSeed, Blaze2FoldedMessageBackend, Blaze2FoldedMessageOpenRequest,
-        Blaze2InterleavedCodewordCommitment, Blaze2InterleavedColumnQuery, Blaze2OpeningClaim,
-        Blaze2OpeningProof, Blaze2RaaAuxTrace, Blaze2RaaAuxTraceCommitment, Blaze2RaaCommitment,
-        Blaze2RaaQuery, Blaze2RaaTrace, Blaze2RaaTraceCommitment, Blaze2RaaTraceSpotQuery,
+        prove_blaze2_opening_with_code_spec, squeeze_blaze2_opening_folding_challenges,
+        squeeze_blaze2_opening_query_indices, verify_blaze2_opening,
+        verify_blaze2_opening_with_code_spec, verify_raa_aux_trace_spot_query,
+        verify_raa_trace_spot_query, Blaze2Code, Blaze2CodeSeed, Blaze2CodeSpec, Blaze2FieldId,
+        Blaze2FoldedMessageBackend, Blaze2FoldedMessageOpenRequest, Blaze2HashId,
+        Blaze2InterleavedCodewordCommitment, Blaze2InterleavedColumnQuery, Blaze2LeafLayout,
+        Blaze2OpeningClaim, Blaze2OpeningProof, Blaze2PackingLayout, Blaze2RaaAuxTrace,
+        Blaze2RaaAuxTraceCommitment, Blaze2RaaCommitment, Blaze2RaaQuery, Blaze2RaaTrace,
+        Blaze2RaaTraceCommitment, Blaze2RaaTraceSpotQuery, RaaVariant,
     },
     blaze_transcript::BlazeBlake2sTranscript,
     code::PackedRaaCode,
@@ -237,6 +240,21 @@ fn opening_fixture(
     (code, code_seed, packed, commitment, claim, num_queries)
 }
 
+fn blaze2_code_spec(seed: u8) -> Blaze2CodeSpec {
+    Blaze2CodeSpec {
+        version: 1,
+        field_id: Blaze2FieldId::B128,
+        hash_id: Blaze2HashId::Blake2s256,
+        raa_variant: RaaVariant::PackedPrefixAccumulator,
+        packing: Blaze2PackingLayout::PackedInterleavedRows,
+        leaf_layout: Blaze2LeafLayout::InterleavedColumn,
+        praa_message_len: 8,
+        praa_expansion_factor: 4,
+        praa_codeword_len: 32,
+        seed: Blaze2CodeSeed([seed; 32]),
+    }
+}
+
 fn audit_blaze2_opening_against_witness<H: Hash, B: Blaze2FoldedMessageBackend>(
     code: &PackedRaaCode,
     code_seed: &Blaze2CodeSeed,
@@ -365,6 +383,55 @@ fn tamper_opened_trace_value<H: Hash>(
         }
     }
     panic!("missing opened value");
+}
+
+#[test]
+fn blaze2_code_spec_deterministically_expands_to_praa_code() {
+    let spec = blaze2_code_spec(44);
+    let code = Blaze2Code::new(spec.clone()).unwrap();
+    let same_code = Blaze2Code::new(spec.clone()).unwrap();
+
+    assert_eq!(code.spec(), &spec);
+    assert_eq!(code.packed().message_len(), spec.praa_message_len);
+    assert_eq!(code.packed().rate(), spec.praa_expansion_factor);
+    assert_eq!(code.packed().codeword_len(), spec.praa_codeword_len);
+
+    let message = (0..spec.praa_message_len)
+        .map(|index| B128::from(3 + index as u64 * 17))
+        .collect::<Vec<_>>();
+    assert_eq!(
+        code.packed().encode_row(&message),
+        same_code.packed().encode_row(&message)
+    );
+
+    let mut rng = ChaCha8Rng::from_seed(spec.seed.0);
+    let expected = PackedRaaCode::new(spec.praa_message_len, spec.praa_expansion_factor, &mut rng);
+    assert_eq!(
+        code.packed().encode_row(&message),
+        expected.encode_row(&message)
+    );
+
+    let changed_code = Blaze2Code::new(blaze2_code_spec(45)).unwrap();
+    assert_ne!(
+        code.packed().encode_row(&message),
+        changed_code.packed().encode_row(&message)
+    );
+}
+
+#[test]
+fn blaze2_code_spec_rejects_inconsistent_lengths() {
+    let mut spec = blaze2_code_spec(46);
+    spec.praa_codeword_len += 1;
+    assert!(Blaze2Code::new(spec).is_err());
+
+    let mut spec = blaze2_code_spec(46);
+    spec.praa_expansion_factor = 3;
+    spec.praa_codeword_len = spec.praa_message_len * spec.praa_expansion_factor;
+    assert!(Blaze2Code::new(spec).is_err());
+
+    let mut spec = blaze2_code_spec(46);
+    spec.version = 0;
+    assert!(Blaze2Code::new(spec).is_err());
 }
 
 #[test]
@@ -911,6 +978,87 @@ fn blaze2_opening_verifies_row_fold_and_raa_boundaries() {
         num_queries,
     )
     .unwrap();
+}
+
+#[test]
+fn blaze2_opening_with_code_spec_binds_compact_public_code() {
+    let (expanded_code, code_seed, packed, commitment, claim, num_queries) = opening_fixture(47);
+    let compact_code = Blaze2Code::new(blaze2_code_spec(47)).unwrap();
+    assert_eq!(
+        compact_code.packed().encode_rows(&packed),
+        expanded_code.encode_rows(&packed)
+    );
+
+    let proof = prove_blaze2_opening_with_code_spec::<_, ExhaustiveFoldedMessageBackend>(
+        &compact_code,
+        &packed,
+        &commitment,
+        &claim,
+        num_queries,
+    )
+    .unwrap();
+    let public = commitment.public();
+
+    verify_blaze2_opening_with_code_spec::<_, ExhaustiveFoldedMessageBackend>(
+        &compact_code,
+        &public,
+        &claim,
+        &proof,
+        num_queries,
+    )
+    .unwrap();
+
+    assert!(
+        verify_blaze2_opening::<_, ExhaustiveFoldedMessageBackend>(
+            &expanded_code,
+            &code_seed,
+            &public,
+            &claim,
+            &proof,
+            num_queries,
+        )
+        .is_err(),
+        "expanded-code transcript must not verify a proof sampled from the compact-code transcript"
+    );
+}
+
+#[test]
+fn blaze2_opening_with_code_spec_rejects_hash_id_mismatch() {
+    let (_, _, packed, commitment, claim, num_queries) = opening_fixture(48);
+    let mut spec = blaze2_code_spec(48);
+    spec.hash_id = Blaze2HashId::Blake2s;
+    let compact_code = Blaze2Code::new(spec).unwrap();
+
+    assert!(
+        prove_blaze2_opening_with_code_spec::<_, ExhaustiveFoldedMessageBackend>(
+            &compact_code,
+            &packed,
+            &commitment,
+            &claim,
+            num_queries,
+        )
+        .is_err()
+    );
+
+    let valid_code = Blaze2Code::new(blaze2_code_spec(48)).unwrap();
+    let proof = prove_blaze2_opening_with_code_spec::<_, ExhaustiveFoldedMessageBackend>(
+        &valid_code,
+        &packed,
+        &commitment,
+        &claim,
+        num_queries,
+    )
+    .unwrap();
+    assert!(
+        verify_blaze2_opening_with_code_spec::<_, ExhaustiveFoldedMessageBackend>(
+            &compact_code,
+            &commitment.public(),
+            &claim,
+            &proof,
+            num_queries,
+        )
+        .is_err()
+    );
 }
 
 #[test]

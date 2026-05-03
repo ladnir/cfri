@@ -3,9 +3,9 @@ use cfri::backend::{
     arithmetic::{Field, PrimeField},
     blaze2::{
         absorb_blaze2_opening_folded_eval, absorb_blaze2_opening_public,
-        absorb_blaze2_opening_row_evals, build_raa_aux_trace, build_raa_trace,
-        build_raa_trace_into, check_raa_folded_codeword_link, check_raa_trace_at,
-        evaluate_multilinear, evaluate_packed_matrix_at_point,
+        absorb_blaze2_opening_public_with_code_spec, absorb_blaze2_opening_row_evals,
+        build_raa_aux_trace, build_raa_trace, build_raa_trace_into, check_raa_folded_codeword_link,
+        check_raa_trace_at, evaluate_multilinear, evaluate_packed_matrix_at_point,
         evaluate_packed_matrix_at_point_into, evaluate_packed_rows_at_point_into,
         fold_interleaved_column, fold_packed_query_pair, fold_packed_rows_into,
         pack_interleaved_rows, pack_interleaved_rows_into, prove_blaze2_basefold_opening,
@@ -24,7 +24,9 @@ use cfri::backend::{
     code::PackedRaaCode,
     hash::{Blake2s, Hash, Output},
     systematic_basefold::{
-        Blaze2BaseFoldBackendParams, Blaze2BaseFoldBackendSpec, SystematicFoldableCodeSpec,
+        required_blaze2_basefold_auxiliary_oracle_len, BackendProofQueryDomain,
+        Blaze2BaseFoldBackendParams, Blaze2BaseFoldBackendSpec, Blaze2BaseFoldOpenRequest,
+        HolographicQuerySchedule, SystematicFoldableCodeSpec,
     },
     transcript::InMemoryTranscript as _,
     Error,
@@ -264,7 +266,8 @@ fn blaze2_basefold_backend_params(
     q_raa_input: usize,
     q_backend_proof: usize,
 ) -> Blaze2BaseFoldBackendParams {
-    let auxiliary_oracle_len = blaze2_code_spec(seed).praa_codeword_len * 4;
+    let auxiliary_oracle_len =
+        required_blaze2_basefold_auxiliary_oracle_len(&blaze2_code_spec(seed));
     blaze2_basefold_backend_params_with_auxiliary_len(
         seed,
         q_raa_input,
@@ -446,6 +449,40 @@ fn blaze2_basefold_outer_bytes_with_field_bytes(
                         .sum::<usize>()
             })
             .sum::<usize>()
+}
+
+fn replay_blaze2_basefold_schedule(
+    params: &Blaze2BaseFoldBackendParams,
+    commitment: &Blaze2InterleavedCodewordCommitment<Blake2s256>,
+    claim: &Blaze2OpeningClaim,
+    proof: &Blaze2BaseFoldOpeningProof<Blake2s256>,
+) -> HolographicQuerySchedule {
+    let mut transcript = CfriTranscript::<Blake2s256>::new();
+    absorb_blaze2_opening_public_with_code_spec(
+        &mut transcript,
+        params.praa(),
+        &commitment.public(),
+        claim,
+        params.spec().q_raa_input,
+    );
+    absorb_blaze2_opening_row_evals(&mut transcript, &proof.row_evals);
+    let mut folding_challenges = vec![B128::ZERO; commitment.num_rows()];
+    squeeze_blaze2_opening_folding_challenges(&mut transcript, &mut folding_challenges);
+    let folded_eval = proof
+        .row_evals
+        .iter()
+        .zip(folding_challenges.iter())
+        .fold(B128::ZERO, |acc, (&eval, &challenge)| {
+            acc + eval * challenge
+        });
+    absorb_blaze2_opening_folded_eval(&mut transcript, &folded_eval);
+    let request = Blaze2BaseFoldOpenRequest {
+        col_point: &claim.col_point,
+        folded_eval,
+    };
+    params
+        .sample_query_schedule(&mut transcript, &proof.backend_prequery, &request)
+        .unwrap()
 }
 
 fn blaze2_basefold_backend_query_bytes_with_field_bytes(
@@ -1283,7 +1320,16 @@ fn blaze2_basefold_opening_verifies_with_typed_backend_schedule() {
     assert_eq!(proof.queries.len(), q_raa_input);
     assert!(proof.backend_prequery.auxiliary.is_some());
     assert!(proof.backend_proof.auxiliary.is_some());
-    assert!(proof.backend_proof.compiler_parity.queries.len() <= q_backend_proof);
+    let schedule = replay_blaze2_basefold_schedule(&params, &commitment, &claim, &proof);
+    let compiler_parity_query_count = schedule
+        .proof_queries()
+        .iter()
+        .filter(|query| query.domain == BackendProofQueryDomain::CompilerParity)
+        .count();
+    assert_eq!(
+        proof.backend_proof.compiler_parity.queries.len(),
+        compiler_parity_query_count
+    );
     verify_blaze2_basefold_opening(&params, &commitment.public(), &claim, &proof).unwrap();
 }
 
@@ -1316,9 +1362,37 @@ fn blaze2_basefold_outer_shape_matches_paper_after_field_byte_correction() {
         q_raa_input,
         "backend proof queries must not create extra Blaze input-column openings"
     );
+    let schedule = replay_blaze2_basefold_schedule(&params, &commitment, &claim, &proof);
+    let compiler_parity_query_count = schedule
+        .proof_queries()
+        .iter()
+        .filter(|query| query.domain == BackendProofQueryDomain::CompilerParity)
+        .count();
+    let auxiliary_query_count = schedule
+        .proof_queries()
+        .iter()
+        .filter(|query| query.domain == BackendProofQueryDomain::Auxiliary)
+        .count();
+    assert_eq!(
+        compiler_parity_query_count + auxiliary_query_count,
+        q_backend_proof,
+        "typed backend proof schedule has exactly Q_backend entries"
+    );
+    assert_eq!(
+        proof.backend_proof.compiler_parity.queries.len(),
+        compiler_parity_query_count,
+        "compiler-parity openings match their subset of the backend proof schedule"
+    );
     assert!(
-        proof.backend_proof.compiler_parity.queries.len() <= q_backend_proof,
-        "compiler-parity openings are a subset of the backend proof schedule"
+        proof
+            .backend_proof
+            .auxiliary
+            .as_ref()
+            .unwrap()
+            .queries
+            .len()
+            >= auxiliary_query_count + 3 * schedule.raa_final_queries().len() + 1,
+        "auxiliary proof carries scheduled relation openings plus explicit eval-accumulator checks"
     );
     assert_eq!(
         proof.backend_prequery.folded_parity_layers.len(),
@@ -1373,7 +1447,7 @@ fn blaze2_basefold_opening_rejects_row_eval_folded_eval_mismatch() {
 #[test]
 fn blaze2_basefold_opening_derives_configured_auxiliary_trace() {
     let (_, _, packed, commitment, claim, _) = opening_fixture(54);
-    let auxiliary_len = blaze2_code_spec(54).praa_codeword_len * 4;
+    let auxiliary_len = required_blaze2_basefold_auxiliary_oracle_len(&blaze2_code_spec(54));
     let params = blaze2_basefold_backend_params_with_auxiliary_len(54, 4, 11, auxiliary_len);
     let proof = prove_blaze2_basefold_opening(&params, &packed, &commitment, &claim, &[]).unwrap();
 

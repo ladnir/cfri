@@ -18,6 +18,12 @@ const RAA_AUX_EVAL_ROW: usize = 3;
 const RAA_AUX_RELATION_ROW_COUNT: usize = 3;
 const RAA_AUX_ROW_COUNT: usize = 4;
 
+pub const BLAZE2_BASEFOLD_AUXILIARY_ROW_COUNT: usize = RAA_AUX_ROW_COUNT;
+
+pub fn required_blaze2_basefold_auxiliary_oracle_len(spec: &Blaze2CodeSpec) -> usize {
+    spec.praa_codeword_len * BLAZE2_BASEFOLD_AUXILIARY_ROW_COUNT
+}
+
 #[derive(Clone, Copy, Debug, Eq, PartialEq)]
 pub enum CodewordPart {
     Systematic,
@@ -1747,7 +1753,7 @@ fn validate_blaze2_backend_spec(spec: &Blaze2BaseFoldBackendSpec) -> Result<(), 
             "compiler systematic length must equal PRAA codeword length".to_string(),
         ));
     }
-    let expected_auxiliary_len = spec.praa.praa_codeword_len * RAA_AUX_ROW_COUNT;
+    let expected_auxiliary_len = required_blaze2_basefold_auxiliary_oracle_len(&spec.praa);
     if spec.auxiliary_oracle_len == 0 {
         return Err(Error::InvalidPcsParam(format!(
             "Blaze2 BaseFold backend needs the flattened PRAA auxiliary/evaluation trace length {expected_auxiliary_len}"
@@ -2698,7 +2704,7 @@ mod tests {
         HolographicQueryScheduleSpec {
             q_raa_input: 6,
             q_backend_proof: 7,
-            auxiliary_oracle_len: 64,
+            auxiliary_oracle_len: 16 * BLAZE2_BASEFOLD_AUXILIARY_ROW_COUNT,
         }
     }
 
@@ -2709,19 +2715,20 @@ mod tests {
     }
 
     fn blaze2_backend_spec() -> Blaze2BaseFoldBackendSpec {
+        let praa = Blaze2CodeSpec {
+            version: 1,
+            field_id: Blaze2FieldId::B128,
+            hash_id: Blaze2HashId::Blake2s256,
+            raa_variant: RaaVariant::PackedPrefixAccumulator,
+            packing: Blaze2PackingLayout::PackedInterleavedRows,
+            leaf_layout: Blaze2LeafLayout::InterleavedColumn,
+            praa_message_len: 8,
+            praa_expansion_factor: 4,
+            praa_codeword_len: 32,
+            seed: Blaze2CodeSeed([19; 32]),
+        };
         Blaze2BaseFoldBackendSpec {
-            praa: Blaze2CodeSpec {
-                version: 1,
-                field_id: Blaze2FieldId::B128,
-                hash_id: Blaze2HashId::Blake2s256,
-                raa_variant: RaaVariant::PackedPrefixAccumulator,
-                packing: Blaze2PackingLayout::PackedInterleavedRows,
-                leaf_layout: Blaze2LeafLayout::InterleavedColumn,
-                praa_message_len: 8,
-                praa_expansion_factor: 4,
-                praa_codeword_len: 32,
-                seed: Blaze2CodeSeed([19; 32]),
-            },
+            praa: praa.clone(),
             compiler_code: SystematicFoldableCodeSpec {
                 version: 1,
                 compiler_message_len: 32,
@@ -2733,7 +2740,7 @@ mod tests {
             },
             q_raa_input: 6,
             q_backend_proof: 7,
-            auxiliary_oracle_len: 128,
+            auxiliary_oracle_len: required_blaze2_basefold_auxiliary_oracle_len(&praa),
         }
     }
 

@@ -42,6 +42,25 @@ PERF|scheme=blaze|mode=transparent|num_vars=8|poly_len=256|rows=64|queries=16|se
 PERF|scheme=blaze|mode=hiding|num_vars=8|poly_len=256|rows=64|queries=16|setup_ms=1.407|trim_ms=0.324|commit_ms=1.821|eval_ms=0.000|open_ms=47.797|verify_ms=38.781|proof_bytes=6378160
 ```
 
+## Latest Transparent Check
+
+Captured on: 2026-05-02
+
+Command:
+
+```powershell
+cargo test --release -p cfri --test perf_baseline current_release_transparent_performance_baseline -- --ignored --nocapture --test-threads=1
+```
+
+This capture includes the fully checked Blaze product relation path and the BaseFold batch-opening
+deduplication for repeated polynomial indices.
+
+```text
+PERF|kind=metadata|crate=cfri|profile=release|test=current_release_transparent_performance_baseline
+PERF|scheme=basefold|mode=transparent|num_vars=10|poly_len=1024|setup_ms=1.588|trim_ms=0.135|commit_ms=1.641|eval_ms=0.048|open_ms=4.372|verify_ms=0.382|proof_bytes=12096
+PERF|scheme=blaze|mode=transparent|num_vars=8|poly_len=256|rows=64|queries=16|setup_ms=0.855|trim_ms=0.182|commit_ms=2.166|eval_ms=0.000|open_ms=108.563|verify_ms=28.498|proof_bytes=3425408
+```
+
 ## Covered Cases
 
 - `basefold`, transparent mode, `num_vars=10`.

@@ -629,15 +629,25 @@ where
         let (queried_els, queries_usize) =
             query_phase(transcript, &comm, &oracles, pp.num_verifier_queries);
 
+        let mut eval_poly_slots = vec![usize::MAX; comms.len()];
+        let mut unique_eval_polys = Vec::new();
+        for eval in evals {
+            let poly = eval.poly();
+            if eval_poly_slots[poly] == usize::MAX {
+                eval_poly_slots[poly] = unique_eval_polys.len();
+                unique_eval_polys.push(poly);
+            }
+        }
+
         let mut individual_queries: Vec<Vec<(F, F)>> = Vec::with_capacity(queries_usize.len());
 
         let mut individual_paths: Vec<Vec<Vec<Output<H>>>> =
             Vec::with_capacity(queries_usize.len());
         for query in &queries_usize {
-            let mut comm_queries = Vec::with_capacity(evals.len());
-            let mut comm_paths = Vec::with_capacity(evals.len());
-            for eval in evals {
-                let c = comms[eval.poly()];
+            let mut comm_queries = Vec::with_capacity(unique_eval_polys.len());
+            let mut comm_paths = Vec::with_capacity(unique_eval_polys.len());
+            for &poly in &unique_eval_polys {
+                let c = comms[poly];
                 let res = query_codeword::<F, H>(query, &c.codeword.poly, &c.codeword_tree);
                 comm_queries.push(res.0);
                 comm_paths.push(res.1);
@@ -903,11 +913,21 @@ where
 
         let mut query_challenges = transcript.squeeze_challenges(vp.num_verifier_queries);
 
+        let mut eval_poly_slots = vec![usize::MAX; comms.len()];
+        let mut unique_eval_polys = Vec::new();
+        for eval in evals {
+            let poly = eval.poly();
+            if eval_poly_slots[poly] == usize::MAX {
+                eval_poly_slots[poly] = unique_eval_polys.len();
+                unique_eval_polys.push(poly);
+            }
+        }
+
         let mut ind_queries = Vec::with_capacity(vp.num_verifier_queries);
         let mut count = 0;
         for i in 0..vp.num_verifier_queries {
-            let mut comms_queries = Vec::with_capacity(evals.len());
-            for j in 0..evals.len() {
+            let mut comms_queries = Vec::with_capacity(unique_eval_polys.len());
+            for _ in 0..unique_eval_polys.len() {
                 let queries = transcript.read_field_elements(2).unwrap();
 
                 comms_queries.push(queries);
@@ -920,8 +940,8 @@ where
         let mut batch_paths = Vec::with_capacity(vp.num_verifier_queries);
         let mut count = 0;
         for i in 0..vp.num_verifier_queries {
-            let mut comms_merkle_paths = Vec::with_capacity(evals.len());
-            for j in 0..evals.len() {
+            let mut comms_merkle_paths = Vec::with_capacity(unique_eval_polys.len());
+            for _ in 0..unique_eval_polys.len() {
                 let merkle_path = transcript
                     .read_commitments(vp.num_vars + vp.log_rate - 1)
                     .unwrap();
@@ -963,9 +983,10 @@ where
         for (i, query) in queries.iter().enumerate() {
             let mut lc0 = F::ZERO;
             let mut lc1 = F::ZERO;
-            for j in 0..scalars.len() {
-                lc0 += scalars[j] * ind_queries[i][j][0];
-                lc1 += scalars[j] * ind_queries[i][j][1];
+            for (j, eval) in evals.iter().enumerate() {
+                let slot = eval_poly_slots[eval.poly()];
+                lc0 += scalars[j] * ind_queries[i][slot][0];
+                lc1 += scalars[j] * ind_queries[i][slot][1];
             }
             assert_eq!(query[0], lc0);
             assert_eq!(query[1], lc1);
@@ -1004,12 +1025,12 @@ where
         );
 
         for vq in 0..vp.num_verifier_queries {
-            for cq in 0..ind_queries[vq].len() {
+            for (slot, poly) in unique_eval_polys.iter().copied().enumerate() {
                 authenticate_merkle_sibling_path_root::<H, F>(
-                    &batch_paths[vq][cq],
-                    (ind_queries[vq][cq][0], ind_queries[vq][cq][1]),
+                    &batch_paths[vq][slot],
+                    (ind_queries[vq][slot][0], ind_queries[vq][slot][1]),
                     queries_usize[vq],
-                    comms[evals[cq].poly].as_ref(),
+                    comms[poly].as_ref(),
                 );
 
                 count += 1;

@@ -7,6 +7,7 @@ pub mod pcs;
 pub mod pip_fri;
 pub mod plonky2_util;
 pub mod polyfrim;
+pub mod transcript;
 pub mod virgo;
 
 pub mod blaze {

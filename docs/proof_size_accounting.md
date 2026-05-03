@@ -1,0 +1,198 @@
+# Proof Size Accounting: BaseFold and Blaze
+
+This note is deliberately paper-first. It ignores the current implementation and asks what an
+argument proof should contain after compiling the IOPs with Fiat-Shamir and Merkle commitments.
+
+Sources:
+
+- BaseFold: <https://eprint.iacr.org/2023/1705.pdf>
+- Blaze: <https://eprint.iacr.org/2024/1609.pdf>
+
+## Shared Byte Model
+
+| Symbol | Meaning | Typical paper value |
+| --- | --- | --- |
+| `field_bytes` | bytes per field element in proof | `8` for 64-bit field comparisons, `16` for GF(2^128), `32` for 256-bit fields |
+| `hash_bytes` | bytes per Merkle digest | `32` for Blake2s256 |
+| `lambda` | target security bits | `100` in the paper comparisons |
+| `D` | number of BaseFold folding rounds | roughly number of multilinear variables after any `k0` base case |
+| `N_i` | BaseFold oracle length at layer `i` | `N_i = expansion * k0 * 2^i` |
+| `Q_BF` | BaseFold query repetitions | chosen so `(1 - delta + gamma * D)^Q_BF` is at most `2^-lambda` |
+| `Q_RAA` | Blaze RAA/interleaving query repetitions | `ceil(lambda / -log2(1 - delta_RAA / 3))` |
+
+The formulas below separate "field payload" from "hash authentication". For these transparent
+schemes the Merkle authentication paths are usually the dominant term.
+
+## BaseFold PCS Proof Contents
+
+From BaseFold Protocol 4, a single evaluation proof contains:
+
+1. Sumcheck messages `h_D, ..., h_1`.
+2. Commitments to the folded proof oracles `pi_{D-1}, ..., pi_0`.
+3. Query openings proving folding consistency between adjacent oracle layers.
+4. A terminal check that `pi_0` is a valid base-code codeword.
+
+The initial root for `pi_D = Enc_D(f)` is the polynomial commitment, so it is public input rather
+than part of the opening proof.
+
+### BaseFold Spreadsheet Rows
+
+| Component | Count | Unit bytes | Total bytes | Notes |
+| --- | ---: | ---: | ---: | --- |
+| Sumcheck degree-2 polynomials | `3 * D` | `field_bytes` | `=3*D*field_bytes` | Each `h_i(X)` is degree 2, so three field elements. |
+| Folded oracle Merkle roots | `D - 1` or `D` | `hash_bytes` | `=(D-final_clear)*hash_bytes` | If `pi_0` is sent in the clear, roots are only for `pi_{D-1}..pi_1`; otherwise include `pi_0`. |
+| Final base codeword | `N_0` | `field_bytes` | `=N_0*field_bytes` | Usually cheaper than committing when `N_0` is tiny. |
+| Query leaf values, optimized path reuse | `Q_BF * (D + 1)` | `field_bytes` | `=Q_BF*(D+1)*field_bytes` | Top layer needs both children; lower layers need only the sibling value because the folded value is carried down. |
+| Query leaf values, literal no reuse | `2 * Q_BF * D` | `field_bytes` | `=2*Q_BF*D*field_bytes` | Useful as a red-flag upper bound. |
+| Query Merkle authentication | `Q_BF * sum_{i=1..D} log2(N_i)` | `hash_bytes` | `=Q_BF*SUM(LOG2(N_i))*hash_bytes` | Paper verifier cost is `O(Q_BF * D)` Merkle path checks, each path length `O(D)`. |
+| Optional transcript/check scalars | `O(D)` | `field_bytes` | small | Usually already covered by sumcheck or derived by Fiat-Shamir. |
+
+For the common `k0 = 1`, `N_i = expansion * 2^i`. If the expansion is 2, then
+`sum_{i=1..D} log2(N_i) = D*(D+3)/2`.
+
+So the dominant BaseFold size is:
+
+```text
+basefold_bytes ~= Q_BF * sum_{i=1..D} log2(N_i) * hash_bytes
+               + Q_BF * (D + 1) * field_bytes
+               + 3 * D * field_bytes
+               + folded_roots
+               + final_codeword
+```
+
+The BaseFold paper gives the protocol and asymptotics, while its exact figure data for standalone
+PCS proof size is plotted visually. The Blaze paper's Figure 4 reports BaseFold proof sizes of about
+`1.2, 1.2, 1.4, 1.4, 1.4 MB` for `25..29` variables in its comparison setting.
+
+## Blaze Proof Contents
+
+Blaze commits to an interleaved packed RAA codeword and then reduces the large interleaved
+claim to a smaller BaseFold claim.
+
+From Blaze Section 8.2, for a polynomial with `t * k` coefficients:
+
+1. The proof opens a constant number of `t`-length columns of the interleaved code.
+2. The proof includes a BaseFold proof on a smaller witness size, written in the paper as `n / t`.
+3. The proof includes Merkle paths for the queried interleaved-code columns.
+
+For the RAA query count, the paper sets distance `delta_RAA = 0.19` and targets 100 bits:
+
+```text
+100 / -log2(1 - 0.19 / 3) = 1059.407...
+```
+
+Strict ceiling from the rounded `0.19` value gives `1060`, while the paper text reports `1059`.
+For reproducing the paper's Figure 4 accounting, use the paper's `1059`; for a strict parameter
+calculator, use the ceiling rule on the exact distance value. The paper then states the dominant
+extra column payload as:
+
+```text
+1059 * 8 * t bytes
+```
+
+That is the spreadsheet formula `Q_RAA * field_bytes * t` with `field_bytes = 8`. If we instantiate
+the same proof over GF(2^128), this row becomes `1059 * 16 * t`.
+
+### Blaze Spreadsheet Rows
+
+| Component | Count | Unit bytes | Total bytes | Notes |
+| --- | ---: | ---: | ---: | --- |
+| Interleaving/evaluation vector | `t` or `2 * t` | `field_bytes` | `=t*field_bytes` or `=2*t*field_bytes` | Lemma 6.1 has `2t + cc(k)` non-oracle communication; Section 8.2 folds this into "constant number of columns". |
+| RAA queried columns | `Q_RAA * t` | `field_bytes` | `=Q_RAA*t*field_bytes` | Explicit paper row: `1059 * 8 * t` bytes. |
+| RAA column Merkle paths | `Q_RAA * log2(n / t)` | `hash_bytes` | `=Q_RAA*LOG2(n/t)*hash_bytes` | Section 8.2 says 1059 paths for a tree with `n/t` leaves. |
+| Inner BaseFold proof | `1` | `basefold_bytes(n/t)` | `=basefold_bytes(n/t)` | This is smaller than BaseFold on the original witness. |
+| Small scalar overhead | `O(log n)` | `field_bytes` | small | From the MLIOP/IOPP and batching reductions. |
+| Commitment roots | constant plus inner roots | `hash_bytes` | small | Public commitment root is not counted as opening proof unless the benchmark includes it. |
+
+Dominant Blaze size:
+
+```text
+blaze_bytes ~= basefold_bytes(n / t)
+             + Q_RAA * t * field_bytes
+             + Q_RAA * log2(n / t) * hash_bytes
+             + O(t * field_bytes + log(n) * field_bytes + hash_bytes * log(n/t))
+```
+
+The important first-principles point is that Blaze should not include a full `t * n` row-combination
+vector. That is exactly the object Blaze avoids by using the inner BaseFold proof. The price paid is
+many RAA column queries plus their Merkle paths.
+
+## Paper Figure 4 Values
+
+Blaze Figure 4 reports proof sizes in MB:
+
+| Variables | Input MB | BaseFold MB | Blaze MB | Interleaved Blaze MB |
+| ---: | ---: | ---: | ---: | ---: |
+| 25 | 256 | 1.2 | 1.3 | 17.6 |
+| 26 | 512 | 1.2 | 1.4 | 17.7 |
+| 27 | 1024 | 1.4 | 2.0 | 18.0 |
+| 28 | 2048 | 1.4 | 2.5 | 18.5 |
+| 29 | 4096 | 1.4 | 3.7 | 19.7 |
+| 30 | 8192 | x | 3.8 | 21.8 |
+| 31 | 16384 | x | 6.1 | 26.2 |
+
+These are consistent with the paper-level decomposition: BaseFold is dominated by `Q_BF` Merkle
+paths across `D` shrinking layers, while Blaze is "smaller BaseFold plus RAA column openings".
+The missing concrete parameter in the text is the exact `t` used per row of Figure 4; the formulas
+above expose that as an explicit spreadsheet input.
+
+## 5% Reproduction Model
+
+The paper does not print every concrete knob needed to regenerate Figure 4 exactly. In particular,
+it omits the exact interleaving schedule and the exact BaseFold query-count schedule used for the
+plotted standalone sizes. With a 5% tolerance, the Figure 4 rows can be reproduced by fitting only
+the hidden security/query knobs while keeping the proof components above fixed.
+
+For BaseFold, using
+
+```text
+BF_MB = (roots + final + Q_BF * (SUM_i log2(N_i) * hash_bytes
+        + (D + 1) * field_bytes)) / 1_000_000
+```
+
+with `field_bytes = 8`, `hash_bytes = 32`, `N_i = 2^(i+1)`, and the integer `Q_BF` implied by the
+rounded paper table gives:
+
+| Variables | Paper MB | Implied `Q_BF` | Model MB | Error |
+| ---: | ---: | ---: | ---: | ---: |
+| 25 | 1.2 | 105 | 1.199 | -0.06% |
+| 26 | 1.2 | 98 | 1.205 | 0.41% |
+| 27 | 1.4 | 106 | 1.399 | -0.07% |
+| 28 | 1.4 | 99 | 1.399 | -0.04% |
+| 29 | 1.4 | 93 | 1.405 | 0.34% |
+
+The variation in implied `Q_BF` is almost certainly table rounding plus parameter tiers, not a deep
+protocol effect. The useful conclusion is that the standalone BaseFold row is consistent with about
+`100` query repetitions and normal Merkle path accounting.
+
+For Blaze, the author's benchmark source uses a fixed row length `2^21` and varies the number of
+rows. The paper formula says the incremental Blaze term is `Q_RAA * 8 * t` bytes, with `Q_RAA =
+1059`, plus a BaseFold/Merkle-path component. Fitting that component as a constant `0.477 MB`
+and solving for the effective opened-column count gives:
+
+| Variables | Paper MB | Effective `t` | Model MB | Error |
+| ---: | ---: | ---: | ---: | ---: |
+| 25 | 1.3 | 97 | 1.299 | -0.07% |
+| 26 | 1.4 | 109 | 1.400 | -0.02% |
+| 27 | 2.0 | 180 | 2.002 | 0.10% |
+| 28 | 2.5 | 239 | 2.502 | 0.07% |
+| 29 | 3.7 | 380 | 3.696 | -0.10% |
+| 30 | 3.8 | 392 | 3.798 | -0.05% |
+| 31 | 6.1 | 664 | 6.102 | 0.03% |
+
+These `t` values should be read as effective proof-size parameters, not necessarily literal powers
+of two for an implementation. If we force power-of-two row counts and the printed `1059 * 8 * t`
+term, the table cannot be matched within 5%; the max error is closer to 9%. That is a useful
+warning: the printed Figure 4 sizes depend on an unstated implementation/rounding convention.
+
+## Correctness Target For Our Implementation
+
+For proof-size regression accounting, the implementation should be measured against these
+component budgets:
+
+1. BaseFold should have one chain of folded oracle commitments, sumcheck messages, and query
+   decommitments. It should not commit to a fresh full-size object inside each query.
+2. Blaze should add `Q_RAA` column openings and `Q_RAA` column Merkle paths, then delegate the
+   reduced claim to one smaller BaseFold proof.
+3. Any proof-size term proportional to `Q_RAA * t * log(n/t)` field elements, `Q_RAA * n`, or a full
+   row-combination vector is not part of the paper Blaze proof shape.

@@ -103,11 +103,27 @@ impl Permutation {
     }
 
     pub fn interleave_long<F: BlazeField>(&self, input: &Vec<Vec<F>>) -> Vec<Vec<F>> {
+        self.interleave_long_with(input, &self.permutation2)
+    }
+
+    pub fn interleave1_long<F: BlazeField>(&self, input: &Vec<Vec<F>>) -> Vec<Vec<F>> {
+        self.interleave_long_with(input, &self.permutation1)
+    }
+
+    pub fn interleave2_long<F: BlazeField>(&self, input: &Vec<Vec<F>>) -> Vec<Vec<F>> {
+        self.interleave_long_with(input, &self.permutation2)
+    }
+
+    fn interleave_long_with<F: BlazeField>(
+        &self,
+        input: &Vec<Vec<F>>,
+        permutation: &[usize],
+    ) -> Vec<Vec<F>> {
         let mut new_inputs = Vec::new();
         for vec in input {
             let mut new_input = vec![F::zero(); vec.len()];
             new_input.par_iter_mut().enumerate().for_each(|(i, mut x)| {
-                let mut j = self.permutation2[i];
+                let j = permutation[i];
                 *x = vec[j];
             });
             new_inputs.push(new_input);
@@ -387,9 +403,39 @@ pub fn encode_bits_ser<F: BlazeField>(message: Vec<F>, p: &Permutation, rate: us
     serial_accumulator(&mut first_round); // Accumulate
     let mut second_round = p.interleave2(first_round); // Interleave
     serial_accumulator(&mut second_round); // Accumulate
-    let mut third_round = p.interleave3(second_round);
-    serial_accumulator(&mut third_round);
-    third_round
+    second_round
+}
+
+#[test]
+fn encode_bits_ser_matches_explicit_long_raa_chain() {
+    let mut rng = ChaCha8Rng::seed_from_u64(0x5eed);
+    let rate = 4;
+    let p = Permutation::create(&mut rng, 16);
+    let rows = vec![
+        (0..4)
+            .map(|i| Blazeu64 {
+                value: (3 * i + 1) as u64,
+            })
+            .collect::<Vec<_>>(),
+        (0..4)
+            .map(|i| Blazeu64 {
+                value: (5 * i + 2) as u64,
+            })
+            .collect::<Vec<_>>(),
+    ];
+
+    let mut explicit = repetition_code_long(&rows, rate);
+    explicit = p.interleave1_long(&explicit);
+    serial_accumulator_long(&mut explicit);
+    explicit = p.interleave2_long(&explicit);
+    serial_accumulator_long(&mut explicit);
+
+    let encoded = rows
+        .iter()
+        .map(|row| encode_bits_ser(row.clone(), &p, rate))
+        .collect::<Vec<_>>();
+
+    assert_eq!(encoded, explicit);
 }
 pub fn encode_bits_long<F: BlazeField>(
     message: &Vec<Vec<F>>,

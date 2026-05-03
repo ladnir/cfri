@@ -485,23 +485,23 @@ where
         transcript.write_field_elements(&final_oracle.poly);
 
         //write query paths
-        queried_els
-            .iter()
-            .map(|q| &q.0)
-            .flatten()
-            .for_each(|query| {
-                transcript.write_field_element(&query.0);
-                transcript.write_field_element(&query.1);
-            });
+        write_compact_query_values::<F, H>(
+            transcript,
+            &queried_els,
+            &queries_usize_,
+            pp.num_rounds,
+        );
 
         //write merkle paths
         queried_els.iter().for_each(|query| {
             let indices = &query.1;
             indices.into_iter().enumerate().for_each(|(i, q)| {
-                if (i == 0) {
-                    write_merkle_path::<H, F>(&comm.codeword_tree, *q, transcript);
-                } else {
-                    write_merkle_path::<H, F>(&trees[i - 1], *q, transcript);
+                if i < pp.num_rounds {
+                    if i == 0 {
+                        write_merkle_sibling_path::<H, F>(&comm.codeword_tree, *q, transcript);
+                    } else {
+                        write_merkle_sibling_path::<H, F>(&trees[i - 1], *q, transcript);
+                    }
                 }
             })
         });
@@ -631,7 +631,7 @@ where
 
         let mut individual_queries: Vec<Vec<(F, F)>> = Vec::with_capacity(queries_usize.len());
 
-        let mut individual_paths: Vec<Vec<Vec<(Output<H>, Output<H>)>>> =
+        let mut individual_paths: Vec<Vec<Vec<Output<H>>>> =
             Vec::with_capacity(queries_usize.len());
         for query in &queries_usize {
             let mut comm_queries = Vec::with_capacity(evals.len());
@@ -647,18 +647,19 @@ where
             individual_paths.push(comm_paths);
         }
 
-        let merkle_paths: Vec<Vec<Vec<(Output<H>, Output<H>)>>> = queried_els
+        let merkle_paths: Vec<Vec<Vec<Output<H>>>> = queried_els
             .iter()
             .map(|query| {
                 let indices = &query.1;
                 indices
                     .into_iter()
                     .enumerate()
+                    .filter(|(i, _)| *i < pp.num_rounds)
                     .map(|(i, q)| {
                         if (i == 0) {
-                            return get_merkle_path::<H, F>(&comm.codeword_tree, *q, false);
+                            return get_merkle_sibling_path::<H, F>(&comm.codeword_tree, *q);
                         } else {
-                            return get_merkle_path::<H, F>(&trees[i - 1], *q, false);
+                            return get_merkle_sibling_path::<H, F>(&trees[i - 1], *q);
                         }
                     })
                     .collect()
@@ -673,14 +674,9 @@ where
             transcript.write_field_element(f2).unwrap();
         });
         //paths for batch
-        individual_paths
-            .iter()
-            .flatten()
-            .flatten()
-            .for_each(|(h1, h2)| {
-                transcript.write_commitment(h1);
-                transcript.write_commitment(h2);
-            });
+        individual_paths.iter().flatten().flatten().for_each(|h| {
+            transcript.write_commitment(h);
+        });
 
         //write sum check oracles
 
@@ -689,23 +685,13 @@ where
         //write final oracle
         transcript.write_field_elements(oracles.pop().unwrap().poly.iter().collect_vec());
         //write query paths
-        queried_els
-            .iter()
-            .map(|q| &q.0)
-            .flatten()
-            .for_each(|query| {
-                transcript.write_field_element(&query.0);
-                transcript.write_field_element(&query.1);
-            });
+        write_compact_query_values::<F, H>(transcript, &queried_els, &queries_usize, pp.num_rounds);
         //write merkle paths
-        merkle_paths
-            .iter()
-            .flatten()
-            .flatten()
-            .for_each(|(h1, h2)| {
-                transcript.write_commitment(h1);
-                transcript.write_commitment(h2);
+        merkle_paths.iter().flatten().for_each(|path| {
+            path.iter().for_each(|h| {
+                transcript.write_commitment(h);
             });
+        });
 
         Ok(())
     }
@@ -771,40 +757,35 @@ where
 
         size = size + field_size * final_oracle.len();
         //read query paths
-        let num_queries = vp.num_verifier_queries * 2 * (vp.num_rounds + 1);
+        let num_queries = vp.num_verifier_queries * (vp.num_rounds + 1);
 
         let all_qs = transcript.read_field_elements(num_queries).unwrap();
 
         size = size + (num_queries - 2) * field_size;
         //        println!("size for all iop queries {:?}", size);
 
-        let i_qs = all_qs.chunks((vp.num_rounds + 1) * 2).collect_vec();
-
-        assert_eq!(i_qs.len(), vp.num_verifier_queries);
-
-        let mut queries = i_qs.iter().map(|q| q.chunks(2).collect_vec()).collect_vec();
+        let queries = all_qs
+            .chunks(vp.num_rounds + 1)
+            .map(|q| q.to_vec())
+            .collect_vec();
 
         assert_eq!(queries.len(), vp.num_verifier_queries);
 
         //read merkle paths
 
-        let mut query_merkle_paths: Vec<Vec<Vec<Vec<Output<H>>>>> =
+        let mut query_merkle_paths: Vec<Vec<Vec<Output<H>>>> =
             Vec::with_capacity(vp.num_verifier_queries);
-        let query_merkle_paths: Vec<Vec<Vec<Vec<Output<H>>>>> = (0..vp.num_verifier_queries)
+        let query_merkle_paths: Vec<Vec<Vec<Output<H>>>> = (0..vp.num_verifier_queries)
             .into_iter()
             .map(|i| {
-                let mut merkle_paths: Vec<Vec<Vec<Output<H>>>> =
-                    Vec::with_capacity(vp.num_rounds + 1);
-                for round in 0..(vp.num_rounds + 1) {
+                let mut merkle_paths: Vec<Vec<Output<H>>> = Vec::with_capacity(vp.num_rounds);
+                for round in 0..vp.num_rounds {
                     let mut merkle_path: Vec<Output<H>> = transcript
-                        .read_commitments(2 * (vp.num_vars - round + vp.log_rate - 1))
+                        .read_commitments(vp.num_vars - round + vp.log_rate - 1)
                         .unwrap();
-                    size = size + 256 * (2 * (vp.num_vars - round + vp.log_rate - 1));
+                    size = size + 256 * (vp.num_vars - round + vp.log_rate - 1);
 
-                    let chunked_path: Vec<Vec<Output<H>>> =
-                        merkle_path.chunks(2).map(|c| c.to_vec()).collect_vec();
-
-                    merkle_paths.push(chunked_path);
+                    merkle_paths.push(merkle_path);
                 }
                 merkle_paths
             })
@@ -816,6 +797,7 @@ where
             &sum_check_oracles,
             &fold_challenges,
             &queries,
+            &final_oracle,
             vp.num_rounds,
             vp.num_vars,
             vp.log_rate,
@@ -941,11 +923,10 @@ where
             let mut comms_merkle_paths = Vec::with_capacity(evals.len());
             for j in 0..evals.len() {
                 let merkle_path = transcript
-                    .read_commitments(2 * (vp.num_vars + vp.log_rate))
+                    .read_commitments(vp.num_vars + vp.log_rate - 1)
                     .unwrap();
-                let chunked_path = merkle_path.chunks(2).map(|c| c.to_vec()).collect_vec();
 
-                comms_merkle_paths.push(chunked_path);
+                comms_merkle_paths.push(merkle_path);
             }
 
             batch_paths.push(comms_merkle_paths);
@@ -962,17 +943,16 @@ where
             .unwrap();
 
         //read query paths
-        let num_queries = vp.num_verifier_queries * 2 * (vp.num_rounds + 1);
+        let num_queries = vp.num_verifier_queries * (vp.num_rounds + 1);
 
         let all_qs = transcript.read_field_elements(num_queries).unwrap();
 
-        let i_qs = all_qs.chunks((vp.num_rounds + 1) * 2).collect_vec();
+        let queries = all_qs
+            .chunks(vp.num_rounds + 1)
+            .map(|q| q.to_vec())
+            .collect_vec();
 
-        assert_eq!(i_qs.len(), vp.num_verifier_queries);
-
-        let mut queries = i_qs.iter().map(|q| q.chunks(2).collect_vec()).collect_vec();
-
-        assert_eq!(queries[0][0].len(), 2);
+        assert_eq!(queries.len(), vp.num_verifier_queries);
 
         let scalars = evals
             .iter()
@@ -987,24 +967,22 @@ where
                 lc0 += scalars[j] * ind_queries[i][j][0];
                 lc1 += scalars[j] * ind_queries[i][j][1];
             }
-            assert_eq!(query[0][0], lc0);
-            assert_eq!(query[0][1], lc1);
+            assert_eq!(query[0], lc0);
+            assert_eq!(query[1], lc1);
         }
 
         //start regular verify on the proof in transcript
 
-        let mut query_merkle_paths: Vec<Vec<Vec<Vec<Output<H>>>>> =
+        let mut query_merkle_paths: Vec<Vec<Vec<Output<H>>>> =
             Vec::with_capacity(vp.num_verifier_queries);
         for i in 0..vp.num_verifier_queries {
-            let mut merkle_paths: Vec<Vec<Vec<Output<H>>>> = Vec::with_capacity(vp.num_rounds + 1);
-            for round in 0..(vp.num_rounds + 1) {
+            let mut merkle_paths: Vec<Vec<Output<H>>> = Vec::with_capacity(vp.num_rounds);
+            for round in 0..vp.num_rounds {
                 let merkle_path: Vec<Output<H>> = transcript
-                    .read_commitments(2 * (vp.num_vars - round + vp.log_rate - 1)) //-1 because we already read roots
+                    .read_commitments(vp.num_vars - round + vp.log_rate - 1)
                     .unwrap();
-                let chunked_path: Vec<Vec<Output<H>>> =
-                    merkle_path.chunks(2).map(|c| c.to_vec()).collect_vec();
 
-                merkle_paths.push(chunked_path);
+                merkle_paths.push(merkle_path);
             }
             query_merkle_paths.push(merkle_paths);
         }
@@ -1015,6 +993,7 @@ where
             &sum_check_oracles,
             &fold_challenges,
             &queries,
+            &final_oracle,
             vp.num_rounds,
             vp.num_vars,
             vp.log_rate,
@@ -1026,16 +1005,11 @@ where
 
         for vq in 0..vp.num_verifier_queries {
             for cq in 0..ind_queries[vq].len() {
-                let tree = &comms[evals[cq].poly].codeword_tree;
-                assert_eq!(
-                    tree[tree.len() - 1][0],
-                    batch_paths[vq][cq].pop().unwrap().pop().unwrap()
-                );
-
-                authenticate_merkle_path::<H, F>(
+                authenticate_merkle_sibling_path_root::<H, F>(
                     &batch_paths[vq][cq],
                     (ind_queries[vq][cq][0], ind_queries[vq][cq][1]),
                     queries_usize[vq],
+                    comms[evals[cq].poly].as_ref(),
                 );
 
                 count += 1;
@@ -1905,6 +1879,36 @@ fn basefold_get_query<F: PrimeField>(
     return (queries, indices);
 }
 
+fn write_compact_query_values<F: PrimeField, H: Hash>(
+    transcript: &mut impl TranscriptWrite<Output<H>, F>,
+    queried_els: &[(Vec<(F, F)>, Vec<usize>)],
+    query_indices: &[usize],
+    num_rounds: usize,
+) {
+    queried_els
+        .iter()
+        .zip(query_indices.iter())
+        .for_each(|((query_values, _), query_index)| {
+            if query_values.is_empty() {
+                return;
+            }
+            transcript.write_field_element(&query_values[0].0);
+            transcript.write_field_element(&query_values[0].1);
+
+            // For intermediate folded oracles the verifier carries one value forward from
+            // the previous folding check. Only the sibling value is needed.
+            for layer in 1..num_rounds {
+                let actual_index = query_index >> layer;
+                let sibling = if actual_index & 1 == 0 {
+                    &query_values[layer].1
+                } else {
+                    &query_values[layer].0
+                };
+                transcript.write_field_element(sibling);
+            }
+        });
+}
+
 pub fn get_merkle_path<H: Hash, F: PrimeField>(
     tree: &Vec<Vec<Output<H>>>,
     mut x_index: usize,
@@ -1932,6 +1936,23 @@ pub fn get_merkle_path<H: Hash, F: PrimeField>(
     return queries;
 }
 
+pub fn get_merkle_sibling_path<H: Hash, F: PrimeField>(
+    tree: &Vec<Vec<Output<H>>>,
+    mut x_index: usize,
+) -> Vec<Output<H>> {
+    let mut siblings = Vec::with_capacity(tree.len().saturating_sub(1));
+    x_index >>= 1;
+    for oracle in tree {
+        if oracle.len() == 1 {
+            break;
+        }
+        siblings.push(oracle[x_index ^ 1].clone());
+        x_index >>= 1;
+    }
+
+    siblings
+}
+
 fn write_merkle_path<H: Hash, F: PrimeField>(
     tree: &Vec<Vec<Output<H>>>,
     mut x_index: usize,
@@ -1951,6 +1972,21 @@ fn write_merkle_path<H: Hash, F: PrimeField>(
         }
         transcript.write_commitment(&oracle[p0]);
         transcript.write_commitment(&oracle[p1]);
+        x_index >>= 1;
+    }
+}
+
+fn write_merkle_sibling_path<H: Hash, F: PrimeField>(
+    tree: &Vec<Vec<Output<H>>>,
+    mut x_index: usize,
+    transcript: &mut impl TranscriptWrite<Output<H>, F>,
+) {
+    x_index >>= 1;
+    for oracle in tree {
+        if oracle.len() == 1 {
+            break;
+        }
+        transcript.write_commitment(&oracle[x_index ^ 1]);
         x_index >>= 1;
     }
 }
@@ -1981,6 +2017,37 @@ fn authenticate_merkle_path<H: Hash, F: PrimeField>(
         assert_eq!(hash, path[i + 1][(x_index >> 1) % 2]);
         x_index >>= 1;
     }
+}
+
+fn authenticate_merkle_sibling_path_root<H: Hash, F: PrimeField>(
+    path: &[Output<H>],
+    leaves: (F, F),
+    mut x_index: usize,
+    root: &Output<H>,
+) {
+    let mut hasher = H::new();
+    let mut hash = Output::<H>::default();
+    hasher.update_field_element(&leaves.0);
+    hasher.update_field_element(&leaves.1);
+    hasher.finalize_into_reset(&mut hash);
+
+    x_index >>= 1;
+    for sibling in path {
+        let mut hasher = H::new();
+        let mut next = Output::<H>::default();
+        if x_index & 1 == 0 {
+            hasher.update(&hash);
+            hasher.update(sibling);
+        } else {
+            hasher.update(sibling);
+            hasher.update(&hash);
+        }
+        hasher.finalize_into_reset(&mut next);
+        hash = next;
+        x_index >>= 1;
+    }
+
+    assert_eq!(&hash, root);
 }
 
 fn authenticate_merkle_path_root<H: Hash, F: PrimeField>(
@@ -3380,10 +3447,11 @@ fn query_phase<F: PrimeField, H: Hash>(
 
 fn verifier_query_phase<F: PrimeField, H: Hash>(
     query_challenges: &Vec<F>,
-    query_merkle_paths: &Vec<Vec<Vec<Vec<Output<H>>>>>,
+    query_merkle_paths: &Vec<Vec<Vec<Output<H>>>>,
     sum_check_oracles: &Vec<Vec<F>>,
     fold_challenges: &Vec<F>,
-    queries: &Vec<Vec<&[F]>>,
+    compact_queries: &Vec<Vec<F>>,
+    final_oracle: &[F],
     num_rounds: usize,
     num_vars: usize,
     log_rate: usize,
@@ -3393,7 +3461,7 @@ fn verifier_query_phase<F: PrimeField, H: Hash>(
     code_type: &str,
 ) -> Vec<usize> {
     assert_eq!(query_merkle_paths.len(), query_challenges.len());
-    assert_eq!(queries.len(), query_challenges.len());
+    assert_eq!(compact_queries.len(), query_challenges.len());
     let n = (1 << (num_vars + log_rate));
     let mut queries_usize: Vec<usize> = query_challenges
         .par_iter()
@@ -3428,7 +3496,9 @@ fn verifier_query_phase<F: PrimeField, H: Hash>(
             let mut cipher = cipher.clone();
             let mut rng = rng.clone();
             let mut cur_index = *query_index;
-            let mut cur_queries = &queries[qi];
+            let compact_query = &compact_queries[qi];
+            assert_eq!(compact_query.len(), num_rounds + 1);
+            let mut current_pair = (compact_query[0], compact_query[1]);
 
             for i in 0..num_rounds {
                 let temp = cur_index;
@@ -3465,21 +3535,29 @@ fn verifier_query_phase<F: PrimeField, H: Hash>(
                 }
 
                 let res = interpolate2_weights(
-                    [(x0, cur_queries[i][0]), (x1, cur_queries[i][1])],
+                    [(x0, current_pair.0), (x1, current_pair.1)],
                     F::ONE,
                     fold_challenges[i],
                 );
 
-                assert_eq!(res, cur_queries[i + 1][(cur_index >> 1) % 2]);
-
-                authenticate_merkle_path_root::<H, F>(
+                authenticate_merkle_sibling_path_root::<H, F>(
                     &query_merkle_paths[qi][i],
-                    (cur_queries[i][0], cur_queries[i][1]),
+                    current_pair,
                     cur_index,
                     &roots[i],
                 );
 
                 cur_index >>= 1;
+                if i + 1 == num_rounds {
+                    assert_eq!(res, final_oracle[cur_index]);
+                } else {
+                    let sibling = compact_query[i + 2];
+                    current_pair = if cur_index & 1 == 0 {
+                        (res, sibling)
+                    } else {
+                        (sibling, res)
+                    };
+                }
             }
         });
 
@@ -3498,7 +3576,7 @@ fn query_codeword<F: PrimeField, H: Hash>(
     query: &usize,
     codeword: &Vec<F>,
     codeword_tree: &Vec<Vec<Output<H>>>,
-) -> ((F, F), Vec<(Output<H>, Output<H>)>) {
+) -> ((F, F), Vec<Output<H>>) {
     let mut p0 = *query;
     let temp = p0;
     let mut p1 = p0 ^ 1;
@@ -3508,7 +3586,7 @@ fn query_codeword<F: PrimeField, H: Hash>(
     }
     return (
         (codeword[p0], codeword[p1]),
-        get_merkle_path::<H, F>(&codeword_tree, *query, true),
+        get_merkle_sibling_path::<H, F>(&codeword_tree, *query),
     );
 }
 

@@ -3,12 +3,10 @@ use cfri::backend::arithmetic::Field;
 use cfri::backend::{
     halo2_curves::bn256::Fr,
     pcs::PolynomialCommitmentScheme,
-    transcript::{
-        Blake2sTranscript, FieldTranscript, FieldTranscriptRead, FieldTranscriptWrite,
-        InMemoryTranscript,
-    },
+    transcript::{FieldTranscript, FieldTranscriptRead, FieldTranscriptWrite},
 };
 use cfri::blaze::{Basefold, BasefoldExtParams, HidingBasefold, MultilinearPolynomial};
+use cfri::transcript::Blake2sTranscript;
 use rand_chacha::{rand_core::SeedableRng, ChaCha8Rng};
 use std::panic::{catch_unwind, AssertUnwindSafe};
 
@@ -55,7 +53,7 @@ fn basefold_native_commit_open_verify_small() {
 
     let poly = MultilinearPolynomial::rand(num_vars, &mut rng);
     let proof = {
-        let mut transcript = Blake2sTranscript::new(());
+        let mut transcript = Blake2sTranscript::new();
         let comm = Pcs::commit_and_write(&pp, &poly, &mut transcript).unwrap();
         let point = transcript.squeeze_challenges(num_vars);
         let eval = poly.evaluate(&point);
@@ -65,7 +63,7 @@ fn basefold_native_commit_open_verify_small() {
     };
 
     let result = {
-        let mut transcript = Blake2sTranscript::from_proof((), proof.as_slice());
+        let mut transcript = Blake2sTranscript::from_proof(proof.as_slice());
         let comm = Pcs::read_commitment(&vp, &mut transcript).unwrap();
         let point = transcript.squeeze_challenges(num_vars);
         let eval = transcript.read_field_element().unwrap();
@@ -74,7 +72,7 @@ fn basefold_native_commit_open_verify_small() {
     assert!(result.is_ok());
 
     let invalid = || {
-        let mut transcript = Blake2sTranscript::from_proof((), proof.as_slice());
+        let mut transcript = Blake2sTranscript::from_proof(proof.as_slice());
         let comm = Pcs::read_commitment(&vp, &mut transcript).unwrap();
         let mut point = transcript.squeeze_challenges(num_vars);
         point[0] += Fr::ONE;
@@ -94,7 +92,7 @@ fn hiding_basefold_native_commit_open_verify_small() {
 
     let poly = MultilinearPolynomial::rand(num_vars, &mut rng);
     let proof = {
-        let mut transcript = Blake2sTranscript::new(());
+        let mut transcript = Blake2sTranscript::new();
         let comm = HidingPcs::commit_and_write(&pp, &poly, &mut transcript).unwrap();
         let point = transcript.squeeze_challenges(num_vars);
         let eval = poly.evaluate(&point);
@@ -104,7 +102,7 @@ fn hiding_basefold_native_commit_open_verify_small() {
     };
 
     let result = {
-        let mut transcript = Blake2sTranscript::from_proof((), proof.as_slice());
+        let mut transcript = Blake2sTranscript::from_proof(proof.as_slice());
         let comm = HidingPcs::read_commitment(&vp, &mut transcript).unwrap();
         let point = transcript.squeeze_challenges(num_vars);
         let eval = transcript.read_field_element().unwrap();
@@ -113,7 +111,7 @@ fn hiding_basefold_native_commit_open_verify_small() {
     assert!(result.is_ok());
 
     let invalid = || {
-        let mut transcript = Blake2sTranscript::from_proof((), proof.as_slice());
+        let mut transcript = Blake2sTranscript::from_proof(proof.as_slice());
         let comm = HidingPcs::read_commitment(&vp, &mut transcript).unwrap();
         let mut point = transcript.squeeze_challenges(num_vars);
         point[0] += Fr::ONE;

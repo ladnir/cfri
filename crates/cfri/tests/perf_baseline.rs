@@ -237,15 +237,15 @@ fn run_blaze_transparent(num_vars: usize, num_rows: usize, num_queries: usize) {
         timed(|| blaze::commit_and_write::<Blazeu64, Blake2s>(&pp, &data, &mut blaze_transcript));
     black_box(&commit.value);
     let mut b128_transcript = Blake2sTranscript::new(());
-    let point = b128_transcript.squeeze_challenges(num_vars);
-    let zero = B128::zero();
+    let point = b128_transcript.squeeze_challenges((num_rows >> 1).ilog2() as usize + num_vars);
+    let eval_value = blaze::evaluate_commitment(&commit.value, &point).unwrap();
     let eval = timed(|| {
         blaze::open(
             &pp,
             &data,
             &commit.value,
             &point,
-            &zero,
+            &eval_value,
             &mut blaze_transcript,
             &mut b128_transcript,
         )
@@ -305,15 +305,20 @@ fn run_blaze_hiding(num_vars: usize, num_rows: usize, num_queries: usize) {
     });
     black_box(&commit.value);
     let mut b128_transcript = Blake2sTranscript::new(());
-    let point = b128_transcript.squeeze_challenges(num_vars);
-    let zero = B128::zero();
+    let point = b128_transcript.squeeze_challenges((num_rows >> 1).ilog2() as usize + num_vars);
+    let hidden_point = {
+        let mut hidden_point = point.clone();
+        hidden_point.push(B128::zero());
+        hidden_point
+    };
+    let eval_value = blaze::evaluate_commitment(&commit.value, &hidden_point).unwrap();
     let eval = timed(|| {
         blaze::open_with_hiding(
             &pp,
             &data,
             &commit.value,
             &point,
-            &zero,
+            &eval_value,
             &mut blaze_transcript,
             &mut b128_transcript,
         )

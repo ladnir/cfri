@@ -533,13 +533,19 @@ input_queries.len() == q_raa_input
 proof_queries.len() == q_backend_proof
 ```
 
-For the current accumulator-based eval-binding path, the first RAA final-accumulator spot is fixed
-to the terminal transition `(n_praa - 2, n_praa - 1)`. The remaining RAA final spots are sampled by
-the transcript. This still consumes exactly two `input_queries` per final-accumulator spot and
-therefore preserves the configured `q_raa_input`; it prevents a prover from satisfying only the
-opened terminal value while hiding the folded-evaluation defect in the unchecked terminal
-recurrence. This is a local hardening rule, not a replacement for the target Section 5 MLIOP
-global eval-binding argument.
+The eval-binding path must include a global degree-2 sumcheck for:
+
+```text
+sum_i eval_weight[i] * c_star[i] == folded_eval
+```
+
+where `eval_weight` is verifier-derived from the PRAA code and the multilinear opening point. The
+round polynomials are backend prequery messages. Their Fiat-Shamir challenges are also the
+systematic fold-chain challenges, so the sumcheck terminal check uses the clear terminal systematic
+symbol of `C_sys(c_star)` as `c_star(r)`. The first RAA final-accumulator spot is still fixed to the
+terminal transition `(n_praa - 2, n_praa - 1)` as a local guard for the legacy accumulator row; the
+remaining RAA final spots are sampled by the transcript. This still consumes exactly two
+`input_queries` per final-accumulator spot and preserves the configured `q_raa_input`.
 
 Do not sample one untyped list from the full compiler codeword and then hope the number of
 systematic hits is right. If a protocol step needs `q_raa_input` systematic input checks, sample
@@ -658,12 +664,14 @@ The Blaze2 backend handles:
 1. Emit backend prequery commitments required by the RMLE IOPP core, such as roots for the
    non-systematic part of `C_sys(c_star)`, folded-layer roots, auxiliary-oracle roots, or sumcheck
    messages.
-2. Sample the full query schedule after those objects are bound.
-3. Ask Blaze2 to authenticate the schedule entries that touch the compiler-systematic input copy
+2. Emit the eval-binding sumcheck messages before folded-layer roots when those sumcheck
+   challenges drive the fold chain.
+3. Sample the full query schedule after those objects are bound.
+4. Ask Blaze2 to authenticate the schedule entries that touch the compiler-systematic input copy
    `c_star`.
-4. Authenticate compiler-non-systematic and auxiliary proof-oracle entries inside the backend
+5. Authenticate compiler-non-systematic and auxiliary proof-oracle entries inside the backend
    proof.
-5. Call the inner RMLE/PRAA IOPP core for the folded relation using the same explicit query
+6. Call the inner RMLE/PRAA IOPP core for the folded relation using the same explicit query
    schedule.
 
 `backend_prequery_commitments` must not be a PCS commitment to the full folded codeword `c_star`,

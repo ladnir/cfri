@@ -222,6 +222,11 @@ pub struct RaaFinalAccumulatorQueryProof<H: Hash> {
     pub eval_previous: AuxiliaryOracleQuery<H>,
 }
 
+#[derive(Clone, Debug, Eq, PartialEq)]
+pub struct RaaEvalSumcheckProof {
+    pub round_polynomials: Vec<[B128; 3]>,
+}
+
 #[derive(Clone, Copy, Debug)]
 pub struct Blaze2BaseFoldOpenRequest<'a> {
     pub col_point: &'a [B128],
@@ -231,6 +236,7 @@ pub struct Blaze2BaseFoldOpenRequest<'a> {
 #[derive(Clone, Debug, Eq, PartialEq)]
 pub struct Blaze2BaseFoldPrequeryPublic<H: Hash> {
     pub compiler_parity: CompilerParityPublicCommitment<H>,
+    pub eval_sumcheck: Option<RaaEvalSumcheckProof>,
     pub folded_parity_layers: Vec<CompilerParityPublicCommitment<H>>,
     pub terminal_codeword: Vec<B128>,
     pub auxiliary: Option<AuxiliaryOraclePublicCommitment<H>>,
@@ -514,21 +520,37 @@ impl Blaze2BaseFoldBackendParams {
                 auxiliary_oracle.to_vec(),
             )?)
         };
+        let auxiliary_public = auxiliary.as_ref().map(AuxiliaryOracleCommitment::public);
+        let (eval_sumcheck, eval_sumcheck_challenges) = if self.spec.auxiliary_oracle_len == 0 {
+            (None, None)
+        } else {
+            let (proof, challenges) = prove_raa_eval_sumcheck::<H>(
+                self.spec(),
+                &compiler_parity.public(),
+                auxiliary_public.as_ref(),
+                request,
+                self.praa.packed(),
+                folded_codeword,
+            )?;
+            (Some(proof), Some(challenges))
+        };
         let (folded_parity_layers, folded_parity_public, physical_layers, fold_challenges) = self
             .prove_folded_parity_layers::<H>(
             folded_codeword,
             &compiler_parity.public(),
-            auxiliary.as_ref().map(AuxiliaryOracleCommitment::public),
+            auxiliary_public.as_ref(),
             request,
+            eval_sumcheck_challenges.as_deref(),
         )?;
         let public = Blaze2BaseFoldPrequeryPublic {
             compiler_parity: compiler_parity.public(),
+            eval_sumcheck,
             folded_parity_layers: folded_parity_public,
             terminal_codeword: physical_layers
                 .last()
                 .expect("folded parity prover returns at least the top physical layer")
                 .clone(),
-            auxiliary: auxiliary.as_ref().map(AuxiliaryOracleCommitment::public),
+            auxiliary: auxiliary_public,
         };
         Ok((
             public,
@@ -671,8 +693,9 @@ impl Blaze2BaseFoldBackendParams {
         &self,
         message: &[B128],
         compiler_parity: &CompilerParityPublicCommitment<H>,
-        auxiliary: Option<AuxiliaryOraclePublicCommitment<H>>,
+        auxiliary: Option<&AuxiliaryOraclePublicCommitment<H>>,
         request: &Blaze2BaseFoldOpenRequest<'_>,
+        fold_challenge_override: Option<&[B128]>,
     ) -> Result<
         (
             Vec<CompilerParityCommitment<H>>,
@@ -696,7 +719,7 @@ impl Blaze2BaseFoldBackendParams {
             &mut transcript,
             self.spec(),
             compiler_parity,
-            auxiliary.as_ref(),
+            auxiliary,
             request,
         );
 
@@ -706,10 +729,22 @@ impl Blaze2BaseFoldBackendParams {
         let mut folded_parity_public = Vec::with_capacity(layout.num_rounds());
         let mut fold_challenges = Vec::with_capacity(layout.num_rounds());
 
+        if let Some(challenges) = fold_challenge_override {
+            if challenges.len() != layout.num_rounds() {
+                return Err(Error::InvalidPcsOpen(
+                    "fold challenge override length does not match compiler layout".to_string(),
+                ));
+            }
+        }
+
         for round in 0..layout.num_rounds() {
-            transcript.absorb("systematic-basefold-fold-challenge-v1");
-            absorb_usize(&mut transcript, round);
-            let alpha: B128 = transcript.squeeze();
+            let alpha = if let Some(challenges) = fold_challenge_override {
+                challenges[round]
+            } else {
+                transcript.absorb("systematic-basefold-fold-challenge-v1");
+                absorb_usize(&mut transcript, round);
+                transcript.squeeze()
+            };
             fold_challenges.push(alpha);
 
             let mut next = vec![B128::ZERO; current.len() >> 1];
@@ -1608,6 +1643,13 @@ pub fn absorb_blaze2_basefold_prequery_public<H: Hash, S>(
 ) {
     transcript.absorb("blaze2-basefold-prequery-public-v1");
     absorb_compiler_parity_public_commitment(transcript, &prequery.compiler_parity);
+    match &prequery.eval_sumcheck {
+        Some(proof) => {
+            transcript.absorb("raa-eval-sumcheck-present");
+            absorb_raa_eval_sumcheck_proof(transcript, proof);
+        }
+        None => transcript.absorb("raa-eval-sumcheck-absent"),
+    }
     absorb_usize(transcript, prequery.folded_parity_layers.len());
     for (round, public) in prequery.folded_parity_layers.iter().enumerate() {
         absorb_folded_parity_public_commitment(transcript, round + 1, public);
@@ -1623,6 +1665,29 @@ pub fn absorb_blaze2_basefold_prequery_public<H: Hash, S>(
             absorb_auxiliary_oracle_public_commitment(transcript, auxiliary);
         }
         None => transcript.absorb("auxiliary-oracle-absent"),
+    }
+}
+
+fn absorb_raa_eval_sumcheck_proof<H: Hash, S>(
+    transcript: &mut CfriTranscript<H, S>,
+    proof: &RaaEvalSumcheckProof,
+) {
+    transcript.absorb("raa-eval-sumcheck-proof-v1");
+    absorb_usize(transcript, proof.round_polynomials.len());
+    for (round, coeffs) in proof.round_polynomials.iter().enumerate() {
+        absorb_raa_eval_sumcheck_round(transcript, round, coeffs);
+    }
+}
+
+fn absorb_raa_eval_sumcheck_round<H: Hash, S>(
+    transcript: &mut CfriTranscript<H, S>,
+    round: usize,
+    coeffs: &[B128; 3],
+) {
+    transcript.absorb("raa-eval-sumcheck-round-v1");
+    absorb_usize(transcript, round);
+    for coeff in coeffs {
+        transcript.absorb(coeff);
     }
 }
 
@@ -1997,6 +2062,23 @@ fn fold_challenges_from_prequery<H: Hash>(
             "folded parity prequery layer count does not match compiler layout".to_string(),
         ));
     }
+    if let Some(proof) = &prequery.eval_sumcheck {
+        let code = Blaze2Code::new(spec.praa.clone())?;
+        return verify_raa_eval_sumcheck::<H>(
+            spec,
+            &prequery.compiler_parity,
+            prequery.auxiliary.as_ref(),
+            request,
+            code.packed(),
+            &prequery.terminal_codeword,
+            proof,
+        );
+    }
+    if spec.auxiliary_oracle_len != 0 {
+        return Err(Error::InvalidPcsOpen(
+            "Blaze2 BaseFold prequery is missing the RAA eval sumcheck".to_string(),
+        ));
+    }
 
     let mut transcript = CfriTranscript::<H>::new();
     absorb_blaze2_basefold_fold_chain_prefix(
@@ -2018,6 +2100,182 @@ fn fold_challenges_from_prequery<H: Hash>(
         );
     }
     Ok(challenges)
+}
+
+fn prove_raa_eval_sumcheck<H: Hash>(
+    spec: &Blaze2BaseFoldBackendSpec,
+    compiler_parity: &CompilerParityPublicCommitment<H>,
+    auxiliary: Option<&AuxiliaryOraclePublicCommitment<H>>,
+    request: &Blaze2BaseFoldOpenRequest<'_>,
+    code: &PackedRaaCode,
+    codeword: &[B128],
+) -> Result<(RaaEvalSumcheckProof, Vec<B128>), Error> {
+    let len = code.codeword_len();
+    if codeword.len() != len {
+        return Err(Error::InvalidPcsOpen(format!(
+            "RAA eval sumcheck codeword has length {}, expected {len}",
+            codeword.len()
+        )));
+    }
+    if !len.is_power_of_two() {
+        return Err(Error::InvalidPcsOpen(
+            "RAA eval sumcheck requires a power-of-two codeword length".to_string(),
+        ));
+    }
+
+    let mut weights = raa_codeword_eval_weights(code, request.col_point)?;
+    let mut values = codeword.to_vec();
+    let mut claimed_sum = request.folded_eval;
+    let mut transcript = CfriTranscript::<H>::new();
+    absorb_blaze2_basefold_fold_chain_prefix(
+        &mut transcript,
+        spec,
+        compiler_parity,
+        auxiliary,
+        request,
+    );
+
+    let num_rounds = log2_strict(len);
+    let mut round_polynomials = Vec::with_capacity(num_rounds);
+    let mut challenges = Vec::with_capacity(num_rounds);
+    let mut active_len = len;
+    for round in 0..num_rounds {
+        let coeffs = raa_eval_sumcheck_round(&weights[..active_len], &values[..active_len])?;
+        if raa_eval_sumcheck_zero_plus_one(&coeffs) != claimed_sum {
+            return Err(Error::InvalidPcsOpen(
+                "RAA eval sumcheck initial sum does not match folded eval".to_string(),
+            ));
+        }
+        absorb_raa_eval_sumcheck_round(&mut transcript, round, &coeffs);
+        let challenge = transcript.squeeze();
+        raa_eval_sumcheck_fold_round(&mut weights, &mut values, active_len, challenge);
+        claimed_sum = raa_eval_sumcheck_evaluate(&coeffs, challenge);
+        active_len >>= 1;
+        round_polynomials.push(coeffs);
+        challenges.push(challenge);
+    }
+
+    if active_len != 1 || weights[0] * values[0] != claimed_sum {
+        return Err(Error::InvalidPcsOpen(
+            "RAA eval sumcheck terminal product does not match folded eval".to_string(),
+        ));
+    }
+
+    Ok((RaaEvalSumcheckProof { round_polynomials }, challenges))
+}
+
+fn verify_raa_eval_sumcheck<H: Hash>(
+    spec: &Blaze2BaseFoldBackendSpec,
+    compiler_parity: &CompilerParityPublicCommitment<H>,
+    auxiliary: Option<&AuxiliaryOraclePublicCommitment<H>>,
+    request: &Blaze2BaseFoldOpenRequest<'_>,
+    code: &PackedRaaCode,
+    terminal_codeword: &[B128],
+    proof: &RaaEvalSumcheckProof,
+) -> Result<Vec<B128>, Error> {
+    let len = code.codeword_len();
+    let num_rounds = log2_strict(len);
+    if proof.round_polynomials.len() != num_rounds {
+        return Err(Error::InvalidPcsOpen(
+            "RAA eval sumcheck round count does not match codeword length".to_string(),
+        ));
+    }
+    if terminal_codeword.is_empty() {
+        return Err(Error::InvalidPcsOpen(
+            "RAA eval sumcheck needs the clear terminal codeword".to_string(),
+        ));
+    }
+
+    let mut transcript = CfriTranscript::<H>::new();
+    absorb_blaze2_basefold_fold_chain_prefix(
+        &mut transcript,
+        spec,
+        compiler_parity,
+        auxiliary,
+        request,
+    );
+
+    let mut claimed_sum = request.folded_eval;
+    let mut challenges = Vec::with_capacity(num_rounds);
+    for (round, coeffs) in proof.round_polynomials.iter().enumerate() {
+        if raa_eval_sumcheck_zero_plus_one(coeffs) != claimed_sum {
+            return Err(Error::InvalidPcsOpen(
+                "RAA eval sumcheck consistency check failed".to_string(),
+            ));
+        }
+        absorb_raa_eval_sumcheck_round(&mut transcript, round, coeffs);
+        let challenge = transcript.squeeze();
+        claimed_sum = raa_eval_sumcheck_evaluate(coeffs, challenge);
+        challenges.push(challenge);
+    }
+
+    let weights = raa_codeword_eval_weights(code, request.col_point)?;
+    let folded_weight = fold_eval_sumcheck_vector(weights, &challenges)?;
+    if claimed_sum != folded_weight * terminal_codeword[0] {
+        return Err(Error::InvalidPcsOpen(
+            "RAA eval sumcheck terminal check failed".to_string(),
+        ));
+    }
+
+    Ok(challenges)
+}
+
+fn raa_eval_sumcheck_round(weights: &[B128], values: &[B128]) -> Result<[B128; 3], Error> {
+    if weights.len() != values.len() || weights.is_empty() || weights.len() & 1 != 0 {
+        return Err(Error::InvalidPcsOpen(
+            "RAA eval sumcheck round has incompatible vector lengths".to_string(),
+        ));
+    }
+    let half = weights.len() >> 1;
+    let mut coeffs = [B128::ZERO; 3];
+    for idx in 0..half {
+        let weight_left = weights[idx];
+        let weight_delta = weights[idx + half] - weight_left;
+        let value_left = values[idx];
+        let value_delta = values[idx + half] - value_left;
+        coeffs[0] += weight_left * value_left;
+        coeffs[1] += weight_left * value_delta + weight_delta * value_left;
+        coeffs[2] += weight_delta * value_delta;
+    }
+    Ok(coeffs)
+}
+
+fn raa_eval_sumcheck_fold_round(
+    weights: &mut [B128],
+    values: &mut [B128],
+    active_len: usize,
+    challenge: B128,
+) {
+    let half = active_len >> 1;
+    for idx in 0..half {
+        weights[idx] = fold_systematic_pair(weights[idx], weights[idx + half], challenge);
+        values[idx] = fold_systematic_pair(values[idx], values[idx + half], challenge);
+    }
+}
+
+fn fold_eval_sumcheck_vector(mut values: Vec<B128>, challenges: &[B128]) -> Result<B128, Error> {
+    if values.len() != (1usize << challenges.len()) {
+        return Err(Error::InvalidPcsOpen(
+            "RAA eval sumcheck terminal vector shape is invalid".to_string(),
+        ));
+    }
+    let mut active_len = values.len();
+    for &challenge in challenges {
+        let half = active_len >> 1;
+        for idx in 0..half {
+            values[idx] = fold_systematic_pair(values[idx], values[idx + half], challenge);
+        }
+        active_len = half;
+    }
+    Ok(values[0])
+}
+
+fn raa_eval_sumcheck_evaluate(coeffs: &[B128; 3], point: B128) -> B128 {
+    coeffs[0] + point * (coeffs[1] + point * coeffs[2])
+}
+
+fn raa_eval_sumcheck_zero_plus_one(coeffs: &[B128; 3]) -> B128 {
+    coeffs[0] + raa_eval_sumcheck_evaluate(coeffs, B128::ONE)
 }
 
 fn parity_values_at_round(
@@ -3348,10 +3606,10 @@ mod tests {
     #[test]
     fn backend_compiler_parity_fold_paths_are_checked() {
         let params = Blaze2BaseFoldBackendParams::new(blaze2_backend_spec()).unwrap();
-        let folded_codeword = message(params.compiler_code().layout().message_len(), 149);
-        let auxiliary = message(params.spec().auxiliary_oracle_len, 151);
         let request_point = make_request_point(&params, 11);
-        let request = open_request(&request_point);
+        let (folded_codeword, auxiliary, folded_eval) =
+            folded_codeword_and_auxiliary(&params, 149, &request_point);
+        let request = open_request_with_eval(&request_point, folded_eval);
         let (prequery, state) = params
             .prove_prequery::<Blake2s>(&folded_codeword, &auxiliary, &request)
             .unwrap();
@@ -3421,10 +3679,10 @@ mod tests {
     #[test]
     fn backend_auxiliary_queries_are_authenticated() {
         let params = Blaze2BaseFoldBackendParams::new(blaze2_backend_spec()).unwrap();
-        let folded_codeword = message(params.compiler_code().layout().message_len(), 61);
-        let auxiliary = message(params.spec().auxiliary_oracle_len, 73);
         let request_point = make_request_point(&params, 13);
-        let request = open_request(&request_point);
+        let (folded_codeword, auxiliary, folded_eval) =
+            folded_codeword_and_auxiliary(&params, 61, &request_point);
+        let request = open_request_with_eval(&request_point, folded_eval);
         let (prequery, state) = params
             .prove_prequery::<Blake2s>(&folded_codeword, &auxiliary, &request)
             .unwrap();
@@ -3563,10 +3821,10 @@ mod tests {
     #[test]
     fn backend_schedule_binds_spec_and_prequery_public() {
         let params = Blaze2BaseFoldBackendParams::new(blaze2_backend_spec()).unwrap();
-        let folded_codeword = message(params.compiler_code().layout().message_len(), 43);
-        let auxiliary = message(params.spec().auxiliary_oracle_len, 59);
         let request_point = make_request_point(&params, 23);
-        let request = open_request(&request_point);
+        let (folded_codeword, auxiliary, folded_eval) =
+            folded_codeword_and_auxiliary(&params, 43, &request_point);
+        let request = open_request_with_eval(&request_point, folded_eval);
         let (prequery, _) = params
             .prove_prequery::<Blake2s>(&folded_codeword, &auxiliary, &request)
             .unwrap();
@@ -3583,9 +3841,15 @@ mod tests {
         assert_eq!(lhs_schedule, rhs_schedule);
 
         let changed_request_point = make_request_point(&params, 29);
-        let changed_request = open_request(&changed_request_point);
+        let (_, changed_request_auxiliary, changed_request_eval) =
+            folded_codeword_and_auxiliary(&params, 43, &changed_request_point);
+        let changed_request = open_request_with_eval(&changed_request_point, changed_request_eval);
         let (changed_request_prequery, _) = params
-            .prove_prequery::<Blake2s>(&folded_codeword, &auxiliary, &changed_request)
+            .prove_prequery::<Blake2s>(
+                &folded_codeword,
+                &changed_request_auxiliary,
+                &changed_request,
+            )
             .unwrap();
         assert!(
             prequery.terminal_codeword != changed_request_prequery.terminal_codeword
@@ -3601,13 +3865,19 @@ mod tests {
             .unwrap();
         assert_ne!(lhs_schedule, changed_schedule);
 
-        let changed_folded_codeword = message(params.compiler_code().layout().message_len(), 101);
+        let (changed_folded_codeword, changed_folded_auxiliary, changed_folded_eval) =
+            folded_codeword_and_auxiliary(&params, 101, &request_point);
+        let changed_folded_request = open_request_with_eval(&request_point, changed_folded_eval);
         let (changed_prequery, _) = params
-            .prove_prequery::<Blake2s>(&changed_folded_codeword, &auxiliary, &request)
+            .prove_prequery::<Blake2s>(
+                &changed_folded_codeword,
+                &changed_folded_auxiliary,
+                &changed_folded_request,
+            )
             .unwrap();
         let mut changed = CfriTranscript::<Blake2s>::new();
         let changed_schedule = params
-            .sample_query_schedule(&mut changed, &changed_prequery, &request)
+            .sample_query_schedule(&mut changed, &changed_prequery, &changed_folded_request)
             .unwrap();
         assert_ne!(lhs_schedule, changed_schedule);
 

@@ -16,10 +16,9 @@ use cfri::backend::{
         verify_raa_trace_spot_query, Blaze2BaseFoldOpeningProof, Blaze2Code, Blaze2CodeSeed,
         Blaze2CodeSpec, Blaze2FieldId, Blaze2FoldedMessageBackend, Blaze2FoldedMessageOpenRequest,
         Blaze2HashId, Blaze2InterleavedCodewordCommitment, Blaze2InterleavedColumnQuery,
-        Blaze2LeafLayout, Blaze2OpeningClaim, Blaze2OpeningProof, Blaze2OpeningQuery,
-        Blaze2PackingLayout, Blaze2RaaAuxTrace, Blaze2RaaAuxTraceCommitment, Blaze2RaaCommitment,
-        Blaze2RaaQuery, Blaze2RaaTrace, Blaze2RaaTraceCommitment, Blaze2RaaTraceSpotQuery,
-        RaaVariant,
+        Blaze2LeafLayout, Blaze2OpeningClaim, Blaze2OpeningProof, Blaze2PackingLayout,
+        Blaze2RaaAuxTrace, Blaze2RaaAuxTraceCommitment, Blaze2RaaCommitment, Blaze2RaaQuery,
+        Blaze2RaaTrace, Blaze2RaaTraceCommitment, Blaze2RaaTraceSpotQuery, RaaVariant,
     },
     blaze_transcript::BlazeBlake2sTranscript,
     code::PackedRaaCode,
@@ -423,6 +422,12 @@ fn blaze2_basefold_outer_bytes_with_field_bytes(
     field_bytes: usize,
 ) -> usize {
     let backend_prequery_bytes = proof.backend_prequery.compiler_parity.root.len()
+        + proof
+            .backend_prequery
+            .eval_sumcheck
+            .as_ref()
+            .map(|sumcheck| sumcheck.round_polynomials.len() * 3 * field_bytes)
+            .unwrap_or(0)
         + proof
             .backend_prequery
             .folded_parity_layers
@@ -1355,7 +1360,10 @@ fn blaze2_basefold_outer_shape_matches_paper_after_field_byte_correction() {
     let paper_field_bytes = 8;
     let hash_bytes = 32;
     let outer_path_len = params.praa().packed().codeword_len().trailing_zeros() as usize;
+    let eval_sumcheck_bytes =
+        params.praa().packed().codeword_len().trailing_zeros() as usize * 3 * paper_field_bytes;
     let backend_prequery_bytes = (1 + params.compiler_code().layout().num_rounds()) * hash_bytes
+        + eval_sumcheck_bytes
         + hash_bytes
         + (params.compiler_code().layout().parity_expansion_factor() + 1) * paper_field_bytes;
     let expected_outer = t * paper_field_bytes
@@ -1530,33 +1538,12 @@ fn blaze2_basefold_opening_rejects_terminal_only_eval_binding_defect() {
     auxiliary.extend_from_slice(&trace.u3);
     auxiliary.extend_from_slice(&trace.u4);
     auxiliary.extend_from_slice(&eval_accumulator);
-    let (backend_prequery, backend_state) = params
-        .prove_prequery::<Blake2s256>(&folded_codeword, &auxiliary, &backend_request)
-        .unwrap();
-    let schedule = params
-        .sample_query_schedule(&mut transcript, &backend_prequery, &backend_request)
-        .unwrap();
-    assert_eq!(
-        schedule.raa_final_queries()[0].index,
-        code.codeword_len() - 1,
-        "terminal transition must be checked before random RAA final spots"
+    assert!(
+        params
+            .prove_prequery::<Blake2s256>(&folded_codeword, &auxiliary, &backend_request)
+            .is_err(),
+        "eval sumcheck generation must reject a terminal-only folded-eval defect"
     );
-
-    let mut queries = Vec::with_capacity(schedule.input_queries().len());
-    for input_query in schedule.input_queries() {
-        queries.push(Blaze2OpeningQuery {
-            column_opening: commitment.query(input_query.logical_index).unwrap(),
-        });
-    }
-    let backend_proof = params.open_query_proof(&backend_state, &schedule).unwrap();
-    let proof = Blaze2BaseFoldOpeningProof {
-        row_evals,
-        backend_prequery,
-        backend_proof,
-        queries,
-    };
-
-    assert!(verify_blaze2_basefold_opening(&params, &public_commitment, &claim, &proof).is_err());
 }
 
 #[test]
@@ -1575,6 +1562,38 @@ fn blaze2_basefold_opening_derives_configured_auxiliary_trace() {
         Some(auxiliary_len)
     );
     verify_blaze2_basefold_opening(&params, &commitment.public(), &claim, &proof).unwrap();
+    assert_eq!(
+        proof
+            .backend_prequery
+            .eval_sumcheck
+            .as_ref()
+            .unwrap()
+            .round_polynomials
+            .len(),
+        params.praa().packed().codeword_len().trailing_zeros() as usize
+    );
+
+    let mut bad_sumcheck = proof.clone();
+    bad_sumcheck
+        .backend_prequery
+        .eval_sumcheck
+        .as_mut()
+        .unwrap()
+        .round_polynomials[0][0] += B128::ONE;
+    assert!(
+        verify_blaze2_basefold_opening(&params, &commitment.public(), &claim, &bad_sumcheck)
+            .is_err()
+    );
+
+    let mut missing_sumcheck = proof.clone();
+    missing_sumcheck.backend_prequery.eval_sumcheck = None;
+    assert!(verify_blaze2_basefold_opening(
+        &params,
+        &commitment.public(),
+        &claim,
+        &missing_sumcheck
+    )
+    .is_err());
 
     let mut bad_relation = proof.clone();
     bad_relation

@@ -112,6 +112,11 @@ holographic_basefold_bytes ~=
 For Blaze, `systematic_opening_bytes_owned_by_wrapper` is zero inside the backend term because
 systematic `c_star` openings are counted in the Blaze outer term.
 
+The current Blaze2 holographic backend carries an eval-binding product sumcheck for
+`sum_i eval_weight[i] * c_star[i] = folded_eval`. Its round messages contribute
+`3 * log2(n_praa) * field_bytes` before serialization framing. This is a backend prequery term, not
+an additional Blaze input-column opening.
+
 The BaseFold paper gives the protocol and asymptotics, while its exact figure data for standalone
 PCS proof size is plotted visually. The Blaze paper's Figure 4 reports BaseFold proof sizes of about
 `1.2, 1.2, 1.4, 1.4, 1.4 MB` for `25..29` variables in its comparison setting.

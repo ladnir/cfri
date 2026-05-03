@@ -5,6 +5,7 @@ pub mod basefold;
 pub mod binary_extension_fields;
 pub mod binius_iter;
 pub mod blaze;
+pub mod blaze2;
 pub mod blaze_transcript;
 pub mod code;
 pub mod expression;

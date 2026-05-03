@@ -15,7 +15,6 @@ pub mod blaze {
         avx_int_types::{u64::Blazeu64, BlazeField},
         binary_extension_fields::B128,
         blaze::{self, BlazeBasefoldParams, BlazeBasefoldPcs},
-        blaze2,
         pcs::multilinear::{Basefold, BasefoldExtParams, HidingBasefold},
         poly::multilinear::MultilinearPolynomial,
     };

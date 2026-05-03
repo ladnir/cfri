@@ -36,6 +36,32 @@ pub struct Blaze2RaaQuery<F: BlazeField, H: Hash> {
     pub path: Vec<Output<H>>,
 }
 
+#[derive(Clone, Debug, Serialize, Deserialize)]
+pub struct Blaze2RaaTraceCommitment<H: Hash> {
+    trace_rows: Vec<Vec<B128>>,
+    merkle_tree: Vec<Vec<Output<H>>>,
+}
+
+#[derive(Clone, Debug, Serialize, Deserialize)]
+pub struct Blaze2RaaTracePublicCommitment<H: Hash> {
+    root: Output<H>,
+    codeword_len: usize,
+    num_rows: usize,
+}
+
+#[derive(Clone, Debug)]
+pub struct Blaze2RaaTraceQuery<H: Hash> {
+    pub index: usize,
+    pub values: Vec<B128>,
+    pub path: Vec<Output<H>>,
+}
+
+#[derive(Clone, Debug)]
+pub struct Blaze2RaaTraceSpotQuery<H: Hash> {
+    pub index: usize,
+    pub queries: Vec<Blaze2RaaTraceQuery<H>>,
+}
+
 #[derive(Clone, Debug, PartialEq, Eq)]
 pub struct Blaze2RaaTrace {
     pub u2: Vec<B128>,
@@ -51,6 +77,22 @@ impl<F: BlazeField, H: Hash> PartialEq for Blaze2RaaQuery<F, H> {
 }
 
 impl<F: BlazeField, H: Hash> Eq for Blaze2RaaQuery<F, H> {}
+
+impl<H: Hash> PartialEq for Blaze2RaaTraceQuery<H> {
+    fn eq(&self, other: &Self) -> bool {
+        self.index == other.index && self.values == other.values && self.path == other.path
+    }
+}
+
+impl<H: Hash> Eq for Blaze2RaaTraceQuery<H> {}
+
+impl<H: Hash> PartialEq for Blaze2RaaTraceSpotQuery<H> {
+    fn eq(&self, other: &Self) -> bool {
+        self.index == other.index && self.queries == other.queries
+    }
+}
+
+impl<H: Hash> Eq for Blaze2RaaTraceSpotQuery<H> {}
 
 impl<F: BlazeField, H: Hash> Blaze2RaaCommitment<F, H> {
     pub fn commit_rows(code: PackedRaaCode, rows: &[Vec<F>]) -> Result<Self, Error> {
@@ -126,7 +168,105 @@ impl<F: BlazeField, H: Hash> Blaze2RaaCommitment<F, H> {
     }
 }
 
+impl<H: Hash> Blaze2RaaTraceCommitment<H> {
+    pub fn commit_trace(trace: &Blaze2RaaTrace) -> Result<Self, Error> {
+        let codeword_len = validate_raa_trace_commitment_shape(trace)?;
+        let trace_rows = vec![
+            trace.u2.clone(),
+            trace.u3.clone(),
+            trace.u4.clone(),
+            trace.u5.clone(),
+        ];
+        let merkle_tree = merkelize_b128_rows::<H>(&trace_rows);
+        debug_assert_eq!(trace_rows[0].len(), codeword_len);
+        Ok(Self {
+            trace_rows,
+            merkle_tree,
+        })
+    }
+
+    pub fn public(&self) -> Blaze2RaaTracePublicCommitment<H> {
+        Blaze2RaaTracePublicCommitment {
+            root: self.root().clone(),
+            codeword_len: self.codeword_len(),
+            num_rows: self.num_rows(),
+        }
+    }
+
+    pub fn trace_rows(&self) -> &[Vec<B128>] {
+        &self.trace_rows
+    }
+
+    pub fn root(&self) -> &Output<H> {
+        &self.merkle_tree[self.merkle_tree.len() - 1][0]
+    }
+
+    pub fn codeword_len(&self) -> usize {
+        self.trace_rows[0].len()
+    }
+
+    pub fn num_rows(&self) -> usize {
+        self.trace_rows.len()
+    }
+
+    pub fn query(&self, index: usize) -> Result<Blaze2RaaTraceQuery<H>, Error> {
+        validate_query_index(index, self.codeword_len())?;
+        let pair_start = index & !1;
+        let mut values = Vec::with_capacity(self.num_rows() * 2);
+        for row in &self.trace_rows {
+            values.push(row[pair_start]);
+            values.push(row[pair_start + 1]);
+        }
+        Ok(Blaze2RaaTraceQuery {
+            index,
+            values,
+            path: merkle_sibling_path::<H>(&self.merkle_tree, index),
+        })
+    }
+
+    pub fn spot_query(
+        &self,
+        code: &PackedRaaCode,
+        index: usize,
+    ) -> Result<Blaze2RaaTraceSpotQuery<H>, Error> {
+        validate_query_index(index, self.codeword_len())?;
+        if code.codeword_len() != self.codeword_len() {
+            return Err(Error::InvalidPcsOpen(
+                "Blaze2 RAA trace commitment length does not match code".to_string(),
+            ));
+        }
+
+        let permutation = code.permutation();
+        let mut opened_pair_starts = Vec::with_capacity(3);
+        push_unique_pair_start(&mut opened_pair_starts, index);
+        if index > 0 {
+            push_unique_pair_start(&mut opened_pair_starts, index - 1);
+        }
+        push_unique_pair_start(&mut opened_pair_starts, permutation.permutation2[index]);
+
+        let mut queries = Vec::with_capacity(opened_pair_starts.len());
+        for pair_start in opened_pair_starts {
+            queries.push(self.query(pair_start)?);
+        }
+        Ok(Blaze2RaaTraceSpotQuery { index, queries })
+    }
+}
+
 impl<H: Hash> Blaze2RaaPublicCommitment<H> {
+    pub fn root(&self) -> &Output<H> {
+        &self.root
+    }
+
+    pub fn codeword_len(&self) -> usize {
+        self.codeword_len
+    }
+
+    pub fn num_rows(&self) -> usize {
+        self.num_rows
+    }
+}
+
+impl<H: Hash> Blaze2RaaTracePublicCommitment<H> {
     pub fn root(&self) -> &Output<H> {
         &self.root
     }
@@ -159,6 +299,30 @@ impl<H: Hash> AsRef<Output<H>> for Blaze2RaaPublicCommitment<H> {
 }
 
 impl<H: Hash> AsRef<[Output<H>]> for Blaze2RaaPublicCommitment<H> {
+    fn as_ref(&self) -> &[Output<H>] {
+        slice::from_ref(self.root())
+    }
+}
+
+impl<H: Hash> AsRef<Output<H>> for Blaze2RaaTraceCommitment<H> {
+    fn as_ref(&self) -> &Output<H> {
+        self.root()
+    }
+}
+
+impl<H: Hash> AsRef<[Output<H>]> for Blaze2RaaTraceCommitment<H> {
+    fn as_ref(&self) -> &[Output<H>] {
+        slice::from_ref(self.root())
+    }
+}
+
+impl<H: Hash> AsRef<Output<H>> for Blaze2RaaTracePublicCommitment<H> {
+    fn as_ref(&self) -> &Output<H> {
+        self.root()
+    }
+}
+
+impl<H: Hash> AsRef<[Output<H>]> for Blaze2RaaTracePublicCommitment<H> {
     fn as_ref(&self) -> &[Output<H>] {
         slice::from_ref(self.root())
     }
@@ -199,6 +363,28 @@ impl<F: BlazeField, H: Hash> Blaze2RaaQuery<F, H> {
 
     pub fn authenticate(&self, root: &Output<H>) -> Result<(), Error> {
         authenticate_query::<F, H>(self, root)
+    }
+}
+
+impl<H: Hash> Blaze2RaaTraceQuery<H> {
+    pub fn authenticate(
+        &self,
+        root: &Output<H>,
+        num_rows: usize,
+        codeword_len: usize,
+    ) -> Result<(), Error> {
+        authenticate_b128_query::<H>(self, root, num_rows, codeword_len)
+    }
+}
+
+impl<H: Hash> Blaze2RaaTraceSpotQuery<H> {
+    pub fn verify(
+        &self,
+        code: &PackedRaaCode,
+        message: &[B128],
+        root: &Output<H>,
+    ) -> Result<(), Error> {
+        verify_raa_trace_spot_query(code, message, root, self)
     }
 }
 
@@ -412,6 +598,67 @@ pub fn check_raa_trace_at(
     Ok(())
 }
 
+pub fn verify_raa_trace_spot_query<H: Hash>(
+    code: &PackedRaaCode,
+    message: &[B128],
+    root: &Output<H>,
+    opening: &Blaze2RaaTraceSpotQuery<H>,
+) -> Result<(), Error> {
+    let len = validate_raa_message(code, message)?;
+    validate_query_index(opening.index, len)?;
+    authenticate_trace_spot_queries(root, opening, len)?;
+
+    let permutation = code.permutation();
+    let index = opening.index;
+    let expected_u2 = message[permutation.permutation1[index] / code.rate()];
+    let u2 = trace_spot_value(opening, RAA_TRACE_ROW_U2, index)?;
+    if u2 != expected_u2 {
+        return Err(Error::InvalidPcsOpen(
+            "Blaze2 RAA authenticated spot check failed repetition/permutation layer".to_string(),
+        ));
+    }
+
+    let u3 = trace_spot_value(opening, RAA_TRACE_ROW_U3, index)?;
+    let expected_u3 = if index == 0 {
+        u2
+    } else {
+        trace_spot_value(opening, RAA_TRACE_ROW_U3, index - 1)? + u2
+    };
+    if u3 != expected_u3 {
+        return Err(Error::InvalidPcsOpen(
+            "Blaze2 RAA authenticated spot check failed first accumulator layer".to_string(),
+        ));
+    }
+
+    let u4 = trace_spot_value(opening, RAA_TRACE_ROW_U4, index)?;
+    let permuted_u3 = trace_spot_value(opening, RAA_TRACE_ROW_U3, permutation.permutation2[index])?;
+    if u4 != permuted_u3 {
+        return Err(Error::InvalidPcsOpen(
+            "Blaze2 RAA authenticated spot check failed second permutation layer".to_string(),
+        ));
+    }
+
+    let u5 = trace_spot_value(opening, RAA_TRACE_ROW_U5, index)?;
+    let expected_u5 = if index == 0 {
+        u4
+    } else {
+        trace_spot_value(opening, RAA_TRACE_ROW_U5, index - 1)? + u4
+    };
+    if u5 != expected_u5 {
+        return Err(Error::InvalidPcsOpen(
+            "Blaze2 RAA authenticated spot check failed second accumulator layer".to_string(),
+        ));
+    }
+
+    Ok(())
+}
+
+const RAA_TRACE_NUM_ROWS: usize = 4;
+const RAA_TRACE_ROW_U2: usize = 0;
+const RAA_TRACE_ROW_U3: usize = 1;
+const RAA_TRACE_ROW_U4: usize = 2;
+const RAA_TRACE_ROW_U5: usize = 3;
+
 fn validate_message_rows<F: BlazeField>(rows: &[Vec<F>], row_len: usize) -> Result<(), Error> {
     if rows.is_empty() {
         return Err(Error::InvalidPcsOpen(
@@ -437,6 +684,13 @@ fn validate_raa_message(code: &PackedRaaCode, message: &[B128]) -> Result<usize,
     Ok(code.codeword_len())
 }
 
+fn validate_raa_trace_commitment_shape(trace: &Blaze2RaaTrace) -> Result<usize, Error> {
+    let len = trace.u2.len();
+    validate_query_index(0, len)?;
+    validate_raa_trace_shape(trace, len)?;
+    Ok(len)
+}
+
 fn validate_raa_trace_shape(trace: &Blaze2RaaTrace, len: usize) -> Result<(), Error> {
     if trace.u2.len() != len
         || trace.u3.len() != len
@@ -448,6 +702,61 @@ fn validate_raa_trace_shape(trace: &Blaze2RaaTrace, len: usize) -> Result<(), Er
         ));
     }
     Ok(())
+}
+
+fn authenticate_trace_spot_queries<H: Hash>(
+    root: &Output<H>,
+    opening: &Blaze2RaaTraceSpotQuery<H>,
+    codeword_len: usize,
+) -> Result<(), Error> {
+    if opening.queries.is_empty() {
+        return Err(Error::InvalidPcsOpen(
+            "Blaze2 RAA authenticated spot check has no openings".to_string(),
+        ));
+    }
+
+    let mut seen_pair_starts = Vec::with_capacity(opening.queries.len());
+    for query in &opening.queries {
+        query.authenticate(root, RAA_TRACE_NUM_ROWS, codeword_len)?;
+        let pair_start = query.index & !1;
+        if seen_pair_starts.contains(&pair_start) {
+            return Err(Error::InvalidPcsOpen(
+                "Blaze2 RAA authenticated spot check repeats an opening pair".to_string(),
+            ));
+        }
+        seen_pair_starts.push(pair_start);
+    }
+    Ok(())
+}
+
+fn trace_spot_value<H: Hash>(
+    opening: &Blaze2RaaTraceSpotQuery<H>,
+    row: usize,
+    index: usize,
+) -> Result<B128, Error> {
+    let pair_start = index & !1;
+    let value_offset = row * 2 + (index & 1);
+    for query in &opening.queries {
+        if query.index & !1 == pair_start {
+            if value_offset >= query.values.len() {
+                return Err(Error::InvalidPcsOpen(
+                    "Blaze2 RAA trace query has too few values".to_string(),
+                ));
+            }
+            return Ok(query.values[value_offset]);
+        }
+    }
+
+    Err(Error::InvalidPcsOpen(
+        "Blaze2 RAA authenticated spot check is missing a required opening".to_string(),
+    ))
+}
+
+fn push_unique_pair_start(opened_pair_starts: &mut Vec<usize>, index: usize) {
+    let pair_start = index & !1;
+    if !opened_pair_starts.contains(&pair_start) {
+        opened_pair_starts.push(pair_start);
+    }
 }
 
 fn prefix_accumulate_into(input: &[B128], out: &mut [B128]) {
@@ -574,6 +883,42 @@ fn merkelize_rows<F: BlazeField, H: Hash>(rows: &[Vec<F>]) -> Vec<Vec<Output<H>>
     tree
 }
 
+fn merkelize_b128_rows<H: Hash>(rows: &[Vec<B128>]) -> Vec<Vec<Output<H>>> {
+    let row_len = rows[0].len();
+    let log_len = log2_strict(row_len);
+    let leaves = (0..(row_len >> 1))
+        .into_par_iter()
+        .map(|leaf_idx| {
+            let mut hasher = H::new();
+            let mut hash = Output::<H>::default();
+            for row in rows {
+                hasher.update_field_element(&row[leaf_idx << 1]);
+                hasher.update_field_element(&row[(leaf_idx << 1) + 1]);
+            }
+            hasher.finalize_into_reset(&mut hash);
+            hash
+        })
+        .collect::<Vec<_>>();
+
+    let mut tree = Vec::with_capacity(log_len);
+    tree.push(leaves);
+    for level in 1..log_len {
+        let parents = tree[level - 1]
+            .par_chunks_exact(2)
+            .map(|children| {
+                let mut hasher = H::new();
+                let mut hash = Output::<H>::default();
+                hasher.update(&children[0]);
+                hasher.update(&children[1]);
+                hasher.finalize_into_reset(&mut hash);
+                hash
+            })
+            .collect::<Vec<_>>();
+        tree.push(parents);
+    }
+    tree
+}
+
 fn merkle_sibling_path<H: Hash>(tree: &[Vec<Output<H>>], mut query_index: usize) -> Vec<Output<H>> {
     let mut path = Vec::with_capacity(tree.len().saturating_sub(1));
     query_index >>= 1;
@@ -585,6 +930,56 @@ fn merkle_sibling_path<H: Hash>(tree: &[Vec<Output<H>>], mut query_index: usize)
         query_index >>= 1;
     }
     path
+}
+
+fn authenticate_b128_query<H: Hash>(
+    query: &Blaze2RaaTraceQuery<H>,
+    root: &Output<H>,
+    num_rows: usize,
+    codeword_len: usize,
+) -> Result<(), Error> {
+    validate_query_index(query.index, codeword_len)?;
+    if num_rows == 0 || query.values.len() != num_rows * 2 {
+        return Err(Error::InvalidPcsOpen(
+            "Blaze2 RAA trace query value count does not match row count".to_string(),
+        ));
+    }
+    if query.path.len() != log2_strict(codeword_len) - 1 {
+        return Err(Error::InvalidPcsOpen(
+            "Blaze2 RAA trace query path has incompatible length".to_string(),
+        ));
+    }
+
+    let mut hasher = H::new();
+    let mut hash = Output::<H>::default();
+    for pair in query.values.chunks_exact(2) {
+        hasher.update_field_element(&pair[0]);
+        hasher.update_field_element(&pair[1]);
+    }
+    hasher.finalize_into_reset(&mut hash);
+
+    let mut query_index = query.index >> 1;
+    for sibling in &query.path {
+        let mut hasher = H::new();
+        let mut next = Output::<H>::default();
+        if query_index & 1 == 0 {
+            hasher.update(&hash);
+            hasher.update(sibling);
+        } else {
+            hasher.update(sibling);
+            hasher.update(&hash);
+        }
+        hasher.finalize_into_reset(&mut next);
+        hash = next;
+        query_index >>= 1;
+    }
+
+    if &hash != root {
+        return Err(Error::InvalidPcsOpen(
+            "Blaze2 RAA trace query does not authenticate".to_string(),
+        ));
+    }
+    Ok(())
 }
 
 fn authenticate_query<F: BlazeField, H: Hash>(

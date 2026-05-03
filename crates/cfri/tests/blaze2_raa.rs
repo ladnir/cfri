@@ -4,11 +4,13 @@ use cfri::backend::{
     blaze2::{
         build_raa_trace, build_raa_trace_into, check_raa_trace_at, evaluate_multilinear,
         evaluate_packed_rows_at_point_into, fold_packed_query_pair, fold_packed_rows_into,
-        pack_interleaved_rows, pack_interleaved_rows_into, Blaze2RaaCommitment, Blaze2RaaQuery,
+        pack_interleaved_rows, pack_interleaved_rows_into, verify_raa_trace_spot_query,
+        Blaze2RaaCommitment, Blaze2RaaQuery, Blaze2RaaTrace, Blaze2RaaTraceCommitment,
+        Blaze2RaaTraceSpotQuery,
     },
     blaze_transcript::BlazeBlake2sTranscript,
     code::PackedRaaCode,
-    hash::Blake2s,
+    hash::{Blake2s, Hash},
     transcript::InMemoryTranscript as _,
 };
 use cfri::blaze::{BlazeField, Blazeu64, B128};
@@ -36,6 +38,34 @@ fn packed_rows(rows: &[Vec<Blazeu64>]) -> Vec<Vec<B128>> {
                 .collect::<Vec<_>>()
         })
         .collect::<Vec<_>>()
+}
+
+fn raa_trace_fixture(seed: u8) -> (PackedRaaCode, Vec<B128>, Blaze2RaaTrace) {
+    let mut rng = ChaCha8Rng::from_seed([seed; 32]);
+    let code = PackedRaaCode::new(8, 4, &mut rng);
+    let rows = rows(4, 8);
+    let packed = pack_interleaved_rows(&rows).unwrap();
+    let challenges = vec![B128::from(17 + seed as u64), B128::from(39 + seed as u64)];
+    let mut folded_message = vec![B128::ZERO; code.message_len()];
+    fold_packed_rows_into(&packed, &challenges, &mut folded_message).unwrap();
+    let trace = build_raa_trace(&code, &folded_message).unwrap();
+    (code, folded_message, trace)
+}
+
+fn tamper_opened_trace_value<H: Hash>(
+    opening: &mut Blaze2RaaTraceSpotQuery<H>,
+    row: usize,
+    index: usize,
+) {
+    let pair_start = index & !1;
+    let value_offset = row * 2 + (index & 1);
+    for query in &mut opening.queries {
+        if query.index & !1 == pair_start {
+            query.values[value_offset] += B128::ONE;
+            return;
+        }
+    }
+    panic!("missing opened value");
 }
 
 #[test]
@@ -318,6 +348,96 @@ fn blaze2_raa_trace_rejects_bad_shapes() {
     let mut trace = build_raa_trace(&code, &message).unwrap();
     trace.u4.pop();
     assert!(check_raa_trace_at(&code, &message, &trace, 0).is_err());
+}
+
+#[test]
+fn blaze2_raa_trace_spot_queries_authenticate_and_verify_all_positions() {
+    let (code, message, trace) = raa_trace_fixture(14);
+    let comm = Blaze2RaaTraceCommitment::<Blake2s256>::commit_trace(&trace).unwrap();
+    let public = comm.public();
+
+    assert_eq!(public.codeword_len(), code.codeword_len());
+    assert_eq!(public.num_rows(), 4);
+    for index in 0..code.codeword_len() {
+        let opening = comm.spot_query(&code, index).unwrap();
+        assert!(!opening.queries.is_empty());
+        assert!(opening.queries.len() <= 3);
+        opening.verify(&code, &message, public.root()).unwrap();
+        verify_raa_trace_spot_query(&code, &message, public.root(), &opening).unwrap();
+    }
+}
+
+#[test]
+fn blaze2_raa_trace_spot_queries_reject_tampered_opening_value() {
+    let (code, message, trace) = raa_trace_fixture(15);
+    let comm = Blaze2RaaTraceCommitment::<Blake2s256>::commit_trace(&trace).unwrap();
+    let mut opening = comm.spot_query(&code, 9).unwrap();
+    tamper_opened_trace_value(&mut opening, 0, 9);
+
+    assert!(opening.verify(&code, &message, comm.root()).is_err());
+}
+
+#[test]
+fn blaze2_raa_trace_spot_queries_reject_tampered_opening_path() {
+    let (code, message, trace) = raa_trace_fixture(16);
+    let comm = Blaze2RaaTraceCommitment::<Blake2s256>::commit_trace(&trace).unwrap();
+    let mut opening = comm.spot_query(&code, 11).unwrap();
+    opening.queries[0].path[0][0] ^= 1;
+
+    assert!(opening.verify(&code, &message, comm.root()).is_err());
+}
+
+#[test]
+fn blaze2_raa_trace_spot_queries_reject_missing_required_opening() {
+    let (code, message, trace) = raa_trace_fixture(17);
+    let comm = Blaze2RaaTraceCommitment::<Blake2s256>::commit_trace(&trace).unwrap();
+    let index = (1..code.codeword_len())
+        .find(|&index| comm.spot_query(&code, index).unwrap().queries.len() == 3)
+        .unwrap();
+    let mut opening = comm.spot_query(&code, index).unwrap();
+    opening.queries.pop();
+
+    assert!(opening.verify(&code, &message, comm.root()).is_err());
+}
+
+#[test]
+fn blaze2_raa_trace_spot_queries_reject_authenticated_bad_repetition_layer() {
+    let (code, message, mut trace) = raa_trace_fixture(18);
+    trace.u2[5] += B128::ONE;
+    let comm = Blaze2RaaTraceCommitment::<Blake2s256>::commit_trace(&trace).unwrap();
+    let opening = comm.spot_query(&code, 5).unwrap();
+
+    assert!(opening.verify(&code, &message, comm.root()).is_err());
+}
+
+#[test]
+fn blaze2_raa_trace_spot_queries_reject_authenticated_bad_first_accumulator_layer() {
+    let (code, message, mut trace) = raa_trace_fixture(19);
+    trace.u3[6] += B128::ONE;
+    let comm = Blaze2RaaTraceCommitment::<Blake2s256>::commit_trace(&trace).unwrap();
+    let opening = comm.spot_query(&code, 6).unwrap();
+
+    assert!(opening.verify(&code, &message, comm.root()).is_err());
+}
+
+#[test]
+fn blaze2_raa_trace_spot_queries_reject_authenticated_bad_second_permutation_layer() {
+    let (code, message, mut trace) = raa_trace_fixture(20);
+    trace.u4[7] += B128::ONE;
+    let comm = Blaze2RaaTraceCommitment::<Blake2s256>::commit_trace(&trace).unwrap();
+    let opening = comm.spot_query(&code, 7).unwrap();
+
+    assert!(opening.verify(&code, &message, comm.root()).is_err());
+}
+
+#[test]
+fn blaze2_raa_trace_spot_queries_reject_authenticated_bad_second_accumulator_layer() {
+    let (code, message, mut trace) = raa_trace_fixture(21);
+    trace.u5[8] += B128::ONE;
+    let comm = Blaze2RaaTraceCommitment::<Blake2s256>::commit_trace(&trace).unwrap();
+    let opening = comm.spot_query(&code, 8).unwrap();
+
+    assert!(opening.verify(&code, &message, comm.root()).is_err());
 }
 
 #[test]

@@ -83,19 +83,46 @@ pub struct CompilerParityQueryProof<H: Hash> {
     pub queries: Vec<CompilerParityQuery<H>>,
 }
 
+#[derive(Clone, Debug)]
+pub struct AuxiliaryOracleCommitment<H: Hash> {
+    values: Vec<B128>,
+    merkle_tree: Vec<Vec<Output<H>>>,
+}
+
+#[derive(Clone, Debug, Eq, PartialEq)]
+pub struct AuxiliaryOraclePublicCommitment<H: Hash> {
+    pub root: Output<H>,
+    pub len: usize,
+}
+
+#[derive(Clone, Debug, Eq, PartialEq)]
+pub struct AuxiliaryOracleQuery<H: Hash> {
+    pub logical_index: usize,
+    pub value: B128,
+    pub path: Vec<Output<H>>,
+}
+
+#[derive(Clone, Debug, Eq, PartialEq)]
+pub struct AuxiliaryOracleQueryProof<H: Hash> {
+    pub queries: Vec<AuxiliaryOracleQuery<H>>,
+}
+
 #[derive(Clone, Debug, Eq, PartialEq)]
 pub struct Blaze2BaseFoldPrequeryPublic<H: Hash> {
     pub compiler_parity: CompilerParityPublicCommitment<H>,
+    pub auxiliary: Option<AuxiliaryOraclePublicCommitment<H>>,
 }
 
 #[derive(Clone, Debug)]
 pub struct Blaze2BaseFoldProverState<H: Hash> {
     compiler_parity: CompilerParityCommitment<H>,
+    auxiliary: Option<AuxiliaryOracleCommitment<H>>,
 }
 
 #[derive(Clone, Debug, Eq, PartialEq)]
 pub struct Blaze2BaseFoldQueryProof<H: Hash> {
     pub compiler_parity: CompilerParityQueryProof<H>,
+    pub auxiliary: Option<AuxiliaryOracleQueryProof<H>>,
 }
 
 #[derive(Clone, Debug, Eq, PartialEq)]
@@ -309,6 +336,7 @@ impl Blaze2BaseFoldBackendParams {
     pub fn prove_prequery<H: Hash>(
         &self,
         folded_codeword: &[B128],
+        auxiliary_oracle: &[B128],
     ) -> Result<
         (
             Blaze2BaseFoldPrequeryPublic<H>,
@@ -316,11 +344,26 @@ impl Blaze2BaseFoldBackendParams {
         ),
         Error,
     > {
+        validate_auxiliary_oracle_shape(self.spec.auxiliary_oracle_len, auxiliary_oracle)?;
         let compiler_parity = self.compiler_code.commit_parity(folded_codeword)?;
+        let auxiliary = if self.spec.auxiliary_oracle_len == 0 {
+            None
+        } else {
+            Some(AuxiliaryOracleCommitment::commit_values(
+                auxiliary_oracle.to_vec(),
+            )?)
+        };
         let public = Blaze2BaseFoldPrequeryPublic {
             compiler_parity: compiler_parity.public(),
+            auxiliary: auxiliary.as_ref().map(AuxiliaryOracleCommitment::public),
         };
-        Ok((public, Blaze2BaseFoldProverState { compiler_parity }))
+        Ok((
+            public,
+            Blaze2BaseFoldProverState {
+                compiler_parity,
+                auxiliary,
+            },
+        ))
     }
 
     pub fn sample_query_schedule<H: Hash, S>(
@@ -342,8 +385,25 @@ impl Blaze2BaseFoldBackendParams {
         state: &Blaze2BaseFoldProverState<H>,
         schedule: &HolographicQuerySchedule,
     ) -> Result<Blaze2BaseFoldQueryProof<H>, Error> {
+        let auxiliary = match &state.auxiliary {
+            Some(auxiliary) => Some(auxiliary.prove_schedule(schedule)?),
+            None => {
+                let has_auxiliary_queries = schedule
+                    .proof_queries()
+                    .iter()
+                    .any(|query| query.domain == BackendProofQueryDomain::Auxiliary);
+                if has_auxiliary_queries {
+                    return Err(Error::InvalidPcsOpen(
+                        "backend schedule contains auxiliary queries but no auxiliary oracle is committed"
+                            .to_string(),
+                    ));
+                }
+                None
+            }
+        };
         Ok(Blaze2BaseFoldQueryProof {
             compiler_parity: state.compiler_parity.prove_schedule(schedule)?,
+            auxiliary,
         })
     }
 
@@ -358,6 +418,12 @@ impl Blaze2BaseFoldBackendParams {
         proof.compiler_parity.verify(
             &prequery.compiler_parity,
             self.compiler_code.layout(),
+            schedule,
+        )?;
+        verify_auxiliary_query_proof(
+            prequery.auxiliary.as_ref(),
+            proof.auxiliary.as_ref(),
+            self.spec.auxiliary_oracle_len,
             schedule,
         )
     }
@@ -638,6 +704,144 @@ impl<H: Hash> CompilerParityQueryProof<H> {
     }
 }
 
+impl<H: Hash> AuxiliaryOracleCommitment<H> {
+    pub fn commit_values(values: Vec<B128>) -> Result<Self, Error> {
+        if values.is_empty() {
+            return Err(Error::InvalidPcsParam(
+                "auxiliary oracle commitment needs a non-empty value vector".to_string(),
+            ));
+        }
+        let merkle_tree = merkelize_b128_padded::<H>(&values);
+        Ok(Self {
+            values,
+            merkle_tree,
+        })
+    }
+
+    pub fn public(&self) -> AuxiliaryOraclePublicCommitment<H> {
+        AuxiliaryOraclePublicCommitment {
+            root: self.root().clone(),
+            len: self.len(),
+        }
+    }
+
+    pub fn root(&self) -> &Output<H> {
+        &self.merkle_tree[self.merkle_tree.len() - 1][0]
+    }
+
+    pub fn len(&self) -> usize {
+        self.values.len()
+    }
+
+    pub fn is_empty(&self) -> bool {
+        self.values.is_empty()
+    }
+
+    pub fn values(&self) -> &[B128] {
+        &self.values
+    }
+
+    pub fn query(&self, logical_index: usize) -> Result<AuxiliaryOracleQuery<H>, Error> {
+        validate_auxiliary_query_index(logical_index, self.len())?;
+        Ok(AuxiliaryOracleQuery {
+            logical_index,
+            value: self.values[logical_index],
+            path: merkle_padded_sibling_path::<H>(&self.merkle_tree, logical_index),
+        })
+    }
+
+    pub fn prove_schedule(
+        &self,
+        schedule: &HolographicQuerySchedule,
+    ) -> Result<AuxiliaryOracleQueryProof<H>, Error> {
+        let mut queries = Vec::new();
+        for query in schedule.proof_queries() {
+            if query.domain == BackendProofQueryDomain::Auxiliary {
+                queries.push(self.query(query.index)?);
+            }
+        }
+        Ok(AuxiliaryOracleQueryProof { queries })
+    }
+}
+
+impl<H: Hash> AuxiliaryOracleQuery<H> {
+    pub fn authenticate(&self, public: &AuxiliaryOraclePublicCommitment<H>) -> Result<(), Error> {
+        validate_auxiliary_query_index(self.logical_index, public.len)?;
+        let padded_len = public.len.next_power_of_two();
+        let expected_path_len = log2_strict(padded_len);
+        if self.path.len() != expected_path_len {
+            return Err(Error::InvalidPcsOpen(
+                "auxiliary oracle query path has incompatible length".to_string(),
+            ));
+        }
+
+        let mut hash = hash_b128_leaf::<H>(&self.value);
+        let mut query_index = self.logical_index;
+        for sibling in &self.path {
+            let mut hasher = H::new();
+            let mut next = Output::<H>::default();
+            if query_index & 1 == 0 {
+                hasher.update(&hash);
+                hasher.update(sibling);
+            } else {
+                hasher.update(sibling);
+                hasher.update(&hash);
+            }
+            hasher.finalize_into_reset(&mut next);
+            hash = next;
+            query_index >>= 1;
+        }
+
+        if hash != public.root {
+            return Err(Error::InvalidPcsOpen(
+                "auxiliary oracle query does not authenticate".to_string(),
+            ));
+        }
+        Ok(())
+    }
+}
+
+impl<H: Hash> AuxiliaryOracleQueryProof<H> {
+    pub fn verify(
+        &self,
+        public: &AuxiliaryOraclePublicCommitment<H>,
+        auxiliary_oracle_len: usize,
+        schedule: &HolographicQuerySchedule,
+    ) -> Result<(), Error> {
+        if public.len != auxiliary_oracle_len {
+            return Err(Error::InvalidPcsOpen(
+                "auxiliary oracle commitment length does not match backend spec".to_string(),
+            ));
+        }
+
+        let expected_count = schedule
+            .proof_queries()
+            .iter()
+            .filter(|query| query.domain == BackendProofQueryDomain::Auxiliary)
+            .count();
+        if self.queries.len() != expected_count {
+            return Err(Error::InvalidPcsOpen(
+                "auxiliary oracle query proof count does not match schedule".to_string(),
+            ));
+        }
+
+        let mut supplied = self.queries.iter();
+        for expected in schedule.proof_queries() {
+            if expected.domain != BackendProofQueryDomain::Auxiliary {
+                continue;
+            }
+            let query = supplied.next().expect("query count checked above");
+            if query.logical_index != expected.index {
+                return Err(Error::InvalidPcsOpen(
+                    "auxiliary oracle query index does not match schedule".to_string(),
+                ));
+            }
+            query.authenticate(public)?;
+        }
+        Ok(())
+    }
+}
+
 pub fn fold_systematic_pair<F: Field>(left: F, right: F, alpha: F) -> F {
     (F::ONE - alpha) * left + alpha * right
 }
@@ -687,6 +891,22 @@ pub fn absorb_blaze2_basefold_prequery_public<H: Hash, S>(
 ) {
     transcript.absorb("blaze2-basefold-prequery-public-v1");
     absorb_compiler_parity_public_commitment(transcript, &prequery.compiler_parity);
+    match &prequery.auxiliary {
+        Some(auxiliary) => {
+            transcript.absorb("auxiliary-oracle-present");
+            absorb_auxiliary_oracle_public_commitment(transcript, auxiliary);
+        }
+        None => transcript.absorb("auxiliary-oracle-absent"),
+    }
+}
+
+pub fn absorb_auxiliary_oracle_public_commitment<H: Hash, S>(
+    transcript: &mut CfriTranscript<H, S>,
+    public: &AuxiliaryOraclePublicCommitment<H>,
+) {
+    transcript.absorb("auxiliary-oracle-public-commitment-v1");
+    absorb_usize(transcript, public.len);
+    transcript.absorb(&public.root);
 }
 
 impl HolographicQuerySchedule {
@@ -847,6 +1067,16 @@ fn validate_message_and_parity_output(
     Ok(())
 }
 
+fn validate_auxiliary_oracle_shape(expected_len: usize, values: &[B128]) -> Result<(), Error> {
+    if values.len() != expected_len {
+        return Err(Error::InvalidPcsOpen(format!(
+            "auxiliary oracle has length {}, expected {expected_len}",
+            values.len()
+        )));
+    }
+    Ok(())
+}
+
 fn validate_query_schedule_spec(
     layout: &SystematicAugmentedRfcLayout,
     spec: &HolographicQueryScheduleSpec,
@@ -966,6 +1196,72 @@ fn validate_parity_query_index(index: usize, len: usize) -> Result<(), Error> {
         )));
     }
     Ok(())
+}
+
+fn validate_auxiliary_query_index(index: usize, len: usize) -> Result<(), Error> {
+    if len == 0 {
+        return Err(Error::InvalidPcsOpen(
+            "auxiliary oracle query domain is empty".to_string(),
+        ));
+    }
+    if index >= len {
+        return Err(Error::InvalidPcsOpen(format!(
+            "auxiliary oracle query index {index} is outside length {len}"
+        )));
+    }
+    Ok(())
+}
+
+fn verify_auxiliary_query_proof<H: Hash>(
+    public: Option<&AuxiliaryOraclePublicCommitment<H>>,
+    proof: Option<&AuxiliaryOracleQueryProof<H>>,
+    auxiliary_oracle_len: usize,
+    schedule: &HolographicQuerySchedule,
+) -> Result<(), Error> {
+    let expected_count = schedule
+        .proof_queries()
+        .iter()
+        .filter(|query| query.domain == BackendProofQueryDomain::Auxiliary)
+        .count();
+    if auxiliary_oracle_len == 0 {
+        if public.is_some() || proof.is_some() || expected_count != 0 {
+            return Err(Error::InvalidPcsOpen(
+                "backend has no auxiliary oracle but auxiliary proof data was supplied or scheduled"
+                    .to_string(),
+            ));
+        }
+        return Ok(());
+    }
+
+    let public = public.ok_or_else(|| {
+        Error::InvalidPcsOpen(
+            "backend spec expects an auxiliary oracle commitment, but it is absent".to_string(),
+        )
+    })?;
+    if public.len != auxiliary_oracle_len {
+        return Err(Error::InvalidPcsOpen(
+            "auxiliary oracle commitment length does not match backend spec".to_string(),
+        ));
+    }
+    if expected_count == 0 {
+        if proof
+            .map(|proof| !proof.queries.is_empty())
+            .unwrap_or(false)
+        {
+            return Err(Error::InvalidPcsOpen(
+                "auxiliary query proof was supplied even though schedule has no auxiliary queries"
+                    .to_string(),
+            ));
+        }
+        return Ok(());
+    }
+    let proof = proof.ok_or_else(|| {
+        Error::InvalidPcsOpen(
+            "backend schedule contains auxiliary queries, but auxiliary query proof is absent"
+                .to_string(),
+        )
+    })?;
+    proof.verify(public, auxiliary_oracle_len, schedule)
 }
 
 fn merkelize_b128_padded<H: Hash>(values: &[B128]) -> Vec<Vec<Output<H>>> {
@@ -1516,11 +1812,18 @@ mod tests {
     fn backend_prequery_round_trips_through_scheduled_queries() {
         let params = Blaze2BaseFoldBackendParams::new(blaze2_backend_spec()).unwrap();
         let folded_codeword = message(params.compiler_code().layout().message_len(), 41);
-        let (prequery, state) = params.prove_prequery::<Blake2s>(&folded_codeword).unwrap();
+        let auxiliary = message(params.spec().auxiliary_oracle_len, 53);
+        let (prequery, state) = params
+            .prove_prequery::<Blake2s>(&folded_codeword, &auxiliary)
+            .unwrap();
 
         assert_eq!(
             prequery.compiler_parity.len,
             params.compiler_code().layout().parity_len()
+        );
+        assert_eq!(
+            prequery.auxiliary.as_ref().unwrap().len,
+            params.spec().auxiliary_oracle_len
         );
 
         let mut transcript = CfriTranscript::<Blake2s>::new();
@@ -1557,10 +1860,77 @@ mod tests {
     }
 
     #[test]
+    fn backend_auxiliary_queries_are_authenticated() {
+        let params = Blaze2BaseFoldBackendParams::new(blaze2_backend_spec()).unwrap();
+        let folded_codeword = message(params.compiler_code().layout().message_len(), 61);
+        let auxiliary = message(params.spec().auxiliary_oracle_len, 73);
+        let (prequery, state) = params
+            .prove_prequery::<Blake2s>(&folded_codeword, &auxiliary)
+            .unwrap();
+        let schedule = explicit_schedule(params.compiler_code().layout());
+        let proof = params.open_query_proof(&state, &schedule).unwrap();
+        let top_queries = schedule
+            .input_queries()
+            .iter()
+            .map(|query| TopQuery {
+                index: query.logical_index,
+                value: folded_codeword[query.logical_index],
+            })
+            .collect::<Vec<_>>();
+
+        assert_eq!(proof.auxiliary.as_ref().unwrap().queries.len(), 1);
+        assert_eq!(
+            proof.auxiliary.as_ref().unwrap().queries[0].logical_index,
+            3
+        );
+        params
+            .verify_query_proof(&prequery, &schedule, &proof, &top_queries)
+            .unwrap();
+
+        let mut tampered = proof.clone();
+        tampered.auxiliary.as_mut().unwrap().queries[0].value += B128::ONE;
+        assert!(params
+            .verify_query_proof(&prequery, &schedule, &tampered, &top_queries)
+            .is_err());
+
+        let mut missing = proof;
+        missing.auxiliary = None;
+        assert!(params
+            .verify_query_proof(&prequery, &schedule, &missing, &top_queries)
+            .is_err());
+    }
+
+    #[test]
+    fn backend_prequery_validates_auxiliary_shape() {
+        let mut spec = blaze2_backend_spec();
+        spec.auxiliary_oracle_len = 0;
+        let params = Blaze2BaseFoldBackendParams::new(spec).unwrap();
+        let folded_codeword = message(params.compiler_code().layout().message_len(), 67);
+        let (prequery, state) = params
+            .prove_prequery::<Blake2s>(&folded_codeword, &[])
+            .unwrap();
+        assert!(prequery.auxiliary.is_none());
+
+        let mut transcript = CfriTranscript::<Blake2s>::new();
+        let schedule = params
+            .sample_query_schedule(&mut transcript, &prequery)
+            .unwrap();
+        let proof = params.open_query_proof(&state, &schedule).unwrap();
+        assert!(proof.auxiliary.is_none());
+
+        assert!(params
+            .prove_prequery::<Blake2s>(&folded_codeword, &[B128::ONE])
+            .is_err());
+    }
+
+    #[test]
     fn backend_schedule_binds_spec_and_prequery_public() {
         let params = Blaze2BaseFoldBackendParams::new(blaze2_backend_spec()).unwrap();
         let folded_codeword = message(params.compiler_code().layout().message_len(), 43);
-        let (prequery, _) = params.prove_prequery::<Blake2s>(&folded_codeword).unwrap();
+        let auxiliary = message(params.spec().auxiliary_oracle_len, 59);
+        let (prequery, _) = params
+            .prove_prequery::<Blake2s>(&folded_codeword, &auxiliary)
+            .unwrap();
 
         let mut lhs = CfriTranscript::<Blake2s>::new();
         let lhs_schedule = params.sample_query_schedule(&mut lhs, &prequery).unwrap();
@@ -1571,7 +1941,17 @@ mod tests {
 
         let changed_folded_codeword = message(params.compiler_code().layout().message_len(), 101);
         let (changed_prequery, _) = params
-            .prove_prequery::<Blake2s>(&changed_folded_codeword)
+            .prove_prequery::<Blake2s>(&changed_folded_codeword, &auxiliary)
+            .unwrap();
+        let mut changed = CfriTranscript::<Blake2s>::new();
+        let changed_schedule = params
+            .sample_query_schedule(&mut changed, &changed_prequery)
+            .unwrap();
+        assert_ne!(lhs_schedule, changed_schedule);
+
+        let changed_auxiliary = message(params.spec().auxiliary_oracle_len, 211);
+        let (changed_prequery, _) = params
+            .prove_prequery::<Blake2s>(&folded_codeword, &changed_auxiliary)
             .unwrap();
         let mut changed = CfriTranscript::<Blake2s>::new();
         let changed_schedule = params

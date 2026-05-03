@@ -1546,9 +1546,15 @@ pub fn prove_blaze2_basefold_opening<H: Blaze2HashSpec>(
         col_point: &claim.col_point,
         folded_eval,
     };
-    let auxiliary_values =
-        blaze2_basefold_auxiliary_oracle(packed_code, &folded_message, auxiliary_oracle, params)?;
     let folded_codeword = packed_code.encode_row(&folded_message);
+    let auxiliary_values = blaze2_basefold_auxiliary_oracle(
+        packed_code,
+        &folded_message,
+        &folded_codeword,
+        &backend_request,
+        auxiliary_oracle,
+        params,
+    )?;
     let (backend_prequery, backend_state) =
         params.prove_prequery::<H>(&folded_codeword, &auxiliary_values, &backend_request)?;
     let schedule =
@@ -1806,6 +1812,8 @@ pub fn verify_blaze2_opening_with_code_spec<H: Blaze2HashSpec, B: Blaze2FoldedMe
 fn blaze2_basefold_auxiliary_oracle(
     code: &PackedRaaCode,
     folded_message: &[B128],
+    folded_codeword: &[B128],
+    request: &Blaze2BaseFoldOpenRequest<'_>,
     caller_auxiliary: &[B128],
     params: &Blaze2BaseFoldBackendParams,
 ) -> Result<Vec<B128>, Error> {
@@ -1824,6 +1832,8 @@ fn blaze2_basefold_auxiliary_oracle(
     auxiliary.extend_from_slice(&trace.u2);
     auxiliary.extend_from_slice(&trace.u3);
     auxiliary.extend_from_slice(&trace.u4);
+    let eval_accumulator = build_raa_eval_accumulator(code, folded_codeword, request)?;
+    auxiliary.extend_from_slice(&eval_accumulator);
     if auxiliary.len() != expected_len {
         return Err(Error::InvalidPcsOpen(format!(
             "derived Blaze2 BaseFold auxiliary trace has {} entries but backend expects {expected_len}",
@@ -1837,6 +1847,96 @@ fn blaze2_basefold_auxiliary_oracle(
         ));
     }
     Ok(auxiliary)
+}
+
+pub fn build_raa_eval_accumulator(
+    code: &PackedRaaCode,
+    codeword: &[B128],
+    request: &Blaze2BaseFoldOpenRequest<'_>,
+) -> Result<Vec<B128>, Error> {
+    let len = code.codeword_len();
+    if codeword.len() != len {
+        return Err(Error::InvalidPcsOpen(format!(
+            "RAA evaluation accumulator codeword has length {}, expected {len}",
+            codeword.len()
+        )));
+    }
+    let weights = raa_codeword_eval_weights(code, request.col_point)?;
+    let mut accumulator = vec![B128::ZERO; len];
+    let mut running = B128::ZERO;
+    for i in 0..len {
+        running += weights[i] * codeword[i];
+        accumulator[i] = running;
+    }
+    if accumulator.last().copied().unwrap_or(B128::ZERO) != request.folded_eval {
+        return Err(Error::InvalidPcsOpen(
+            "RAA evaluation accumulator terminal value does not match folded eval".to_string(),
+        ));
+    }
+    Ok(accumulator)
+}
+
+pub fn raa_codeword_eval_weights(code: &PackedRaaCode, point: &[B128]) -> Result<Vec<B128>, Error> {
+    if point.len() != log2_strict(code.message_len()) {
+        return Err(Error::InvalidPcsOpen(format!(
+            "RAA evaluation point has {} coordinates for message length {}",
+            point.len(),
+            code.message_len()
+        )));
+    }
+
+    let message_weights = monomial_basis_weights(point);
+    let len = code.codeword_len();
+    let mut u2_weights = vec![B128::ZERO; len];
+    let mut seen = vec![false; code.message_len()];
+    for i in 0..len {
+        let source = code.permutation().permutation1[i] / code.rate();
+        if !seen[source] {
+            u2_weights[i] = message_weights[source];
+            seen[source] = true;
+        }
+    }
+    if seen.iter().any(|seen| !*seen) {
+        return Err(Error::InvalidPcsOpen(
+            "RAA repetition permutation does not cover every message coordinate".to_string(),
+        ));
+    }
+
+    let mut u3_weights = vec![B128::ZERO; len];
+    for i in 0..len {
+        u3_weights[i] = u2_weights[i];
+        if i + 1 < len {
+            u3_weights[i] += u2_weights[i + 1];
+        }
+    }
+
+    let mut u4_weights = vec![B128::ZERO; len];
+    for i in 0..len {
+        u4_weights[i] = u3_weights[code.permutation().permutation2[i]];
+    }
+
+    let mut codeword_weights = vec![B128::ZERO; len];
+    for i in 0..len {
+        codeword_weights[i] = u4_weights[i];
+        if i + 1 < len {
+            codeword_weights[i] += u4_weights[i + 1];
+        }
+    }
+    Ok(codeword_weights)
+}
+
+fn monomial_basis_weights(point: &[B128]) -> Vec<B128> {
+    let len = 1usize << point.len();
+    let mut weights = vec![B128::ONE; len];
+    for (coord, &challenge) in point.iter().enumerate() {
+        let bit = point.len() - 1 - coord;
+        for (index, weight) in weights.iter_mut().enumerate() {
+            if (index >> bit) & 1 == 1 {
+                *weight *= challenge;
+            }
+        }
+    }
+    weights
 }
 
 pub fn build_raa_aux_trace(

@@ -9,7 +9,7 @@ use cfri::backend::{
         evaluate_packed_matrix_at_point_into, evaluate_packed_rows_at_point_into,
         fold_interleaved_column, fold_packed_query_pair, fold_packed_rows_into,
         pack_interleaved_rows, pack_interleaved_rows_into, prove_blaze2_basefold_opening,
-        prove_blaze2_opening, prove_blaze2_opening_with_code_spec,
+        prove_blaze2_opening, prove_blaze2_opening_with_code_spec, raa_codeword_eval_weights,
         squeeze_blaze2_opening_folding_challenges, squeeze_blaze2_opening_query_indices,
         verify_blaze2_basefold_opening, verify_blaze2_opening,
         verify_blaze2_opening_with_code_spec, verify_raa_aux_trace_spot_query,
@@ -605,6 +605,26 @@ fn blaze2_raa_query_transcript_roundtrip() {
 
     assert_eq!(actual, expected);
     actual.authenticate(comm.root()).unwrap();
+}
+
+#[test]
+fn blaze2_raa_codeword_eval_weights_reconstruct_message_eval() {
+    let mut rng = ChaCha8Rng::from_seed([63; 32]);
+    let code = PackedRaaCode::new(8, 4, &mut rng);
+    let message = (0..code.message_len())
+        .map(|index| B128::from(19 + 7 * index as u64))
+        .collect::<Vec<_>>();
+    let point = vec![B128::from(3), B128::from(5), B128::from(11)];
+    let mut scratch = vec![B128::ZERO; message.len()];
+    let expected = evaluate_multilinear(&message, &point, &mut scratch).unwrap();
+    let codeword = code.encode_row(&message);
+    let weights = raa_codeword_eval_weights(&code, &point).unwrap();
+    let actual = codeword
+        .iter()
+        .zip(weights.iter())
+        .fold(B128::ZERO, |acc, (&value, &weight)| acc + value * weight);
+
+    assert_eq!(actual, expected);
 }
 
 #[test]
@@ -1348,7 +1368,7 @@ fn blaze2_basefold_opening_rejects_row_eval_folded_eval_mismatch() {
 #[test]
 fn blaze2_basefold_opening_derives_configured_auxiliary_trace() {
     let (_, _, packed, commitment, claim, _) = opening_fixture(54);
-    let auxiliary_len = blaze2_code_spec(54).praa_codeword_len * 3;
+    let auxiliary_len = blaze2_code_spec(54).praa_codeword_len * 4;
     let params = blaze2_basefold_backend_params_with_auxiliary_len(54, 4, 11, auxiliary_len);
     let proof = prove_blaze2_basefold_opening(&params, &packed, &commitment, &claim, &[]).unwrap();
 

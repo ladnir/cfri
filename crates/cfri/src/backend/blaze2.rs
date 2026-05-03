@@ -653,6 +653,31 @@ pub fn verify_raa_trace_spot_query<H: Hash>(
     Ok(())
 }
 
+pub fn check_raa_folded_codeword_link<F: BlazeField, H: Hash>(
+    row_query: &Blaze2RaaQuery<F, H>,
+    challenges: &[B128],
+    trace_opening: &Blaze2RaaTraceSpotQuery<H>,
+) -> Result<(), Error> {
+    if row_query.index & !1 != trace_opening.index & !1 {
+        return Err(Error::InvalidPcsOpen(
+            "Blaze2 RAA folded codeword link uses different query pairs".to_string(),
+        ));
+    }
+
+    let pair_start = row_query.index & !1;
+    let folded_pair = fold_packed_query_pair(&row_query.values, challenges)?;
+    let trace_pair = (
+        trace_spot_value(trace_opening, RAA_TRACE_ROW_U5, pair_start)?,
+        trace_spot_value(trace_opening, RAA_TRACE_ROW_U5, pair_start + 1)?,
+    );
+    if trace_pair != folded_pair {
+        return Err(Error::InvalidPcsOpen(
+            "Blaze2 RAA folded codeword link failed".to_string(),
+        ));
+    }
+    Ok(())
+}
+
 const RAA_TRACE_NUM_ROWS: usize = 4;
 const RAA_TRACE_ROW_U2: usize = 0;
 const RAA_TRACE_ROW_U3: usize = 1;

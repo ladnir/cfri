@@ -2,11 +2,11 @@ use blake2::Blake2s256;
 use cfri::backend::{
     arithmetic::Field,
     blaze2::{
-        build_raa_trace, build_raa_trace_into, check_raa_trace_at, evaluate_multilinear,
-        evaluate_packed_rows_at_point_into, fold_packed_query_pair, fold_packed_rows_into,
-        pack_interleaved_rows, pack_interleaved_rows_into, verify_raa_trace_spot_query,
-        Blaze2RaaCommitment, Blaze2RaaQuery, Blaze2RaaTrace, Blaze2RaaTraceCommitment,
-        Blaze2RaaTraceSpotQuery,
+        build_raa_trace, build_raa_trace_into, check_raa_folded_codeword_link, check_raa_trace_at,
+        evaluate_multilinear, evaluate_packed_rows_at_point_into, fold_packed_query_pair,
+        fold_packed_rows_into, pack_interleaved_rows, pack_interleaved_rows_into,
+        verify_raa_trace_spot_query, Blaze2RaaCommitment, Blaze2RaaQuery, Blaze2RaaTrace,
+        Blaze2RaaTraceCommitment, Blaze2RaaTraceSpotQuery,
     },
     blaze_transcript::BlazeBlake2sTranscript,
     code::PackedRaaCode,
@@ -452,6 +452,8 @@ fn blaze2_raa_folded_query_matches_encoded_folded_rows() {
     let mut folded_message = vec![B128::ZERO; code.message_len()];
     fold_packed_rows_into(&packed, &challenges, &mut folded_message).unwrap();
     let folded_codeword = code.encode_row(&folded_message);
+    let trace = build_raa_trace(&code, &folded_message).unwrap();
+    let trace_comm = Blaze2RaaTraceCommitment::<Blake2s256>::commit_trace(&trace).unwrap();
 
     for index in [0usize, 1, 6, 17, 30, 31] {
         let query = comm.query(index).unwrap();
@@ -461,5 +463,68 @@ fn blaze2_raa_folded_query_matches_encoded_folded_rows() {
             pair,
             (folded_codeword[pair_start], folded_codeword[pair_start + 1])
         );
+
+        let trace_opening = trace_comm.spot_query(&code, index).unwrap();
+        trace_opening
+            .verify(&code, &folded_message, trace_comm.root())
+            .unwrap();
+        check_raa_folded_codeword_link(&query, &challenges, &trace_opening).unwrap();
     }
+}
+
+#[test]
+fn blaze2_raa_folded_codeword_link_rejects_wrong_challenge() {
+    let mut rng = ChaCha8Rng::from_seed([22; 32]);
+    let code = PackedRaaCode::new(8, 4, &mut rng);
+    let rows = rows(4, 8);
+    let comm =
+        Blaze2RaaCommitment::<Blazeu64, Blake2s256>::commit_rows(code.clone(), &rows).unwrap();
+    let packed = pack_interleaved_rows(&rows).unwrap();
+    let challenges = vec![B128::from(17), B128::from(39)];
+    let mut folded_message = vec![B128::ZERO; code.message_len()];
+    fold_packed_rows_into(&packed, &challenges, &mut folded_message).unwrap();
+    let trace = build_raa_trace(&code, &folded_message).unwrap();
+    let trace_comm = Blaze2RaaTraceCommitment::<Blake2s256>::commit_trace(&trace).unwrap();
+
+    let query = comm.query(6).unwrap();
+    let trace_opening = trace_comm.spot_query(&code, 6).unwrap();
+    let wrong_challenges = vec![B128::from(18), B128::from(39)];
+
+    assert!(check_raa_folded_codeword_link(&query, &wrong_challenges, &trace_opening).is_err());
+}
+
+#[test]
+fn blaze2_raa_folded_codeword_link_rejects_authenticated_bad_trace_codeword() {
+    let mut rng = ChaCha8Rng::from_seed([23; 32]);
+    let code = PackedRaaCode::new(8, 4, &mut rng);
+    let rows = rows(4, 8);
+    let comm =
+        Blaze2RaaCommitment::<Blazeu64, Blake2s256>::commit_rows(code.clone(), &rows).unwrap();
+    let packed = pack_interleaved_rows(&rows).unwrap();
+    let challenges = vec![B128::from(17), B128::from(39)];
+    let mut folded_message = vec![B128::ZERO; code.message_len()];
+    fold_packed_rows_into(&packed, &challenges, &mut folded_message).unwrap();
+    let mut trace = build_raa_trace(&code, &folded_message).unwrap();
+    trace.u5[6] += B128::ONE;
+    let trace_comm = Blaze2RaaTraceCommitment::<Blake2s256>::commit_trace(&trace).unwrap();
+
+    let query = comm.query(6).unwrap();
+    let trace_opening = trace_comm.spot_query(&code, 6).unwrap();
+
+    assert!(check_raa_folded_codeword_link(&query, &challenges, &trace_opening).is_err());
+}
+
+#[test]
+fn blaze2_raa_folded_codeword_link_rejects_mismatched_query_pair() {
+    let (code, folded_message, trace) = raa_trace_fixture(24);
+    let rows = rows(4, 8);
+    let comm =
+        Blaze2RaaCommitment::<Blazeu64, Blake2s256>::commit_rows(code.clone(), &rows).unwrap();
+    let trace_comm = Blaze2RaaTraceCommitment::<Blake2s256>::commit_trace(&trace).unwrap();
+    let query = comm.query(0).unwrap();
+    let trace_opening = trace_comm.spot_query(&code, 2).unwrap();
+    let challenges = vec![B128::from(41), B128::from(63)];
+
+    assert_eq!(folded_message.len(), code.message_len());
+    assert!(check_raa_folded_codeword_link(&query, &challenges, &trace_opening).is_err());
 }

@@ -110,19 +110,54 @@ pub struct AuxiliaryOracleQueryProof<H: Hash> {
 #[derive(Clone, Debug, Eq, PartialEq)]
 pub struct Blaze2BaseFoldPrequeryPublic<H: Hash> {
     pub compiler_parity: CompilerParityPublicCommitment<H>,
+    pub folded_parity_layers: Vec<CompilerParityPublicCommitment<H>>,
     pub auxiliary: Option<AuxiliaryOraclePublicCommitment<H>>,
 }
 
 #[derive(Clone, Debug)]
 pub struct Blaze2BaseFoldProverState<H: Hash> {
     compiler_parity: CompilerParityCommitment<H>,
+    folded_parity_layers: Vec<CompilerParityCommitment<H>>,
+    physical_layers: Vec<Vec<B128>>,
+    fold_challenges: Vec<B128>,
     auxiliary: Option<AuxiliaryOracleCommitment<H>>,
 }
 
 #[derive(Clone, Debug, Eq, PartialEq)]
 pub struct Blaze2BaseFoldQueryProof<H: Hash> {
     pub compiler_parity: CompilerParityQueryProof<H>,
+    pub compiler_parity_folds: CompilerParityFoldQueryProof<H>,
     pub auxiliary: Option<AuxiliaryOracleQueryProof<H>>,
+}
+
+#[derive(Clone, Debug, Eq, PartialEq)]
+pub struct CompilerParityFoldQueryProof<H: Hash> {
+    pub paths: Vec<CompilerParityFoldPath<H>>,
+}
+
+#[derive(Clone, Debug, Eq, PartialEq)]
+pub struct CompilerParityFoldPath<H: Hash> {
+    pub top_logical_index: usize,
+    pub top_physical_index: usize,
+    pub steps: Vec<CompilerParityFoldStep<H>>,
+}
+
+#[derive(Clone, Debug, Eq, PartialEq)]
+pub struct CompilerParityFoldStep<H: Hash> {
+    pub round: usize,
+    pub output_physical_index: usize,
+    pub left_physical_index: usize,
+    pub left_logical_index: usize,
+    pub left_value: B128,
+    pub left_path: Vec<Output<H>>,
+    pub right_physical_index: usize,
+    pub right_logical_index: usize,
+    pub right_value: B128,
+    pub right_path: Vec<Output<H>>,
+    pub folded_physical_index: usize,
+    pub folded_logical_index: usize,
+    pub folded_value: B128,
+    pub folded_path: Vec<Output<H>>,
 }
 
 #[derive(Clone, Debug, Eq, PartialEq)]
@@ -353,14 +388,24 @@ impl Blaze2BaseFoldBackendParams {
                 auxiliary_oracle.to_vec(),
             )?)
         };
+        let (folded_parity_layers, folded_parity_public, physical_layers, fold_challenges) = self
+            .prove_folded_parity_layers::<H>(
+            folded_codeword,
+            &compiler_parity.public(),
+            auxiliary.as_ref().map(AuxiliaryOracleCommitment::public),
+        )?;
         let public = Blaze2BaseFoldPrequeryPublic {
             compiler_parity: compiler_parity.public(),
+            folded_parity_layers: folded_parity_public,
             auxiliary: auxiliary.as_ref().map(AuxiliaryOracleCommitment::public),
         };
         Ok((
             public,
             Blaze2BaseFoldProverState {
                 compiler_parity,
+                folded_parity_layers,
+                physical_layers,
+                fold_challenges,
                 auxiliary,
             },
         ))
@@ -403,6 +448,7 @@ impl Blaze2BaseFoldBackendParams {
         };
         Ok(Blaze2BaseFoldQueryProof {
             compiler_parity: state.compiler_parity.prove_schedule(schedule)?,
+            compiler_parity_folds: self.open_compiler_parity_fold_paths(state, schedule)?,
             auxiliary,
         })
     }
@@ -418,6 +464,12 @@ impl Blaze2BaseFoldBackendParams {
         proof.compiler_parity.verify(
             &prequery.compiler_parity,
             self.compiler_code.layout(),
+            schedule,
+        )?;
+        proof.compiler_parity_folds.verify(
+            prequery,
+            self.compiler_code.layout(),
+            &fold_challenges_from_prequery(self.spec(), prequery)?,
             schedule,
         )?;
         verify_auxiliary_query_proof(
@@ -460,6 +512,170 @@ impl Blaze2BaseFoldBackendParams {
             });
         }
         Ok(top_queries)
+    }
+
+    fn prove_folded_parity_layers<H: Hash>(
+        &self,
+        message: &[B128],
+        compiler_parity: &CompilerParityPublicCommitment<H>,
+        auxiliary: Option<AuxiliaryOraclePublicCommitment<H>>,
+    ) -> Result<
+        (
+            Vec<CompilerParityCommitment<H>>,
+            Vec<CompilerParityPublicCommitment<H>>,
+            Vec<Vec<B128>>,
+            Vec<B128>,
+        ),
+        Error,
+    > {
+        let layout = self.compiler_code.layout();
+        let mut current = vec![B128::ZERO; layout.codeword_len()];
+        let mut parity_scratch = vec![B128::ZERO; layout.parity_len()];
+        self.compiler_code.encode_physical_codeword_into(
+            message,
+            &mut current,
+            &mut parity_scratch,
+        )?;
+
+        let mut transcript = CfriTranscript::<H>::new();
+        absorb_blaze2_basefold_fold_chain_prefix(
+            &mut transcript,
+            self.spec(),
+            compiler_parity,
+            auxiliary.as_ref(),
+        );
+
+        let mut physical_layers = Vec::with_capacity(layout.num_rounds() + 1);
+        physical_layers.push(current.clone());
+        let mut folded_parity_layers = Vec::with_capacity(layout.num_rounds());
+        let mut folded_parity_public = Vec::with_capacity(layout.num_rounds());
+        let mut fold_challenges = Vec::with_capacity(layout.num_rounds());
+
+        for round in 0..layout.num_rounds() {
+            transcript.absorb("systematic-basefold-fold-challenge-v1");
+            absorb_usize(&mut transcript, round);
+            let alpha: B128 = transcript.squeeze();
+            fold_challenges.push(alpha);
+
+            let mut next = vec![B128::ZERO; current.len() >> 1];
+            self.compiler_code
+                .fold_physical_codeword_round_into(round, &current, alpha, &mut next)?;
+            let parity = parity_values_at_round(layout, round + 1, &next)?;
+            let commitment = CompilerParityCommitment::commit_values(parity)?;
+            let public = commitment.public();
+            absorb_folded_parity_public_commitment(&mut transcript, round + 1, &public);
+            folded_parity_public.push(public);
+            folded_parity_layers.push(commitment);
+            physical_layers.push(next.clone());
+            current = next;
+        }
+
+        Ok((
+            folded_parity_layers,
+            folded_parity_public,
+            physical_layers,
+            fold_challenges,
+        ))
+    }
+
+    fn open_compiler_parity_fold_paths<H: Hash>(
+        &self,
+        state: &Blaze2BaseFoldProverState<H>,
+        schedule: &HolographicQuerySchedule,
+    ) -> Result<CompilerParityFoldQueryProof<H>, Error> {
+        let mut paths = Vec::new();
+        for query in schedule.proof_queries() {
+            if query.domain != BackendProofQueryDomain::CompilerParity {
+                continue;
+            }
+            let top_physical_index = query.physical_index.ok_or_else(|| {
+                Error::InvalidPcsOpen(
+                    "compiler parity query is missing its physical index".to_string(),
+                )
+            })?;
+            paths.push(self.open_compiler_parity_fold_path(
+                state,
+                query.index,
+                top_physical_index,
+            )?);
+        }
+        Ok(CompilerParityFoldQueryProof { paths })
+    }
+
+    fn open_compiler_parity_fold_path<H: Hash>(
+        &self,
+        state: &Blaze2BaseFoldProverState<H>,
+        top_logical_index: usize,
+        top_physical_index: usize,
+    ) -> Result<CompilerParityFoldPath<H>, Error> {
+        let layout = self.compiler_code.layout();
+        if state.physical_layers.len() != layout.num_rounds() + 1
+            || state.folded_parity_layers.len() != layout.num_rounds()
+            || state.fold_challenges.len() != layout.num_rounds()
+        {
+            return Err(Error::InvalidPcsOpen(
+                "backend folded parity state has incompatible layer count".to_string(),
+            ));
+        }
+
+        let mut steps = Vec::with_capacity(layout.num_rounds());
+        let mut current_physical_index = top_physical_index;
+        for round in 0..layout.num_rounds() {
+            let current_len = layout.codeword_len() >> round;
+            let half_len = current_len >> 1;
+            let output_physical_index = current_physical_index & (half_len - 1);
+            let pair = layout.fold_pair(round, output_physical_index)?;
+            let left = parity_query_for_physical_index(
+                layout,
+                round,
+                &state.compiler_parity,
+                &state.folded_parity_layers,
+                pair.left,
+            )?;
+            let right = parity_query_for_physical_index(
+                layout,
+                round,
+                &state.compiler_parity,
+                &state.folded_parity_layers,
+                pair.right,
+            )?;
+            let folded = parity_query_for_physical_index(
+                layout,
+                round + 1,
+                &state.compiler_parity,
+                &state.folded_parity_layers,
+                output_physical_index,
+            )?;
+            debug_assert_eq!(left.value, state.physical_layers[round][pair.left]);
+            debug_assert_eq!(right.value, state.physical_layers[round][pair.right]);
+            debug_assert_eq!(
+                folded.value,
+                state.physical_layers[round + 1][output_physical_index]
+            );
+            steps.push(CompilerParityFoldStep {
+                round,
+                output_physical_index,
+                left_physical_index: pair.left,
+                left_logical_index: left.logical_index,
+                left_value: left.value,
+                left_path: left.path,
+                right_physical_index: pair.right,
+                right_logical_index: right.logical_index,
+                right_value: right.value,
+                right_path: right.path,
+                folded_physical_index: output_physical_index,
+                folded_logical_index: folded.logical_index,
+                folded_value: folded.value,
+                folded_path: folded.path,
+            });
+            current_physical_index = output_physical_index;
+        }
+
+        Ok(CompilerParityFoldPath {
+            top_logical_index,
+            top_physical_index,
+            steps,
+        })
     }
 }
 
@@ -776,6 +992,131 @@ impl<H: Hash> CompilerParityQueryProof<H> {
     }
 }
 
+impl<H: Hash> CompilerParityFoldQueryProof<H> {
+    pub fn verify(
+        &self,
+        prequery: &Blaze2BaseFoldPrequeryPublic<H>,
+        layout: &SystematicAugmentedRfcLayout,
+        fold_challenges: &[B128],
+        schedule: &HolographicQuerySchedule,
+    ) -> Result<(), Error> {
+        if prequery.folded_parity_layers.len() != layout.num_rounds()
+            || fold_challenges.len() != layout.num_rounds()
+        {
+            return Err(Error::InvalidPcsOpen(
+                "folded parity prequery layer count does not match layout".to_string(),
+            ));
+        }
+
+        let expected_count = schedule
+            .proof_queries()
+            .iter()
+            .filter(|query| query.domain == BackendProofQueryDomain::CompilerParity)
+            .count();
+        if self.paths.len() != expected_count {
+            return Err(Error::InvalidPcsOpen(
+                "compiler parity fold path count does not match schedule".to_string(),
+            ));
+        }
+
+        let mut supplied = self.paths.iter();
+        for expected in schedule.proof_queries() {
+            if expected.domain != BackendProofQueryDomain::CompilerParity {
+                continue;
+            }
+            let path = supplied.next().expect("path count checked above");
+            let expected_physical = expected.physical_index.ok_or_else(|| {
+                Error::InvalidPcsOpen(
+                    "compiler parity query is missing its physical index".to_string(),
+                )
+            })?;
+            if path.top_logical_index != expected.index
+                || path.top_physical_index != expected_physical
+            {
+                return Err(Error::InvalidPcsOpen(
+                    "compiler parity fold path does not match schedule".to_string(),
+                ));
+            }
+            path.verify(prequery, layout, fold_challenges)?;
+        }
+        Ok(())
+    }
+}
+
+impl<H: Hash> CompilerParityFoldPath<H> {
+    fn verify(
+        &self,
+        prequery: &Blaze2BaseFoldPrequeryPublic<H>,
+        layout: &SystematicAugmentedRfcLayout,
+        fold_challenges: &[B128],
+    ) -> Result<(), Error> {
+        if self.steps.len() != layout.num_rounds() {
+            return Err(Error::InvalidPcsOpen(
+                "compiler parity fold path has wrong round count".to_string(),
+            ));
+        }
+        let mut current_physical_index = self.top_physical_index;
+        for (round, step) in self.steps.iter().enumerate() {
+            if step.round != round {
+                return Err(Error::InvalidPcsOpen(
+                    "compiler parity fold path round is out of order".to_string(),
+                ));
+            }
+            let current_len = layout.codeword_len() >> round;
+            let half_len = current_len >> 1;
+            let output_physical_index = current_physical_index & (half_len - 1);
+            let pair = layout.fold_pair(round, output_physical_index)?;
+            if step.output_physical_index != output_physical_index
+                || step.left_physical_index != pair.left
+                || step.right_physical_index != pair.right
+                || step.folded_physical_index != output_physical_index
+            {
+                return Err(Error::InvalidPcsOpen(
+                    "compiler parity fold path indices do not follow the fold pair".to_string(),
+                ));
+            }
+
+            verify_parity_layer_opening(
+                prequery,
+                layout,
+                round,
+                pair.left,
+                step.left_logical_index,
+                step.left_value,
+                &step.left_path,
+            )?;
+            verify_parity_layer_opening(
+                prequery,
+                layout,
+                round,
+                pair.right,
+                step.right_logical_index,
+                step.right_value,
+                &step.right_path,
+            )?;
+            verify_parity_layer_opening(
+                prequery,
+                layout,
+                round + 1,
+                output_physical_index,
+                step.folded_logical_index,
+                step.folded_value,
+                &step.folded_path,
+            )?;
+
+            let folded =
+                fold_rfc_parity_pair(step.left_value, step.right_value, fold_challenges[round]);
+            if folded != step.folded_value {
+                return Err(Error::InvalidPcsOpen(
+                    "compiler parity fold path value does not satisfy fold equation".to_string(),
+                ));
+            }
+            current_physical_index = output_physical_index;
+        }
+        Ok(())
+    }
+}
+
 impl<H: Hash> AuxiliaryOracleCommitment<H> {
     pub fn commit_values(values: Vec<B128>) -> Result<Self, Error> {
         if values.is_empty() {
@@ -963,6 +1304,10 @@ pub fn absorb_blaze2_basefold_prequery_public<H: Hash, S>(
 ) {
     transcript.absorb("blaze2-basefold-prequery-public-v1");
     absorb_compiler_parity_public_commitment(transcript, &prequery.compiler_parity);
+    absorb_usize(transcript, prequery.folded_parity_layers.len());
+    for (round, public) in prequery.folded_parity_layers.iter().enumerate() {
+        absorb_folded_parity_public_commitment(transcript, round + 1, public);
+    }
     match &prequery.auxiliary {
         Some(auxiliary) => {
             transcript.absorb("auxiliary-oracle-present");
@@ -970,6 +1315,34 @@ pub fn absorb_blaze2_basefold_prequery_public<H: Hash, S>(
         }
         None => transcript.absorb("auxiliary-oracle-absent"),
     }
+}
+
+fn absorb_blaze2_basefold_fold_chain_prefix<H: Hash, S>(
+    transcript: &mut CfriTranscript<H, S>,
+    spec: &Blaze2BaseFoldBackendSpec,
+    compiler_parity: &CompilerParityPublicCommitment<H>,
+    auxiliary: Option<&AuxiliaryOraclePublicCommitment<H>>,
+) {
+    transcript.absorb("blaze2-basefold-fold-chain-v1");
+    absorb_blaze2_basefold_backend_spec(transcript, spec);
+    absorb_compiler_parity_public_commitment(transcript, compiler_parity);
+    match auxiliary {
+        Some(auxiliary) => {
+            transcript.absorb("auxiliary-oracle-present");
+            absorb_auxiliary_oracle_public_commitment(transcript, auxiliary);
+        }
+        None => transcript.absorb("auxiliary-oracle-absent"),
+    }
+}
+
+fn absorb_folded_parity_public_commitment<H: Hash, S>(
+    transcript: &mut CfriTranscript<H, S>,
+    round: usize,
+    public: &CompilerParityPublicCommitment<H>,
+) {
+    transcript.absorb("folded-parity-public-commitment-v1");
+    absorb_usize(transcript, round);
+    absorb_compiler_parity_public_commitment(transcript, public);
 }
 
 pub fn absorb_auxiliary_oracle_public_commitment<H: Hash, S>(
@@ -1175,6 +1548,132 @@ fn validate_query_schedule_spec(
         ));
     }
     Ok(())
+}
+
+fn fold_challenges_from_prequery<H: Hash>(
+    spec: &Blaze2BaseFoldBackendSpec,
+    prequery: &Blaze2BaseFoldPrequeryPublic<H>,
+) -> Result<Vec<B128>, Error> {
+    let layout = SystematicAugmentedRfcLayout::new(spec.compiler_code.clone())?;
+    if prequery.folded_parity_layers.len() != layout.num_rounds() {
+        return Err(Error::InvalidPcsOpen(
+            "folded parity prequery layer count does not match compiler layout".to_string(),
+        ));
+    }
+
+    let mut transcript = CfriTranscript::<H>::new();
+    absorb_blaze2_basefold_fold_chain_prefix(
+        &mut transcript,
+        spec,
+        &prequery.compiler_parity,
+        prequery.auxiliary.as_ref(),
+    );
+    let mut challenges = Vec::with_capacity(layout.num_rounds());
+    for round in 0..layout.num_rounds() {
+        transcript.absorb("systematic-basefold-fold-challenge-v1");
+        absorb_usize(&mut transcript, round);
+        challenges.push(transcript.squeeze());
+        absorb_folded_parity_public_commitment(
+            &mut transcript,
+            round + 1,
+            &prequery.folded_parity_layers[round],
+        );
+    }
+    Ok(challenges)
+}
+
+fn parity_values_at_round(
+    layout: &SystematicAugmentedRfcLayout,
+    round: usize,
+    physical_codeword: &[B128],
+) -> Result<Vec<B128>, Error> {
+    let message_len = layout.message_len_at_round(round)?;
+    let parity_len = message_len * layout.parity_expansion_factor();
+    let codeword_len = message_len * (layout.parity_expansion_factor() + 1);
+    if physical_codeword.len() != codeword_len {
+        return Err(Error::InvalidPcsOpen(format!(
+            "physical folded codeword has length {}, expected {codeword_len} at round {round}",
+            physical_codeword.len()
+        )));
+    }
+
+    let mut parity = vec![B128::ZERO; parity_len];
+    for (physical_index, &value) in physical_codeword.iter().enumerate() {
+        let address = layout.physical_to_logical_at_round(round, physical_index)?;
+        if address.part == CodewordPart::Parity {
+            parity[address.local_index] = value;
+        }
+    }
+    Ok(parity)
+}
+
+fn parity_query_for_physical_index<H: Hash>(
+    layout: &SystematicAugmentedRfcLayout,
+    round: usize,
+    top: &CompilerParityCommitment<H>,
+    folded: &[CompilerParityCommitment<H>],
+    physical_index: usize,
+) -> Result<CompilerParityQuery<H>, Error> {
+    let address = layout.physical_to_logical_at_round(round, physical_index)?;
+    if address.part != CodewordPart::Parity {
+        return Err(Error::InvalidPcsOpen(
+            "compiler parity fold path tried to authenticate a systematic position as parity"
+                .to_string(),
+        ));
+    }
+    parity_commitment_at_round(top, folded, round)?.query(address.local_index)
+}
+
+fn parity_commitment_at_round<'a, H: Hash>(
+    top: &'a CompilerParityCommitment<H>,
+    folded: &'a [CompilerParityCommitment<H>],
+    round: usize,
+) -> Result<&'a CompilerParityCommitment<H>, Error> {
+    if round == 0 {
+        return Ok(top);
+    }
+    folded.get(round - 1).ok_or_else(|| {
+        Error::InvalidPcsOpen(format!(
+            "missing folded parity commitment for round {round}"
+        ))
+    })
+}
+
+fn parity_public_at_round<'a, H: Hash>(
+    prequery: &'a Blaze2BaseFoldPrequeryPublic<H>,
+    round: usize,
+) -> Result<&'a CompilerParityPublicCommitment<H>, Error> {
+    if round == 0 {
+        return Ok(&prequery.compiler_parity);
+    }
+    prequery.folded_parity_layers.get(round - 1).ok_or_else(|| {
+        Error::InvalidPcsOpen(format!(
+            "missing folded parity public commitment for round {round}"
+        ))
+    })
+}
+
+fn verify_parity_layer_opening<H: Hash>(
+    prequery: &Blaze2BaseFoldPrequeryPublic<H>,
+    layout: &SystematicAugmentedRfcLayout,
+    round: usize,
+    physical_index: usize,
+    logical_index: usize,
+    value: B128,
+    path: &[Output<H>],
+) -> Result<(), Error> {
+    let address = layout.physical_to_logical_at_round(round, physical_index)?;
+    if address.part != CodewordPart::Parity || address.local_index != logical_index {
+        return Err(Error::InvalidPcsOpen(
+            "parity layer opening does not match the fold-path physical address".to_string(),
+        ));
+    }
+    CompilerParityQuery {
+        logical_index,
+        value,
+        path: path.to_vec(),
+    }
+    .authenticate(parity_public_at_round(prequery, round)?)
 }
 
 fn squeeze_bounded_index<H: Hash, S>(
@@ -1956,6 +2455,21 @@ mod tests {
             params.compiler_code().layout().parity_len()
         );
         assert_eq!(
+            prequery.folded_parity_layers.len(),
+            params.compiler_code().layout().num_rounds()
+        );
+        for (round, public) in prequery.folded_parity_layers.iter().enumerate() {
+            assert_eq!(
+                public.len,
+                params
+                    .compiler_code()
+                    .layout()
+                    .message_len_at_round(round + 1)
+                    .unwrap()
+                    * params.compiler_code().layout().parity_expansion_factor()
+            );
+        }
+        assert_eq!(
             prequery.auxiliary.as_ref().unwrap().len,
             params.spec().auxiliary_oracle_len
         );
@@ -1991,6 +2505,53 @@ mod tests {
                 .verify_query_proof(&prequery, &schedule, &bad_proof, &top_queries)
                 .is_err());
         }
+    }
+
+    #[test]
+    fn backend_compiler_parity_fold_paths_are_checked() {
+        let params = Blaze2BaseFoldBackendParams::new(blaze2_backend_spec()).unwrap();
+        let folded_codeword = message(params.compiler_code().layout().message_len(), 149);
+        let auxiliary = message(params.spec().auxiliary_oracle_len, 151);
+        let (prequery, state) = params
+            .prove_prequery::<Blake2s>(&folded_codeword, &auxiliary)
+            .unwrap();
+        let schedule = explicit_schedule(params.compiler_code().layout());
+        let proof = params.open_query_proof(&state, &schedule).unwrap();
+        let top_queries = schedule
+            .input_queries()
+            .iter()
+            .map(|query| TopQuery {
+                index: query.logical_index,
+                value: folded_codeword[query.logical_index],
+            })
+            .collect::<Vec<_>>();
+
+        assert_eq!(proof.compiler_parity_folds.paths.len(), 2);
+        assert_eq!(
+            proof.compiler_parity_folds.paths[0].steps.len(),
+            params.compiler_code().layout().num_rounds()
+        );
+        params
+            .verify_query_proof(&prequery, &schedule, &proof, &top_queries)
+            .unwrap();
+
+        let mut tampered_value = proof.clone();
+        tampered_value.compiler_parity_folds.paths[0].steps[0].folded_value += B128::ONE;
+        assert!(params
+            .verify_query_proof(&prequery, &schedule, &tampered_value, &top_queries)
+            .is_err());
+
+        let mut tampered_path = proof.clone();
+        tampered_path.compiler_parity_folds.paths[0].steps[0].left_path[0][0] ^= 1;
+        assert!(params
+            .verify_query_proof(&prequery, &schedule, &tampered_path, &top_queries)
+            .is_err());
+
+        let mut tampered_root = prequery;
+        tampered_root.folded_parity_layers[0].root[0] ^= 1;
+        assert!(params
+            .verify_query_proof(&tampered_root, &schedule, &proof, &top_queries)
+            .is_err());
     }
 
     #[test]

@@ -405,6 +405,12 @@ fn blaze2_basefold_outer_bytes_with_field_bytes(
     let backend_prequery_bytes = proof.backend_prequery.compiler_parity.root.len()
         + proof
             .backend_prequery
+            .folded_parity_layers
+            .iter()
+            .map(|layer| layer.root.len())
+            .sum::<usize>()
+        + proof
+            .backend_prequery
             .auxiliary
             .as_ref()
             .map(|auxiliary| auxiliary.root.len())
@@ -437,6 +443,35 @@ fn blaze2_basefold_backend_query_bytes_with_field_bytes(
         .iter()
         .map(|query| field_bytes + query.path.iter().map(|digest| digest.len()).sum::<usize>())
         .sum::<usize>()
+        + proof
+            .backend_proof
+            .compiler_parity_folds
+            .paths
+            .iter()
+            .map(|path| {
+                path.steps
+                    .iter()
+                    .map(|step| {
+                        3 * field_bytes
+                            + step
+                                .left_path
+                                .iter()
+                                .map(|digest| digest.len())
+                                .sum::<usize>()
+                            + step
+                                .right_path
+                                .iter()
+                                .map(|digest| digest.len())
+                                .sum::<usize>()
+                            + step
+                                .folded_path
+                                .iter()
+                                .map(|digest| digest.len())
+                                .sum::<usize>()
+                    })
+                    .sum::<usize>()
+            })
+            .sum::<usize>()
         + proof
             .backend_proof
             .auxiliary
@@ -1229,7 +1264,7 @@ fn blaze2_basefold_outer_shape_matches_paper_after_field_byte_correction() {
     let paper_field_bytes = 8;
     let hash_bytes = 32;
     let outer_path_len = params.praa().packed().codeword_len().trailing_zeros() as usize;
-    let backend_prequery_bytes = hash_bytes;
+    let backend_prequery_bytes = (1 + params.compiler_code().layout().num_rounds()) * hash_bytes;
     let expected_outer = t * paper_field_bytes
         + backend_prequery_bytes
         + q_raa_input * (t * paper_field_bytes + outer_path_len * hash_bytes);
@@ -1248,6 +1283,11 @@ fn blaze2_basefold_outer_shape_matches_paper_after_field_byte_correction() {
         proof.backend_proof.compiler_parity.queries.len(),
         q_backend_proof,
         "backend proof query count is separate from Q_RAA input openings"
+    );
+    assert_eq!(
+        proof.backend_prequery.folded_parity_layers.len(),
+        params.compiler_code().layout().num_rounds(),
+        "folded-layer roots are backend prequery commitments, not extra Blaze input openings"
     );
     assert!(blaze2_basefold_backend_query_bytes_with_field_bytes(&proof, paper_field_bytes) > 0);
 }

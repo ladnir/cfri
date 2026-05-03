@@ -532,8 +532,7 @@ fn blaze2_basefold_backend_query_bytes_with_field_bytes(
             .as_ref()
             .map(|auxiliary| {
                 auxiliary
-                    .queries
-                    .iter()
+                    .all_queries()
                     .map(|query| {
                         field_bytes + query.path.iter().map(|digest| digest.len()).sum::<usize>()
                     })
@@ -1337,8 +1336,7 @@ fn blaze2_basefold_opening_verifies_with_typed_backend_schedule() {
             .auxiliary
             .as_ref()
             .unwrap()
-            .queries
-            .len(),
+            .query_count(),
         schedule.expected_auxiliary_query_proof_count()
     );
     verify_blaze2_basefold_opening(&params, &commitment.public(), &claim, &proof).unwrap();
@@ -1396,8 +1394,7 @@ fn blaze2_basefold_outer_shape_matches_paper_after_field_byte_correction() {
             .auxiliary
             .as_ref()
             .unwrap()
-            .queries
-            .len(),
+            .query_count(),
         schedule.expected_auxiliary_query_proof_count(),
         "auxiliary proof carries exactly the schedule-required relation and eval-accumulator openings"
     );
@@ -1474,8 +1471,8 @@ fn blaze2_basefold_opening_derives_configured_auxiliary_trace() {
         .auxiliary
         .as_mut()
         .unwrap()
-        .queries
-        .last_mut()
+        .eval_terminal_query
+        .as_mut()
         .unwrap()
         .value += B128::ONE;
     assert!(

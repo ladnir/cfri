@@ -2,11 +2,14 @@ use blake2::Blake2s256;
 use cfri::backend::{
     arithmetic::Field,
     blaze2::{
-        build_raa_trace, build_raa_trace_into, check_raa_folded_codeword_link, check_raa_trace_at,
-        evaluate_multilinear, evaluate_packed_rows_at_point_into, fold_packed_query_pair,
-        fold_packed_rows_into, pack_interleaved_rows, pack_interleaved_rows_into,
-        verify_raa_trace_spot_query, Blaze2RaaCommitment, Blaze2RaaQuery, Blaze2RaaTrace,
-        Blaze2RaaTraceCommitment, Blaze2RaaTraceSpotQuery,
+        build_raa_aux_trace, build_raa_trace, build_raa_trace_into, check_raa_folded_codeword_link,
+        check_raa_trace_at, evaluate_multilinear, evaluate_packed_rows_at_point_into,
+        fold_interleaved_column, fold_packed_query_pair, fold_packed_rows_into,
+        pack_interleaved_rows, pack_interleaved_rows_into, verify_raa_aux_trace_spot_query,
+        verify_raa_trace_spot_query, Blaze2InterleavedCodewordCommitment,
+        Blaze2InterleavedColumnQuery, Blaze2RaaAuxTrace, Blaze2RaaAuxTraceCommitment,
+        Blaze2RaaCommitment, Blaze2RaaQuery, Blaze2RaaTrace, Blaze2RaaTraceCommitment,
+        Blaze2RaaTraceSpotQuery,
     },
     blaze_transcript::BlazeBlake2sTranscript,
     code::PackedRaaCode,
@@ -50,6 +53,39 @@ fn raa_trace_fixture(seed: u8) -> (PackedRaaCode, Vec<B128>, Blaze2RaaTrace) {
     fold_packed_rows_into(&packed, &challenges, &mut folded_message).unwrap();
     let trace = build_raa_trace(&code, &folded_message).unwrap();
     (code, folded_message, trace)
+}
+
+fn paper_raa_fixture(
+    seed: u8,
+) -> (
+    PackedRaaCode,
+    Vec<Vec<B128>>,
+    Vec<B128>,
+    Vec<B128>,
+    Blaze2RaaAuxTrace,
+) {
+    let mut rng = ChaCha8Rng::from_seed([seed; 32]);
+    let code = PackedRaaCode::new(8, 4, &mut rng);
+    let rows = rows(4, 8);
+    let packed = pack_interleaved_rows(&rows).unwrap();
+    let challenges = vec![B128::from(17 + seed as u64), B128::from(39 + seed as u64)];
+    let mut folded_message = vec![B128::ZERO; code.message_len()];
+    fold_packed_rows_into(&packed, &challenges, &mut folded_message).unwrap();
+    let codeword_rows = code.encode_rows(&packed);
+    let trace = build_raa_aux_trace(&code, &folded_message).unwrap();
+    (code, codeword_rows, challenges, folded_message, trace)
+}
+
+fn paper_column_openings<H: Hash>(
+    commitment: &Blaze2InterleavedCodewordCommitment<H>,
+    index: usize,
+) -> Vec<Blaze2InterleavedColumnQuery<H>> {
+    let mut queries = Vec::with_capacity(2);
+    queries.push(commitment.query(index).unwrap());
+    if index > 0 {
+        queries.push(commitment.query(index - 1).unwrap());
+    }
+    queries
 }
 
 fn tamper_opened_trace_value<H: Hash>(
@@ -438,6 +474,143 @@ fn blaze2_raa_trace_spot_queries_reject_authenticated_bad_second_accumulator_lay
     let opening = comm.spot_query(&code, 8).unwrap();
 
     assert!(opening.verify(&code, &message, comm.root()).is_err());
+}
+
+#[test]
+fn blaze2_paper_raa_aux_trace_links_to_committed_columns() {
+    let (code, codeword_rows, challenges, folded_message, trace) = paper_raa_fixture(25);
+    let column_comm =
+        Blaze2InterleavedCodewordCommitment::<Blake2s256>::commit_codeword_rows(&codeword_rows)
+            .unwrap();
+    let aux_comm = Blaze2RaaAuxTraceCommitment::<Blake2s256>::commit_trace(&trace).unwrap();
+    let folded_codeword = code.encode_row(&folded_message);
+
+    assert_eq!(column_comm.num_rows(), challenges.len());
+    assert_eq!(column_comm.codeword_len(), code.codeword_len());
+    assert_eq!(aux_comm.num_rows(), 3);
+    assert_eq!(aux_comm.codeword_len(), code.codeword_len());
+
+    for index in [0usize, 1, 6, 7, 17, 30, 31] {
+        let current_column = column_comm.query(index).unwrap();
+        assert_eq!(
+            fold_interleaved_column(&current_column, &challenges).unwrap(),
+            folded_codeword[index]
+        );
+
+        let opening = aux_comm.spot_query(&code, index).unwrap();
+        let columns = paper_column_openings(&column_comm, index);
+        opening
+            .verify(
+                &code,
+                &folded_message,
+                aux_comm.root(),
+                column_comm.root(),
+                &columns,
+                &challenges,
+            )
+            .unwrap();
+        verify_raa_aux_trace_spot_query(
+            &code,
+            &folded_message,
+            aux_comm.root(),
+            &opening,
+            column_comm.root(),
+            &columns,
+            &challenges,
+        )
+        .unwrap();
+    }
+}
+
+#[test]
+fn blaze2_paper_raa_aux_trace_rejects_authenticated_bad_auxiliary_layer() {
+    let (code, codeword_rows, challenges, folded_message, mut trace) = paper_raa_fixture(26);
+    trace.u4[7] += B128::ONE;
+    let column_comm =
+        Blaze2InterleavedCodewordCommitment::<Blake2s256>::commit_codeword_rows(&codeword_rows)
+            .unwrap();
+    let aux_comm = Blaze2RaaAuxTraceCommitment::<Blake2s256>::commit_trace(&trace).unwrap();
+    let opening = aux_comm.spot_query(&code, 7).unwrap();
+    let columns = paper_column_openings(&column_comm, 7);
+
+    assert!(opening
+        .verify(
+            &code,
+            &folded_message,
+            aux_comm.root(),
+            column_comm.root(),
+            &columns,
+            &challenges,
+        )
+        .is_err());
+}
+
+#[test]
+fn blaze2_paper_raa_aux_trace_rejects_authenticated_bad_committed_column() {
+    let (code, mut codeword_rows, challenges, folded_message, trace) = paper_raa_fixture(27);
+    codeword_rows[0][6] += B128::ONE;
+    let column_comm =
+        Blaze2InterleavedCodewordCommitment::<Blake2s256>::commit_codeword_rows(&codeword_rows)
+            .unwrap();
+    let aux_comm = Blaze2RaaAuxTraceCommitment::<Blake2s256>::commit_trace(&trace).unwrap();
+    let opening = aux_comm.spot_query(&code, 6).unwrap();
+    let columns = paper_column_openings(&column_comm, 6);
+
+    assert!(opening
+        .verify(
+            &code,
+            &folded_message,
+            aux_comm.root(),
+            column_comm.root(),
+            &columns,
+            &challenges,
+        )
+        .is_err());
+}
+
+#[test]
+fn blaze2_paper_raa_aux_trace_rejects_tampered_column_opening() {
+    let (code, codeword_rows, challenges, folded_message, trace) = paper_raa_fixture(28);
+    let column_comm =
+        Blaze2InterleavedCodewordCommitment::<Blake2s256>::commit_codeword_rows(&codeword_rows)
+            .unwrap();
+    let aux_comm = Blaze2RaaAuxTraceCommitment::<Blake2s256>::commit_trace(&trace).unwrap();
+    let opening = aux_comm.spot_query(&code, 6).unwrap();
+    let mut columns = paper_column_openings(&column_comm, 6);
+    columns[0].values[0] += B128::ONE;
+
+    assert!(opening
+        .verify(
+            &code,
+            &folded_message,
+            aux_comm.root(),
+            column_comm.root(),
+            &columns,
+            &challenges,
+        )
+        .is_err());
+}
+
+#[test]
+fn blaze2_paper_raa_aux_trace_rejects_missing_previous_column() {
+    let (code, codeword_rows, challenges, folded_message, trace) = paper_raa_fixture(29);
+    let column_comm =
+        Blaze2InterleavedCodewordCommitment::<Blake2s256>::commit_codeword_rows(&codeword_rows)
+            .unwrap();
+    let aux_comm = Blaze2RaaAuxTraceCommitment::<Blake2s256>::commit_trace(&trace).unwrap();
+    let opening = aux_comm.spot_query(&code, 6).unwrap();
+    let columns = vec![column_comm.query(6).unwrap()];
+
+    assert!(opening
+        .verify(
+            &code,
+            &folded_message,
+            aux_comm.root(),
+            column_comm.root(),
+            &columns,
+            &challenges,
+        )
+        .is_err());
 }
 
 #[test]

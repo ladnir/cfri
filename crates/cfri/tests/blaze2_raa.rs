@@ -409,6 +409,7 @@ fn blaze2_basefold_outer_bytes_with_field_bytes(
             .iter()
             .map(|layer| layer.root.len())
             .sum::<usize>()
+        + proof.backend_prequery.terminal_codeword.len() * field_bytes
         + proof
             .backend_prequery
             .auxiliary
@@ -1264,7 +1265,8 @@ fn blaze2_basefold_outer_shape_matches_paper_after_field_byte_correction() {
     let paper_field_bytes = 8;
     let hash_bytes = 32;
     let outer_path_len = params.praa().packed().codeword_len().trailing_zeros() as usize;
-    let backend_prequery_bytes = (1 + params.compiler_code().layout().num_rounds()) * hash_bytes;
+    let backend_prequery_bytes = (1 + params.compiler_code().layout().num_rounds()) * hash_bytes
+        + (params.compiler_code().layout().parity_expansion_factor() + 1) * paper_field_bytes;
     let expected_outer = t * paper_field_bytes
         + backend_prequery_bytes
         + q_raa_input * (t * paper_field_bytes + outer_path_len * hash_bytes);

@@ -111,6 +111,7 @@ pub struct AuxiliaryOracleQueryProof<H: Hash> {
 pub struct Blaze2BaseFoldPrequeryPublic<H: Hash> {
     pub compiler_parity: CompilerParityPublicCommitment<H>,
     pub folded_parity_layers: Vec<CompilerParityPublicCommitment<H>>,
+    pub terminal_codeword: Vec<B128>,
     pub auxiliary: Option<AuxiliaryOraclePublicCommitment<H>>,
 }
 
@@ -397,6 +398,10 @@ impl Blaze2BaseFoldBackendParams {
         let public = Blaze2BaseFoldPrequeryPublic {
             compiler_parity: compiler_parity.public(),
             folded_parity_layers: folded_parity_public,
+            terminal_codeword: physical_layers
+                .last()
+                .expect("folded parity prover returns at least the top physical layer")
+                .clone(),
             auxiliary: auxiliary.as_ref().map(AuxiliaryOracleCommitment::public),
         };
         Ok((
@@ -468,7 +473,7 @@ impl Blaze2BaseFoldBackendParams {
         )?;
         proof.compiler_parity_folds.verify(
             prequery,
-            self.compiler_code.layout(),
+            self.compiler_code(),
             &fold_challenges_from_prequery(self.spec(), prequery)?,
             schedule,
         )?;
@@ -996,10 +1001,11 @@ impl<H: Hash> CompilerParityFoldQueryProof<H> {
     pub fn verify(
         &self,
         prequery: &Blaze2BaseFoldPrequeryPublic<H>,
-        layout: &SystematicAugmentedRfcLayout,
+        code: &SystematicAugmentedRfcCode,
         fold_challenges: &[B128],
         schedule: &HolographicQuerySchedule,
     ) -> Result<(), Error> {
+        let layout = code.layout();
         if prequery.folded_parity_layers.len() != layout.num_rounds()
             || fold_challenges.len() != layout.num_rounds()
         {
@@ -1007,6 +1013,7 @@ impl<H: Hash> CompilerParityFoldQueryProof<H> {
                 "folded parity prequery layer count does not match layout".to_string(),
             ));
         }
+        verify_terminal_codeword(prequery, code)?;
 
         let expected_count = schedule
             .proof_queries()
@@ -1307,6 +1314,11 @@ pub fn absorb_blaze2_basefold_prequery_public<H: Hash, S>(
     absorb_usize(transcript, prequery.folded_parity_layers.len());
     for (round, public) in prequery.folded_parity_layers.iter().enumerate() {
         absorb_folded_parity_public_commitment(transcript, round + 1, public);
+    }
+    transcript.absorb("terminal-codeword-v1");
+    absorb_usize(transcript, prequery.terminal_codeword.len());
+    for value in &prequery.terminal_codeword {
+        transcript.absorb(value);
     }
     match &prequery.auxiliary {
         Some(auxiliary) => {
@@ -1674,6 +1686,56 @@ fn verify_parity_layer_opening<H: Hash>(
         path: path.to_vec(),
     }
     .authenticate(parity_public_at_round(prequery, round)?)
+}
+
+fn verify_terminal_codeword<H: Hash>(
+    prequery: &Blaze2BaseFoldPrequeryPublic<H>,
+    code: &SystematicAugmentedRfcCode,
+) -> Result<(), Error> {
+    let layout = code.layout();
+    let terminal_round = layout.num_rounds();
+    let terminal_len = layout.parity_expansion_factor() + 1;
+    if prequery.terminal_codeword.len() != terminal_len {
+        return Err(Error::InvalidPcsOpen(format!(
+            "terminal codeword has length {}, expected {terminal_len}",
+            prequery.terminal_codeword.len()
+        )));
+    }
+
+    let terminal_address = layout.physical_to_logical_at_round(terminal_round, 0)?;
+    if terminal_address.part != CodewordPart::Systematic || terminal_address.local_index != 0 {
+        return Err(Error::InvalidPcsOpen(
+            "terminal systematic position is not at the expected physical address".to_string(),
+        ));
+    }
+    let terminal_message = [prequery.terminal_codeword[0]];
+    let mut expected = vec![B128::ZERO; terminal_len];
+    let mut parity = vec![B128::ZERO; layout.parity_expansion_factor()];
+    code.encode_physical_codeword_at_round_into(
+        terminal_round,
+        &terminal_message,
+        &mut expected,
+        &mut parity,
+    )?;
+    if expected != prequery.terminal_codeword {
+        return Err(Error::InvalidPcsOpen(
+            "terminal codeword does not satisfy the base systematic RFC code".to_string(),
+        ));
+    }
+
+    let terminal_parity =
+        parity_values_at_round(layout, terminal_round, &prequery.terminal_codeword)?;
+    let terminal_public = parity_public_at_round(prequery, terminal_round)?;
+    let terminal_commitment = CompilerParityCommitment::<H>::commit_values(terminal_parity)?;
+    let terminal_from_clear = terminal_commitment.public();
+    if terminal_from_clear.len != terminal_public.len
+        || terminal_from_clear.root != terminal_public.root
+    {
+        return Err(Error::InvalidPcsOpen(
+            "terminal parity root does not match the clear terminal codeword".to_string(),
+        ));
+    }
+    Ok(())
 }
 
 fn squeeze_bounded_index<H: Hash, S>(
@@ -2547,10 +2609,16 @@ mod tests {
             .verify_query_proof(&prequery, &schedule, &tampered_path, &top_queries)
             .is_err());
 
-        let mut tampered_root = prequery;
+        let mut tampered_root = prequery.clone();
         tampered_root.folded_parity_layers[0].root[0] ^= 1;
         assert!(params
             .verify_query_proof(&tampered_root, &schedule, &proof, &top_queries)
+            .is_err());
+
+        let mut tampered_terminal = prequery;
+        tampered_terminal.terminal_codeword[0] += B128::ONE;
+        assert!(params
+            .verify_query_proof(&tampered_terminal, &schedule, &proof, &top_queries)
             .is_err());
     }
 

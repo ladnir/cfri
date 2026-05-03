@@ -24,7 +24,8 @@ use cfri::backend::{
     code::PackedRaaCode,
     hash::{Blake2s, Hash, Output},
     systematic_basefold::{
-        required_blaze2_basefold_auxiliary_oracle_len, BackendProofQueryDomain,
+        required_blaze2_basefold_auxiliary_oracle_len, required_blaze2_basefold_eval_binding_len,
+        required_blaze2_basefold_relation_auxiliary_len, BackendProofQueryDomain,
         Blaze2BaseFoldBackendParams, Blaze2BaseFoldBackendSpec, Blaze2BaseFoldOpenRequest,
         HolographicQuerySchedule, SystematicFoldableCodeSpec,
     },
@@ -1511,6 +1512,24 @@ fn blaze2_basefold_backend_rejects_arbitrary_auxiliary_length() {
     };
 
     assert!(Blaze2BaseFoldBackendParams::new(spec).is_err());
+}
+
+#[test]
+fn blaze2_basefold_auxiliary_length_splits_relation_and_eval_binding_rows() {
+    let spec = blaze2_code_spec(57);
+    assert_eq!(
+        required_blaze2_basefold_relation_auxiliary_len(&spec),
+        3 * spec.praa_codeword_len
+    );
+    assert_eq!(
+        required_blaze2_basefold_eval_binding_len(&spec),
+        spec.praa_codeword_len
+    );
+    assert_eq!(
+        required_blaze2_basefold_auxiliary_oracle_len(&spec),
+        required_blaze2_basefold_relation_auxiliary_len(&spec)
+            + required_blaze2_basefold_eval_binding_len(&spec)
+    );
 }
 
 #[test]

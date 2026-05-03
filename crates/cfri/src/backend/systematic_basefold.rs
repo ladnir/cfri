@@ -16,12 +16,24 @@ const RAA_AUX_U3_ROW: usize = 1;
 const RAA_AUX_U4_ROW: usize = 2;
 const RAA_AUX_EVAL_ROW: usize = 3;
 const RAA_AUX_RELATION_ROW_COUNT: usize = 3;
+const RAA_AUX_EVAL_BINDING_ROW_COUNT: usize = 1;
 const RAA_AUX_ROW_COUNT: usize = 4;
 
+pub const BLAZE2_BASEFOLD_RELATION_AUXILIARY_ROW_COUNT: usize = RAA_AUX_RELATION_ROW_COUNT;
+pub const BLAZE2_BASEFOLD_EVAL_BINDING_ROW_COUNT: usize = RAA_AUX_EVAL_BINDING_ROW_COUNT;
 pub const BLAZE2_BASEFOLD_AUXILIARY_ROW_COUNT: usize = RAA_AUX_ROW_COUNT;
 
 pub fn required_blaze2_basefold_auxiliary_oracle_len(spec: &Blaze2CodeSpec) -> usize {
-    spec.praa_codeword_len * BLAZE2_BASEFOLD_AUXILIARY_ROW_COUNT
+    required_blaze2_basefold_relation_auxiliary_len(spec)
+        + required_blaze2_basefold_eval_binding_len(spec)
+}
+
+pub fn required_blaze2_basefold_relation_auxiliary_len(spec: &Blaze2CodeSpec) -> usize {
+    spec.praa_codeword_len * BLAZE2_BASEFOLD_RELATION_AUXILIARY_ROW_COUNT
+}
+
+pub fn required_blaze2_basefold_eval_binding_len(spec: &Blaze2CodeSpec) -> usize {
+    spec.praa_codeword_len * BLAZE2_BASEFOLD_EVAL_BINDING_ROW_COUNT
 }
 
 #[derive(Clone, Copy, Debug, Eq, PartialEq)]
@@ -1771,15 +1783,18 @@ fn validate_blaze2_backend_spec(spec: &Blaze2BaseFoldBackendSpec) -> Result<(), 
             "compiler systematic length must equal PRAA codeword length".to_string(),
         ));
     }
-    let expected_auxiliary_len = required_blaze2_basefold_auxiliary_oracle_len(&spec.praa);
+    let expected_relation_auxiliary_len =
+        required_blaze2_basefold_relation_auxiliary_len(&spec.praa);
+    let expected_eval_binding_len = required_blaze2_basefold_eval_binding_len(&spec.praa);
+    let expected_auxiliary_len = expected_relation_auxiliary_len + expected_eval_binding_len;
     if spec.auxiliary_oracle_len == 0 {
         return Err(Error::InvalidPcsParam(format!(
-            "Blaze2 BaseFold backend needs the flattened PRAA auxiliary/evaluation trace length {expected_auxiliary_len}"
+            "Blaze2 BaseFold backend needs {expected_relation_auxiliary_len} relation auxiliary entries plus {expected_eval_binding_len} eval-binding entries"
         )));
     }
     if spec.auxiliary_oracle_len != expected_auxiliary_len {
         return Err(Error::InvalidPcsParam(format!(
-            "auxiliary oracle length must be the flattened PRAA auxiliary/evaluation trace length {expected_auxiliary_len}"
+            "auxiliary oracle length must be {expected_auxiliary_len}: {expected_relation_auxiliary_len} relation auxiliary entries plus {expected_eval_binding_len} eval-binding entries"
         )));
     }
     if spec.q_raa_input & 1 != 0 {

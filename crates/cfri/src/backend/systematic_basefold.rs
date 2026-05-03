@@ -1693,8 +1693,12 @@ impl HolographicQuerySchedule {
             let len = layout.systematic_len();
             let u4_offset = raa_auxiliary_index(RAA_AUX_U4_ROW, 0, len);
             let eval_offset = raa_auxiliary_index(RAA_AUX_EVAL_ROW, 0, len);
-            for _ in 0..spot_count {
-                let index = squeeze_bounded_index(transcript, len - 1)? + 1;
+            for spot in 0..spot_count {
+                let index = if spot == 0 {
+                    len - 1
+                } else {
+                    squeeze_bounded_index(transcript, len - 1)? + 1
+                };
                 let current_input_query = input_queries.len();
                 input_queries.push(SystematicInputQuery {
                     logical_index: index,

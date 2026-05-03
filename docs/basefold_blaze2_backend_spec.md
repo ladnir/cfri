@@ -533,6 +533,14 @@ input_queries.len() == q_raa_input
 proof_queries.len() == q_backend_proof
 ```
 
+For the current accumulator-based eval-binding path, the first RAA final-accumulator spot is fixed
+to the terminal transition `(n_praa - 2, n_praa - 1)`. The remaining RAA final spots are sampled by
+the transcript. This still consumes exactly two `input_queries` per final-accumulator spot and
+therefore preserves the configured `q_raa_input`; it prevents a prover from satisfying only the
+opened terminal value while hiding the folded-evaluation defect in the unchecked terminal
+recurrence. This is a local hardening rule, not a replacement for the target Section 5 MLIOP
+global eval-binding argument.
+
 Do not sample one untyped list from the full compiler codeword and then hope the number of
 systematic hits is right. If a protocol step needs `q_raa_input` systematic input checks, sample
 from the systematic domain directly. If it needs parity/proof-oracle checks, sample those from the

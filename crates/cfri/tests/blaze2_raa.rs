@@ -16,9 +16,10 @@ use cfri::backend::{
         verify_raa_trace_spot_query, Blaze2BaseFoldOpeningProof, Blaze2Code, Blaze2CodeSeed,
         Blaze2CodeSpec, Blaze2FieldId, Blaze2FoldedMessageBackend, Blaze2FoldedMessageOpenRequest,
         Blaze2HashId, Blaze2InterleavedCodewordCommitment, Blaze2InterleavedColumnQuery,
-        Blaze2LeafLayout, Blaze2OpeningClaim, Blaze2OpeningProof, Blaze2PackingLayout,
-        Blaze2RaaAuxTrace, Blaze2RaaAuxTraceCommitment, Blaze2RaaCommitment, Blaze2RaaQuery,
-        Blaze2RaaTrace, Blaze2RaaTraceCommitment, Blaze2RaaTraceSpotQuery, RaaVariant,
+        Blaze2LeafLayout, Blaze2OpeningClaim, Blaze2OpeningProof, Blaze2OpeningQuery,
+        Blaze2PackingLayout, Blaze2RaaAuxTrace, Blaze2RaaAuxTraceCommitment, Blaze2RaaCommitment,
+        Blaze2RaaQuery, Blaze2RaaTrace, Blaze2RaaTraceCommitment, Blaze2RaaTraceSpotQuery,
+        RaaVariant,
     },
     blaze_transcript::BlazeBlake2sTranscript,
     code::PackedRaaCode,
@@ -1446,6 +1447,116 @@ fn blaze2_basefold_opening_rejects_row_eval_folded_eval_mismatch() {
         "test mutation must preserve the outer row-evaluation claim"
     );
     assert!(verify_blaze2_basefold_opening(&params, &commitment.public(), &claim, &proof).is_err());
+}
+
+#[test]
+fn blaze2_basefold_opening_rejects_terminal_only_eval_binding_defect() {
+    let (_, _, packed, commitment, claim, _) = opening_fixture(57);
+    let params = blaze2_basefold_backend_params(57, 4, 7);
+    let code = params.praa().packed();
+    let row_len = code.message_len();
+    let num_rows = packed.len();
+    let mut row_evals = vec![B128::ZERO; num_rows];
+    let mut scratch = vec![B128::ZERO; row_len.max(num_rows)];
+    let claim_value = evaluate_packed_matrix_at_point_into(
+        &packed,
+        &claim.row_point,
+        &claim.col_point,
+        &mut row_evals,
+        &mut scratch,
+    )
+    .unwrap();
+    assert_eq!(claim_value, claim.value);
+
+    let delta = B128::ONE;
+    row_evals[0] += claim.row_point[0] * delta;
+    row_evals[1] += delta;
+    assert_eq!(
+        evaluate_multilinear(&row_evals, &claim.row_point, &mut scratch[..num_rows]).unwrap(),
+        claim.value,
+        "test mutation must preserve the outer row-evaluation claim"
+    );
+
+    let public_commitment = commitment.public();
+    let mut transcript = CfriTranscript::<Blake2s256>::new();
+    absorb_blaze2_opening_public_with_code_spec(
+        &mut transcript,
+        params.praa(),
+        &public_commitment,
+        &claim,
+        params.spec().q_raa_input,
+    );
+    absorb_blaze2_opening_row_evals(&mut transcript, &row_evals);
+    let mut folding_challenges = vec![B128::ZERO; num_rows];
+    squeeze_blaze2_opening_folding_challenges(&mut transcript, &mut folding_challenges);
+
+    let claimed_folded_eval = row_evals
+        .iter()
+        .zip(folding_challenges.iter())
+        .fold(B128::ZERO, |acc, (&eval, &challenge)| {
+            acc + eval * challenge
+        });
+    let mut folded_message = vec![B128::ZERO; row_len];
+    fold_packed_rows_into(&packed, &folding_challenges, &mut folded_message).unwrap();
+    let actual_folded_eval =
+        evaluate_multilinear(&folded_message, &claim.col_point, &mut scratch[..row_len]).unwrap();
+    assert_ne!(
+        claimed_folded_eval, actual_folded_eval,
+        "test mutation must create a folded-eval mismatch"
+    );
+    absorb_blaze2_opening_folded_eval(&mut transcript, &claimed_folded_eval);
+
+    let backend_request = Blaze2BaseFoldOpenRequest {
+        col_point: &claim.col_point,
+        folded_eval: claimed_folded_eval,
+    };
+    let folded_codeword = code.encode_row(&folded_message);
+    let trace = build_raa_aux_trace(code, &folded_message).unwrap();
+    let weights = raa_codeword_eval_weights(code, backend_request.col_point).unwrap();
+    let mut eval_accumulator = vec![B128::ZERO; code.codeword_len()];
+    let mut running = B128::ZERO;
+    for i in 0..code.codeword_len() {
+        running += weights[i] * folded_codeword[i];
+        eval_accumulator[i] = running;
+    }
+    assert_eq!(
+        eval_accumulator[code.codeword_len() - 1],
+        actual_folded_eval
+    );
+    eval_accumulator[code.codeword_len() - 1] = claimed_folded_eval;
+
+    let mut auxiliary = Vec::with_capacity(params.spec().auxiliary_oracle_len);
+    auxiliary.extend_from_slice(&trace.u2);
+    auxiliary.extend_from_slice(&trace.u3);
+    auxiliary.extend_from_slice(&trace.u4);
+    auxiliary.extend_from_slice(&eval_accumulator);
+    let (backend_prequery, backend_state) = params
+        .prove_prequery::<Blake2s256>(&folded_codeword, &auxiliary, &backend_request)
+        .unwrap();
+    let schedule = params
+        .sample_query_schedule(&mut transcript, &backend_prequery, &backend_request)
+        .unwrap();
+    assert_eq!(
+        schedule.raa_final_queries()[0].index,
+        code.codeword_len() - 1,
+        "terminal transition must be checked before random RAA final spots"
+    );
+
+    let mut queries = Vec::with_capacity(schedule.input_queries().len());
+    for input_query in schedule.input_queries() {
+        queries.push(Blaze2OpeningQuery {
+            column_opening: commitment.query(input_query.logical_index).unwrap(),
+        });
+    }
+    let backend_proof = params.open_query_proof(&backend_state, &schedule).unwrap();
+    let proof = Blaze2BaseFoldOpeningProof {
+        row_evals,
+        backend_prequery,
+        backend_proof,
+        queries,
+    };
+
+    assert!(verify_blaze2_basefold_opening(&params, &public_commitment, &claim, &proof).is_err());
 }
 
 #[test]

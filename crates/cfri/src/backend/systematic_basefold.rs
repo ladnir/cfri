@@ -1,7 +1,10 @@
 use crate::backend::{
     arithmetic::Field,
     binary_extension_fields::B128,
-    blaze2::{absorb_blaze2_code_spec, Blaze2Code, Blaze2CodeSpec},
+    blaze2::{
+        absorb_blaze2_code_spec, fold_interleaved_column, Blaze2Code, Blaze2CodeSpec,
+        Blaze2InterleavedColumnQuery,
+    },
     hash::{Blake2s, Hash, Output},
     Error,
 };
@@ -357,6 +360,40 @@ impl Blaze2BaseFoldBackendParams {
             self.compiler_code.layout(),
             schedule,
         )
+    }
+
+    pub fn top_queries_from_interleaved_columns<H: Hash>(
+        &self,
+        schedule: &HolographicQuerySchedule,
+        column_openings: &[Blaze2InterleavedColumnQuery<H>],
+        folding_challenges: &[B128],
+    ) -> Result<Vec<TopQuery<B128>>, Error> {
+        if column_openings.len() != schedule.input_queries().len() {
+            return Err(Error::InvalidPcsOpen(format!(
+                "opened Blaze column count {} does not match backend input query count {}",
+                column_openings.len(),
+                schedule.input_queries().len()
+            )));
+        }
+
+        let mut top_queries = Vec::with_capacity(column_openings.len());
+        for (expected, column) in schedule.input_queries().iter().zip(column_openings) {
+            if column.index != expected.logical_index {
+                return Err(Error::InvalidPcsOpen(
+                    "opened Blaze column index does not match backend input query".to_string(),
+                ));
+            }
+            if column.index >= self.praa.packed().codeword_len() {
+                return Err(Error::InvalidPcsOpen(
+                    "opened Blaze column index is outside PRAA codeword length".to_string(),
+                ));
+            }
+            top_queries.push(TopQuery {
+                index: expected.logical_index,
+                value: fold_interleaved_column(column, folding_challenges)?,
+            });
+        }
+        Ok(top_queries)
     }
 }
 
@@ -1658,5 +1695,55 @@ mod tests {
         schedule.validate_top_queries(&top_queries).unwrap();
         top_queries.swap(0, 1);
         assert!(schedule.validate_top_queries(&top_queries).is_err());
+    }
+
+    #[test]
+    fn top_queries_are_derived_from_matching_blaze_columns() {
+        let params = Blaze2BaseFoldBackendParams::new(blaze2_backend_spec()).unwrap();
+        let schedule = explicit_schedule(params.compiler_code().layout());
+        let folding_challenges = vec![B128::from(3), B128::from(5), B128::from(7)];
+        let columns = schedule
+            .input_queries()
+            .iter()
+            .map(|query| Blaze2InterleavedColumnQuery::<Blake2s> {
+                index: query.logical_index,
+                values: vec![
+                    B128::from(query.logical_index as u64 + 1),
+                    B128::from(query.logical_index as u64 + 2),
+                    B128::from(query.logical_index as u64 + 3),
+                ],
+                path: Vec::new(),
+            })
+            .collect::<Vec<_>>();
+
+        let top_queries = params
+            .top_queries_from_interleaved_columns(&schedule, &columns, &folding_challenges)
+            .unwrap();
+
+        assert_eq!(top_queries.len(), schedule.input_queries().len());
+        for ((top_query, schedule_query), column) in top_queries
+            .iter()
+            .zip(schedule.input_queries())
+            .zip(&columns)
+        {
+            assert_eq!(top_query.index, schedule_query.logical_index);
+            assert_eq!(
+                top_query.value,
+                fold_interleaved_column(column, &folding_challenges).unwrap()
+            );
+        }
+        schedule.validate_top_queries(&top_queries).unwrap();
+
+        let mut wrong_index = columns.clone();
+        wrong_index[0].index += 1;
+        assert!(params
+            .top_queries_from_interleaved_columns(&schedule, &wrong_index, &folding_challenges)
+            .is_err());
+
+        let mut wrong_width = columns;
+        wrong_width[0].values.pop();
+        assert!(params
+            .top_queries_from_interleaved_columns(&schedule, &wrong_width, &folding_challenges)
+            .is_err());
     }
 }

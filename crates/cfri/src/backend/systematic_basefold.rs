@@ -1499,6 +1499,12 @@ fn validate_blaze2_backend_spec(spec: &Blaze2BaseFoldBackendSpec) -> Result<(), 
             "compiler systematic length must equal PRAA codeword length".to_string(),
         ));
     }
+    let expected_auxiliary_len = spec.praa.praa_codeword_len * 3;
+    if spec.auxiliary_oracle_len != 0 && spec.auxiliary_oracle_len != expected_auxiliary_len {
+        return Err(Error::InvalidPcsParam(format!(
+            "auxiliary oracle length must be zero or the flattened PRAA auxiliary trace length {expected_auxiliary_len}"
+        )));
+    }
     Ok(())
 }
 
@@ -2108,7 +2114,7 @@ mod tests {
             },
             q_raa_input: 5,
             q_backend_proof: 7,
-            auxiliary_oracle_len: 11,
+            auxiliary_oracle_len: 96,
         }
     }
 

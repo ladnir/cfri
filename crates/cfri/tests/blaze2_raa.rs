@@ -264,6 +264,15 @@ fn blaze2_basefold_backend_params(
     q_raa_input: usize,
     q_backend_proof: usize,
 ) -> Blaze2BaseFoldBackendParams {
+    blaze2_basefold_backend_params_with_auxiliary_len(seed, q_raa_input, q_backend_proof, 0)
+}
+
+fn blaze2_basefold_backend_params_with_auxiliary_len(
+    seed: u8,
+    q_raa_input: usize,
+    q_backend_proof: usize,
+    auxiliary_oracle_len: usize,
+) -> Blaze2BaseFoldBackendParams {
     let praa = blaze2_code_spec(seed);
     let compiler_message_len = praa.praa_codeword_len;
     let parity_expansion_factor = 1;
@@ -280,7 +289,7 @@ fn blaze2_basefold_backend_params(
         },
         q_raa_input,
         q_backend_proof,
-        auxiliary_oracle_len: 0,
+        auxiliary_oracle_len,
     })
     .unwrap()
 }
@@ -1314,6 +1323,54 @@ fn blaze2_basefold_opening_rejects_bad_outer_column() {
     proof.queries[0].column_opening.values[0] += B128::ONE;
 
     assert!(verify_blaze2_basefold_opening(&params, &commitment.public(), &claim, &proof).is_err());
+}
+
+#[test]
+fn blaze2_basefold_opening_derives_configured_auxiliary_trace() {
+    let (_, _, packed, commitment, claim, _) = opening_fixture(54);
+    let auxiliary_len = blaze2_code_spec(54).praa_codeword_len * 3;
+    let params = blaze2_basefold_backend_params_with_auxiliary_len(54, 4, 11, auxiliary_len);
+    let proof = prove_blaze2_basefold_opening(&params, &packed, &commitment, &claim, &[]).unwrap();
+
+    assert_eq!(
+        proof
+            .backend_prequery
+            .auxiliary
+            .as_ref()
+            .map(|public| public.len),
+        Some(auxiliary_len)
+    );
+    verify_blaze2_basefold_opening(&params, &commitment.public(), &claim, &proof).unwrap();
+
+    let bad_auxiliary = vec![B128::ONE; auxiliary_len];
+    assert!(
+        prove_blaze2_basefold_opening(&params, &packed, &commitment, &claim, &bad_auxiliary)
+            .is_err()
+    );
+}
+
+#[test]
+fn blaze2_basefold_backend_rejects_arbitrary_auxiliary_length() {
+    let praa = blaze2_code_spec(55);
+    let compiler_message_len = praa.praa_codeword_len;
+    let parity_expansion_factor = 1;
+    let spec = Blaze2BaseFoldBackendSpec {
+        praa,
+        compiler_code: SystematicFoldableCodeSpec {
+            version: 1,
+            compiler_message_len,
+            compiler_systematic_len: compiler_message_len,
+            compiler_parity_len: compiler_message_len * parity_expansion_factor,
+            compiler_codeword_len: compiler_message_len * (parity_expansion_factor + 1),
+            parity_expansion_factor,
+            seed: [55 ^ 0xa5; 32],
+        },
+        q_raa_input: 4,
+        q_backend_proof: 7,
+        auxiliary_oracle_len: 1,
+    };
+
+    assert!(Blaze2BaseFoldBackendParams::new(spec).is_err());
 }
 
 #[test]

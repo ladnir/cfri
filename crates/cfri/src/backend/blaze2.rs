@@ -1542,9 +1542,11 @@ pub fn prove_blaze2_basefold_opening<H: Blaze2HashSpec>(
     }
     absorb_blaze2_opening_folded_eval(&mut transcript, &folded_eval);
 
+    let auxiliary_values =
+        blaze2_basefold_auxiliary_oracle(packed_code, &folded_message, auxiliary_oracle, params)?;
     let folded_codeword = packed_code.encode_row(&folded_message);
     let (backend_prequery, backend_state) =
-        params.prove_prequery::<H>(&folded_codeword, auxiliary_oracle)?;
+        params.prove_prequery::<H>(&folded_codeword, &auxiliary_values)?;
     let schedule = params.sample_query_schedule(&mut transcript, &backend_prequery)?;
 
     let mut queries = Vec::with_capacity(schedule.input_queries().len());
@@ -1782,6 +1784,42 @@ pub fn verify_blaze2_opening_with_code_spec<H: Blaze2HashSpec, B: Blaze2FoldedMe
         &input_values,
     )?;
     Ok(())
+}
+
+fn blaze2_basefold_auxiliary_oracle(
+    code: &PackedRaaCode,
+    folded_message: &[B128],
+    caller_auxiliary: &[B128],
+    params: &Blaze2BaseFoldBackendParams,
+) -> Result<Vec<B128>, Error> {
+    let expected_len = params.spec().auxiliary_oracle_len;
+    if expected_len == 0 {
+        if !caller_auxiliary.is_empty() {
+            return Err(Error::InvalidPcsOpen(
+                "Blaze2 BaseFold backend is configured without auxiliary trace data".to_string(),
+            ));
+        }
+        return Ok(Vec::new());
+    }
+
+    let trace = build_raa_aux_trace(code, folded_message)?;
+    let mut auxiliary = Vec::with_capacity(expected_len);
+    auxiliary.extend_from_slice(&trace.u2);
+    auxiliary.extend_from_slice(&trace.u3);
+    auxiliary.extend_from_slice(&trace.u4);
+    if auxiliary.len() != expected_len {
+        return Err(Error::InvalidPcsOpen(format!(
+            "derived Blaze2 BaseFold auxiliary trace has {} entries but backend expects {expected_len}",
+            auxiliary.len()
+        )));
+    }
+    if !caller_auxiliary.is_empty() && caller_auxiliary != auxiliary.as_slice() {
+        return Err(Error::InvalidPcsOpen(
+            "caller-supplied Blaze2 BaseFold auxiliary trace does not match the folded message"
+                .to_string(),
+        ));
+    }
+    Ok(auxiliary)
 }
 
 pub fn build_raa_aux_trace(

@@ -540,7 +540,7 @@ fn blaze2_basefold_proof_size_breakdown(
         .backend_proof
         .auxiliary
         .as_ref()
-        .map(|auxiliary| auxiliary.query_count() * field_bytes)
+        .map(|auxiliary| auxiliary.serialized_value_count() * field_bytes)
         .unwrap_or(0);
     let auxiliary_query_path_bytes = proof
         .backend_proof
@@ -1470,6 +1470,12 @@ fn blaze2_basefold_b128_proof_size_accounting_is_exact() {
         .count();
     let relation_auxiliary_query_count = schedule.relation_auxiliary_proof_query_count();
     let auxiliary_query_count = schedule.expected_auxiliary_query_proof_count();
+    let auxiliary_serialized_value_count = proof
+        .backend_proof
+        .auxiliary
+        .as_ref()
+        .unwrap()
+        .serialized_value_count();
     assert_eq!(
         compiler_parity_query_count + relation_auxiliary_query_count,
         q_backend_proof,
@@ -1545,7 +1551,7 @@ fn blaze2_basefold_b128_proof_size_accounting_is_exact() {
             * compiler_rounds
             * b128_field_bytes,
         compiler_parity_fold_path_bytes: 512,
-        auxiliary_query_value_bytes: auxiliary_query_count * b128_field_bytes,
+        auxiliary_query_value_bytes: auxiliary_serialized_value_count * b128_field_bytes,
         auxiliary_query_path_bytes: 960,
     };
     assert_eq!(
@@ -1570,7 +1576,7 @@ fn blaze2_basefold_b128_proof_size_accounting_is_exact() {
             * compiler_rounds
             * paper_field_bytes,
         compiler_parity_fold_path_bytes: expected_b128_breakdown.compiler_parity_fold_path_bytes,
-        auxiliary_query_value_bytes: auxiliary_query_count * paper_field_bytes,
+        auxiliary_query_value_bytes: auxiliary_serialized_value_count * paper_field_bytes,
         auxiliary_query_path_bytes: expected_b128_breakdown.auxiliary_query_path_bytes,
     };
     assert_eq!(
@@ -1583,12 +1589,12 @@ fn blaze2_basefold_b128_proof_size_accounting_is_exact() {
     );
     assert_eq!(
         b128_breakdown.total_bytes(),
-        3_728,
+        3_616,
         "current small fixture B128 total is the primary acceptance number for the implemented proof"
     );
     assert_eq!(
         paper_breakdown.total_bytes(),
-        3_192,
+        3_136,
         "current small fixture 8-byte projection is reported only for Blaze-paper comparison"
     );
 }
@@ -1766,10 +1772,7 @@ fn blaze2_basefold_opening_derives_configured_auxiliary_trace() {
         .as_mut()
         .unwrap()
         .final_accumulator_queries
-        .first_mut()
-        .unwrap()
-        .u4
-        .value += B128::ONE;
+        .pop();
     assert!(verify_blaze2_basefold_opening(
         &params,
         &commitment.public(),

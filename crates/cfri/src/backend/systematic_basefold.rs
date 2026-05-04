@@ -208,13 +208,17 @@ pub struct AuxiliaryOracleQuery {
 pub struct AuxiliaryOracleQueryProof<H: Hash> {
     pub relation_queries: Vec<AuxiliaryOracleQuery>,
     pub final_accumulator_queries: Vec<RaaFinalAccumulatorQueryProof>,
-    pub local_relation_queries: Vec<AuxiliaryOracleQuery>,
+    pub local_relation_queries: Vec<RaaAuxiliaryLocalRelationProof>,
     pub authentication_nodes: Vec<Output<H>>,
 }
 
 #[derive(Clone, Debug, Eq, PartialEq)]
-pub struct RaaFinalAccumulatorQueryProof {
-    pub u4: AuxiliaryOracleQuery,
+pub struct RaaFinalAccumulatorQueryProof;
+
+#[derive(Clone, Debug, Eq, PartialEq)]
+pub enum RaaAuxiliaryLocalRelationProof {
+    Equality,
+    FirstAccumulatorStep { previous_value: B128 },
 }
 
 #[derive(Clone, Debug, Eq, PartialEq)]
@@ -635,6 +639,7 @@ impl Blaze2BaseFoldBackendParams {
             proof.auxiliary.as_ref(),
             self.spec.auxiliary_oracle_len,
             schedule,
+            top_queries,
         )?;
         verify_raa_auxiliary_local_queries(
             proof.auxiliary.as_ref(),
@@ -1399,18 +1404,12 @@ impl<H: Hash> AuxiliaryOracleCommitment<H> {
         }
         let mut final_accumulator_queries = Vec::with_capacity(schedule.raa_final_queries().len());
         for query in schedule.raa_final_queries() {
-            final_accumulator_queries.push(RaaFinalAccumulatorQueryProof {
-                u4: self.query(query.u4_auxiliary_index)?,
-            });
+            self.query(query.u4_auxiliary_index)?;
+            final_accumulator_queries.push(RaaFinalAccumulatorQueryProof);
         }
-        let mut local_relation_queries = Vec::new();
+        let mut local_relation_queries = Vec::with_capacity(schedule.raa_auxiliary_queries().len());
         for query in schedule.raa_auxiliary_queries() {
-            for index in 0..query.extra_count() {
-                let auxiliary_index = query
-                    .extra_index(index)
-                    .expect("extra_count bounds extra_index");
-                local_relation_queries.push(self.query(auxiliary_index)?);
-            }
+            local_relation_queries.push(self.local_relation_proof(query)?);
         }
         let proof = AuxiliaryOracleQueryProof {
             relation_queries,
@@ -1418,11 +1417,10 @@ impl<H: Hash> AuxiliaryOracleCommitment<H> {
             local_relation_queries,
             authentication_nodes: Vec::new(),
         };
+        let authentication_queries = proof.authentication_queries_from_oracle(schedule, self)?;
         let authentication_nodes = merkle_b128_multiproof_nodes::<H, _>(
             &self.merkle_tree,
-            proof
-                .all_queries()
-                .map(|query| (query.logical_index, query.value)),
+            authentication_queries.iter().copied(),
         )?;
 
         Ok(AuxiliaryOracleQueryProof {
@@ -1430,24 +1428,60 @@ impl<H: Hash> AuxiliaryOracleCommitment<H> {
             ..proof
         })
     }
+
+    fn local_relation_proof(
+        &self,
+        query: &RaaAuxiliaryLocalQuery,
+    ) -> Result<RaaAuxiliaryLocalRelationProof, Error> {
+        let main = self.query(query.main_auxiliary_index)?;
+        match query.relation {
+            RaaAuxiliaryRelationKind::U2Repetition { .. }
+            | RaaAuxiliaryRelationKind::FirstAccumulatorStart { .. }
+            | RaaAuxiliaryRelationKind::SecondPermutation { .. } => {
+                let extra = self.query(query.extra_index(0).expect("single extra relation"))?;
+                if main.value != extra.value {
+                    return Err(Error::InvalidPcsOpen(
+                        "RAA auxiliary local equality relation failed during proof construction"
+                            .to_string(),
+                    ));
+                }
+                Ok(RaaAuxiliaryLocalRelationProof::Equality)
+            }
+            RaaAuxiliaryRelationKind::FirstAccumulatorStep { .. } => {
+                let previous = self.query(query.extra_index(0).expect("previous u3"))?;
+                let u2 = self.query(query.extra_index(1).expect("u2"))?;
+                if main.value != previous.value + u2.value {
+                    return Err(Error::InvalidPcsOpen(
+                        "RAA first accumulator relation failed during proof construction"
+                            .to_string(),
+                    ));
+                }
+                Ok(RaaAuxiliaryLocalRelationProof::FirstAccumulatorStep {
+                    previous_value: previous.value,
+                })
+            }
+        }
+    }
 }
 
 impl<H: Hash> AuxiliaryOracleQueryProof<H> {
     pub fn query_count(&self) -> usize {
         self.relation_queries.len()
             + self.final_accumulator_queries.len()
-            + self.local_relation_queries.len()
+            + self
+                .local_relation_queries
+                .iter()
+                .map(|proof| proof.authentication_query_count())
+                .sum::<usize>()
     }
 
-    pub fn all_queries(&self) -> impl Iterator<Item = &AuxiliaryOracleQuery> {
-        self.relation_queries
-            .iter()
-            .chain(
-                self.final_accumulator_queries
-                    .iter()
-                    .flat_map(RaaFinalAccumulatorQueryProof::queries),
-            )
-            .chain(self.local_relation_queries.iter())
+    pub fn serialized_value_count(&self) -> usize {
+        self.relation_queries.len()
+            + self
+                .local_relation_queries
+                .iter()
+                .map(|proof| proof.serialized_value_count())
+                .sum::<usize>()
     }
 
     pub fn verify(
@@ -1455,17 +1489,18 @@ impl<H: Hash> AuxiliaryOracleQueryProof<H> {
         public: &AuxiliaryOraclePublicCommitment<H>,
         auxiliary_oracle_len: usize,
         schedule: &HolographicQuerySchedule,
+        top_queries: &[TopQuery<B128>],
     ) -> Result<(), Error> {
         if public.len != auxiliary_oracle_len {
             return Err(Error::InvalidPcsOpen(
                 "auxiliary oracle commitment length does not match backend spec".to_string(),
             ));
         }
+        let authentication_queries = self.authentication_queries(schedule, top_queries)?;
         verify_merkle_b128_multiproof::<H, _>(
             &public.root,
             public.len,
-            self.all_queries()
-                .map(|query| (query.logical_index, query.value)),
+            authentication_queries.iter().copied(),
             &self.authentication_nodes,
         )?;
 
@@ -1501,33 +1536,25 @@ impl<H: Hash> AuxiliaryOracleQueryProof<H> {
                 "RAA final accumulator query proof count does not match schedule".to_string(),
             ));
         }
-        for (expected, supplied) in schedule
-            .raa_final_queries()
-            .iter()
-            .zip(self.final_accumulator_queries.iter())
-        {
-            let u4 = &supplied.u4;
-            if u4.logical_index != expected.u4_auxiliary_index {
-                return Err(Error::InvalidPcsOpen(
-                    "RAA final accumulator auxiliary query index does not match schedule"
-                        .to_string(),
-                ));
-            }
-        }
         let mut local_relation_queries = self.local_relation_queries.iter();
         for expected in schedule.raa_auxiliary_queries() {
-            for index in 0..expected.extra_count() {
-                let expected_index = expected
-                    .extra_index(index)
-                    .expect("extra_count bounds extra_index");
-                let query = local_relation_queries.next().ok_or_else(|| {
-                    Error::InvalidPcsOpen(
-                        "RAA auxiliary local relation opening is missing".to_string(),
-                    )
-                })?;
-                if query.logical_index != expected_index {
+            let proof = local_relation_queries.next().ok_or_else(|| {
+                Error::InvalidPcsOpen("RAA auxiliary local relation proof is missing".to_string())
+            })?;
+            match (expected.relation, proof) {
+                (
+                    RaaAuxiliaryRelationKind::U2Repetition { .. }
+                    | RaaAuxiliaryRelationKind::FirstAccumulatorStart { .. }
+                    | RaaAuxiliaryRelationKind::SecondPermutation { .. },
+                    RaaAuxiliaryLocalRelationProof::Equality,
+                ) => {}
+                (
+                    RaaAuxiliaryRelationKind::FirstAccumulatorStep { .. },
+                    RaaAuxiliaryLocalRelationProof::FirstAccumulatorStep { .. },
+                ) => {}
+                _ => {
                     return Err(Error::InvalidPcsOpen(
-                        "RAA auxiliary local relation opening index does not match schedule"
+                        "RAA auxiliary local relation proof shape does not match schedule"
                             .to_string(),
                     ));
                 }
@@ -1540,11 +1567,175 @@ impl<H: Hash> AuxiliaryOracleQueryProof<H> {
         }
         Ok(())
     }
+
+    fn authentication_queries(
+        &self,
+        schedule: &HolographicQuerySchedule,
+        top_queries: &[TopQuery<B128>],
+    ) -> Result<Vec<(usize, B128)>, Error> {
+        let expected_count = expected_auxiliary_query_proof_count(schedule);
+        let mut queries = Vec::with_capacity(expected_count);
+
+        let mut relation_queries = self.relation_queries.iter();
+        for expected in schedule.proof_queries() {
+            if expected.domain != BackendProofQueryDomain::RelationAuxiliary {
+                continue;
+            }
+            let query = relation_queries.next().ok_or_else(|| {
+                Error::InvalidPcsOpen("relation auxiliary query opening is missing".to_string())
+            })?;
+            if query.logical_index != expected.index {
+                return Err(Error::InvalidPcsOpen(
+                    "auxiliary oracle query index does not match schedule".to_string(),
+                ));
+            }
+            queries.push((query.logical_index, query.value));
+        }
+        if relation_queries.next().is_some() {
+            return Err(Error::InvalidPcsOpen(
+                "too many relation auxiliary query openings".to_string(),
+            ));
+        }
+
+        if self.final_accumulator_queries.len() != schedule.raa_final_queries().len() {
+            return Err(Error::InvalidPcsOpen(
+                "RAA final accumulator query proof count does not match schedule".to_string(),
+            ));
+        }
+        for (expected, _) in schedule
+            .raa_final_queries()
+            .iter()
+            .zip(self.final_accumulator_queries.iter())
+        {
+            let current = top_queries
+                .get(expected.current_input_query)
+                .ok_or_else(|| {
+                    Error::InvalidPcsOpen("missing current RAA input query".to_string())
+                })?;
+            let previous = top_queries
+                .get(expected.previous_input_query)
+                .ok_or_else(|| {
+                    Error::InvalidPcsOpen("missing previous RAA input query".to_string())
+                })?;
+            if current.index != expected.index || previous.index + 1 != expected.index {
+                return Err(Error::InvalidPcsOpen(
+                    "RAA final accumulator input queries do not match scheduled neighboring columns"
+                        .to_string(),
+                ));
+            }
+            queries.push((expected.u4_auxiliary_index, current.value - previous.value));
+        }
+
+        let mut local_relation_proofs = self.local_relation_queries.iter();
+        for expected in schedule.raa_auxiliary_queries() {
+            let main = self
+                .relation_queries
+                .get(expected.sampled_auxiliary_ordinal)
+                .ok_or_else(|| {
+                    Error::InvalidPcsOpen(
+                        "RAA auxiliary local relation main opening is missing".to_string(),
+                    )
+                })?;
+            let proof = local_relation_proofs.next().ok_or_else(|| {
+                Error::InvalidPcsOpen("RAA auxiliary local relation proof is missing".to_string())
+            })?;
+            queries.extend(proof.authentication_queries(expected, main.value)?);
+        }
+        if local_relation_proofs.next().is_some() {
+            return Err(Error::InvalidPcsOpen(
+                "too many RAA auxiliary local relation openings".to_string(),
+            ));
+        }
+
+        Ok(queries)
+    }
+
+    fn authentication_queries_from_oracle<HH: Hash>(
+        &self,
+        schedule: &HolographicQuerySchedule,
+        oracle: &AuxiliaryOracleCommitment<HH>,
+    ) -> Result<Vec<(usize, B128)>, Error> {
+        let mut queries = Vec::with_capacity(expected_auxiliary_query_proof_count(schedule));
+        queries.extend(
+            self.relation_queries
+                .iter()
+                .map(|query| (query.logical_index, query.value)),
+        );
+        for expected in schedule.raa_final_queries() {
+            let u4 = oracle.query(expected.u4_auxiliary_index)?;
+            queries.push((u4.logical_index, u4.value));
+        }
+        let mut local_relation_proofs = self.local_relation_queries.iter();
+        for expected in schedule.raa_auxiliary_queries() {
+            let main = self
+                .relation_queries
+                .get(expected.sampled_auxiliary_ordinal)
+                .ok_or_else(|| {
+                    Error::InvalidPcsOpen(
+                        "RAA auxiliary local relation main opening is missing".to_string(),
+                    )
+                })?;
+            let proof = local_relation_proofs.next().ok_or_else(|| {
+                Error::InvalidPcsOpen("RAA auxiliary local relation proof is missing".to_string())
+            })?;
+            queries.extend(proof.authentication_queries(expected, main.value)?);
+        }
+        if local_relation_proofs.next().is_some() {
+            return Err(Error::InvalidPcsOpen(
+                "too many RAA auxiliary local relation openings".to_string(),
+            ));
+        }
+        Ok(queries)
+    }
 }
 
-impl RaaFinalAccumulatorQueryProof {
-    pub fn queries(&self) -> impl Iterator<Item = &AuxiliaryOracleQuery> {
-        [&self.u4].into_iter()
+impl RaaAuxiliaryLocalRelationProof {
+    fn authentication_query_count(&self) -> usize {
+        match self {
+            Self::Equality => 1,
+            Self::FirstAccumulatorStep { .. } => 2,
+        }
+    }
+
+    fn serialized_value_count(&self) -> usize {
+        match self {
+            Self::Equality => 0,
+            Self::FirstAccumulatorStep { .. } => 1,
+        }
+    }
+
+    fn authentication_queries(
+        &self,
+        expected: &RaaAuxiliaryLocalQuery,
+        main_value: B128,
+    ) -> Result<Vec<(usize, B128)>, Error> {
+        match (expected.relation, self) {
+            (
+                RaaAuxiliaryRelationKind::U2Repetition { .. }
+                | RaaAuxiliaryRelationKind::FirstAccumulatorStart { .. }
+                | RaaAuxiliaryRelationKind::SecondPermutation { .. },
+                Self::Equality,
+            ) => Ok(vec![(
+                expected.extra_index(0).expect("single extra relation"),
+                main_value,
+            )]),
+            (
+                RaaAuxiliaryRelationKind::FirstAccumulatorStep { .. },
+                Self::FirstAccumulatorStep { previous_value },
+            ) => Ok(vec![
+                (
+                    expected.extra_index(0).expect("previous u3"),
+                    *previous_value,
+                ),
+                (
+                    expected.extra_index(1).expect("u2"),
+                    main_value - *previous_value,
+                ),
+            ]),
+            _ => Err(Error::InvalidPcsOpen(
+                "RAA auxiliary local relation proof shape does not match schedule".to_string(),
+            )),
+        }
     }
 }
 
@@ -2723,6 +2914,7 @@ fn verify_auxiliary_query_proof<H: Hash>(
     proof: Option<&AuxiliaryOracleQueryProof<H>>,
     auxiliary_oracle_len: usize,
     schedule: &HolographicQuerySchedule,
+    top_queries: &[TopQuery<B128>],
 ) -> Result<(), Error> {
     let expected_count = expected_auxiliary_query_proof_count(schedule);
     if auxiliary_oracle_len == 0 {
@@ -2763,7 +2955,7 @@ fn verify_auxiliary_query_proof<H: Hash>(
                 .to_string(),
         )
     })?;
-    proof.verify(public, auxiliary_oracle_len, schedule)
+    proof.verify(public, auxiliary_oracle_len, schedule, top_queries)
 }
 
 fn verify_raa_final_accumulator_queries<H: Hash>(
@@ -2799,23 +2991,12 @@ fn verify_raa_final_accumulator_queries<H: Hash>(
                     .to_string(),
             ));
         }
-        let final_accumulator = proof
+        proof
             .final_accumulator_queries
             .get(relative_index)
             .ok_or_else(|| {
                 Error::InvalidPcsOpen("RAA final accumulator opening triple is missing".to_string())
             })?;
-        let u4 = &final_accumulator.u4;
-        if u4.logical_index != expected.u4_auxiliary_index {
-            return Err(Error::InvalidPcsOpen(
-                "RAA final accumulator auxiliary opening index does not match schedule".to_string(),
-            ));
-        }
-        if current.value != previous.value + u4.value {
-            return Err(Error::InvalidPcsOpen(
-                "RAA final accumulator relation failed".to_string(),
-            ));
-        }
     }
     Ok(())
 }
@@ -2859,44 +3040,29 @@ fn verify_raa_auxiliary_local_queries<H: Hash>(
             RaaAuxiliaryRelationKind::U2Repetition { .. }
             | RaaAuxiliaryRelationKind::FirstAccumulatorStart { .. }
             | RaaAuxiliaryRelationKind::SecondPermutation { .. } => {
-                let extra = local_relation_queries.next().ok_or_else(|| {
+                let proof = local_relation_queries.next().ok_or_else(|| {
                     Error::InvalidPcsOpen(
                         "RAA auxiliary local relation opening is missing".to_string(),
                     )
                 })?;
-                if extra.logical_index != expected.extra_index(0).expect("single extra relation") {
+                if !matches!(proof, RaaAuxiliaryLocalRelationProof::Equality) {
                     return Err(Error::InvalidPcsOpen(
-                        "RAA auxiliary local relation opening index does not match schedule"
-                            .to_string(),
-                    ));
-                }
-                if main.value != extra.value {
-                    return Err(Error::InvalidPcsOpen(
-                        "RAA auxiliary local equality relation failed".to_string(),
+                        "RAA auxiliary local equality proof has the wrong shape".to_string(),
                     ));
                 }
             }
             RaaAuxiliaryRelationKind::FirstAccumulatorStep { .. } => {
-                let previous = local_relation_queries.next().ok_or_else(|| {
+                let proof = local_relation_queries.next().ok_or_else(|| {
                     Error::InvalidPcsOpen(
                         "RAA first accumulator previous opening is missing".to_string(),
                     )
                 })?;
-                let u2 = local_relation_queries.next().ok_or_else(|| {
-                    Error::InvalidPcsOpen(
-                        "RAA first accumulator input opening is missing".to_string(),
-                    )
-                })?;
-                if previous.logical_index != expected.extra_index(0).expect("previous u3")
-                    || u2.logical_index != expected.extra_index(1).expect("u2")
-                {
+                if !matches!(
+                    proof,
+                    RaaAuxiliaryLocalRelationProof::FirstAccumulatorStep { .. }
+                ) {
                     return Err(Error::InvalidPcsOpen(
-                        "RAA first accumulator opening indices do not match schedule".to_string(),
-                    ));
-                }
-                if main.value != previous.value + u2.value {
-                    return Err(Error::InvalidPcsOpen(
-                        "RAA first accumulator relation failed".to_string(),
+                        "RAA first accumulator proof has the wrong shape".to_string(),
                     ));
                 }
             }
@@ -3961,12 +4127,17 @@ mod tests {
             .unwrap();
 
         let mut tampered_accumulator = proof.clone();
-        tampered_accumulator
-            .auxiliary
-            .as_mut()
-            .unwrap()
-            .local_relation_queries[0]
-            .value += B128::ONE;
+        if let RaaAuxiliaryLocalRelationProof::FirstAccumulatorStep { previous_value } =
+            &mut tampered_accumulator
+                .auxiliary
+                .as_mut()
+                .unwrap()
+                .local_relation_queries[0]
+        {
+            *previous_value += B128::ONE;
+        } else {
+            panic!("expected first accumulator witness");
+        }
         assert!(params
             .verify_query_proof(&prequery, &request, &schedule, &tampered_accumulator, &[])
             .is_err());
@@ -3976,8 +4147,7 @@ mod tests {
             .auxiliary
             .as_mut()
             .unwrap()
-            .local_relation_queries[2]
-            .value += B128::ONE;
+            .authentication_nodes[0][0] ^= 1;
         assert!(params
             .verify_query_proof(&prequery, &request, &schedule, &tampered_permutation, &[])
             .is_err());

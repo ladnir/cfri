@@ -334,6 +334,7 @@ pub struct Blaze2BaseFoldPrequeryPublic<H: Hash> {
     pub terminal_codeword: Vec<B128>,
     pub auxiliary: Option<AuxiliaryOraclePublicCommitment<H>>,
     pub section5_permutation_helper: Option<RaaSection5PermutationHelperPublicCommitment<H>>,
+    pub section5_relation: Option<RaaSection5RelationProof>,
 }
 
 #[derive(Clone, Debug)]
@@ -344,7 +345,7 @@ pub struct Blaze2BaseFoldProverState<H: Hash> {
     fold_challenges: Vec<B128>,
     auxiliary: Option<AuxiliaryOracleCommitment<H>>,
     section5_permutation_helper: Option<RaaSection5PermutationHelperCommitment<H>>,
-    section5_relation_challenges: Option<RaaSection5RelationChallenges>,
+    section5_relation: Option<RaaSection5RelationProof>,
 }
 
 #[derive(Clone, Debug, Eq, PartialEq)]
@@ -671,6 +672,21 @@ impl Blaze2BaseFoldBackendParams {
         let section5_permutation_helper_public = section5_permutation_helper
             .as_ref()
             .map(RaaSection5PermutationHelperCommitment::public);
+        let section5_relation = match (&section5_permutation_helper, section5_relation_challenges) {
+            (Some(helper), Some(challenges)) => Some(prove_raa_section5_relation_proof(
+                self.praa.packed(),
+                auxiliary_oracle,
+                helper.values(),
+                folded_codeword,
+                challenges,
+            )?),
+            (None, None) => None,
+            _ => {
+                return Err(Error::InvalidPcsOpen(
+                    "RAA Section 5 helper and relation challenges are inconsistent".to_string(),
+                ));
+            }
+        };
         let (eval_sumcheck, eval_sumcheck_challenges) = if self.spec.auxiliary_oracle_len == 0 {
             (None, None)
         } else {
@@ -702,6 +718,7 @@ impl Blaze2BaseFoldBackendParams {
                 .clone(),
             auxiliary: auxiliary_public,
             section5_permutation_helper: section5_permutation_helper_public,
+            section5_relation: section5_relation.clone(),
         };
         Ok((
             public,
@@ -712,7 +729,7 @@ impl Blaze2BaseFoldBackendParams {
                 fold_challenges,
                 auxiliary,
                 section5_permutation_helper,
-                section5_relation_challenges,
+                section5_relation,
             },
         ))
     }
@@ -778,30 +795,11 @@ impl Blaze2BaseFoldBackendParams {
             }
         };
         if schedule.raa_relation_strategy() == RaaRelationProofStrategy::Section5 {
-            let auxiliary_commitment = state.auxiliary.as_ref().ok_or_else(|| {
+            let section5_proof = state.section5_relation.clone().ok_or_else(|| {
                 Error::InvalidPcsOpen(
-                    "Section 5 relation proof requires a committed auxiliary oracle".to_string(),
+                    "Section 5 relation proof is missing from prover state".to_string(),
                 )
             })?;
-            let helper = state.section5_permutation_helper.as_ref().ok_or_else(|| {
-                Error::InvalidPcsOpen(
-                    "Section 5 relation proof requires a committed helper oracle".to_string(),
-                )
-            })?;
-            let challenges = state.section5_relation_challenges.ok_or_else(|| {
-                Error::InvalidPcsOpen(
-                    "Section 5 relation proof requires relation challenges".to_string(),
-                )
-            })?;
-            let folded_codeword =
-                extract_initial_systematic_codeword(self.compiler_code.layout(), state)?;
-            let section5_proof = prove_raa_section5_relation_proof(
-                self.praa.packed(),
-                auxiliary_commitment.values(),
-                helper.values(),
-                &folded_codeword,
-                challenges,
-            )?;
             let auxiliary_proof = auxiliary.as_mut().ok_or_else(|| {
                 Error::InvalidPcsOpen(
                     "Section 5 relation proof requires an auxiliary query proof".to_string(),
@@ -857,6 +855,11 @@ impl Blaze2BaseFoldBackendParams {
             self.spec.auxiliary_oracle_len,
             schedule,
             top_queries,
+        )?;
+        verify_section5_relation_query_proof_matches_prequery(
+            prequery.section5_relation.as_ref(),
+            proof.auxiliary.as_ref(),
+            schedule,
         )?;
         verify_section5_permutation_helper_query_proof(
             prequery.section5_permutation_helper.as_ref(),
@@ -2523,6 +2526,17 @@ impl RaaSection5RelationProof {
         self.verify_schedule_shape(schedule)
     }
 
+    fn verify_prequery<H: Hash>(&self, auxiliary_oracle_len: usize) -> Result<(), Error> {
+        self.verify_sumcheck_transcripts::<H>(auxiliary_oracle_len)?;
+        if !self.terminal_evaluations.is_empty() {
+            return Err(Error::InvalidPcsOpen(
+                "unbound serialized RAA Section 5 terminal evaluations are not accepted"
+                    .to_string(),
+            ));
+        }
+        Ok(())
+    }
+
     fn verify_schedule_shape(&self, schedule: &HolographicQuerySchedule) -> Result<(), Error> {
         if schedule.raa_relation_strategy() != RaaRelationProofStrategy::Section5 {
             return Err(Error::InvalidPcsOpen(
@@ -2568,13 +2582,7 @@ impl RaaSection5RelationProof {
         _top_queries: &[TopQuery<B128>],
     ) -> Result<(), Error> {
         self.verify_schedule_shape(schedule)?;
-        self.verify_sumcheck_transcripts::<H>(auxiliary_oracle_len)?;
-        if !self.terminal_evaluations.is_empty() {
-            return Err(Error::InvalidPcsOpen(
-                "unbound serialized RAA Section 5 terminal evaluations are not accepted"
-                    .to_string(),
-            ));
-        }
+        self.verify_prequery::<H>(auxiliary_oracle_len)?;
         Err(Error::InvalidPcsOpen(
             "RAA Section 5 terminal opening binding is not implemented yet".to_string(),
         ))
@@ -2854,6 +2862,10 @@ pub fn absorb_blaze2_basefold_prequery_public<H: Hash, S>(
         transcript.absorb("raa-section5-permutation-helper-present");
         absorb_section5_permutation_helper_public_commitment(transcript, helper);
     }
+    if let Some(proof) = &prequery.section5_relation {
+        transcript.absorb("raa-section5-relation-present");
+        absorb_raa_section5_relation_proof(transcript, proof);
+    }
 }
 
 fn absorb_raa_eval_sumcheck_proof<H: Hash, S>(
@@ -2876,6 +2888,41 @@ fn absorb_raa_eval_sumcheck_round<H: Hash, S>(
     absorb_usize(transcript, round);
     for coeff in coeffs {
         transcript.absorb(coeff);
+    }
+}
+
+fn absorb_raa_section5_relation_proof<H: Hash, S>(
+    transcript: &mut CfriTranscript<H, S>,
+    proof: &RaaSection5RelationProof,
+) {
+    transcript.absorb("raa-section5-relation-proof-v1");
+    absorb_raa_relation_sumcheck_proof(transcript, "permutation", &proof.permutation_sumcheck);
+    absorb_raa_relation_sumcheck_proof(
+        transcript,
+        "first accumulator",
+        &proof.first_accumulator_sumcheck,
+    );
+    absorb_raa_relation_sumcheck_proof(
+        transcript,
+        "second accumulator",
+        &proof.second_accumulator_sumcheck,
+    );
+    absorb_usize(transcript, proof.terminal_evaluations.len());
+    for value in &proof.terminal_evaluations {
+        transcript.absorb(value);
+    }
+}
+
+fn absorb_raa_relation_sumcheck_proof<H: Hash, S>(
+    transcript: &mut CfriTranscript<H, S>,
+    label: &str,
+    proof: &RaaRelationSumcheckProof,
+) {
+    transcript.absorb("raa-section5-relation-sumcheck-proof-v1");
+    transcript.absorb(label);
+    absorb_usize(transcript, proof.round_polynomials.len());
+    for (round, coeffs) in proof.round_polynomials.iter().enumerate() {
+        absorb_raa_relation_sumcheck_round(transcript, label, round, coeffs);
     }
 }
 
@@ -3238,15 +3285,22 @@ fn validate_section5_permutation_helper_public<H: Hash>(
     match (
         spec.raa_relation_strategy,
         &prequery.section5_permutation_helper,
+        &prequery.section5_relation,
     ) {
-        (RaaRelationProofStrategy::LocalQueries, None) => Ok(()),
-        (RaaRelationProofStrategy::LocalQueries, Some(_)) => Err(Error::InvalidPcsOpen(
+        (RaaRelationProofStrategy::LocalQueries, None, None) => Ok(()),
+        (RaaRelationProofStrategy::LocalQueries, Some(_), _) => Err(Error::InvalidPcsOpen(
             "RAA Section 5 helper commitment was supplied for local relation mode".to_string(),
         )),
-        (RaaRelationProofStrategy::Section5, None) => Err(Error::InvalidPcsOpen(
+        (RaaRelationProofStrategy::LocalQueries, None, Some(_)) => Err(Error::InvalidPcsOpen(
+            "RAA Section 5 relation proof was supplied for local relation mode".to_string(),
+        )),
+        (RaaRelationProofStrategy::Section5, None, _) => Err(Error::InvalidPcsOpen(
             "RAA Section 5 helper commitment is missing".to_string(),
         )),
-        (RaaRelationProofStrategy::Section5, Some(helper)) => {
+        (RaaRelationProofStrategy::Section5, Some(_), None) => Err(Error::InvalidPcsOpen(
+            "RAA Section 5 relation proof is missing from prequery".to_string(),
+        )),
+        (RaaRelationProofStrategy::Section5, Some(helper), Some(relation)) => {
             let expected_len =
                 required_blaze2_basefold_section5_permutation_helper_oracle_len(&spec.praa);
             if helper.len != expected_len {
@@ -3255,6 +3309,7 @@ fn validate_section5_permutation_helper_public<H: Hash>(
                     helper.len
                 )));
             }
+            relation.verify_prequery::<H>(spec.auxiliary_oracle_len)?;
             Ok(())
         }
     }
@@ -3267,15 +3322,22 @@ fn validate_section5_permutation_helper_state<H: Hash>(
     match (
         spec.raa_relation_strategy,
         &state.section5_permutation_helper,
+        &state.section5_relation,
     ) {
-        (RaaRelationProofStrategy::LocalQueries, None) => Ok(()),
-        (RaaRelationProofStrategy::LocalQueries, Some(_)) => Err(Error::InvalidPcsOpen(
+        (RaaRelationProofStrategy::LocalQueries, None, None) => Ok(()),
+        (RaaRelationProofStrategy::LocalQueries, Some(_), _) => Err(Error::InvalidPcsOpen(
             "RAA Section 5 helper oracle was built for local relation mode".to_string(),
         )),
-        (RaaRelationProofStrategy::Section5, None) => Err(Error::InvalidPcsOpen(
+        (RaaRelationProofStrategy::LocalQueries, None, Some(_)) => Err(Error::InvalidPcsOpen(
+            "RAA Section 5 relation proof was built for local relation mode".to_string(),
+        )),
+        (RaaRelationProofStrategy::Section5, None, _) => Err(Error::InvalidPcsOpen(
             "RAA Section 5 helper oracle is missing from prover state".to_string(),
         )),
-        (RaaRelationProofStrategy::Section5, Some(helper)) => {
+        (RaaRelationProofStrategy::Section5, Some(_), None) => Err(Error::InvalidPcsOpen(
+            "RAA Section 5 relation proof is missing from prover state".to_string(),
+        )),
+        (RaaRelationProofStrategy::Section5, Some(helper), Some(relation)) => {
             let expected_len =
                 required_blaze2_basefold_section5_permutation_helper_oracle_len(&spec.praa);
             if helper.len() != expected_len {
@@ -3284,6 +3346,7 @@ fn validate_section5_permutation_helper_state<H: Hash>(
                     helper.len()
                 )));
             }
+            relation.verify_prequery::<H>(spec.auxiliary_oracle_len)?;
             Ok(())
         }
     }
@@ -3413,25 +3476,6 @@ fn validate_raa_relation_auxiliary_consistent_with_codeword(
         }
     }
     Ok(())
-}
-
-fn extract_initial_systematic_codeword<H: Hash>(
-    layout: &SystematicAugmentedRfcLayout,
-    state: &Blaze2BaseFoldProverState<H>,
-) -> Result<Vec<B128>, Error> {
-    let physical = state.physical_layers.first().ok_or_else(|| {
-        Error::InvalidPcsOpen("backend prover state has no initial physical layer".to_string())
-    })?;
-    if physical.len() != layout.codeword_len() {
-        return Err(Error::InvalidPcsOpen(
-            "backend initial physical layer length does not match compiler layout".to_string(),
-        ));
-    }
-    let mut codeword = Vec::with_capacity(layout.systematic_len());
-    for logical_index in 0..layout.systematic_len() {
-        codeword.push(physical[layout.systematic_to_physical(logical_index)?]);
-    }
-    Ok(codeword)
 }
 
 fn raa_auxiliary_rows(
@@ -4673,6 +4717,37 @@ fn verify_section5_permutation_helper_query_proof<H: Hash>(
     }
 }
 
+fn verify_section5_relation_query_proof_matches_prequery<H: Hash>(
+    prequery_relation: Option<&RaaSection5RelationProof>,
+    auxiliary_proof: Option<&AuxiliaryOracleQueryProof<H>>,
+    schedule: &HolographicQuerySchedule,
+) -> Result<(), Error> {
+    if schedule.raa_relation_strategy() != RaaRelationProofStrategy::Section5 {
+        if prequery_relation.is_some() {
+            return Err(Error::InvalidPcsOpen(
+                "RAA Section 5 relation prequery was supplied for a non-Section 5 schedule"
+                    .to_string(),
+            ));
+        }
+        return Ok(());
+    }
+    let prequery_relation = prequery_relation.ok_or_else(|| {
+        Error::InvalidPcsOpen("RAA Section 5 relation prequery is missing".to_string())
+    })?;
+    let auxiliary_proof = auxiliary_proof.ok_or_else(|| {
+        Error::InvalidPcsOpen("RAA Section 5 auxiliary query proof is missing".to_string())
+    })?;
+    match &auxiliary_proof.raa_relation {
+        RaaRelationProof::Section5(query_relation) if query_relation == prequery_relation => Ok(()),
+        RaaRelationProof::Section5(_) => Err(Error::InvalidPcsOpen(
+            "RAA Section 5 relation query proof does not match the prequery transcript".to_string(),
+        )),
+        RaaRelationProof::LocalQueries(_) => Err(Error::InvalidPcsOpen(
+            "RAA Section 5 schedule carried local relation proof data".to_string(),
+        )),
+    }
+}
+
 fn verify_raa_relation_openings<H: Hash>(
     proof: Option<&AuxiliaryOracleQueryProof<H>>,
     auxiliary_oracle_len: usize,
@@ -5018,12 +5093,6 @@ mod tests {
             q_backend_proof: 7,
             auxiliary_oracle_len: 16 * BLAZE2_BASEFOLD_AUXILIARY_ROW_COUNT,
             raa_relation_strategy: RaaRelationProofStrategy::LocalQueries,
-        }
-    }
-
-    fn zero_sumcheck_shape(num_vars: usize, degree: usize) -> RaaRelationSumcheckProof {
-        RaaRelationSumcheckProof {
-            round_polynomials: vec![vec![B128::ZERO; degree + 1]; num_vars + 1],
         }
     }
 
@@ -5869,12 +5938,25 @@ mod tests {
             prequery.section5_permutation_helper.as_ref().unwrap().len,
             required_blaze2_basefold_section5_permutation_helper_oracle_len(&params.spec().praa)
         );
+        assert!(prequery.section5_relation.is_some());
         let mut missing_helper = prequery.clone();
         missing_helper.section5_permutation_helper = None;
         let mut transcript = CfriTranscript::<Blake2s>::new();
         assert!(params
             .sample_query_schedule(&mut transcript, &missing_helper, &request)
             .is_err());
+        let mut tampered_prequery_relation = prequery.clone();
+        tampered_prequery_relation
+            .section5_relation
+            .as_mut()
+            .unwrap()
+            .permutation_sumcheck
+            .round_polynomials[1][0] += B128::ONE;
+        let mut transcript = CfriTranscript::<Blake2s>::new();
+        let err = params
+            .sample_query_schedule(&mut transcript, &tampered_prequery_relation, &request)
+            .unwrap_err();
+        assert!(format!("{err:?}").contains("sumcheck consistency"));
         let mut transcript = CfriTranscript::<Blake2s>::new();
         let schedule = params
             .sample_query_schedule(&mut transcript, &prequery, &request)
@@ -5905,6 +5987,10 @@ mod tests {
             auxiliary.raa_relation,
             RaaRelationProof::Section5(_)
         ));
+        assert_eq!(
+            auxiliary.raa_relation,
+            RaaRelationProof::Section5(prequery.section5_relation.clone().unwrap())
+        );
         if let RaaRelationProof::Section5(section5) = &auxiliary.raa_relation {
             let num_vars = log2_strict(params.spec().praa.praa_codeword_len);
             assert_eq!(
@@ -5977,34 +6063,18 @@ mod tests {
                 &top_queries,
             )
             .unwrap_err();
-        assert!(format!("{err:?}").contains("sumcheck consistency"));
+        assert!(format!("{err:?}").contains("does not match the prequery transcript"));
 
-        let mut unbound_terminal_proof = proof.clone();
-        let num_vars = log2_strict(params.spec().praa.praa_codeword_len);
-        if let RaaRelationProof::Section5(section5) = &mut unbound_terminal_proof
-            .auxiliary
+        let mut unbound_terminal_prequery = prequery.clone();
+        unbound_terminal_prequery
+            .section5_relation
             .as_mut()
             .unwrap()
-            .raa_relation
-        {
-            section5.permutation_sumcheck =
-                zero_sumcheck_shape(num_vars, RAA_SECTION5_PERMUTATION_SUMCHECK_DEGREE);
-            section5.first_accumulator_sumcheck =
-                zero_sumcheck_shape(num_vars, RAA_SECTION5_ACCUMULATOR_SUMCHECK_DEGREE);
-            section5.second_accumulator_sumcheck =
-                zero_sumcheck_shape(num_vars, RAA_SECTION5_ACCUMULATOR_SUMCHECK_DEGREE);
-            section5.terminal_evaluations.push(B128::ONE);
-        } else {
-            panic!("expected Section 5 relation proof");
-        }
+            .terminal_evaluations
+            .push(B128::ONE);
+        let mut transcript = CfriTranscript::<Blake2s>::new();
         let err = params
-            .verify_query_proof(
-                &prequery,
-                &request,
-                &schedule,
-                &unbound_terminal_proof,
-                &top_queries,
-            )
+            .sample_query_schedule(&mut transcript, &unbound_terminal_prequery, &request)
             .unwrap_err();
         assert!(format!("{err:?}").contains("unbound serialized RAA Section 5 terminal"));
 

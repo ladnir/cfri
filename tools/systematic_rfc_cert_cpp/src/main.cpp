@@ -2,6 +2,7 @@
 #include <cmath>
 #include <cstdint>
 #include <fstream>
+#include <functional>
 #include <iomanip>
 #include <iostream>
 #include <limits>
@@ -30,6 +31,8 @@ struct Options {
     std::string certificatePath;
     std::string fullThresholdsPath;
     std::string verifyPath;
+    bool idealFirstMoment = false;
+    int totalExpansion = 8;
 };
 
 struct RoundState {
@@ -329,6 +332,186 @@ double basefoldGlobalDistance(int depth, int expansion, double fieldBits, double
     }
     const auto distance = static_cast<double>(n - static_cast<std::uint64_t>(threshold - 1));
     return distance / static_cast<double>(n);
+}
+
+double log2ExpectedRandomLinearLowWeight(
+    std::uint64_t k,
+    std::uint64_t n,
+    int maxWeight,
+    double fieldBits,
+    const std::vector<double>& logFactN) {
+    const auto logQMinusOne = fieldBits + log2OneMinusQInv(fieldBits);
+    const auto codeRateTerm = static_cast<double>(k) * fieldBits - static_cast<double>(n) * fieldBits;
+    double total = NegInf;
+    for (int h = 1; h <= maxWeight && h <= static_cast<int>(n); ++h) {
+        const auto term = log2Comb(logFactN, n, static_cast<std::uint64_t>(h)) +
+                          static_cast<double>(h) * logQMinusOne + codeRateTerm;
+        log2AddTo(total, term);
+    }
+    return total;
+}
+
+double log2UniformVectorLowWeightProb(
+    std::uint64_t n,
+    int maxWeight,
+    double fieldBits,
+    const std::vector<double>& logFactN) {
+    if (maxWeight < 0) {
+        return NegInf;
+    }
+    const auto logQMinusOne = fieldBits + log2OneMinusQInv(fieldBits);
+    double total = NegInf;
+    const auto capped = std::min<std::uint64_t>(n, static_cast<std::uint64_t>(maxWeight));
+    for (std::uint64_t h = 0; h <= capped; ++h) {
+        const auto term = log2Comb(logFactN, n, h) + static_cast<double>(h) * logQMinusOne -
+                          static_cast<double>(n) * fieldBits;
+        log2AddTo(total, term);
+    }
+    return total;
+}
+
+double log2ExpectedSystematicRandomParityLowWeight(
+    std::uint64_t k,
+    std::uint64_t parityN,
+    int maxWeight,
+    double fieldBits,
+    const std::vector<double>& logFactK,
+    const std::vector<double>& logFactParity) {
+    const auto logQMinusOne = fieldBits + log2OneMinusQInv(fieldBits);
+    double total = NegInf;
+    const auto maxSupport = std::min<std::uint64_t>(k, static_cast<std::uint64_t>(std::max(maxWeight, 0)));
+    for (std::uint64_t s = 1; s <= maxSupport; ++s) {
+        const auto parityBudget = maxWeight - static_cast<int>(s);
+        const auto parityTail = log2UniformVectorLowWeightProb(parityN, parityBudget, fieldBits, logFactParity);
+        if (parityTail == NegInf) {
+            continue;
+        }
+        const auto messageCount =
+            log2Comb(logFactK, k, s) + static_cast<double>(s) * logQMinusOne;
+        log2AddTo(total, messageCount + parityTail);
+    }
+    return total;
+}
+
+int largestDistanceBelowBudget(
+    std::uint64_t totalN,
+    const std::function<double(int)>& logExpectation,
+    double securityBits) {
+    int best = 0;
+    const auto budget = -securityBits;
+    for (int d = 1; d <= static_cast<int>(totalN); ++d) {
+        if (logExpectation(d) <= budget) {
+            best = d;
+        } else {
+            break;
+        }
+    }
+    return best;
+}
+
+int randomLinearFirstMomentDistance(
+    std::uint64_t k,
+    std::uint64_t n,
+    double fieldBits,
+    double securityBits,
+    const std::vector<double>& logFactN) {
+    const auto logQMinusOne = fieldBits + log2OneMinusQInv(fieldBits);
+    const auto codeRateTerm = static_cast<double>(k) * fieldBits - static_cast<double>(n) * fieldBits;
+    const auto budget = -securityBits;
+    double cumulative = NegInf;
+    int best = 0;
+    for (std::uint64_t h = 1; h <= n; ++h) {
+        const auto term = log2Comb(logFactN, n, h) + static_cast<double>(h) * logQMinusOne + codeRateTerm;
+        log2AddTo(cumulative, term);
+        if (cumulative <= budget) {
+            best = static_cast<int>(h);
+        } else {
+            break;
+        }
+    }
+    return best;
+}
+
+int systematicRandomParityFirstMomentDistance(
+    std::uint64_t k,
+    std::uint64_t parityN,
+    double fieldBits,
+    double securityBits,
+    const std::vector<double>& logFactK,
+    const std::vector<double>& logFactParity) {
+    const auto totalN = k + parityN;
+    const auto logQMinusOne = fieldBits + log2OneMinusQInv(fieldBits);
+    const auto budget = -securityBits;
+    std::vector<double> exact(static_cast<std::size_t>(totalN + 1), NegInf);
+
+    for (std::uint64_t support = 1; support <= k; ++support) {
+        const auto messageCount =
+            log2Comb(logFactK, k, support) + static_cast<double>(support) * logQMinusOne;
+        for (std::uint64_t parityWeight = 0; parityWeight <= parityN; ++parityWeight) {
+            const auto parityMass =
+                log2Comb(logFactParity, parityN, parityWeight) +
+                static_cast<double>(parityWeight) * logQMinusOne -
+                static_cast<double>(parityN) * fieldBits;
+            auto& cell = exact[static_cast<std::size_t>(support + parityWeight)];
+            log2AddTo(cell, messageCount + parityMass);
+        }
+    }
+
+    double cumulative = NegInf;
+    int best = 0;
+    for (std::uint64_t d = 1; d <= totalN; ++d) {
+        log2AddTo(cumulative, exact[static_cast<std::size_t>(d)]);
+        if (cumulative <= budget) {
+            best = static_cast<int>(d);
+        } else {
+            break;
+        }
+    }
+    return best;
+}
+
+int runIdealFirstMoment(const Options& opts) {
+    if (opts.depth < 0) {
+        throw std::runtime_error("--depth is required for --ideal-first-moment");
+    }
+    if (opts.totalExpansion <= 1) {
+        throw std::runtime_error("--total-expansion must be greater than 1");
+    }
+    if (opts.k0 != 1) {
+        throw std::runtime_error("--ideal-first-moment currently assumes k0=1");
+    }
+
+    std::cout
+        << "depth,k,total_n,parity_n,security_bits,"
+        << "random_linear_distance,random_linear_relative,"
+        << "systematic_random_parity_distance,systematic_random_parity_relative\n";
+
+    for (int depth = 1; depth <= opts.depth; ++depth) {
+        const auto k = opts.k0 << depth;
+        const auto totalN = static_cast<std::uint64_t>(opts.totalExpansion) * k;
+        const auto parityN = totalN - k;
+        const auto securityBits = opts.securityBits + std::ceil(std::log2(static_cast<double>(depth)));
+        const auto logFactTotal = log2Factorials(totalN);
+        const auto logFactK = log2Factorials(k);
+        const auto logFactParity = log2Factorials(parityN);
+
+        const auto randomDistance =
+            randomLinearFirstMomentDistance(k, totalN, opts.fieldBits, securityBits, logFactTotal);
+        const auto systematicDistance = systematicRandomParityFirstMomentDistance(
+            k,
+            parityN,
+            opts.fieldBits,
+            securityBits,
+            logFactK,
+            logFactParity);
+
+        std::cout << depth << ',' << k << ',' << totalN << ',' << parityN << ',' << securityBits << ','
+                  << randomDistance << ',' << std::fixed << std::setprecision(8)
+                  << static_cast<double>(randomDistance) / static_cast<double>(totalN) << ','
+                  << systematicDistance << ','
+                  << static_cast<double>(systematicDistance) / static_cast<double>(totalN) << '\n';
+    }
+    return 0;
 }
 
 std::vector<std::string> splitCsvLine(const std::string& line) {
@@ -700,11 +883,17 @@ Options parseOptions(int argc, char** argv) {
             opts.fullThresholdsPath = requireValue(i, argc, argv, arg);
         } else if (arg == "--verify") {
             opts.verifyPath = requireValue(i, argc, argv, arg);
+        } else if (arg == "--ideal-first-moment") {
+            opts.idealFirstMoment = true;
+        } else if (arg == "--total-expansion") {
+            opts.totalExpansion = std::stoi(requireValue(i, argc, argv, arg));
         } else if (arg == "--help" || arg == "-h") {
             std::cout
                 << "systematic_rfc_cert options:\n"
                 << "  --depth N --parity-expansion N     generate thresholds\n"
                 << "  --verify path                      verify threshold CSV\n"
+                << "  --ideal-first-moment               print ideal random-code first-moment baselines\n"
+                << "  --total-expansion N                total expansion for first-moment baselines\n"
                 << "  --field-bits B                     field size log2, default 128\n"
                 << "  --security-bits B                  per-transition security bits\n"
                 << "  --compare                          print non-systematic comparison columns\n"
@@ -726,6 +915,9 @@ int main(int argc, char** argv) {
         const auto opts = parseOptions(argc, argv);
         if (!opts.verifyPath.empty()) {
             return runVerify(opts);
+        }
+        if (opts.idealFirstMoment) {
+            return runIdealFirstMoment(opts);
         }
         return runGenerate(opts);
     } catch (const std::exception& e) {

@@ -35,3 +35,14 @@ build/systematic_rfc_cert_cpp/systematic_rfc_cert.exe ^
   --field-bits 128 ^
   --security-bits 84
 ```
+
+Ideal random-code first-moment ceiling:
+
+```text
+build/systematic_rfc_cert_cpp/systematic_rfc_cert.exe ^
+  --ideal-first-moment ^
+  --depth 11 ^
+  --total-expansion 8 ^
+  --field-bits 128 ^
+  --security-bits 80
+```

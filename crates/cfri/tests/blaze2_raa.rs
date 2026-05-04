@@ -502,33 +502,22 @@ impl Blaze2BaseFoldProofSizeBudget {
             .as_ref()
             .map(|auxiliary| auxiliary.serialized_value_count())
             .unwrap_or(0);
-        let compiler_parity_query_path_bytes = proof
-            .backend_proof
-            .compiler_parity
-            .authentication_nodes
-            .iter()
-            .map(|digest| digest.len())
-            .sum();
+        let compiler_parity_query_path_bytes = 0;
         let compiler_parity_fold_path_bytes = proof
             .backend_proof
-            .compiler_parity_folds
-            .layer_authentication
+            .authentication
+            .compiler_parity_layers
             .iter()
             .flat_map(|layer| layer.authentication_nodes.iter())
             .map(|digest| digest.len())
             .sum();
         let auxiliary_query_path_bytes = proof
             .backend_proof
-            .auxiliary
-            .as_ref()
-            .map(|auxiliary| {
-                auxiliary
-                    .authentication_nodes
-                    .iter()
-                    .map(|digest| digest.len())
-                    .sum()
-            })
-            .unwrap_or(0);
+            .authentication
+            .auxiliary_nodes
+            .iter()
+            .map(|digest| digest.len())
+            .sum();
 
         Self {
             field_bytes,
@@ -620,13 +609,7 @@ fn blaze2_basefold_proof_size_breakdown(
         .sum();
     let compiler_parity_query_value_bytes =
         proof.backend_proof.compiler_parity.queries.len() * field_bytes;
-    let compiler_parity_query_path_bytes = proof
-        .backend_proof
-        .compiler_parity
-        .authentication_nodes
-        .iter()
-        .map(|digest| digest.len())
-        .sum();
+    let compiler_parity_query_path_bytes = 0;
     let compiler_parity_fold_value_bytes = proof
         .backend_proof
         .compiler_parity_folds
@@ -636,8 +619,8 @@ fn blaze2_basefold_proof_size_breakdown(
         .sum();
     let compiler_parity_fold_path_bytes = proof
         .backend_proof
-        .compiler_parity_folds
-        .layer_authentication
+        .authentication
+        .compiler_parity_layers
         .iter()
         .map(|layer| {
             layer
@@ -655,16 +638,11 @@ fn blaze2_basefold_proof_size_breakdown(
         .unwrap_or(0);
     let auxiliary_query_path_bytes = proof
         .backend_proof
-        .auxiliary
-        .as_ref()
-        .map(|auxiliary| {
-            auxiliary
-                .authentication_nodes
-                .iter()
-                .map(|digest| digest.len())
-                .sum()
-        })
-        .unwrap_or(0);
+        .authentication
+        .auxiliary_nodes
+        .iter()
+        .map(|digest| digest.len())
+        .sum();
 
     Blaze2BaseFoldProofSizeBreakdown {
         row_eval_bytes,
@@ -1632,8 +1610,8 @@ fn blaze2_basefold_b128_proof_size_accounting_is_exact() {
             .compiler_parity_folds
             .layer_authentication
             .len(),
-        compiler_rounds,
-        "compiler-parity fold authentication is shared per folded layer"
+        0,
+        "compiler-parity fold authentication is no longer carried by the fold-path witness"
     );
     assert_eq!(
         proof
@@ -1641,8 +1619,17 @@ fn blaze2_basefold_b128_proof_size_accounting_is_exact() {
             .compiler_parity
             .authentication_nodes
             .len(),
-        10,
-        "compiler-parity query authentication is shared as one multiproof"
+        0,
+        "compiler-parity top authentication is carried by the shared backend proof oracle"
+    );
+    assert_eq!(
+        proof
+            .backend_proof
+            .authentication
+            .compiler_parity_layers
+            .len(),
+        compiler_rounds,
+        "shared backend authentication has exactly one multiproof per compiler commitment layer"
     );
 
     let b128_budget = Blaze2BaseFoldProofSizeBudget::new(
@@ -1697,12 +1684,12 @@ fn blaze2_basefold_b128_proof_size_accounting_is_exact() {
         b128_breakdown.blaze_outer_bytes()
     );
     assert_eq!(
-        b128_budget.compiler_parity_query_path_bytes, 320,
-        "current compiler-parity top authentication budget is pinned until shared backend authentication replaces it"
+        b128_budget.compiler_parity_query_path_bytes, 0,
+        "compiler-parity top authentication is merged into the shared backend layer proof"
     );
     assert_eq!(
-        b128_budget.compiler_parity_fold_path_bytes, 512,
-        "current compiler-parity fold authentication budget is pinned until shared backend authentication replaces it"
+        b128_budget.compiler_parity_fold_path_bytes, 576,
+        "compiler-parity authentication is now one multiproof per commitment layer, including the top parity leaves in round 0"
     );
     assert_eq!(
         b128_budget.auxiliary_query_path_bytes, 960,
@@ -1739,12 +1726,12 @@ fn blaze2_basefold_b128_proof_size_accounting_is_exact() {
     );
     assert_eq!(
         b128_breakdown.total_bytes(),
-        3_616,
+        3_360,
         "current small fixture B128 total is the primary acceptance number for the implemented proof"
     );
     assert_eq!(
         paper_breakdown.total_bytes(),
-        3_136,
+        2_880,
         "current small fixture 8-byte projection is reported only for Blaze-paper comparison"
     );
 }

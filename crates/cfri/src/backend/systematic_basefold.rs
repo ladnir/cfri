@@ -255,6 +255,7 @@ pub struct Blaze2BaseFoldQueryProof<H: Hash> {
     pub compiler_parity: CompilerParityQueryProof<H>,
     pub compiler_parity_folds: CompilerParityFoldQueryProof<H>,
     pub auxiliary: Option<AuxiliaryOracleQueryProof<H>>,
+    pub authentication: BackendProofOracleAuthentication<H>,
 }
 
 #[derive(Clone, Debug, Default, Eq, PartialEq)]
@@ -277,6 +278,12 @@ impl BackendProofOracleQuerySet {
             + self.compiler_parity_fold_query_count()
             + self.auxiliary_queries.len()
     }
+}
+
+#[derive(Clone, Debug, Default, Eq, PartialEq)]
+pub struct BackendProofOracleAuthentication<H: Hash> {
+    pub compiler_parity_layers: Vec<CompilerParityFoldLayerProof<H>>,
+    pub auxiliary_nodes: Vec<Output<H>>,
 }
 
 #[derive(Clone, Debug, Eq, PartialEq)]
@@ -627,10 +634,22 @@ impl Blaze2BaseFoldBackendParams {
                 None
             }
         };
+        let compiler_parity = state.compiler_parity.prove_schedule(schedule)?;
+        let compiler_parity_folds = self.open_compiler_parity_fold_paths(state, schedule)?;
+        let query_set = collect_backend_query_set_from_prover_state(
+            self.compiler_code.layout(),
+            state,
+            schedule,
+            &compiler_parity,
+            &compiler_parity_folds,
+            auxiliary.as_ref(),
+        )?;
+        let authentication = self.open_backend_query_set_authentication(state, &query_set)?;
         Ok(Blaze2BaseFoldQueryProof {
-            compiler_parity: state.compiler_parity.prove_schedule(schedule)?,
-            compiler_parity_folds: self.open_compiler_parity_fold_paths(state, schedule)?,
+            compiler_parity,
+            compiler_parity_folds,
             auxiliary,
+            authentication,
         })
     }
 
@@ -644,12 +663,12 @@ impl Blaze2BaseFoldBackendParams {
     ) -> Result<(), Error> {
         validate_blaze2_basefold_open_request(self, request)?;
         schedule.validate_top_queries(top_queries)?;
-        proof.compiler_parity.verify(
+        proof.compiler_parity.verify_schedule(
             &prequery.compiler_parity,
             self.compiler_code.layout(),
             schedule,
         )?;
-        proof.compiler_parity_folds.verify(
+        proof.compiler_parity_folds.verify_paths(
             prequery,
             self.compiler_code(),
             &proof.compiler_parity,
@@ -663,6 +682,9 @@ impl Blaze2BaseFoldBackendParams {
             schedule,
             top_queries,
         )?;
+        let query_set =
+            self.collect_backend_query_set(prequery, request, schedule, proof, top_queries)?;
+        proof.authentication.verify(prequery, &query_set)?;
         verify_raa_auxiliary_local_queries(
             proof.auxiliary.as_ref(),
             self.spec.auxiliary_oracle_len,
@@ -674,6 +696,58 @@ impl Blaze2BaseFoldBackendParams {
             schedule,
             top_queries,
         )
+    }
+
+    fn open_backend_query_set_authentication<H: Hash>(
+        &self,
+        state: &Blaze2BaseFoldProverState<H>,
+        query_set: &BackendProofOracleQuerySet,
+    ) -> Result<BackendProofOracleAuthentication<H>, Error> {
+        let layout = self.compiler_code.layout();
+        if query_set.compiler_parity_fold_layer_queries.len() != layout.num_rounds() {
+            return Err(Error::InvalidPcsOpen(
+                "backend query set fold layer count does not match layout".to_string(),
+            ));
+        }
+
+        let mut compiler_parity_layers = Vec::with_capacity(layout.num_rounds());
+        for round in 0..layout.num_rounds() {
+            let commitment = parity_commitment_at_round(
+                &state.compiler_parity,
+                &state.folded_parity_layers,
+                round,
+            )?;
+            let mut queries = query_set.compiler_parity_fold_layer_queries[round].clone();
+            if round == 0 {
+                queries.extend(query_set.compiler_parity_queries.iter().copied());
+            }
+            compiler_parity_layers.push(CompilerParityFoldLayerProof {
+                round,
+                authentication_nodes: merkle_b128_multiproof_nodes::<H, _>(
+                    &commitment.merkle_tree,
+                    queries,
+                )?,
+            });
+        }
+
+        let auxiliary_nodes = match (&state.auxiliary, query_set.auxiliary_queries.is_empty()) {
+            (Some(auxiliary), _) => merkle_b128_multiproof_nodes::<H, _>(
+                &auxiliary.merkle_tree,
+                query_set.auxiliary_queries.iter().copied(),
+            )?,
+            (None, true) => Vec::new(),
+            (None, false) => {
+                return Err(Error::InvalidPcsOpen(
+                    "backend query set contains auxiliary leaves but no auxiliary oracle is committed"
+                        .to_string(),
+                ));
+            }
+        };
+
+        Ok(BackendProofOracleAuthentication {
+            compiler_parity_layers,
+            auxiliary_nodes,
+        })
     }
 
     pub fn collect_backend_query_set<H: Hash>(
@@ -828,33 +902,9 @@ impl Blaze2BaseFoldBackendParams {
                 top_physical_index,
             )?);
         }
-        let layout = self.compiler_code.layout();
-        let top_queries = compiler_parity_fold_top_queries(&state.compiler_parity, &paths)?;
-        let layer_queries = compiler_parity_fold_layer_queries(
-            layout,
-            &paths,
-            &top_queries,
-            &state.fold_challenges,
-            None,
-        )?;
-        let mut layer_authentication = Vec::with_capacity(layout.num_rounds());
-        for (round, queries) in layer_queries.iter().enumerate() {
-            let commitment = parity_commitment_at_round(
-                &state.compiler_parity,
-                &state.folded_parity_layers,
-                round,
-            )?;
-            layer_authentication.push(CompilerParityFoldLayerProof {
-                round,
-                authentication_nodes: merkle_b128_multiproof_nodes::<H, _>(
-                    &commitment.merkle_tree,
-                    queries.iter().copied(),
-                )?,
-            });
-        }
         Ok(CompilerParityFoldQueryProof {
             paths,
-            layer_authentication,
+            layer_authentication: Vec::new(),
         })
     }
 
@@ -1161,21 +1211,15 @@ impl<H: Hash> CompilerParityCommitment<H> {
                 queries.push(self.query(query.index)?);
             }
         }
-        let authentication_nodes = merkle_b128_multiproof_nodes::<H, _>(
-            &self.merkle_tree,
-            queries
-                .iter()
-                .map(|query| (query.logical_index, query.value)),
-        )?;
         Ok(CompilerParityQueryProof {
             queries,
-            authentication_nodes,
+            authentication_nodes: Vec::new(),
         })
     }
 }
 
 impl<H: Hash> CompilerParityQueryProof<H> {
-    pub fn verify(
+    fn verify_schedule(
         &self,
         public: &CompilerParityPublicCommitment<H>,
         layout: &SystematicAugmentedRfcLayout,
@@ -1210,14 +1254,12 @@ impl<H: Hash> CompilerParityQueryProof<H> {
                 ));
             }
         }
-        verify_merkle_b128_multiproof::<H, _>(
-            &public.root,
-            public.len,
-            self.queries
-                .iter()
-                .map(|query| (query.logical_index, query.value)),
-            &self.authentication_nodes,
-        )?;
+        if !self.authentication_nodes.is_empty() {
+            return Err(Error::InvalidPcsOpen(
+                "compiler parity authentication must be carried by the backend proof oracle"
+                    .to_string(),
+            ));
+        }
         Ok(())
     }
 }
@@ -1265,8 +1307,71 @@ impl<H: Hash> Blaze2BaseFoldQueryProof<H> {
     }
 }
 
-impl<H: Hash> CompilerParityFoldQueryProof<H> {
+impl<H: Hash> BackendProofOracleAuthentication<H> {
+    pub fn hash_node_count(&self) -> usize {
+        self.compiler_parity_layers
+            .iter()
+            .map(|layer| layer.authentication_nodes.len())
+            .sum::<usize>()
+            + self.auxiliary_nodes.len()
+    }
+
     pub fn verify(
+        &self,
+        prequery: &Blaze2BaseFoldPrequeryPublic<H>,
+        query_set: &BackendProofOracleQuerySet,
+    ) -> Result<(), Error> {
+        if self.compiler_parity_layers.len() != query_set.compiler_parity_fold_layer_queries.len() {
+            return Err(Error::InvalidPcsOpen(
+                "backend proof oracle authentication layer count does not match query set"
+                    .to_string(),
+            ));
+        }
+        for (round, (proof, fold_queries)) in self
+            .compiler_parity_layers
+            .iter()
+            .zip(query_set.compiler_parity_fold_layer_queries.iter())
+            .enumerate()
+        {
+            if proof.round != round {
+                return Err(Error::InvalidPcsOpen(
+                    "backend proof oracle authentication round is out of order".to_string(),
+                ));
+            }
+            let public = parity_public_at_round(prequery, round)?;
+            let mut queries = fold_queries.clone();
+            if round == 0 {
+                queries.extend(query_set.compiler_parity_queries.iter().copied());
+            }
+            verify_merkle_b128_multiproof::<H, _>(
+                &public.root,
+                public.len,
+                queries,
+                &proof.authentication_nodes,
+            )?;
+        }
+
+        match (&prequery.auxiliary, query_set.auxiliary_queries.is_empty()) {
+            (Some(public), _) => verify_merkle_b128_multiproof::<H, _>(
+                &public.root,
+                public.len,
+                query_set.auxiliary_queries.iter().copied(),
+                &self.auxiliary_nodes,
+            )?,
+            (None, true) if self.auxiliary_nodes.is_empty() => {}
+            (None, _) => {
+                return Err(Error::InvalidPcsOpen(
+                    "backend proof oracle contains auxiliary authentication without an auxiliary commitment"
+                        .to_string(),
+                ));
+            }
+        }
+        Ok(())
+    }
+}
+
+impl<H: Hash> CompilerParityFoldQueryProof<H> {
+    fn verify_paths(
         &self,
         prequery: &Blaze2BaseFoldPrequeryPublic<H>,
         code: &SystematicAugmentedRfcCode,
@@ -1299,10 +1404,11 @@ impl<H: Hash> CompilerParityFoldQueryProof<H> {
                 "compiler parity fold path top query count does not match schedule".to_string(),
             ));
         }
-        top_queries.verify(&prequery.compiler_parity, layout, schedule)?;
-        if self.layer_authentication.len() != layout.num_rounds() {
+        top_queries.verify_schedule(&prequery.compiler_parity, layout, schedule)?;
+        if !self.layer_authentication.is_empty() {
             return Err(Error::InvalidPcsOpen(
-                "compiler parity fold layer authentication count does not match layout".to_string(),
+                "compiler parity fold authentication must be carried by the backend proof oracle"
+                    .to_string(),
             ));
         }
 
@@ -1330,32 +1436,13 @@ impl<H: Hash> CompilerParityFoldQueryProof<H> {
             }
             path.verify(layout, fold_challenges, top_query)?;
         }
-        let layer_queries = compiler_parity_fold_layer_queries(
+        compiler_parity_fold_layer_queries(
             layout,
             &self.paths,
             &top_queries.queries,
             fold_challenges,
             Some(&prequery.terminal_codeword),
         )?;
-        for (round, (proof, queries)) in self
-            .layer_authentication
-            .iter()
-            .zip(layer_queries.iter())
-            .enumerate()
-        {
-            if proof.round != round {
-                return Err(Error::InvalidPcsOpen(
-                    "compiler parity fold layer authentication round is out of order".to_string(),
-                ));
-            }
-            let public = parity_public_at_round(prequery, round)?;
-            verify_merkle_b128_multiproof::<H, _>(
-                &public.root,
-                public.len,
-                queries.iter().copied(),
-                &proof.authentication_nodes,
-            )?;
-        }
         Ok(())
     }
 }
@@ -1500,16 +1587,7 @@ impl<H: Hash> AuxiliaryOracleCommitment<H> {
             local_relation_queries,
             authentication_nodes: Vec::new(),
         };
-        let authentication_queries = proof.authentication_queries_from_oracle(schedule, self)?;
-        let authentication_nodes = merkle_b128_multiproof_nodes::<H, _>(
-            &self.merkle_tree,
-            authentication_queries.iter().copied(),
-        )?;
-
-        Ok(AuxiliaryOracleQueryProof {
-            authentication_nodes,
-            ..proof
-        })
+        Ok(AuxiliaryOracleQueryProof { ..proof })
     }
 
     fn local_relation_proof(
@@ -1567,25 +1645,23 @@ impl<H: Hash> AuxiliaryOracleQueryProof<H> {
                 .sum::<usize>()
     }
 
-    pub fn verify(
+    fn verify_schedule(
         &self,
         public: &AuxiliaryOraclePublicCommitment<H>,
         auxiliary_oracle_len: usize,
         schedule: &HolographicQuerySchedule,
-        top_queries: &[TopQuery<B128>],
+        _top_queries: &[TopQuery<B128>],
     ) -> Result<(), Error> {
         if public.len != auxiliary_oracle_len {
             return Err(Error::InvalidPcsOpen(
                 "auxiliary oracle commitment length does not match backend spec".to_string(),
             ));
         }
-        let authentication_queries = self.authentication_queries(schedule, top_queries)?;
-        verify_merkle_b128_multiproof::<H, _>(
-            &public.root,
-            public.len,
-            authentication_queries.iter().copied(),
-            &self.authentication_nodes,
-        )?;
+        if !self.authentication_nodes.is_empty() {
+            return Err(Error::InvalidPcsOpen(
+                "auxiliary authentication must be carried by the backend proof oracle".to_string(),
+            ));
+        }
 
         let expected_count = expected_auxiliary_query_proof_count(schedule);
         if self.query_count() != expected_count {
@@ -2590,6 +2666,63 @@ fn compiler_parity_fold_top_queries<H: Hash>(
     Ok(queries)
 }
 
+fn collect_backend_query_set_from_prover_state<H: Hash>(
+    layout: &SystematicAugmentedRfcLayout,
+    state: &Blaze2BaseFoldProverState<H>,
+    schedule: &HolographicQuerySchedule,
+    compiler_parity: &CompilerParityQueryProof<H>,
+    compiler_parity_folds: &CompilerParityFoldQueryProof<H>,
+    auxiliary: Option<&AuxiliaryOracleQueryProof<H>>,
+) -> Result<BackendProofOracleQuerySet, Error> {
+    let compiler_parity_queries = compiler_parity
+        .queries
+        .iter()
+        .map(|query| (query.logical_index, query.value))
+        .collect();
+    let compiler_parity_fold_layer_queries = compiler_parity_fold_layer_queries(
+        layout,
+        &compiler_parity_folds.paths,
+        &compiler_parity.queries,
+        &state.fold_challenges,
+        None,
+    )?;
+    let auxiliary_queries = match (&state.auxiliary, auxiliary) {
+        (Some(oracle), Some(proof)) => {
+            proof.authentication_queries_from_oracle(schedule, oracle)?
+        }
+        (None, None) => {
+            if expected_auxiliary_query_proof_count(schedule) != 0 {
+                return Err(Error::InvalidPcsOpen(
+                    "backend schedule contains auxiliary queries, but auxiliary query proof is absent"
+                        .to_string(),
+                ));
+            }
+            Vec::new()
+        }
+        (Some(_), None) => {
+            if expected_auxiliary_query_proof_count(schedule) == 0 {
+                Vec::new()
+            } else {
+                return Err(Error::InvalidPcsOpen(
+                    "backend schedule contains auxiliary queries, but auxiliary query proof is absent"
+                        .to_string(),
+                ));
+            }
+        }
+        (None, Some(_)) => {
+            return Err(Error::InvalidPcsOpen(
+                "auxiliary query proof supplied without an auxiliary oracle".to_string(),
+            ));
+        }
+    };
+
+    Ok(BackendProofOracleQuerySet {
+        compiler_parity_queries,
+        compiler_parity_fold_layer_queries,
+        auxiliary_queries,
+    })
+}
+
 fn compiler_parity_fold_layer_queries(
     layout: &SystematicAugmentedRfcLayout,
     paths: &[CompilerParityFoldPath],
@@ -3021,10 +3154,7 @@ fn verify_auxiliary_query_proof<H: Hash>(
         ));
     }
     if expected_count == 0 {
-        if proof
-            .map(|proof| proof.query_count() != 0 || !proof.authentication_nodes.is_empty())
-            .unwrap_or(false)
-        {
+        if proof.map(|proof| proof.query_count() != 0).unwrap_or(false) {
             return Err(Error::InvalidPcsOpen(
                 "auxiliary query proof was supplied even though schedule has no auxiliary queries"
                     .to_string(),
@@ -3038,7 +3168,7 @@ fn verify_auxiliary_query_proof<H: Hash>(
                 .to_string(),
         )
     })?;
-    proof.verify(public, auxiliary_oracle_len, schedule, top_queries)
+    proof.verify_schedule(public, auxiliary_oracle_len, schedule, top_queries)
 }
 
 fn verify_raa_final_accumulator_queries<H: Hash>(
@@ -3943,23 +4073,17 @@ mod tests {
             proof.queries[1].logical_index,
             code.layout().parity_len() - 1
         );
-        proof.verify(&public, code.layout(), &schedule).unwrap();
+        proof
+            .verify_schedule(&public, code.layout(), &schedule)
+            .unwrap();
 
         let mut swapped = proof.clone();
         swapped.queries.swap(0, 1);
-        assert!(swapped.verify(&public, code.layout(), &schedule).is_err());
-
-        let mut tampered_value = proof.clone();
-        tampered_value.queries[0].value += B128::ONE;
-        assert!(tampered_value
-            .verify(&public, code.layout(), &schedule)
+        assert!(swapped
+            .verify_schedule(&public, code.layout(), &schedule)
             .is_err());
 
-        let mut tampered_path = proof;
-        tampered_path.authentication_nodes[0][0] ^= 1;
-        assert!(tampered_path
-            .verify(&public, code.layout(), &schedule)
-            .is_err());
+        assert!(proof.authentication_nodes.is_empty());
     }
 
     #[test]
@@ -4079,7 +4203,7 @@ mod tests {
             .is_err());
 
         let mut tampered_path = proof.clone();
-        tampered_path.compiler_parity_folds.layer_authentication[0].authentication_nodes[0][0] ^= 1;
+        tampered_path.authentication.compiler_parity_layers[0].authentication_nodes[0][0] ^= 1;
         assert!(params
             .verify_query_proof(&prequery, &request, &schedule, &tampered_path, &top_queries)
             .is_err());
@@ -4140,11 +4264,7 @@ mod tests {
             .is_err());
 
         let mut tampered_authentication = proof.clone();
-        tampered_authentication
-            .auxiliary
-            .as_mut()
-            .unwrap()
-            .authentication_nodes[0][0] ^= 1;
+        tampered_authentication.authentication.auxiliary_nodes[0][0] ^= 1;
         assert!(params
             .verify_query_proof(
                 &prequery,
@@ -4226,11 +4346,7 @@ mod tests {
             .is_err());
 
         let mut tampered_permutation = proof;
-        tampered_permutation
-            .auxiliary
-            .as_mut()
-            .unwrap()
-            .authentication_nodes[0][0] ^= 1;
+        tampered_permutation.authentication.auxiliary_nodes[0][0] ^= 1;
         assert!(params
             .verify_query_proof(&prequery, &request, &schedule, &tampered_permutation, &[])
             .is_err());

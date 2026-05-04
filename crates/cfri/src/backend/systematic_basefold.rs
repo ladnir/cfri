@@ -27,6 +27,8 @@ const RAA_SECTION5_G2_0_ROW: usize = 9;
 const RAA_SECTION5_G2_1_ROW: usize = 10;
 const RAA_SECTION5_PERMUTATION_HELPER_ROW_COUNT: usize = 8;
 const RAA_SECTION5_AUX_ROW_COUNT: usize = RAA_AUX_RELATION_ROW_COUNT;
+const RAA_SECTION5_PERMUTATION_SUMCHECK_DEGREE: usize = 3;
+const RAA_SECTION5_ACCUMULATOR_SUMCHECK_DEGREE: usize = 2;
 const RAA_AUX_EVAL_BINDING_ROW_COUNT: usize = 0;
 const RAA_AUX_ROW_COUNT: usize = RAA_AUX_RELATION_ROW_COUNT;
 
@@ -2160,6 +2162,7 @@ impl RaaRelationProof {
     fn verify_openings(
         &self,
         relation_queries: &[AuxiliaryOracleQuery],
+        auxiliary_oracle_len: usize,
         schedule: &HolographicQuerySchedule,
         top_queries: &[TopQuery<B128>],
     ) -> Result<(), Error> {
@@ -2167,7 +2170,12 @@ impl RaaRelationProof {
             Self::LocalQueries(proof) => {
                 proof.verify_openings(relation_queries, schedule, top_queries)
             }
-            Self::Section5(proof) => proof.verify_openings(relation_queries, schedule, top_queries),
+            Self::Section5(proof) => proof.verify_openings(
+                relation_queries,
+                auxiliary_oracle_len,
+                schedule,
+                top_queries,
+            ),
         }
     }
 }
@@ -2504,19 +2512,78 @@ impl RaaSection5RelationProof {
     fn verify_openings(
         &self,
         _relation_queries: &[AuxiliaryOracleQuery],
+        auxiliary_oracle_len: usize,
         schedule: &HolographicQuerySchedule,
         _top_queries: &[TopQuery<B128>],
     ) -> Result<(), Error> {
         self.verify_schedule_shape(schedule)?;
+        self.verify_sumcheck_shapes(auxiliary_oracle_len)?;
+        if !self.terminal_evaluations.is_empty() {
+            return Err(Error::InvalidPcsOpen(
+                "unbound serialized RAA Section 5 terminal evaluations are not accepted"
+                    .to_string(),
+            ));
+        }
         Err(Error::InvalidPcsOpen(
-            "RAA Section 5 relation proof verification is not implemented yet".to_string(),
+            "RAA Section 5 terminal opening binding is not implemented yet".to_string(),
         ))
+    }
+
+    fn verify_sumcheck_shapes(&self, auxiliary_oracle_len: usize) -> Result<(), Error> {
+        if auxiliary_oracle_len % RAA_SECTION5_AUX_ROW_COUNT != 0 {
+            return Err(Error::InvalidPcsOpen(
+                "RAA Section 5 auxiliary oracle length is not row-aligned".to_string(),
+            ));
+        }
+        let domain_len = auxiliary_oracle_len / RAA_SECTION5_AUX_ROW_COUNT;
+        if !domain_len.is_power_of_two() {
+            return Err(Error::InvalidPcsOpen(
+                "RAA Section 5 sumcheck domain length must be a power of two".to_string(),
+            ));
+        }
+        let num_vars = log2_strict(domain_len);
+        self.permutation_sumcheck.verify_shape(
+            num_vars,
+            RAA_SECTION5_PERMUTATION_SUMCHECK_DEGREE,
+            "permutation",
+        )?;
+        self.first_accumulator_sumcheck.verify_shape(
+            num_vars,
+            RAA_SECTION5_ACCUMULATOR_SUMCHECK_DEGREE,
+            "first accumulator",
+        )?;
+        self.second_accumulator_sumcheck.verify_shape(
+            num_vars,
+            RAA_SECTION5_ACCUMULATOR_SUMCHECK_DEGREE,
+            "second accumulator",
+        )
     }
 }
 
 impl RaaRelationSumcheckProof {
     fn serialized_value_count(&self) -> usize {
         self.round_polynomials.iter().map(Vec::len).sum()
+    }
+
+    fn verify_shape(&self, num_vars: usize, degree: usize, label: &str) -> Result<(), Error> {
+        let expected_rounds = num_vars + 1;
+        let expected_values = degree + 1;
+        if self.round_polynomials.len() != expected_rounds {
+            return Err(Error::InvalidPcsOpen(format!(
+                "RAA Section 5 {label} sumcheck has {} rounds, expected {expected_rounds}",
+                self.round_polynomials.len()
+            )));
+        }
+        if self
+            .round_polynomials
+            .iter()
+            .any(|round| round.len() != expected_values)
+        {
+            return Err(Error::InvalidPcsOpen(format!(
+                "RAA Section 5 {label} sumcheck round width does not match degree {degree}",
+            )));
+        }
+        Ok(())
     }
 }
 
@@ -4346,9 +4413,12 @@ fn verify_raa_relation_openings<H: Hash>(
     let proof = proof.ok_or_else(|| {
         Error::InvalidPcsOpen("RAA relation checks require auxiliary query openings".to_string())
     })?;
-    proof
-        .raa_relation
-        .verify_openings(&proof.relation_queries, schedule, top_queries)
+    proof.raa_relation.verify_openings(
+        &proof.relation_queries,
+        auxiliary_oracle_len,
+        schedule,
+        top_queries,
+    )
 }
 
 fn merkelize_b128_padded<H: Hash>(values: &[B128]) -> Vec<Vec<Output<H>>> {
@@ -4668,6 +4738,12 @@ mod tests {
             q_backend_proof: 7,
             auxiliary_oracle_len: 16 * BLAZE2_BASEFOLD_AUXILIARY_ROW_COUNT,
             raa_relation_strategy: RaaRelationProofStrategy::LocalQueries,
+        }
+    }
+
+    fn zero_sumcheck_shape(num_vars: usize, degree: usize) -> RaaRelationSumcheckProof {
+        RaaRelationSumcheckProof {
+            round_polynomials: vec![vec![B128::ZERO; degree + 1]; num_vars + 1],
         }
     }
 
@@ -5576,6 +5652,35 @@ mod tests {
         assert!(params
             .verify_query_proof(&prequery, &request, &schedule, &proof, &top_queries)
             .is_err());
+
+        let mut unbound_terminal_proof = proof.clone();
+        let num_vars = log2_strict(params.spec().praa.praa_codeword_len);
+        if let RaaRelationProof::Section5(section5) = &mut unbound_terminal_proof
+            .auxiliary
+            .as_mut()
+            .unwrap()
+            .raa_relation
+        {
+            section5.permutation_sumcheck =
+                zero_sumcheck_shape(num_vars, RAA_SECTION5_PERMUTATION_SUMCHECK_DEGREE);
+            section5.first_accumulator_sumcheck =
+                zero_sumcheck_shape(num_vars, RAA_SECTION5_ACCUMULATOR_SUMCHECK_DEGREE);
+            section5.second_accumulator_sumcheck =
+                zero_sumcheck_shape(num_vars, RAA_SECTION5_ACCUMULATOR_SUMCHECK_DEGREE);
+            section5.terminal_evaluations.push(B128::ONE);
+        } else {
+            panic!("expected Section 5 relation proof");
+        }
+        let err = params
+            .verify_query_proof(
+                &prequery,
+                &request,
+                &schedule,
+                &unbound_terminal_proof,
+                &top_queries,
+            )
+            .unwrap_err();
+        assert!(format!("{err:?}").contains("unbound serialized RAA Section 5 terminal"));
 
         let helper_top_queries = helper_schedule
             .input_queries()

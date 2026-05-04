@@ -113,6 +113,16 @@ finite replica first moment
 
 It is closer to a direct first-moment proof than to the original threshold-distance recurrence.
 
+There is also a compatible rank-first-moment view in:
+
+```text
+docs/rfc_rank_first_moment_path.md
+```
+
+The rank view asks for an analytic tail bound on final zero-set column-rank deficiency. It may be
+the cleanest way to formalize the large-field advantage, while the product/replica view remains the
+sharper way to count actual low-weight codewords.
+
 ## Immediate Concrete Test
 
 The compressed state should first reproduce the GF(5), depth-3 product sampler crossings:

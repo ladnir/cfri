@@ -222,8 +222,19 @@ pub struct AuxiliaryOracleCommitment<H: Hash> {
     merkle_tree: Vec<Vec<Output<H>>>,
 }
 
+#[derive(Clone, Debug)]
+pub struct RaaSection5PermutationHelperCommitment<H: Hash> {
+    inner: AuxiliaryOracleCommitment<H>,
+}
+
 #[derive(Clone, Debug, Eq, PartialEq)]
 pub struct AuxiliaryOraclePublicCommitment<H: Hash> {
+    pub root: Output<H>,
+    pub len: usize,
+}
+
+#[derive(Clone, Debug, Eq, PartialEq)]
+pub struct RaaSection5PermutationHelperPublicCommitment<H: Hash> {
     pub root: Output<H>,
     pub len: usize,
 }
@@ -299,6 +310,7 @@ pub struct Blaze2BaseFoldPrequeryPublic<H: Hash> {
     pub folded_parity_layers: Vec<CompilerParityPublicCommitment<H>>,
     pub terminal_codeword: Vec<B128>,
     pub auxiliary: Option<AuxiliaryOraclePublicCommitment<H>>,
+    pub section5_permutation_helper: Option<RaaSection5PermutationHelperPublicCommitment<H>>,
 }
 
 #[derive(Clone, Debug)]
@@ -308,6 +320,7 @@ pub struct Blaze2BaseFoldProverState<H: Hash> {
     physical_layers: Vec<Vec<B128>>,
     fold_challenges: Vec<B128>,
     auxiliary: Option<AuxiliaryOracleCommitment<H>>,
+    section5_permutation_helper: Option<RaaSection5PermutationHelperCommitment<H>>,
 }
 
 #[derive(Clone, Debug, Eq, PartialEq)]
@@ -619,6 +632,11 @@ impl Blaze2BaseFoldBackendParams {
             )?)
         };
         let auxiliary_public = auxiliary.as_ref().map(AuxiliaryOracleCommitment::public);
+        let section5_permutation_helper =
+            self.commit_section5_permutation_helper_placeholder::<H>()?;
+        let section5_permutation_helper_public = section5_permutation_helper
+            .as_ref()
+            .map(RaaSection5PermutationHelperCommitment::public);
         let (eval_sumcheck, eval_sumcheck_challenges) = if self.spec.auxiliary_oracle_len == 0 {
             (None, None)
         } else {
@@ -649,6 +667,7 @@ impl Blaze2BaseFoldBackendParams {
                 .expect("folded parity prover returns at least the top physical layer")
                 .clone(),
             auxiliary: auxiliary_public,
+            section5_permutation_helper: section5_permutation_helper_public,
         };
         Ok((
             public,
@@ -658,6 +677,7 @@ impl Blaze2BaseFoldBackendParams {
                 physical_layers,
                 fold_challenges,
                 auxiliary,
+                section5_permutation_helper,
             },
         ))
     }
@@ -669,6 +689,7 @@ impl Blaze2BaseFoldBackendParams {
         request: &Blaze2BaseFoldOpenRequest<'_>,
     ) -> Result<HolographicQuerySchedule, Error> {
         validate_blaze2_basefold_open_request(self, request)?;
+        validate_section5_permutation_helper_public(self.spec(), prequery)?;
         absorb_blaze2_basefold_backend_spec(transcript, self.spec());
         absorb_blaze2_basefold_open_request(transcript, request);
         absorb_blaze2_basefold_prequery_public(transcript, prequery);
@@ -690,6 +711,7 @@ impl Blaze2BaseFoldBackendParams {
         state: &Blaze2BaseFoldProverState<H>,
         schedule: &HolographicQuerySchedule,
     ) -> Result<Blaze2BaseFoldQueryProof<H>, Error> {
+        validate_section5_permutation_helper_state(self.spec(), state)?;
         let auxiliary = match &state.auxiliary {
             Some(auxiliary) => Some(auxiliary.prove_schedule(schedule)?),
             None => {
@@ -734,6 +756,7 @@ impl Blaze2BaseFoldBackendParams {
         top_queries: &[TopQuery<B128>],
     ) -> Result<(), Error> {
         validate_blaze2_basefold_open_request(self, request)?;
+        validate_section5_permutation_helper_public(self.spec(), prequery)?;
         schedule.validate_top_queries(top_queries)?;
         proof.compiler_parity.verify_schedule(
             &prequery.compiler_parity,
@@ -1045,6 +1068,20 @@ impl Blaze2BaseFoldBackendParams {
             top_physical_index,
             steps,
         })
+    }
+
+    fn commit_section5_permutation_helper_placeholder<H: Hash>(
+        &self,
+    ) -> Result<Option<RaaSection5PermutationHelperCommitment<H>>, Error> {
+        if self.spec.raa_relation_strategy != RaaRelationProofStrategy::Section5 {
+            return Ok(None);
+        }
+        let helper_len =
+            required_blaze2_basefold_section5_permutation_helper_oracle_len(self.praa.spec());
+        let values = vec![B128::ZERO; helper_len];
+        Ok(Some(RaaSection5PermutationHelperCommitment::commit_values(
+            values,
+        )?))
     }
 }
 
@@ -1698,6 +1735,29 @@ impl<H: Hash> AuxiliaryOracleCommitment<H> {
                 })
             }
         }
+    }
+}
+
+impl<H: Hash> RaaSection5PermutationHelperCommitment<H> {
+    pub fn commit_values(values: Vec<B128>) -> Result<Self, Error> {
+        Ok(Self {
+            inner: AuxiliaryOracleCommitment::commit_values(values)?,
+        })
+    }
+
+    pub fn public(&self) -> RaaSection5PermutationHelperPublicCommitment<H> {
+        RaaSection5PermutationHelperPublicCommitment {
+            root: self.inner.root().clone(),
+            len: self.inner.len(),
+        }
+    }
+
+    pub fn len(&self) -> usize {
+        self.inner.len()
+    }
+
+    pub fn is_empty(&self) -> bool {
+        self.inner.is_empty()
     }
 }
 
@@ -2384,6 +2444,10 @@ pub fn absorb_blaze2_basefold_prequery_public<H: Hash, S>(
         }
         None => transcript.absorb("auxiliary-oracle-absent"),
     }
+    if let Some(helper) = &prequery.section5_permutation_helper {
+        transcript.absorb("raa-section5-permutation-helper-present");
+        absorb_section5_permutation_helper_public_commitment(transcript, helper);
+    }
 }
 
 fn absorb_raa_eval_sumcheck_proof<H: Hash, S>(
@@ -2454,6 +2518,15 @@ pub fn absorb_auxiliary_oracle_public_commitment<H: Hash, S>(
     public: &AuxiliaryOraclePublicCommitment<H>,
 ) {
     transcript.absorb("auxiliary-oracle-public-commitment-v1");
+    absorb_usize(transcript, public.len);
+    transcript.absorb(&public.root);
+}
+
+pub fn absorb_section5_permutation_helper_public_commitment<H: Hash, S>(
+    transcript: &mut CfriTranscript<H, S>,
+    public: &RaaSection5PermutationHelperPublicCommitment<H>,
+) {
+    transcript.absorb("raa-section5-permutation-helper-public-commitment-v1");
     absorb_usize(transcript, public.len);
     transcript.absorb(&public.root);
 }
@@ -2720,6 +2793,64 @@ fn validate_blaze2_backend_spec(spec: &Blaze2BaseFoldBackendSpec) -> Result<(), 
         ));
     }
     Ok(())
+}
+
+fn validate_section5_permutation_helper_public<H: Hash>(
+    spec: &Blaze2BaseFoldBackendSpec,
+    prequery: &Blaze2BaseFoldPrequeryPublic<H>,
+) -> Result<(), Error> {
+    match (
+        spec.raa_relation_strategy,
+        &prequery.section5_permutation_helper,
+    ) {
+        (RaaRelationProofStrategy::LocalQueries, None) => Ok(()),
+        (RaaRelationProofStrategy::LocalQueries, Some(_)) => Err(Error::InvalidPcsOpen(
+            "RAA Section 5 helper commitment was supplied for local relation mode".to_string(),
+        )),
+        (RaaRelationProofStrategy::Section5, None) => Err(Error::InvalidPcsOpen(
+            "RAA Section 5 helper commitment is missing".to_string(),
+        )),
+        (RaaRelationProofStrategy::Section5, Some(helper)) => {
+            let expected_len =
+                required_blaze2_basefold_section5_permutation_helper_oracle_len(&spec.praa);
+            if helper.len != expected_len {
+                return Err(Error::InvalidPcsOpen(format!(
+                    "RAA Section 5 helper commitment has length {}, expected {expected_len}",
+                    helper.len
+                )));
+            }
+            Ok(())
+        }
+    }
+}
+
+fn validate_section5_permutation_helper_state<H: Hash>(
+    spec: &Blaze2BaseFoldBackendSpec,
+    state: &Blaze2BaseFoldProverState<H>,
+) -> Result<(), Error> {
+    match (
+        spec.raa_relation_strategy,
+        &state.section5_permutation_helper,
+    ) {
+        (RaaRelationProofStrategy::LocalQueries, None) => Ok(()),
+        (RaaRelationProofStrategy::LocalQueries, Some(_)) => Err(Error::InvalidPcsOpen(
+            "RAA Section 5 helper oracle was built for local relation mode".to_string(),
+        )),
+        (RaaRelationProofStrategy::Section5, None) => Err(Error::InvalidPcsOpen(
+            "RAA Section 5 helper oracle is missing from prover state".to_string(),
+        )),
+        (RaaRelationProofStrategy::Section5, Some(helper)) => {
+            let expected_len =
+                required_blaze2_basefold_section5_permutation_helper_oracle_len(&spec.praa);
+            if helper.len() != expected_len {
+                return Err(Error::InvalidPcsOpen(format!(
+                    "RAA Section 5 helper oracle has length {}, expected {expected_len}",
+                    helper.len()
+                )));
+            }
+            Ok(())
+        }
+    }
 }
 
 fn validate_message_and_parity_output_at_round(
@@ -4319,6 +4450,22 @@ mod tests {
                 RaaRelationProofStrategy::Section5
             )
         );
+
+        let request_point = make_request_point(&params, 17);
+        let (folded_codeword, auxiliary, folded_eval) =
+            folded_codeword_and_auxiliary(&params, 19, &request_point);
+        let request = open_request_with_eval(&request_point, folded_eval);
+        let (prequery, state) = params
+            .prove_prequery::<Blake2s>(&folded_codeword, &auxiliary, &request)
+            .unwrap();
+        assert_eq!(
+            prequery.section5_permutation_helper.as_ref().unwrap().len,
+            helper_len
+        );
+        assert_eq!(
+            state.section5_permutation_helper.as_ref().unwrap().len(),
+            helper_len
+        );
     }
 
     #[test]
@@ -4924,6 +5071,16 @@ mod tests {
         let (prequery, state) = params
             .prove_prequery::<Blake2s>(&folded_codeword, &auxiliary, &request)
             .unwrap();
+        assert_eq!(
+            prequery.section5_permutation_helper.as_ref().unwrap().len,
+            required_blaze2_basefold_section5_permutation_helper_oracle_len(&params.spec().praa)
+        );
+        let mut missing_helper = prequery.clone();
+        missing_helper.section5_permutation_helper = None;
+        let mut transcript = CfriTranscript::<Blake2s>::new();
+        assert!(params
+            .sample_query_schedule(&mut transcript, &missing_helper, &request)
+            .is_err());
         let mut transcript = CfriTranscript::<Blake2s>::new();
         let schedule = params
             .sample_query_schedule(&mut transcript, &prequery, &request)
@@ -4979,6 +5136,7 @@ mod tests {
             .prove_prequery::<Blake2s>(&folded_codeword, &auxiliary, &request)
             .unwrap();
         assert!(prequery.auxiliary.is_some());
+        assert!(prequery.section5_permutation_helper.is_none());
 
         let mut transcript = CfriTranscript::<Blake2s>::new();
         let schedule = params

@@ -176,10 +176,11 @@ Section 5. The helper domain now has a named prequery commitment slot, exact len
 honest packed product-tree witness values for the current alpha/beta challenges, and scheduled
 backend authentication for helper leaves. The prover now emits honestly populated Section 5
 zero-check transcripts for the helper/permutation gate and the two accumulator relations, and the
-verifier checks the transcript shape and Fiat-Shamir round consistency before failing closed. The
-verifier still fails closed before accepting the global relation because terminal oracle evaluation
-binding is not implemented yet. The paper-critical verifier relation still has to bind those
-terminal claims to backend proof-oracle openings without local companion Merkle openings.
+verifier checks the transcript shape, initial zero claims, and Fiat-Shamir round consistency before
+failing closed. The verifier still fails closed before accepting the global relation because
+terminal oracle evaluation binding is not implemented yet. The paper-critical verifier relation
+still has to bind those terminal claims to backend proof-oracle openings without local companion
+Merkle openings.
 
 After re-reading Blaze Section 5, the honest implementation cannot be just "the same three rows
 with fewer openings." The paper relation uses MLIOP proof oracles for the RAA computation: the
@@ -201,7 +202,8 @@ B/C below, with a concrete Section 5 proof-oracle layout:
    - u3 = A * u2,
    - u4 = M_pi2 * u3,
    - c_star = A * u4; [In progress: the prover emits honest zero-check transcripts derived from
-     the committed auxiliary/helper state, and the verifier rejects malformed transcript rounds]
+     the committed auxiliary/helper state, and the verifier rejects malformed transcript rounds or
+     nonzero initial claims]
 4. bind sumcheck terminal oracle evaluations to backend proof-oracle openings, not unbound
    serialized terminal values; [In progress: verifier rejects unbound serialized terminal values
    and validates the three Section 5 sumcheck transcript shapes and round consistency before

@@ -2596,21 +2596,29 @@ impl RaaSection5RelationProof {
             ));
         }
         let num_vars = log2_strict(domain_len);
-        self.permutation_sumcheck.verify_transcript::<H>(
+        let permutation = self.permutation_sumcheck.verify_transcript::<H>(
             num_vars,
             RAA_SECTION5_PERMUTATION_SUMCHECK_DEGREE,
             "permutation",
         )?;
-        self.first_accumulator_sumcheck.verify_transcript::<H>(
+        let first_accumulator = self.first_accumulator_sumcheck.verify_transcript::<H>(
             num_vars,
             RAA_SECTION5_ACCUMULATOR_SUMCHECK_DEGREE,
             "first accumulator",
         )?;
-        self.second_accumulator_sumcheck.verify_transcript::<H>(
+        let second_accumulator = self.second_accumulator_sumcheck.verify_transcript::<H>(
             num_vars,
             RAA_SECTION5_ACCUMULATOR_SUMCHECK_DEGREE,
             "second accumulator",
         )?;
+        if permutation.initial_sum != B128::ZERO
+            || first_accumulator.initial_sum != B128::ZERO
+            || second_accumulator.initial_sum != B128::ZERO
+        {
+            return Err(Error::InvalidPcsOpen(
+                "RAA Section 5 sumcheck initial zero claim failed".to_string(),
+            ));
+        }
         Ok(())
     }
 }
@@ -5956,7 +5964,7 @@ mod tests {
         if let RaaRelationProof::Section5(section5) =
             &mut tampered_sumcheck.auxiliary.as_mut().unwrap().raa_relation
         {
-            section5.permutation_sumcheck.round_polynomials[0][0] += B128::ONE;
+            section5.permutation_sumcheck.round_polynomials[1][0] += B128::ONE;
         } else {
             panic!("expected Section 5 relation proof");
         }

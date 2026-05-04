@@ -217,3 +217,33 @@ python scripts/rank_tree_feature_row.py \
 The sampled bad buckets all have multiple complete identity subtrees and parity projection
 collisions across several levels. This is not exact enumeration, but it supports the same recursive
 collision-score direction at one higher depth.
+
+An equivalent and cleaner way to state `rho_d` is through the quotient restricted parity matrix:
+
+```text
+M(S,P) = P columns restricted to rows [k] \ S.
+```
+
+Then:
+
+```text
+rank(I_S, P_Z) = |S| + rank(M(S,P)).
+```
+
+The structural proof should show that outside the recursive collision family, `M(S,P)` has generic
+rank `k-|S|`. The scripts:
+
+```text
+scripts/restricted_parity_relations.py
+scripts/summarize_restricted_relations.py
+```
+
+confirm this view on the exact depth-3 rows. For example:
+
+```text
+s=6,z_p=3 bad shapes: 224 all have restricted rank 1 on 2 remaining rows
+s=5,z_p=3 bad shapes: 13027 all have restricted rank 2 on 3 remaining rows
+```
+
+Projective collapse explains the simplest structural defects; the remaining structural defects are
+nontrivial determinant identities of the restricted tensor columns.

@@ -136,6 +136,38 @@ The empirical bad-shape signatures suggest a combinatorial upper bound of the fo
 rank deficiency <= recursive_collision_score(S, P).
 ```
 
+The current best diagnostic is to form the restricted parity matrix:
+
+```text
+P_Z restricted to rows [k] \ S.
+```
+
+The exact rank condition becomes:
+
+```text
+rank(I_S, P_Z) = |S| + rank(P_Z | [k]\S).
+```
+
+So structural defects are precisely shapes where the selected parity tensor columns lose rank after
+the identity rows are quotiented away. In depth-3 examples:
+
+```text
+pure structural bad:
+  remaining rows:      2
+  selected parity:     3
+  restricted rank:     1
+  projective classes:  1
+
+sporadic finite-field bad:
+  remaining rows:      3
+  selected parity:     3
+  restricted rank:     2 for one seed
+  projective classes:  3
+  resamples to rank 3
+```
+
+The first case is a deterministic quotient collapse. The second is an accidental determinant zero.
+
 If this score is zero for all `|Z| >= k + e`, then the large-field structural distance is at least:
 
 ```text

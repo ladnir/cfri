@@ -557,8 +557,9 @@ fn blaze2_basefold_proof_size_breakdown(
         .as_ref()
         .map(|auxiliary| {
             auxiliary
-                .all_queries()
-                .map(|query| query.path.iter().map(|digest| digest.len()).sum::<usize>())
+                .authentication_nodes
+                .iter()
+                .map(|digest| digest.len())
                 .sum()
         })
         .unwrap_or(0);
@@ -1534,12 +1535,12 @@ fn blaze2_basefold_outer_shape_matches_paper_after_field_byte_correction() {
     );
     assert_eq!(
         paper_breakdown.total_bytes(),
-        8_984,
+        6_360,
         "current small fixture paper-style total should stay explicit until backend proof path reuse changes"
     );
     assert_eq!(
         blaze2_basefold_proof_size_breakdown(&proof, 16).total_bytes(),
-        9_680,
+        7_056,
         "current small fixture B128 total should stay explicit until serialization or backend path reuse changes"
     );
 }

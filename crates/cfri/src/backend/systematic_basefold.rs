@@ -10,6 +10,7 @@ use crate::backend::{
     Error,
 };
 use crate::transcript::Transcript as CfriTranscript;
+use std::collections::BTreeMap;
 
 const RAA_AUX_U2_ROW: usize = 0;
 const RAA_AUX_U3_ROW: usize = 1;
@@ -198,22 +199,22 @@ pub struct AuxiliaryOraclePublicCommitment<H: Hash> {
 }
 
 #[derive(Clone, Debug, Eq, PartialEq)]
-pub struct AuxiliaryOracleQuery<H: Hash> {
+pub struct AuxiliaryOracleQuery {
     pub logical_index: usize,
     pub value: B128,
-    pub path: Vec<Output<H>>,
 }
 
 #[derive(Clone, Debug, Eq, PartialEq)]
 pub struct AuxiliaryOracleQueryProof<H: Hash> {
-    pub relation_queries: Vec<AuxiliaryOracleQuery<H>>,
-    pub final_accumulator_queries: Vec<RaaFinalAccumulatorQueryProof<H>>,
-    pub local_relation_queries: Vec<AuxiliaryOracleQuery<H>>,
+    pub relation_queries: Vec<AuxiliaryOracleQuery>,
+    pub final_accumulator_queries: Vec<RaaFinalAccumulatorQueryProof>,
+    pub local_relation_queries: Vec<AuxiliaryOracleQuery>,
+    pub authentication_nodes: Vec<Output<H>>,
 }
 
 #[derive(Clone, Debug, Eq, PartialEq)]
-pub struct RaaFinalAccumulatorQueryProof<H: Hash> {
-    pub u4: AuxiliaryOracleQuery<H>,
+pub struct RaaFinalAccumulatorQueryProof {
+    pub u4: AuxiliaryOracleQuery,
 }
 
 #[derive(Clone, Debug, Eq, PartialEq)]
@@ -1355,12 +1356,11 @@ impl<H: Hash> AuxiliaryOracleCommitment<H> {
         &self.values
     }
 
-    pub fn query(&self, logical_index: usize) -> Result<AuxiliaryOracleQuery<H>, Error> {
+    pub fn query(&self, logical_index: usize) -> Result<AuxiliaryOracleQuery, Error> {
         validate_auxiliary_query_index(logical_index, self.len())?;
         Ok(AuxiliaryOracleQuery {
             logical_index,
             value: self.values[logical_index],
-            path: merkle_padded_sibling_path::<H>(&self.merkle_tree, logical_index),
         })
     }
 
@@ -1389,48 +1389,19 @@ impl<H: Hash> AuxiliaryOracleCommitment<H> {
                 local_relation_queries.push(self.query(auxiliary_index)?);
             }
         }
-        Ok(AuxiliaryOracleQueryProof {
+        let proof = AuxiliaryOracleQueryProof {
             relation_queries,
             final_accumulator_queries,
             local_relation_queries,
+            authentication_nodes: Vec::new(),
+        };
+        let authentication_nodes =
+            auxiliary_merkle_multiproof_nodes::<H>(&self.merkle_tree, &proof.all_queries_vec())?;
+
+        Ok(AuxiliaryOracleQueryProof {
+            authentication_nodes,
+            ..proof
         })
-    }
-}
-
-impl<H: Hash> AuxiliaryOracleQuery<H> {
-    pub fn authenticate(&self, public: &AuxiliaryOraclePublicCommitment<H>) -> Result<(), Error> {
-        validate_auxiliary_query_index(self.logical_index, public.len)?;
-        let padded_len = public.len.next_power_of_two();
-        let expected_path_len = log2_strict(padded_len);
-        if self.path.len() != expected_path_len {
-            return Err(Error::InvalidPcsOpen(
-                "auxiliary oracle query path has incompatible length".to_string(),
-            ));
-        }
-
-        let mut hash = hash_b128_leaf::<H>(&self.value);
-        let mut query_index = self.logical_index;
-        for sibling in &self.path {
-            let mut hasher = H::new();
-            let mut next = Output::<H>::default();
-            if query_index & 1 == 0 {
-                hasher.update(&hash);
-                hasher.update(sibling);
-            } else {
-                hasher.update(sibling);
-                hasher.update(&hash);
-            }
-            hasher.finalize_into_reset(&mut next);
-            hash = next;
-            query_index >>= 1;
-        }
-
-        if hash != public.root {
-            return Err(Error::InvalidPcsOpen(
-                "auxiliary oracle query does not authenticate".to_string(),
-            ));
-        }
-        Ok(())
     }
 }
 
@@ -1441,7 +1412,7 @@ impl<H: Hash> AuxiliaryOracleQueryProof<H> {
             + self.local_relation_queries.len()
     }
 
-    pub fn all_queries(&self) -> impl Iterator<Item = &AuxiliaryOracleQuery<H>> {
+    pub fn all_queries(&self) -> impl Iterator<Item = &AuxiliaryOracleQuery> {
         self.relation_queries
             .iter()
             .chain(
@@ -1450,6 +1421,10 @@ impl<H: Hash> AuxiliaryOracleQueryProof<H> {
                     .flat_map(RaaFinalAccumulatorQueryProof::queries),
             )
             .chain(self.local_relation_queries.iter())
+    }
+
+    fn all_queries_vec(&self) -> Vec<AuxiliaryOracleQuery> {
+        self.all_queries().cloned().collect()
     }
 
     pub fn verify(
@@ -1463,6 +1438,7 @@ impl<H: Hash> AuxiliaryOracleQueryProof<H> {
                 "auxiliary oracle commitment length does not match backend spec".to_string(),
             ));
         }
+        verify_auxiliary_merkle_multiproof(public, self.all_queries(), &self.authentication_nodes)?;
 
         let expected_count = expected_auxiliary_query_proof_count(schedule);
         if self.query_count() != expected_count {
@@ -1484,7 +1460,6 @@ impl<H: Hash> AuxiliaryOracleQueryProof<H> {
                     "auxiliary oracle query index does not match schedule".to_string(),
                 ));
             }
-            query.authenticate(public)?;
         }
         if relation_queries.next().is_some() {
             return Err(Error::InvalidPcsOpen(
@@ -1509,7 +1484,6 @@ impl<H: Hash> AuxiliaryOracleQueryProof<H> {
                         .to_string(),
                 ));
             }
-            u4.authenticate(public)?;
         }
         let mut local_relation_queries = self.local_relation_queries.iter();
         for expected in schedule.raa_auxiliary_queries() {
@@ -1528,7 +1502,6 @@ impl<H: Hash> AuxiliaryOracleQueryProof<H> {
                             .to_string(),
                     ));
                 }
-                query.authenticate(public)?;
             }
         }
         if local_relation_queries.next().is_some() {
@@ -1540,8 +1513,8 @@ impl<H: Hash> AuxiliaryOracleQueryProof<H> {
     }
 }
 
-impl<H: Hash> RaaFinalAccumulatorQueryProof<H> {
-    pub fn queries(&self) -> impl Iterator<Item = &AuxiliaryOracleQuery<H>> {
+impl RaaFinalAccumulatorQueryProof {
+    pub fn queries(&self) -> impl Iterator<Item = &AuxiliaryOracleQuery> {
         [&self.u4].into_iter()
     }
 }
@@ -2624,7 +2597,10 @@ fn verify_auxiliary_query_proof<H: Hash>(
         ));
     }
     if expected_count == 0 {
-        if proof.map(|proof| proof.query_count() != 0).unwrap_or(false) {
+        if proof
+            .map(|proof| proof.query_count() != 0 || !proof.authentication_nodes.is_empty())
+            .unwrap_or(false)
+        {
             return Err(Error::InvalidPcsOpen(
                 "auxiliary query proof was supplied even though schedule has no auxiliary queries"
                     .to_string(),
@@ -2827,6 +2803,133 @@ fn merkle_padded_sibling_path<H: Hash>(
         query_index >>= 1;
     }
     path
+}
+
+fn auxiliary_merkle_multiproof_nodes<H: Hash>(
+    tree: &[Vec<Output<H>>],
+    queries: &[AuxiliaryOracleQuery],
+) -> Result<Vec<Output<H>>, Error> {
+    if queries.is_empty() {
+        return Ok(Vec::new());
+    }
+    let mut known = BTreeMap::new();
+    for query in queries {
+        validate_auxiliary_query_index(query.logical_index, tree[0].len())?;
+        let hash = hash_b128_leaf::<H>(&query.value);
+        if let Some(existing) = known.insert(query.logical_index, hash.clone()) {
+            if existing != hash {
+                return Err(Error::InvalidPcsOpen(
+                    "duplicate auxiliary query index has conflicting values".to_string(),
+                ));
+            }
+        }
+    }
+
+    let mut authentication_nodes = Vec::new();
+    for level in tree.iter().take(tree.len().saturating_sub(1)) {
+        let mut next = BTreeMap::new();
+        for (&index, hash) in known.iter() {
+            let sibling_index = index ^ 1;
+            if index & 1 == 1 && known.contains_key(&sibling_index) {
+                continue;
+            }
+            let sibling = if let Some(sibling) = known.get(&sibling_index) {
+                sibling.clone()
+            } else {
+                let sibling = level[sibling_index].clone();
+                authentication_nodes.push(sibling.clone());
+                sibling
+            };
+            let parent = if index & 1 == 0 {
+                hash_pair::<H>(hash, &sibling)
+            } else {
+                hash_pair::<H>(&sibling, hash)
+            };
+            next.insert(index >> 1, parent);
+        }
+        known = next;
+    }
+    Ok(authentication_nodes)
+}
+
+fn verify_auxiliary_merkle_multiproof<'a, H: Hash>(
+    public: &AuxiliaryOraclePublicCommitment<H>,
+    queries: impl Iterator<Item = &'a AuxiliaryOracleQuery>,
+    authentication_nodes: &[Output<H>],
+) -> Result<(), Error> {
+    let mut known = BTreeMap::new();
+    for query in queries {
+        validate_auxiliary_query_index(query.logical_index, public.len)?;
+        let hash = hash_b128_leaf::<H>(&query.value);
+        if let Some(existing) = known.insert(query.logical_index, hash.clone()) {
+            if existing != hash {
+                return Err(Error::InvalidPcsOpen(
+                    "duplicate auxiliary query index has conflicting values".to_string(),
+                ));
+            }
+        }
+    }
+    if known.is_empty() {
+        if authentication_nodes.is_empty() {
+            return Ok(());
+        }
+        return Err(Error::InvalidPcsOpen(
+            "auxiliary Merkle multiproof has authentication nodes but no queries".to_string(),
+        ));
+    }
+
+    let padded_len = public.len.next_power_of_two();
+    let expected_rounds = log2_strict(padded_len);
+    let mut supplied = authentication_nodes.iter();
+    for _ in 0..expected_rounds {
+        let mut next = BTreeMap::new();
+        for (&index, hash) in known.iter() {
+            let sibling_index = index ^ 1;
+            if index & 1 == 1 && known.contains_key(&sibling_index) {
+                continue;
+            }
+            let sibling = if let Some(sibling) = known.get(&sibling_index) {
+                sibling.clone()
+            } else {
+                supplied
+                    .next()
+                    .ok_or_else(|| {
+                        Error::InvalidPcsOpen(
+                            "auxiliary Merkle multiproof is missing an authentication node"
+                                .to_string(),
+                        )
+                    })?
+                    .clone()
+            };
+            let parent = if index & 1 == 0 {
+                hash_pair::<H>(hash, &sibling)
+            } else {
+                hash_pair::<H>(&sibling, hash)
+            };
+            next.insert(index >> 1, parent);
+        }
+        known = next;
+    }
+    if supplied.next().is_some() {
+        return Err(Error::InvalidPcsOpen(
+            "auxiliary Merkle multiproof has too many authentication nodes".to_string(),
+        ));
+    }
+    if known.len() != 1 || *known.values().next().expect("known root exists") != public.root {
+        return Err(Error::InvalidPcsOpen(
+            "auxiliary Merkle multiproof does not authenticate".to_string(),
+        ));
+    }
+    Ok(())
+}
+
+fn hash_pair<H: Hash>(left: &Output<H>, right: &Output<H>) -> Output<H> {
+    let mut hasher = H::new();
+    let mut hash = Output::<H>::default();
+    hasher.update(left);
+    hasher.update(right);
+    hasher.finalize_into_reset(&mut hash);
+    hash
 }
 
 fn hash_b128_leaf<H: Hash>(value: &B128) -> Output<H> {
@@ -3611,6 +3714,22 @@ mod tests {
         tampered.auxiliary.as_mut().unwrap().relation_queries[0].value += B128::ONE;
         assert!(params
             .verify_query_proof(&prequery, &request, &schedule, &tampered, &top_queries)
+            .is_err());
+
+        let mut tampered_authentication = proof.clone();
+        tampered_authentication
+            .auxiliary
+            .as_mut()
+            .unwrap()
+            .authentication_nodes[0][0] ^= 1;
+        assert!(params
+            .verify_query_proof(
+                &prequery,
+                &request,
+                &schedule,
+                &tampered_authentication,
+                &top_queries
+            )
             .is_err());
 
         let mut missing = proof;

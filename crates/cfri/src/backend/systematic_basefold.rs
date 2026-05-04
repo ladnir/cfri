@@ -16,10 +16,22 @@ const RAA_AUX_U2_ROW: usize = 0;
 const RAA_AUX_U3_ROW: usize = 1;
 const RAA_AUX_U4_ROW: usize = 2;
 const RAA_AUX_RELATION_ROW_COUNT: usize = 3;
+const RAA_SECTION5_F1_0_ROW: usize = 3;
+const RAA_SECTION5_F1_1_ROW: usize = 4;
+const RAA_SECTION5_G1_0_ROW: usize = 5;
+const RAA_SECTION5_G1_1_ROW: usize = 6;
+const RAA_SECTION5_F2_0_ROW: usize = 7;
+const RAA_SECTION5_F2_1_ROW: usize = 8;
+const RAA_SECTION5_G2_0_ROW: usize = 9;
+const RAA_SECTION5_G2_1_ROW: usize = 10;
+const RAA_SECTION5_PERMUTATION_HELPER_ROW_COUNT: usize = 8;
+const RAA_SECTION5_AUX_ROW_COUNT: usize =
+    RAA_AUX_RELATION_ROW_COUNT + RAA_SECTION5_PERMUTATION_HELPER_ROW_COUNT;
 const RAA_AUX_EVAL_BINDING_ROW_COUNT: usize = 0;
 const RAA_AUX_ROW_COUNT: usize = RAA_AUX_RELATION_ROW_COUNT;
 
 pub const BLAZE2_BASEFOLD_RELATION_AUXILIARY_ROW_COUNT: usize = RAA_AUX_RELATION_ROW_COUNT;
+pub const BLAZE2_BASEFOLD_SECTION5_AUXILIARY_ROW_COUNT: usize = RAA_SECTION5_AUX_ROW_COUNT;
 pub const BLAZE2_BASEFOLD_EVAL_BINDING_ROW_COUNT: usize = RAA_AUX_EVAL_BINDING_ROW_COUNT;
 pub const BLAZE2_BASEFOLD_AUXILIARY_ROW_COUNT: usize = RAA_AUX_ROW_COUNT;
 
@@ -29,6 +41,17 @@ pub fn required_blaze2_basefold_auxiliary_oracle_len(spec: &Blaze2CodeSpec) -> u
 
 pub fn required_blaze2_basefold_relation_auxiliary_len(spec: &Blaze2CodeSpec) -> usize {
     spec.praa_codeword_len * BLAZE2_BASEFOLD_RELATION_AUXILIARY_ROW_COUNT
+}
+
+pub fn required_blaze2_basefold_section5_auxiliary_oracle_len(spec: &Blaze2CodeSpec) -> usize {
+    spec.praa_codeword_len * BLAZE2_BASEFOLD_SECTION5_AUXILIARY_ROW_COUNT
+}
+
+pub fn required_blaze2_basefold_auxiliary_oracle_len_for_strategy(
+    spec: &Blaze2CodeSpec,
+    strategy: RaaRelationProofStrategy,
+) -> usize {
+    spec.praa_codeword_len * raa_relation_auxiliary_row_count(strategy)
 }
 
 pub fn required_blaze2_basefold_eval_binding_len(spec: &Blaze2CodeSpec) -> usize {
@@ -2664,8 +2687,13 @@ fn validate_blaze2_backend_spec(spec: &Blaze2BaseFoldBackendSpec) -> Result<(), 
     }
     let expected_relation_auxiliary_len =
         required_blaze2_basefold_relation_auxiliary_len(&spec.praa);
+    let expected_strategy_auxiliary_len =
+        required_blaze2_basefold_auxiliary_oracle_len_for_strategy(
+            &spec.praa,
+            spec.raa_relation_strategy,
+        );
     let expected_eval_binding_len = required_blaze2_basefold_eval_binding_len(&spec.praa);
-    let expected_auxiliary_len = expected_relation_auxiliary_len + expected_eval_binding_len;
+    let expected_auxiliary_len = expected_strategy_auxiliary_len + expected_eval_binding_len;
     if spec.auxiliary_oracle_len == 0 {
         return Err(Error::InvalidPcsParam(format!(
             "Blaze2 BaseFold backend needs {expected_relation_auxiliary_len} relation auxiliary entries"
@@ -2673,7 +2701,7 @@ fn validate_blaze2_backend_spec(spec: &Blaze2BaseFoldBackendSpec) -> Result<(), 
     }
     if spec.auxiliary_oracle_len != expected_auxiliary_len {
         return Err(Error::InvalidPcsParam(format!(
-            "auxiliary oracle length must be {expected_auxiliary_len}: {expected_relation_auxiliary_len} relation auxiliary entries"
+            "auxiliary oracle length must be {expected_auxiliary_len}: {expected_relation_auxiliary_len} RAA relation entries plus strategy proof-oracle entries"
         )));
     }
     if spec.raa_relation_strategy == RaaRelationProofStrategy::LocalQueries
@@ -2743,13 +2771,18 @@ fn validate_raa_relation_auxiliary_consistent_with_codeword(
         return Ok(());
     }
     let len = code.codeword_len();
-    if codeword.len() != len || auxiliary_oracle.len() != RAA_AUX_ROW_COUNT * len {
+    let relation_len = RAA_AUX_ROW_COUNT * len;
+    if codeword.len() != len
+        || auxiliary_oracle.len() < relation_len
+        || auxiliary_oracle.len() % len != 0
+    {
         return Err(Error::InvalidPcsOpen(
             "RAA relation auxiliary oracle shape does not match folded codeword".to_string(),
         ));
     }
 
-    let (u2, rest) = auxiliary_oracle.split_at(len);
+    let relation_auxiliary = &auxiliary_oracle[..relation_len];
+    let (u2, rest) = relation_auxiliary.split_at(len);
     let (u3, u4) = rest.split_at(len);
     let permutation = code.permutation();
 
@@ -2826,11 +2859,11 @@ fn validate_query_schedule_spec(
                 .to_string(),
         ));
     }
-    if spec.auxiliary_oracle_len != 0
-        && spec.auxiliary_oracle_len != RAA_AUX_ROW_COUNT * layout.systematic_len()
-    {
+    let expected_auxiliary_len =
+        raa_relation_auxiliary_row_count(spec.raa_relation_strategy) * layout.systematic_len();
+    if spec.auxiliary_oracle_len != 0 && spec.auxiliary_oracle_len != expected_auxiliary_len {
         return Err(Error::InvalidPcsParam(
-            "auxiliary-enabled systematic BaseFold schedule expects a flattened RAA relation auxiliary trace"
+            "auxiliary-enabled systematic BaseFold schedule expects a flattened strategy-specific RAA relation auxiliary trace"
                 .to_string(),
         ));
     }
@@ -3605,6 +3638,26 @@ fn raa_auxiliary_index(row: usize, index: usize, len: usize) -> usize {
     row * len + index
 }
 
+fn raa_relation_auxiliary_row_count(strategy: RaaRelationProofStrategy) -> usize {
+    match strategy {
+        RaaRelationProofStrategy::LocalQueries => RAA_AUX_ROW_COUNT,
+        RaaRelationProofStrategy::Section5 => RAA_SECTION5_AUX_ROW_COUNT,
+    }
+}
+
+fn raa_section5_permutation_helper_rows() -> [usize; RAA_SECTION5_PERMUTATION_HELPER_ROW_COUNT] {
+    [
+        RAA_SECTION5_F1_0_ROW,
+        RAA_SECTION5_F1_1_ROW,
+        RAA_SECTION5_G1_0_ROW,
+        RAA_SECTION5_G1_1_ROW,
+        RAA_SECTION5_F2_0_ROW,
+        RAA_SECTION5_F2_1_ROW,
+        RAA_SECTION5_G2_0_ROW,
+        RAA_SECTION5_G2_1_ROW,
+    ]
+}
+
 fn raa_relation_auxiliary_len(auxiliary_oracle_len: usize) -> usize {
     auxiliary_oracle_len
 }
@@ -4111,6 +4164,7 @@ mod tests {
         auxiliary.extend_from_slice(&trace.u2);
         auxiliary.extend_from_slice(&trace.u3);
         auxiliary.extend_from_slice(&trace.u4);
+        auxiliary.resize(params.spec().auxiliary_oracle_len, B128::ZERO);
         assert_eq!(auxiliary.len(), params.spec().auxiliary_oracle_len);
         (folded_codeword, auxiliary, folded_eval)
     }
@@ -4228,6 +4282,34 @@ mod tests {
                 auxiliary_oracle_len: spec.auxiliary_oracle_len,
                 raa_relation_strategy: spec.raa_relation_strategy,
             }
+        );
+    }
+
+    #[test]
+    fn section5_auxiliary_domain_includes_permutation_helper_oracles() {
+        let mut spec = blaze2_backend_spec();
+        let local_len = required_blaze2_basefold_auxiliary_oracle_len(&spec.praa);
+        let section5_len = required_blaze2_basefold_section5_auxiliary_oracle_len(&spec.praa);
+        assert_eq!(local_len, spec.praa.praa_codeword_len * RAA_AUX_ROW_COUNT);
+        assert_eq!(
+            section5_len,
+            spec.praa.praa_codeword_len
+                * (RAA_AUX_ROW_COUNT + raa_section5_permutation_helper_rows().len())
+        );
+
+        spec.raa_relation_strategy = RaaRelationProofStrategy::Section5;
+        assert!(Blaze2BaseFoldBackendParams::new(spec.clone()).is_err());
+        spec.auxiliary_oracle_len = section5_len;
+        let params = Blaze2BaseFoldBackendParams::new(spec.clone()).unwrap();
+        assert_eq!(params.spec().auxiliary_oracle_len, section5_len);
+
+        let schedule_spec = params.query_schedule_spec();
+        assert_eq!(
+            schedule_spec.auxiliary_oracle_len,
+            required_blaze2_basefold_auxiliary_oracle_len_for_strategy(
+                &spec.praa,
+                RaaRelationProofStrategy::Section5
+            )
         );
     }
 
@@ -4824,6 +4906,8 @@ mod tests {
         let mut spec = blaze2_backend_spec();
         spec.raa_relation_strategy = RaaRelationProofStrategy::Section5;
         spec.q_raa_input = 5;
+        spec.auxiliary_oracle_len =
+            required_blaze2_basefold_section5_auxiliary_oracle_len(&spec.praa);
         let params = Blaze2BaseFoldBackendParams::new(spec).unwrap();
         let request_point = make_request_point(&params, 17);
         let (folded_codeword, auxiliary, folded_eval) =

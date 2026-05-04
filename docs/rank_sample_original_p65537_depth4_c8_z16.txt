@@ -1,0 +1,2 @@
+ensemble,prime,depth,k,n,zero_count,code_samples,subset_samples,failures,trials,failure_rate,min_rank,log2_expected_deficient_sets
+original,65537,4,16,128,16,5,5000,0,25000,0,16,-inf

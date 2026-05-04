@@ -293,6 +293,27 @@ systematic obstruction is concentrated near `z=k` and `z=k+1`, and no sampled fa
 `z=k+2`. If this persists, the systematic distance loss may be only a couple of symbols, not a
 growing fraction of block length.
 
+For comparison, a non-systematic depth-4 sample at `z=k=16` saw no rank failures:
+
+```text
+python scripts/sample_rfc_rank_failure.py \
+  --prime 65537 \
+  --depth 4 \
+  --total-expansion 8 \
+  --zero-count 16 \
+  --code-samples 5 \
+  --subset-samples 5000 \
+  --seed 401
+```
+
+The result was `0 / 25000` failures, with minimum sampled rank `16`. This is not a proof of the
+original MDS claim, but it continues to support the split:
+
+```text
+original RFC:     no visible structural obstruction
+systematic RFC:   visible obstruction caused by identity/tree collisions
+```
+
 ## Proof Obligation
 
 A strong certificate would prove something like:

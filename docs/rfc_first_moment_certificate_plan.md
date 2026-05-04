@@ -274,3 +274,46 @@ forced nonzero/equal offset as a coarse penalty.
 ```
 
 The challenge is to derive this state recursively without sampling child codes.
+
+## Crossing Test For Compressed States
+
+The script:
+
+```text
+python scripts/compressed_one_step_crossing.py \
+  docs/sample_one_step_categories_gf5_depth3_c8_cpp.csv \
+  --prime 5 \
+  --total-n 64 \
+  --out docs/sample_one_step_compressed_crossing_gf5_depth3_c8_cpp
+```
+
+computes certificate-style cumulative crossings. For each projected state and cutoff `D`, it
+upper-bounds that bucket by:
+
+```text
+total_pair_count(bucket) * max_{exact category in bucket} Pr[wt <= D].
+```
+
+This asks the real question: how many distance symbols do we lose if the recurrence tracks only the
+projected state?
+
+For the GF(5), depth-3 one-step artifact:
+
+```text
+ensemble      projection                      crossing   loss vs exact
+original      exact                           16         0
+original      support                         10        -6
+original      support, active                 16         0
+original      support, equal_nonzero, active  16         0
+original      support, single_root, double    16         0
+
+systematic    exact                           20         0
+systematic    support                         13        -7
+systematic    support, active                 18        -2
+systematic    support, equal_nonzero, active  19        -1
+systematic    support, single_root, double    19        -1
+```
+
+So `(support, single_root, double_root)` loses only one symbol on the systematic one-step crossing,
+and loses nothing on the original one-step crossing. This is the best current candidate compressed
+state.

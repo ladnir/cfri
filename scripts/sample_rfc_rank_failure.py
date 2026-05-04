@@ -13,6 +13,7 @@ It is a design/calibration tool for a possible rank-first-moment certificate.
 from __future__ import annotations
 
 import argparse
+import itertools
 import math
 import random
 
@@ -95,6 +96,7 @@ def main() -> None:
     parser.add_argument("--subset-samples", type=int, default=1000)
     parser.add_argument("--seed", type=int, default=1)
     parser.add_argument("--systematic", action="store_true")
+    parser.add_argument("--exact-k-subsets", action="store_true")
     args = parser.parse_args()
 
     rng = random.Random(args.seed)
@@ -102,6 +104,27 @@ def main() -> None:
     n = args.total_expansion * k
     if args.zero_count < 1 or args.zero_count > n:
         raise SystemExit("--zero-count must be in 1..N")
+
+    if args.exact_k_subsets:
+        generator = (
+            systematic_generator_prime(args.depth, args.total_expansion, args.prime, rng)
+            if args.systematic
+            else rfc_generator_prime(args.depth, args.total_expansion, args.prime, rng)
+        )
+        failures = 0
+        first_bad: tuple[int, ...] | None = None
+        checked = 0
+        for columns_tuple in itertools.combinations(range(n), k):
+            checked += 1
+            if rank_selected_columns(generator, list(columns_tuple), args.prime) < k:
+                failures += 1
+                if first_bad is None:
+                    first_bad = columns_tuple
+        ensemble = "systematic" if args.systematic else "original"
+        print("ensemble,prime,depth,k,n,checked_k_subsets,rank_deficient_k_subsets,first_bad")
+        first_bad_text = "" if first_bad is None else ":".join(str(column) for column in first_bad)
+        print(f"{ensemble},{args.prime},{args.depth},{k},{n},{checked},{failures},{first_bad_text}")
+        return
 
     failures = 0
     trials = 0

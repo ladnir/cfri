@@ -90,6 +90,26 @@ So random zero-set sampling is blind because the bad sets are sparse in the ambi
 The rank viewpoint is still useful, but only if we prove an analytic rank-deficiency tail for fixed
 zero-set shapes.
 
+## MDS Check
+
+The same script has a small exact `k`-subset mode. At `GF(65537)`, depth 2, `c=8`, it checked all
+`35960` subsets of `k=4` columns:
+
+```text
+original:
+  rank-deficient k-subsets: 0
+
+systematic:
+  rank-deficient k-subsets: 28
+  first bad subset: 0:1:4:18
+```
+
+So the original stacked RFC looks generically MDS in this tiny test, but the systematic generator
+does not. This does not kill the rank route: distance at the target parameters only needs large
+zero sets of size `z > k` to span, and systematic identity columns should be conditioned on rather
+than treated as random parity columns. But it does rule out the simplest possible proof statement
+that every `k` final coordinates are independent.
+
 ## Proof Obligation
 
 A strong certificate would prove something like:

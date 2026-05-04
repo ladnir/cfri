@@ -1,0 +1,5 @@
+identity_pairs,identity_quads,parity_half_pairs,parity_quarter_pairs,parity_mod_half_collisions,parity_mod_quarter_collisions,count,first_bad
+2,1,1,0,1,1,224,0:1:2:3:4:6:8:36
+3,1,0,1,0,1,168,0:1:2:3:4:5:8:22
+3,1,1,0,1,1,112,0:1:2:3:4:5:8:36
+3,1,0,0,0,1,56,0:1:2:3:4:5:8:50

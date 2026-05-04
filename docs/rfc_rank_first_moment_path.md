@@ -200,6 +200,29 @@ That is only a hypothesis, not a proof. But if the true structural loss is `O(de
 parameters would still be close to the ideal random-parity first-moment distance and far above the
 current threshold certificate.
 
+Some depth-3 rows are still small enough to enumerate exactly:
+
+```text
+s_identity  z_parity  total z  checked   deficient
+6           2         8        43120     560
+5           3         8        1552320   13027
+6           3         9        776160    224
+```
+
+The exact `s=6,z_p=3` row confirms that deficiencies persist at total zero count `k+1`, so the
+depth-3 systematic distance is at most Singleton minus two in this sampled large-prime instance.
+The bad shapes are still tree-structured. For example, in `s=6,z_p=3`, all 224 bad shapes have:
+
+```text
+identity_pairs = 3
+identity_quads = 1
+parity_half_pairs = 1
+parity_mod_quarter_collisions = 2
+```
+
+So the obstruction is not arbitrary rank failure; it is tied to selecting many systematic sibling
+pairs together with parity columns that collide under recursive halves/quarters.
+
 ## Proof Obligation
 
 A strong certificate would prove something like:

@@ -14,9 +14,11 @@ small-depth profile modes for finding structural deficient zero-set shapes.
 from __future__ import annotations
 
 import argparse
+import csv
 import itertools
 import math
 import random
+from pathlib import Path
 
 
 def mod_prime(value: int, prime: int) -> int:
@@ -101,8 +103,13 @@ def main() -> None:
     parser.add_argument("--exact-rank-profile", action="store_true")
     parser.add_argument("--systematic-shape-profile", action="store_true")
     parser.add_argument("--systematic-shape-sample-profile", action="store_true")
+    parser.add_argument("--systematic-shape-row", action="store_true")
+    parser.add_argument("--s-identity", type=int, default=-1)
+    parser.add_argument("--z-parity", type=int, default=-1)
     parser.add_argument("--shape-samples", type=int, default=1000)
     parser.add_argument("--shape-extra-max", type=int, default=1)
+    parser.add_argument("--bad-shapes-path", default=None)
+    parser.add_argument("--max-bad-records", type=int, default=1000)
     args = parser.parse_args()
 
     rng = random.Random(args.seed)
@@ -110,6 +117,52 @@ def main() -> None:
     n = args.total_expansion * k
     if args.zero_count < 1 or args.zero_count > n:
         raise SystemExit("--zero-count must be in 1..N")
+
+    if args.systematic_shape_row:
+        if not args.systematic:
+            raise SystemExit("--systematic-shape-row requires --systematic")
+        if args.s_identity < 0 or args.s_identity > k:
+            raise SystemExit("--s-identity must be in 0..k")
+        parity_n = n - k
+        if args.z_parity < 0 or args.z_parity > parity_n:
+            raise SystemExit("--z-parity must be in 0..parity_n")
+
+        generator = systematic_generator_prime(args.depth, args.total_expansion, args.prime, rng)
+        failures = 0
+        checked = 0
+        min_rank = k
+        first_bad: tuple[int, ...] | None = None
+        recorded_bad: list[tuple[int, ...]] = []
+        for identity_columns in itertools.combinations(range(k), args.s_identity):
+            for parity_columns in itertools.combinations(range(parity_n), args.z_parity):
+                columns = tuple(identity_columns) + tuple(k + column for column in parity_columns)
+                rank = rank_selected_columns(generator, list(columns), args.prime)
+                checked += 1
+                min_rank = min(min_rank, rank)
+                if rank < k:
+                    failures += 1
+                    if first_bad is None:
+                        first_bad = columns
+                    if len(recorded_bad) < args.max_bad_records:
+                        recorded_bad.append(columns)
+
+        if args.bad_shapes_path is not None:
+            with Path(args.bad_shapes_path).open("w", newline="") as handle:
+                writer = csv.writer(handle)
+                writer.writerow(["index", "columns"])
+                for index, columns in enumerate(recorded_bad):
+                    writer.writerow([index, ":".join(str(column) for column in columns)])
+
+        first_bad_text = "" if first_bad is None else ":".join(str(column) for column in first_bad)
+        print(
+            "ensemble,prime,depth,k,n,parity_n,s_identity,z_parity,"
+            "checked_shapes,rank_deficient_shapes,min_rank,first_bad"
+        )
+        print(
+            f"systematic,{args.prime},{args.depth},{k},{n},{parity_n},"
+            f"{args.s_identity},{args.z_parity},{checked},{failures},{min_rank},{first_bad_text}"
+        )
+        return
 
     if args.systematic_shape_sample_profile:
         if not args.systematic:

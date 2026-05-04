@@ -1562,11 +1562,23 @@ fn blaze2_basefold_b128_proof_size_accounting_is_exact() {
         .filter(|query| query.domain == BackendProofQueryDomain::CompilerParity)
         .count();
     let relation_auxiliary_query_count = schedule.relation_auxiliary_proof_query_count();
+    let auxiliary_authentication_query_count = schedule.raa_auxiliary_authentication_query_count();
     let auxiliary_query_count = schedule.expected_auxiliary_query_proof_count();
     assert_eq!(
         compiler_parity_query_count + relation_auxiliary_query_count,
         q_backend_proof,
         "typed backend proof schedule has exactly Q_backend entries"
+    );
+    assert_eq!(
+        auxiliary_query_count,
+        relation_auxiliary_query_count
+            + schedule.raa_final_queries().len()
+            + auxiliary_authentication_query_count,
+        "every auxiliary authenticated leaf is either sampled, final-derived, or an explicit local-relation companion"
+    );
+    assert!(
+        auxiliary_authentication_query_count > 0,
+        "RAA local-relation companion leaves must be explicit schedule entries while they are still Merkle-authenticated"
     );
     assert_eq!(
         proof.backend_proof.compiler_parity.queries.len(),

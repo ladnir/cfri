@@ -322,6 +322,7 @@ pub struct HolographicQuerySchedule {
     proof_queries: Vec<BackendProofQuery>,
     raa_final_queries: Vec<RaaFinalAccumulatorQuery>,
     raa_auxiliary_queries: Vec<RaaAuxiliaryLocalQuery>,
+    raa_auxiliary_authentication_queries: Vec<BackendProofQuery>,
 }
 
 #[derive(Clone, Copy, Debug, Eq, PartialEq)]
@@ -1696,10 +1697,16 @@ impl<H: Hash> AuxiliaryOracleQueryProof<H> {
             ));
         }
         let mut local_relation_queries = self.local_relation_queries.iter();
+        let mut local_authentication_queries =
+            schedule.raa_auxiliary_authentication_queries().iter();
         for expected in schedule.raa_auxiliary_queries() {
             let proof = local_relation_queries.next().ok_or_else(|| {
                 Error::InvalidPcsOpen("RAA auxiliary local relation proof is missing".to_string())
             })?;
+            consume_expected_raa_auxiliary_authentication_queries(
+                &mut local_authentication_queries,
+                expected,
+            )?;
             match (expected.relation, proof) {
                 (
                     RaaAuxiliaryRelationKind::U2Repetition { .. }
@@ -1722,6 +1729,11 @@ impl<H: Hash> AuxiliaryOracleQueryProof<H> {
         if local_relation_queries.next().is_some() {
             return Err(Error::InvalidPcsOpen(
                 "too many RAA auxiliary local relation openings".to_string(),
+            ));
+        }
+        if local_authentication_queries.next().is_some() {
+            return Err(Error::InvalidPcsOpen(
+                "too many scheduled RAA auxiliary local authentication queries".to_string(),
             ));
         }
         Ok(())
@@ -1786,6 +1798,8 @@ impl<H: Hash> AuxiliaryOracleQueryProof<H> {
         }
 
         let mut local_relation_proofs = self.local_relation_queries.iter();
+        let mut local_authentication_queries =
+            schedule.raa_auxiliary_authentication_queries().iter();
         for expected in schedule.raa_auxiliary_queries() {
             let main = self
                 .relation_queries
@@ -1798,11 +1812,32 @@ impl<H: Hash> AuxiliaryOracleQueryProof<H> {
             let proof = local_relation_proofs.next().ok_or_else(|| {
                 Error::InvalidPcsOpen("RAA auxiliary local relation proof is missing".to_string())
             })?;
-            queries.extend(proof.authentication_queries(expected, main.value)?);
+            for query in proof.authentication_queries(expected, main.value)? {
+                let scheduled = local_authentication_queries.next().ok_or_else(|| {
+                    Error::InvalidPcsOpen(
+                        "RAA auxiliary local authentication query is missing from schedule"
+                            .to_string(),
+                    )
+                })?;
+                if scheduled.domain != BackendProofQueryDomain::RelationAuxiliary
+                    || scheduled.index != query.0
+                {
+                    return Err(Error::InvalidPcsOpen(
+                        "RAA auxiliary local authentication query does not match schedule"
+                            .to_string(),
+                    ));
+                }
+                queries.push(query);
+            }
         }
         if local_relation_proofs.next().is_some() {
             return Err(Error::InvalidPcsOpen(
                 "too many RAA auxiliary local relation openings".to_string(),
+            ));
+        }
+        if local_authentication_queries.next().is_some() {
+            return Err(Error::InvalidPcsOpen(
+                "too many scheduled RAA auxiliary local authentication queries".to_string(),
             ));
         }
 
@@ -1825,6 +1860,8 @@ impl<H: Hash> AuxiliaryOracleQueryProof<H> {
             queries.push((u4.logical_index, u4.value));
         }
         let mut local_relation_proofs = self.local_relation_queries.iter();
+        let mut local_authentication_queries =
+            schedule.raa_auxiliary_authentication_queries().iter();
         for expected in schedule.raa_auxiliary_queries() {
             let main = self
                 .relation_queries
@@ -1837,11 +1874,32 @@ impl<H: Hash> AuxiliaryOracleQueryProof<H> {
             let proof = local_relation_proofs.next().ok_or_else(|| {
                 Error::InvalidPcsOpen("RAA auxiliary local relation proof is missing".to_string())
             })?;
-            queries.extend(proof.authentication_queries(expected, main.value)?);
+            for query in proof.authentication_queries(expected, main.value)? {
+                let scheduled = local_authentication_queries.next().ok_or_else(|| {
+                    Error::InvalidPcsOpen(
+                        "RAA auxiliary local authentication query is missing from schedule"
+                            .to_string(),
+                    )
+                })?;
+                if scheduled.domain != BackendProofQueryDomain::RelationAuxiliary
+                    || scheduled.index != query.0
+                {
+                    return Err(Error::InvalidPcsOpen(
+                        "RAA auxiliary local authentication query does not match schedule"
+                            .to_string(),
+                    ));
+                }
+                queries.push(query);
+            }
         }
         if local_relation_proofs.next().is_some() {
             return Err(Error::InvalidPcsOpen(
                 "too many RAA auxiliary local relation openings".to_string(),
+            ));
+        }
+        if local_authentication_queries.next().is_some() {
+            return Err(Error::InvalidPcsOpen(
+                "too many scheduled RAA auxiliary local authentication queries".to_string(),
             ));
         }
         Ok(queries)
@@ -2121,6 +2179,7 @@ impl HolographicQuerySchedule {
             proof_queries,
             raa_final_queries,
             raa_auxiliary_queries: Vec::new(),
+            raa_auxiliary_authentication_queries: Vec::new(),
         })
     }
 
@@ -2140,6 +2199,14 @@ impl HolographicQuerySchedule {
         &self.raa_auxiliary_queries
     }
 
+    pub fn raa_auxiliary_authentication_queries(&self) -> &[BackendProofQuery] {
+        &self.raa_auxiliary_authentication_queries
+    }
+
+    pub fn raa_auxiliary_authentication_query_count(&self) -> usize {
+        self.raa_auxiliary_authentication_queries.len()
+    }
+
     pub fn relation_auxiliary_proof_query_count(&self) -> usize {
         self.proof_queries
             .iter()
@@ -2150,11 +2217,7 @@ impl HolographicQuerySchedule {
     pub fn expected_auxiliary_query_proof_count(&self) -> usize {
         self.relation_auxiliary_proof_query_count()
             + self.raa_final_queries.len()
-            + self
-                .raa_auxiliary_queries
-                .iter()
-                .map(RaaAuxiliaryLocalQuery::extra_count)
-                .sum::<usize>()
+            + self.raa_auxiliary_authentication_queries.len()
     }
 
     pub fn attach_raa_auxiliary_local_queries(
@@ -2162,6 +2225,8 @@ impl HolographicQuerySchedule {
         code: &PackedRaaCode,
     ) -> Result<(), Error> {
         self.raa_auxiliary_queries = build_raa_auxiliary_local_queries(code, &self.proof_queries)?;
+        self.raa_auxiliary_authentication_queries =
+            build_raa_auxiliary_authentication_queries(&self.raa_auxiliary_queries)?;
         Ok(())
     }
 
@@ -2991,6 +3056,60 @@ fn build_raa_auxiliary_local_queries(
     Ok(queries)
 }
 
+fn build_raa_auxiliary_authentication_queries(
+    local_queries: &[RaaAuxiliaryLocalQuery],
+) -> Result<Vec<BackendProofQuery>, Error> {
+    let extra_count = local_queries
+        .iter()
+        .map(RaaAuxiliaryLocalQuery::extra_count)
+        .sum();
+    let mut queries = Vec::with_capacity(extra_count);
+    for query in local_queries {
+        for extra_ordinal in 0..query.extra_count() {
+            let index = query.extra_index(extra_ordinal).ok_or_else(|| {
+                Error::InvalidPcsOpen(
+                    "RAA auxiliary local authentication query ordinal is invalid".to_string(),
+                )
+            })?;
+            queries.push(BackendProofQuery {
+                domain: BackendProofQueryDomain::RelationAuxiliary,
+                index,
+                physical_index: None,
+            });
+        }
+    }
+    Ok(queries)
+}
+
+fn consume_expected_raa_auxiliary_authentication_queries<'a, I>(
+    scheduled: &mut I,
+    expected: &RaaAuxiliaryLocalQuery,
+) -> Result<(), Error>
+where
+    I: Iterator<Item = &'a BackendProofQuery>,
+{
+    for extra_ordinal in 0..expected.extra_count() {
+        let expected_index = expected.extra_index(extra_ordinal).ok_or_else(|| {
+            Error::InvalidPcsOpen(
+                "RAA auxiliary local authentication query ordinal is invalid".to_string(),
+            )
+        })?;
+        let scheduled_query = scheduled.next().ok_or_else(|| {
+            Error::InvalidPcsOpen(
+                "RAA auxiliary local authentication query is missing from schedule".to_string(),
+            )
+        })?;
+        if scheduled_query.domain != BackendProofQueryDomain::RelationAuxiliary
+            || scheduled_query.index != expected_index
+        {
+            return Err(Error::InvalidPcsOpen(
+                "RAA auxiliary local authentication query does not match schedule".to_string(),
+            ));
+        }
+    }
+    Ok(())
+}
+
 fn raa_auxiliary_local_query_for_index(
     code: &PackedRaaCode,
     auxiliary_index: usize,
@@ -3717,6 +3836,7 @@ mod tests {
             ],
             raa_final_queries: Vec::new(),
             raa_auxiliary_queries: Vec::new(),
+            raa_auxiliary_authentication_queries: Vec::new(),
         }
     }
 
@@ -4310,6 +4430,7 @@ mod tests {
             ],
             raa_final_queries: Vec::new(),
             raa_auxiliary_queries: Vec::new(),
+            raa_auxiliary_authentication_queries: Vec::new(),
         };
         schedule
             .attach_raa_auxiliary_local_queries(params.praa().packed())
@@ -4324,6 +4445,7 @@ mod tests {
             }
         );
         let proof = params.open_query_proof(&state, &schedule).unwrap();
+        assert_eq!(schedule.raa_auxiliary_authentication_query_count(), 3);
         assert_eq!(proof.auxiliary.as_ref().unwrap().query_count(), 5);
         params
             .verify_query_proof(&prequery, &request, &schedule, &proof, &[])
@@ -4343,6 +4465,12 @@ mod tests {
         }
         assert!(params
             .verify_query_proof(&prequery, &request, &schedule, &tampered_accumulator, &[])
+            .is_err());
+
+        let mut tampered_schedule = schedule.clone();
+        tampered_schedule.raa_auxiliary_authentication_queries[0].index += 1;
+        assert!(params
+            .verify_query_proof(&prequery, &request, &tampered_schedule, &proof, &[])
             .is_err());
 
         let mut tampered_permutation = proof;

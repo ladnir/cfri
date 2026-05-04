@@ -93,7 +93,7 @@ be two instantiations of the same budget.
 
 Acceptance:
 
-- The current fixture remains pinned at `3,616` B128 bytes and `3,136` projected bytes until a
+- The current fixture remains pinned at `3,360` B128 bytes and `2,880` projected bytes until a
   structural change intentionally moves it.
 - Every moved byte bucket has a named reason in the budget test.
 
@@ -159,6 +159,12 @@ Acceptance:
 - Duplicate leaves with conflicting values reject before proof construction or verification.
 
 ### 4. Remove Unscheduled Auxiliary Local Openings
+
+Status: In progress. The companion leaves for RAA local relations are now explicit
+`raa_auxiliary_authentication_queries` in the holographic schedule and the verifier checks that
+the derived companion values match those scheduled authentication leaves. This removes the hidden
+proof-object multiplier, but it does not yet achieve the paper-size target because those companion
+leaves are still Merkle-authenticated. The remaining target is Option B or C below.
 
 The auxiliary term is currently the largest remaining bucket. Values have been tightened, but the
 proof still authenticates auxiliary companion leaves for local RAA relations. The final design must

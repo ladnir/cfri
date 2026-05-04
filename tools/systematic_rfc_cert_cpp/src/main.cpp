@@ -34,6 +34,7 @@ struct Options {
     std::string verifyPath;
     bool idealFirstMoment = false;
     bool sampleRfcFirstMoment = false;
+    bool sampleRfcOneStep = false;
     int totalExpansion = 8;
     int prime = 5;
     int samples = 100;
@@ -750,6 +751,205 @@ int runSampleRfcFirstMoment(const Options& opts) {
     return 0;
 }
 
+struct EncodedMessage {
+    int support = 0;
+    std::vector<int> word;
+};
+
+std::vector<EncodedMessage> enumerateEncodedMessages(
+    const std::vector<int>& generator,
+    std::uint64_t k,
+    std::uint64_t n,
+    int prime) {
+    std::vector<EncodedMessage> out;
+    std::vector<int> message(static_cast<std::size_t>(k), 0);
+    std::vector<int> scratch(static_cast<std::size_t>(n), 0);
+    const auto totalMessages = static_cast<std::size_t>(std::round(std::pow(static_cast<double>(prime), static_cast<double>(k))));
+    out.reserve(totalMessages);
+
+    do {
+        auto [support, encodedWeight] = messageSupportAndEncodedWeight(message, generator, n, prime, scratch);
+        (void)encodedWeight;
+        out.push_back(EncodedMessage{support, scratch});
+    } while (incrementMessage(message, prime));
+
+    return out;
+}
+
+std::vector<double> binomialPmf(int count, double probability) {
+    std::vector<double> out(static_cast<std::size_t>(count + 1), 0.0);
+    if (count == 0) {
+        out[0] = 1.0;
+        return out;
+    }
+    const auto logP = std::log(probability);
+    const auto logQ = std::log(1.0 - probability);
+    for (int s = 0; s <= count; ++s) {
+        const auto logValue =
+            std::lgamma(static_cast<double>(count + 1)) -
+            std::lgamma(static_cast<double>(s + 1)) -
+            std::lgamma(static_cast<double>(count - s + 1)) +
+            static_cast<double>(s) * logP +
+            static_cast<double>(count - s) * logQ;
+        out[static_cast<std::size_t>(s)] = std::exp(logValue);
+    }
+    return out;
+}
+
+std::vector<double> localParentWeightDistribution(
+    int equalNonzero,
+    int singleRoot,
+    int doubleRoot,
+    int prime) {
+    const auto p1 = 1.0 / static_cast<double>(prime - 1);
+    const auto p2 = 2.0 / static_cast<double>(prime - 1);
+    const auto single = binomialPmf(singleRoot, p1);
+    const auto generic = binomialPmf(doubleRoot, p2);
+    const auto maxWeight = 2 * (equalNonzero + singleRoot + doubleRoot);
+    std::vector<double> out(static_cast<std::size_t>(maxWeight + 1), 0.0);
+    for (int a = 0; a <= singleRoot; ++a) {
+        for (int b = 0; b <= doubleRoot; ++b) {
+            const auto weight = maxWeight - a - b;
+            out[static_cast<std::size_t>(weight)] +=
+                single[static_cast<std::size_t>(a)] * generic[static_cast<std::size_t>(b)];
+        }
+    }
+    return out;
+}
+
+std::uint64_t categoryKey(int equalNonzero, int singleRoot, int doubleRoot) {
+    return static_cast<std::uint64_t>(equalNonzero) |
+           (static_cast<std::uint64_t>(singleRoot) << 16) |
+           (static_cast<std::uint64_t>(doubleRoot) << 32);
+}
+
+void accumulateOneStepPairSpectrum(
+    const std::vector<EncodedMessage>& messages,
+    std::uint64_t childN,
+    int prime,
+    bool systematic,
+    std::vector<double>& spectrum,
+    std::unordered_map<std::uint64_t, std::vector<double>>& localCache) {
+    for (const auto& left : messages) {
+        for (const auto& right : messages) {
+            if (left.support == 0 && right.support == 0) {
+                continue;
+            }
+
+            int equalNonzero = 0;
+            int singleRoot = 0;
+            int doubleRoot = 0;
+            for (std::uint64_t j = 0; j < childN; ++j) {
+                const auto l = left.word[static_cast<std::size_t>(j)];
+                const auto r = right.word[static_cast<std::size_t>(j)];
+                if (l == 0 && r == 0) {
+                    continue;
+                }
+                if (l == r) {
+                    ++equalNonzero;
+                } else if (l == 0 || r == 0) {
+                    ++singleRoot;
+                } else {
+                    ++doubleRoot;
+                }
+            }
+
+            const auto key = categoryKey(equalNonzero, singleRoot, doubleRoot);
+            auto it = localCache.find(key);
+            if (it == localCache.end()) {
+                it = localCache
+                         .emplace(
+                             key,
+                             localParentWeightDistribution(equalNonzero, singleRoot, doubleRoot, prime))
+                         .first;
+            }
+
+            const auto systematicWeight = systematic ? left.support + right.support : 0;
+            const auto& local = it->second;
+            for (std::size_t h = 0; h < local.size(); ++h) {
+                const auto totalWeight = systematicWeight + static_cast<int>(h);
+                if (totalWeight >= 0 && totalWeight < static_cast<int>(spectrum.size())) {
+                    spectrum[static_cast<std::size_t>(totalWeight)] += local[h];
+                }
+            }
+        }
+    }
+}
+
+int runSampleRfcOneStep(const Options& opts) {
+    if (opts.depth <= 0) {
+        throw std::runtime_error("--sample-rfc-one-step requires --depth >= 1");
+    }
+    if (opts.totalExpansion <= 1) {
+        throw std::runtime_error("--total-expansion must be greater than 1");
+    }
+    if (opts.prime <= 2) {
+        throw std::runtime_error("--prime must be an odd prime for this sampler");
+    }
+    if (opts.samples <= 0) {
+        throw std::runtime_error("--samples must be positive");
+    }
+
+    const auto parentDepth = opts.depth;
+    const auto childDepth = parentDepth - 1;
+    const auto childK = std::uint64_t{1} << childDepth;
+    const auto parentK = std::uint64_t{1} << parentDepth;
+    const auto oldChildN = static_cast<std::uint64_t>(opts.totalExpansion) * childK;
+    const auto sysChildN = static_cast<std::uint64_t>(opts.totalExpansion - 1) * childK;
+    const auto totalN = static_cast<std::uint64_t>(opts.totalExpansion) * parentK;
+
+    std::vector<double> oldSpectrum(static_cast<std::size_t>(totalN + 1), 0.0);
+    std::vector<double> sysSpectrum(static_cast<std::size_t>(totalN + 1), 0.0);
+    std::mt19937_64 rng(opts.seed);
+
+    for (int sample = 0; sample < opts.samples; ++sample) {
+        const auto oldChild = rfcGeneratorPrime(childDepth, opts.totalExpansion, opts.prime, rng);
+        const auto sysChild = rfcGeneratorPrime(childDepth, opts.totalExpansion - 1, opts.prime, rng);
+        const auto oldMessages = enumerateEncodedMessages(oldChild, childK, oldChildN, opts.prime);
+        const auto sysMessages = enumerateEncodedMessages(sysChild, childK, sysChildN, opts.prime);
+        std::unordered_map<std::uint64_t, std::vector<double>> oldCache;
+        std::unordered_map<std::uint64_t, std::vector<double>> sysCache;
+        accumulateOneStepPairSpectrum(oldMessages, oldChildN, opts.prime, false, oldSpectrum, oldCache);
+        accumulateOneStepPairSpectrum(sysMessages, sysChildN, opts.prime, true, sysSpectrum, sysCache);
+        if (opts.samples >= 10 && (sample + 1) % std::max(1, opts.samples / 10) == 0) {
+            std::cerr << "sample=" << (sample + 1) << "/" << opts.samples << '\n';
+        }
+    }
+
+    for (auto& value : oldSpectrum) {
+        value /= static_cast<double>(opts.samples);
+    }
+    for (auto& value : sysSpectrum) {
+        value /= static_cast<double>(opts.samples);
+    }
+
+    std::cout << "p=" << opts.prime << " parent_depth=" << parentDepth << " parent_k=" << parentK
+              << " total_n=" << totalN << " samples=" << opts.samples << " total_expansion="
+              << opts.totalExpansion << '\n';
+    std::cout << "old_one_step_first_moment_crossing=" << firstCumulativeAtLeastOne(oldSpectrum) << '\n';
+    std::cout << "systematic_one_step_first_moment_crossing=" << firstCumulativeAtLeastOne(sysSpectrum) << '\n';
+    std::cout << "weight,old_expected_count,systematic_expected_count\n";
+    for (std::size_t h = 0; h < oldSpectrum.size(); ++h) {
+        if (oldSpectrum[h] != 0.0 || sysSpectrum[h] != 0.0) {
+            std::cout << h << ',' << std::setprecision(12) << oldSpectrum[h] << ',' << sysSpectrum[h]
+                      << '\n';
+        }
+    }
+
+    if (!opts.spectrumPath.empty()) {
+        std::ofstream out(opts.spectrumPath);
+        if (!out) {
+            throw std::runtime_error("failed to open spectrum output path");
+        }
+        out << "weight,old_expected_count,systematic_expected_count\n";
+        out << std::setprecision(17);
+        for (std::size_t h = 0; h < oldSpectrum.size(); ++h) {
+            out << h << ',' << oldSpectrum[h] << ',' << sysSpectrum[h] << '\n';
+        }
+    }
+    return 0;
+}
+
 std::vector<std::string> splitCsvLine(const std::string& line) {
     std::vector<std::string> out;
     std::string cell;
@@ -1123,6 +1323,8 @@ Options parseOptions(int argc, char** argv) {
             opts.idealFirstMoment = true;
         } else if (arg == "--sample-rfc-first-moment") {
             opts.sampleRfcFirstMoment = true;
+        } else if (arg == "--sample-rfc-one-step") {
+            opts.sampleRfcOneStep = true;
         } else if (arg == "--total-expansion") {
             opts.totalExpansion = std::stoi(requireValue(i, argc, argv, arg));
         } else if (arg == "--prime") {
@@ -1142,6 +1344,7 @@ Options parseOptions(int argc, char** argv) {
                 << "  --verify path                      verify threshold CSV\n"
                 << "  --ideal-first-moment               print ideal random-code first-moment baselines\n"
                 << "  --sample-rfc-first-moment          sample tiny-field RFC first-moment spectra\n"
+                << "  --sample-rfc-one-step              sample child-pair one-step RFC first-moment spectra\n"
                 << "  --total-expansion N                total expansion for first-moment baselines\n"
                 << "  --prime P --samples N --seed N     sampler parameters\n"
                 << "  --spectrum-path path               write sampled spectrum CSV\n"
@@ -1173,6 +1376,9 @@ int main(int argc, char** argv) {
         }
         if (opts.sampleRfcFirstMoment) {
             return runSampleRfcFirstMoment(opts);
+        }
+        if (opts.sampleRfcOneStep) {
+            return runSampleRfcOneStep(opts);
         }
         return runGenerate(opts);
     } catch (const std::exception& e) {

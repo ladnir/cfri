@@ -60,3 +60,16 @@ build/systematic_rfc_cert_cpp/systematic_rfc_cert.exe ^
   --spectrum-path docs/sample_first_moment_gf5_depth3_c8_cpp.csv ^
   --support-spectrum-path docs/sample_first_moment_gf5_depth3_c8_by_support_cpp.csv
 ```
+
+One-step child-pair first-moment transition:
+
+```text
+build/systematic_rfc_cert_cpp/systematic_rfc_cert.exe ^
+  --sample-rfc-one-step ^
+  --prime 5 ^
+  --depth 3 ^
+  --total-expansion 8 ^
+  --samples 100 ^
+  --seed 11 ^
+  --spectrum-path docs/sample_one_step_first_moment_gf5_depth3_c8_cpp.csv
+```

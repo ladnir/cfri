@@ -168,3 +168,36 @@ In this tiny-field sampled regime, the systematic affine construction is not wor
 original; it is better. That does not prove anything for the target binary-extension-field setting,
 but it strengthens the suspicion that the large certified systematic/non-systematic gap is mostly
 proof architecture and counting slack rather than an unavoidable systematicity tax.
+
+## One-Step Pair Transition
+
+The C++ tool also has a one-step pair-transition sampler:
+
+```text
+build/systematic_rfc_cert_cpp/systematic_rfc_cert.exe \
+  --sample-rfc-one-step \
+  --prime 5 \
+  --depth 3 \
+  --total-expansion 8 \
+  --samples 100 \
+  --seed 11 \
+  --spectrum-path docs/sample_one_step_first_moment_gf5_depth3_c8_cpp.csv
+```
+
+For each sampled child code at depth `2`, it enumerates every ordered child pair `(l,r)`, computes
+the category counts of `(P(l), P(r)-P(l))`, and exactly integrates over the fresh parent-layer
+diagonal `T`. This produces the conditional first-moment spectrum for depth `3` without sampling
+the parent diagonal.
+
+For `GF(5)`, `c=8`, parent depth `3`, 100 child samples:
+
+```text
+original one-step first-moment crossing:      16
+systematic one-step first-moment crossing:    20
+```
+
+The direct sampled depth-3 run gave crossings `17` and `20`. The systematic crossing matches
+exactly; the original crossing differs by one symbol, plausibly because the one-step computation
+averages over the parent diagonal instead of sampling it. This is a useful intermediate target:
+the next rigorous recurrence should reproduce this pair-transition calculation without sampling
+the child code.

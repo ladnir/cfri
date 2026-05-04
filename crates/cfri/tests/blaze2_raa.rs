@@ -521,7 +521,7 @@ fn blaze2_basefold_proof_size_breakdown(
         .compiler_parity_folds
         .paths
         .iter()
-        .map(|path| path.steps.len() * 3 * field_bytes)
+        .map(|path| path.steps.len() * 2 * field_bytes)
         .sum();
     let compiler_parity_fold_path_bytes = proof
         .backend_proof
@@ -532,15 +532,10 @@ fn blaze2_basefold_proof_size_breakdown(
             path.steps
                 .iter()
                 .map(|step| {
-                    step.left_path
+                    step.sibling_path
                         .iter()
                         .map(|digest| digest.len())
                         .sum::<usize>()
-                        + step
-                            .right_path
-                            .iter()
-                            .map(|digest| digest.len())
-                            .sum::<usize>()
                         + step
                             .folded_path
                             .iter()
@@ -1539,12 +1534,12 @@ fn blaze2_basefold_outer_shape_matches_paper_after_field_byte_correction() {
     );
     assert_eq!(
         paper_breakdown.total_bytes(),
-        11_064,
+        8_984,
         "current small fixture paper-style total should stay explicit until backend proof path reuse changes"
     );
     assert_eq!(
         blaze2_basefold_proof_size_breakdown(&proof, 16).total_bytes(),
-        11_920,
+        9_680,
         "current small fixture B128 total should stay explicit until serialization or backend path reuse changes"
     );
 }

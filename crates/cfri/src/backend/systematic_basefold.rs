@@ -268,14 +268,10 @@ pub struct CompilerParityFoldPath<H: Hash> {
 pub struct CompilerParityFoldStep<H: Hash> {
     pub round: usize,
     pub output_physical_index: usize,
-    pub left_physical_index: usize,
-    pub left_logical_index: usize,
-    pub left_value: B128,
-    pub left_path: Vec<Output<H>>,
-    pub right_physical_index: usize,
-    pub right_logical_index: usize,
-    pub right_value: B128,
-    pub right_path: Vec<Output<H>>,
+    pub sibling_physical_index: usize,
+    pub sibling_logical_index: usize,
+    pub sibling_value: B128,
+    pub sibling_path: Vec<Output<H>>,
     pub folded_physical_index: usize,
     pub folded_logical_index: usize,
     pub folded_value: B128,
@@ -625,6 +621,7 @@ impl Blaze2BaseFoldBackendParams {
         proof.compiler_parity_folds.verify(
             prequery,
             self.compiler_code(),
+            &proof.compiler_parity,
             &fold_challenges_from_prequery(self.spec(), prequery, request)?,
             schedule,
         )?;
@@ -807,19 +804,22 @@ impl Blaze2BaseFoldBackendParams {
             let half_len = current_len >> 1;
             let output_physical_index = current_physical_index & (half_len - 1);
             let pair = layout.fold_pair(round, output_physical_index)?;
-            let left = parity_query_for_physical_index(
+            let sibling_physical_index = if current_physical_index == pair.left {
+                pair.right
+            } else if current_physical_index == pair.right {
+                pair.left
+            } else {
+                return Err(Error::InvalidPcsOpen(
+                    "compiler parity fold path current index does not lie in its fold pair"
+                        .to_string(),
+                ));
+            };
+            let sibling = parity_query_for_physical_index(
                 layout,
                 round,
                 &state.compiler_parity,
                 &state.folded_parity_layers,
-                pair.left,
-            )?;
-            let right = parity_query_for_physical_index(
-                layout,
-                round,
-                &state.compiler_parity,
-                &state.folded_parity_layers,
-                pair.right,
+                sibling_physical_index,
             )?;
             let folded = parity_query_for_physical_index(
                 layout,
@@ -828,8 +828,10 @@ impl Blaze2BaseFoldBackendParams {
                 &state.folded_parity_layers,
                 output_physical_index,
             )?;
-            debug_assert_eq!(left.value, state.physical_layers[round][pair.left]);
-            debug_assert_eq!(right.value, state.physical_layers[round][pair.right]);
+            debug_assert_eq!(
+                sibling.value,
+                state.physical_layers[round][sibling_physical_index]
+            );
             debug_assert_eq!(
                 folded.value,
                 state.physical_layers[round + 1][output_physical_index]
@@ -837,14 +839,10 @@ impl Blaze2BaseFoldBackendParams {
             steps.push(CompilerParityFoldStep {
                 round,
                 output_physical_index,
-                left_physical_index: pair.left,
-                left_logical_index: left.logical_index,
-                left_value: left.value,
-                left_path: left.path,
-                right_physical_index: pair.right,
-                right_logical_index: right.logical_index,
-                right_value: right.value,
-                right_path: right.path,
+                sibling_physical_index,
+                sibling_logical_index: sibling.logical_index,
+                sibling_value: sibling.value,
+                sibling_path: sibling.path,
                 folded_physical_index: output_physical_index,
                 folded_logical_index: folded.logical_index,
                 folded_value: folded.value,
@@ -1179,6 +1177,7 @@ impl<H: Hash> CompilerParityFoldQueryProof<H> {
         &self,
         prequery: &Blaze2BaseFoldPrequeryPublic<H>,
         code: &SystematicAugmentedRfcCode,
+        top_queries: &CompilerParityQueryProof<H>,
         fold_challenges: &[B128],
         schedule: &HolographicQuerySchedule,
     ) -> Result<(), Error> {
@@ -1202,13 +1201,22 @@ impl<H: Hash> CompilerParityFoldQueryProof<H> {
                 "compiler parity fold path count does not match schedule".to_string(),
             ));
         }
+        if top_queries.queries.len() != expected_count {
+            return Err(Error::InvalidPcsOpen(
+                "compiler parity fold path top query count does not match schedule".to_string(),
+            ));
+        }
 
         let mut supplied = self.paths.iter();
+        let mut supplied_top_queries = top_queries.queries.iter();
         for expected in schedule.proof_queries() {
             if expected.domain != BackendProofQueryDomain::CompilerParity {
                 continue;
             }
             let path = supplied.next().expect("path count checked above");
+            let top_query = supplied_top_queries
+                .next()
+                .expect("top query count checked above");
             let expected_physical = expected.physical_index.ok_or_else(|| {
                 Error::InvalidPcsOpen(
                     "compiler parity query is missing its physical index".to_string(),
@@ -1221,7 +1229,7 @@ impl<H: Hash> CompilerParityFoldQueryProof<H> {
                     "compiler parity fold path does not match schedule".to_string(),
                 ));
             }
-            path.verify(prequery, layout, fold_challenges)?;
+            path.verify(prequery, layout, fold_challenges, top_query)?;
         }
         Ok(())
     }
@@ -1233,12 +1241,20 @@ impl<H: Hash> CompilerParityFoldPath<H> {
         prequery: &Blaze2BaseFoldPrequeryPublic<H>,
         layout: &SystematicAugmentedRfcLayout,
         fold_challenges: &[B128],
+        top_query: &CompilerParityQuery<H>,
     ) -> Result<(), Error> {
         if self.steps.len() != layout.num_rounds() {
             return Err(Error::InvalidPcsOpen(
                 "compiler parity fold path has wrong round count".to_string(),
             ));
         }
+        if top_query.logical_index != self.top_logical_index {
+            return Err(Error::InvalidPcsOpen(
+                "compiler parity fold path top query does not match path index".to_string(),
+            ));
+        }
+        top_query.authenticate(&prequery.compiler_parity)?;
+        let mut current_value = top_query.value;
         let mut current_physical_index = self.top_physical_index;
         for (round, step) in self.steps.iter().enumerate() {
             if step.round != round {
@@ -1250,9 +1266,19 @@ impl<H: Hash> CompilerParityFoldPath<H> {
             let half_len = current_len >> 1;
             let output_physical_index = current_physical_index & (half_len - 1);
             let pair = layout.fold_pair(round, output_physical_index)?;
+            let (left_value, right_value, sibling_physical_index) =
+                if current_physical_index == pair.left {
+                    (current_value, step.sibling_value, pair.right)
+                } else if current_physical_index == pair.right {
+                    (step.sibling_value, current_value, pair.left)
+                } else {
+                    return Err(Error::InvalidPcsOpen(
+                        "compiler parity fold path current index does not lie in its fold pair"
+                            .to_string(),
+                    ));
+                };
             if step.output_physical_index != output_physical_index
-                || step.left_physical_index != pair.left
-                || step.right_physical_index != pair.right
+                || step.sibling_physical_index != sibling_physical_index
                 || step.folded_physical_index != output_physical_index
             {
                 return Err(Error::InvalidPcsOpen(
@@ -1264,19 +1290,10 @@ impl<H: Hash> CompilerParityFoldPath<H> {
                 prequery,
                 layout,
                 round,
-                pair.left,
-                step.left_logical_index,
-                step.left_value,
-                &step.left_path,
-            )?;
-            verify_parity_layer_opening(
-                prequery,
-                layout,
-                round,
-                pair.right,
-                step.right_logical_index,
-                step.right_value,
-                &step.right_path,
+                sibling_physical_index,
+                step.sibling_logical_index,
+                step.sibling_value,
+                &step.sibling_path,
             )?;
             verify_parity_layer_opening(
                 prequery,
@@ -1288,13 +1305,13 @@ impl<H: Hash> CompilerParityFoldPath<H> {
                 &step.folded_path,
             )?;
 
-            let folded =
-                fold_rfc_parity_pair(step.left_value, step.right_value, fold_challenges[round]);
+            let folded = fold_rfc_parity_pair(left_value, right_value, fold_challenges[round]);
             if folded != step.folded_value {
                 return Err(Error::InvalidPcsOpen(
                     "compiler parity fold path value does not satisfy fold equation".to_string(),
                 ));
             }
+            current_value = step.folded_value;
             current_physical_index = output_physical_index;
         }
         Ok(())
@@ -3536,7 +3553,7 @@ mod tests {
             .is_err());
 
         let mut tampered_path = proof.clone();
-        tampered_path.compiler_parity_folds.paths[0].steps[0].left_path[0][0] ^= 1;
+        tampered_path.compiler_parity_folds.paths[0].steps[0].sibling_path[0][0] ^= 1;
         assert!(params
             .verify_query_proof(&prequery, &request, &schedule, &tampered_path, &top_queries)
             .is_err());

@@ -128,14 +128,14 @@ Blaze2/BaseFold fixture (`t = 2` packed rows, `n_praa = 32`, `Q_RAA = 4`,
 | Blaze-authenticated column values | 64 |
 | Blaze-authenticated column Merkle paths | 640 |
 | Backend compiler-parity query values and paths | 672 |
-| Backend compiler-parity fold values and paths | 5,600 |
+| Backend compiler-parity fold values and paths | 3,520 |
 | Backend auxiliary query values and paths | 3,712 |
-| Total | 11,064 |
+| Total | 8,984 |
 
 This confirms the structural acceptance point: the Blaze outer term is exactly row evaluations plus
 backend prequery material plus `Q_RAA` opened columns and paths. The remaining large term is inside
-the backend proof, especially the literal compiler-parity fold paths, and is the next target for
-path reuse/serialization tightening.
+the backend proof, especially the literal compiler-parity fold and auxiliary paths, and is the next
+target for path reuse/serialization tightening.
 
 The BaseFold paper gives the protocol and asymptotics, while its exact figure data for standalone
 PCS proof size is plotted visually. The Blaze paper's Figure 4 reports BaseFold proof sizes of about

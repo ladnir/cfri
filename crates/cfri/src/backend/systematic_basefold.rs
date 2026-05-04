@@ -304,6 +304,13 @@ struct RaaRelationSumcheckCheck {
 }
 
 #[derive(Clone, Debug, Eq, PartialEq)]
+struct RaaSection5RelationChecks {
+    permutation: RaaRelationSumcheckCheck,
+    first_accumulator: RaaRelationSumcheckCheck,
+    second_accumulator: RaaRelationSumcheckCheck,
+}
+
+#[derive(Clone, Debug, Eq, PartialEq)]
 pub enum RaaAuxiliaryLocalRelationProof {
     Equality,
     FirstAccumulatorStep { previous_value: B128 },
@@ -2526,15 +2533,18 @@ impl RaaSection5RelationProof {
         self.verify_schedule_shape(schedule)
     }
 
-    fn verify_prequery<H: Hash>(&self, auxiliary_oracle_len: usize) -> Result<(), Error> {
-        self.verify_sumcheck_transcripts::<H>(auxiliary_oracle_len)?;
+    fn verify_prequery<H: Hash>(
+        &self,
+        auxiliary_oracle_len: usize,
+    ) -> Result<RaaSection5RelationChecks, Error> {
+        let checks = self.verify_sumcheck_transcripts::<H>(auxiliary_oracle_len)?;
         if !self.terminal_evaluations.is_empty() {
             return Err(Error::InvalidPcsOpen(
                 "unbound serialized RAA Section 5 terminal evaluations are not accepted"
                     .to_string(),
             ));
         }
-        Ok(())
+        Ok(checks)
     }
 
     fn verify_schedule_shape(&self, schedule: &HolographicQuerySchedule) -> Result<(), Error> {
@@ -2582,7 +2592,7 @@ impl RaaSection5RelationProof {
         _top_queries: &[TopQuery<B128>],
     ) -> Result<(), Error> {
         self.verify_schedule_shape(schedule)?;
-        self.verify_prequery::<H>(auxiliary_oracle_len)?;
+        let _checks = self.verify_prequery::<H>(auxiliary_oracle_len)?;
         Err(Error::InvalidPcsOpen(
             "RAA Section 5 terminal opening binding is not implemented yet".to_string(),
         ))
@@ -2591,7 +2601,7 @@ impl RaaSection5RelationProof {
     fn verify_sumcheck_transcripts<H: Hash>(
         &self,
         auxiliary_oracle_len: usize,
-    ) -> Result<(), Error> {
+    ) -> Result<RaaSection5RelationChecks, Error> {
         if auxiliary_oracle_len % RAA_SECTION5_AUX_ROW_COUNT != 0 {
             return Err(Error::InvalidPcsOpen(
                 "RAA Section 5 auxiliary oracle length is not row-aligned".to_string(),
@@ -2627,7 +2637,11 @@ impl RaaSection5RelationProof {
                 "RAA Section 5 sumcheck initial zero claim failed".to_string(),
             ));
         }
-        Ok(())
+        Ok(RaaSection5RelationChecks {
+            permutation,
+            first_accumulator,
+            second_accumulator,
+        })
     }
 }
 

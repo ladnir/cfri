@@ -181,7 +181,10 @@ failing closed. Those relation transcripts are now prequery material absorbed be
 sampling, and the query proof must match the prequery transcript. The verifier still fails closed
 before accepting the global relation because terminal oracle evaluation binding is not implemented
 yet. The paper-critical verifier relation still has to bind those terminal claims to backend
-proof-oracle openings without local companion Merkle openings.
+proof-oracle openings without local companion Merkle openings. The verifier now returns a named
+bundle of Section 5 terminal challenge vectors and terminal claims from the sumcheck transcript
+checks, so the missing binding has concrete proof-oracle evaluation targets instead of living behind
+a generic fail-closed branch.
 
 After re-reading Blaze Section 5, the honest implementation cannot be just "the same three rows
 with fewer openings." The paper relation uses MLIOP proof oracles for the RAA computation: the
@@ -207,8 +210,9 @@ B/C below, with a concrete Section 5 proof-oracle layout:
      nonzero initial claims; those transcripts are now bound before query sampling]
 4. bind sumcheck terminal oracle evaluations to backend proof-oracle openings, not unbound
    serialized terminal values; [In progress: verifier rejects unbound serialized terminal values
-   and validates the three Section 5 sumcheck transcript shapes and round consistency before
-   failing closed at the missing terminal-opening binding]
+   and validates the three Section 5 sumcheck transcript shapes and round consistency, now deriving
+   named terminal challenge/claim objects before failing closed at the missing terminal-opening
+   binding]
 5. switch the normal Blaze2 backend from `LocalQueries` to `Section5`.
 ```
 

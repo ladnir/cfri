@@ -169,11 +169,12 @@ auxiliary traces whose `u3 = A * u2`, `u4 = M_pi2 * u3`, and `c_star = A * u4` r
 the folded PRAA codeword. The relation proof variant is now explicit (`LocalQueries` versus
 `Section5`), and the Section 5 mode now routes through the normal scheduled relation-query and
 backend authentication machinery while still failing closed at the missing global relation verifier.
-The Section 5 auxiliary domain is strategy-specific: local mode keeps the old `3 * n_praa` rows
-for `u2/u3/u4`, while Section 5 reserves `11 * n_praa` rows: `u2/u3/u4` plus the eight flattened
-truth-table halves for `f1`, `g1`, `f2`, and `g2`. That is only a prover/API guardrail: the
-paper-critical verifier relation still has to prove `u2 = M_pi1 * F_r(m)` and the
-accumulator/permutation relations without local companion Merkle openings.
+The Section 5 pre-challenge auxiliary domain intentionally remains `3 * n_praa` rows for
+`u2/u3/u4`. The eight flattened truth-table halves for `f1`, `g1`, `f2`, and `g2` are a separate
+post-alpha/beta helper-oracle domain, because those oracles depend on verifier challenges in Blaze
+Section 5. That is only a prover/API guardrail: the paper-critical verifier relation still has to
+prove `u2 = M_pi1 * F_r(m)` and the accumulator/permutation relations without local companion
+Merkle openings.
 
 After re-reading Blaze Section 5, the honest implementation cannot be just "the same three rows
 with fewer openings." The paper relation uses MLIOP proof oracles for the RAA computation: the
@@ -183,9 +184,12 @@ proof-oracle queries by the MLIOP-to-IOPP/BaseFold layer. The remaining target i
 B/C below, with a concrete Section 5 proof-oracle layout:
 
 ```text
-1. define the packed Section 5 proof-oracle rows; [Complete for the row/domain layout]
+1. define the packed Section 5 proof-oracle rows; [In progress: pre-challenge `u2/u3/u4` rows are
+   explicit; post-challenge `f/g` helper-row constants and byte budget are explicit, but they still
+   need their own commitment phase]
 2. commit/authenticate those rows through the shared backend query-set collector; [In progress:
-   scheduled Section 5 rows are in the auxiliary query domain, but honest values are placeholders]
+   scheduled pre-challenge Section 5 rows are in the auxiliary query domain, but honest helper
+   values and helper authentication are placeholders]
 3. implement the alpha/beta/r transcript rounds and batched sumcheck checks for:
    - repetition/permutation into u2,
    - u3 = A * u2,
@@ -302,7 +306,7 @@ Acceptance:
 | 2. Replace the current proof-size constants with budget-derived assertions. | Complete. |
 | 3. Build the shared backend query-set collector. | Complete. |
 | 4. Generate per-layer multiproofs from the collector. | Complete. |
-| 5. Move auxiliary local relation checks into scheduled or algebraic backend checks. | In progress: arbitrary auxiliary traces now reject at prequery construction; the relation proof strategy is explicit; Section 5 now has a strategy-specific 11-row proof-oracle domain and builds scheduled relation openings/authentication, but fails closed at the missing global relation verifier. |
+| 5. Move auxiliary local relation checks into scheduled or algebraic backend checks. | In progress: arbitrary auxiliary traces now reject at prequery construction; the relation proof strategy is explicit; Section 5 builds scheduled pre-challenge relation openings/authentication and has a named post-challenge helper-oracle budget, but fails closed at the missing global relation verifier. |
 | 6. Replace the Blaze2-specific backend proof structs with the shared BaseFold-core proof. | Pending. |
 | 7. Add the 8-byte/16-byte field-width template and lock both acceptance numbers. | Pending. |
 

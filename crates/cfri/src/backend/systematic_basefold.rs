@@ -25,13 +25,14 @@ const RAA_SECTION5_F2_1_ROW: usize = 8;
 const RAA_SECTION5_G2_0_ROW: usize = 9;
 const RAA_SECTION5_G2_1_ROW: usize = 10;
 const RAA_SECTION5_PERMUTATION_HELPER_ROW_COUNT: usize = 8;
-const RAA_SECTION5_AUX_ROW_COUNT: usize =
-    RAA_AUX_RELATION_ROW_COUNT + RAA_SECTION5_PERMUTATION_HELPER_ROW_COUNT;
+const RAA_SECTION5_AUX_ROW_COUNT: usize = RAA_AUX_RELATION_ROW_COUNT;
 const RAA_AUX_EVAL_BINDING_ROW_COUNT: usize = 0;
 const RAA_AUX_ROW_COUNT: usize = RAA_AUX_RELATION_ROW_COUNT;
 
 pub const BLAZE2_BASEFOLD_RELATION_AUXILIARY_ROW_COUNT: usize = RAA_AUX_RELATION_ROW_COUNT;
 pub const BLAZE2_BASEFOLD_SECTION5_AUXILIARY_ROW_COUNT: usize = RAA_SECTION5_AUX_ROW_COUNT;
+pub const BLAZE2_BASEFOLD_SECTION5_PERMUTATION_HELPER_ROW_COUNT: usize =
+    RAA_SECTION5_PERMUTATION_HELPER_ROW_COUNT;
 pub const BLAZE2_BASEFOLD_EVAL_BINDING_ROW_COUNT: usize = RAA_AUX_EVAL_BINDING_ROW_COUNT;
 pub const BLAZE2_BASEFOLD_AUXILIARY_ROW_COUNT: usize = RAA_AUX_ROW_COUNT;
 
@@ -45,6 +46,12 @@ pub fn required_blaze2_basefold_relation_auxiliary_len(spec: &Blaze2CodeSpec) ->
 
 pub fn required_blaze2_basefold_section5_auxiliary_oracle_len(spec: &Blaze2CodeSpec) -> usize {
     spec.praa_codeword_len * BLAZE2_BASEFOLD_SECTION5_AUXILIARY_ROW_COUNT
+}
+
+pub fn required_blaze2_basefold_section5_permutation_helper_oracle_len(
+    spec: &Blaze2CodeSpec,
+) -> usize {
+    spec.praa_codeword_len * BLAZE2_BASEFOLD_SECTION5_PERMUTATION_HELPER_ROW_COUNT
 }
 
 pub fn required_blaze2_basefold_auxiliary_oracle_len_for_strategy(
@@ -4286,19 +4293,20 @@ mod tests {
     }
 
     #[test]
-    fn section5_auxiliary_domain_includes_permutation_helper_oracles() {
+    fn section5_auxiliary_domain_separates_post_challenge_helper_oracles() {
         let mut spec = blaze2_backend_spec();
         let local_len = required_blaze2_basefold_auxiliary_oracle_len(&spec.praa);
         let section5_len = required_blaze2_basefold_section5_auxiliary_oracle_len(&spec.praa);
+        let helper_len =
+            required_blaze2_basefold_section5_permutation_helper_oracle_len(&spec.praa);
         assert_eq!(local_len, spec.praa.praa_codeword_len * RAA_AUX_ROW_COUNT);
+        assert_eq!(section5_len, local_len);
         assert_eq!(
-            section5_len,
-            spec.praa.praa_codeword_len
-                * (RAA_AUX_ROW_COUNT + raa_section5_permutation_helper_rows().len())
+            helper_len,
+            spec.praa.praa_codeword_len * raa_section5_permutation_helper_rows().len()
         );
 
         spec.raa_relation_strategy = RaaRelationProofStrategy::Section5;
-        assert!(Blaze2BaseFoldBackendParams::new(spec.clone()).is_err());
         spec.auxiliary_oracle_len = section5_len;
         let params = Blaze2BaseFoldBackendParams::new(spec.clone()).unwrap();
         assert_eq!(params.spec().auxiliary_oracle_len, section5_len);

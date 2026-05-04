@@ -39,6 +39,7 @@ struct Options {
     int samples = 100;
     std::uint64_t seed = 1;
     std::string spectrumPath;
+    std::string supportSpectrumPath;
 };
 
 struct RoundState {
@@ -604,6 +605,9 @@ std::pair<int, int> messageSupportAndEncodedWeight(
 struct SampleSpectrum {
     std::vector<double> oldSpectrum;
     std::vector<double> systematicSpectrum;
+    std::vector<double> oldBySupport;
+    std::vector<double> systematicBySupport;
+    std::uint64_t supportCols = 0;
     double oldMinSum = 0.0;
     double systematicMinSum = 0.0;
 };
@@ -628,6 +632,9 @@ SampleSpectrum sampleRfcSpectra(const Options& opts) {
     SampleSpectrum result;
     result.oldSpectrum.assign(static_cast<std::size_t>(totalN + 1), 0.0);
     result.systematicSpectrum.assign(static_cast<std::size_t>(totalN + 1), 0.0);
+    result.supportCols = totalN + 1;
+    result.oldBySupport.assign(static_cast<std::size_t>((k + 1) * result.supportCols), 0.0);
+    result.systematicBySupport.assign(static_cast<std::size_t>((k + 1) * result.supportCols), 0.0);
 
     std::mt19937_64 rng(opts.seed);
     std::vector<int> message(static_cast<std::size_t>(k), 0);
@@ -650,6 +657,8 @@ SampleSpectrum sampleRfcSpectra(const Options& opts) {
             const auto sysWeight = sysPair.first + sysPair.second;
             result.oldSpectrum[static_cast<std::size_t>(oldWeight)] += 1.0;
             result.systematicSpectrum[static_cast<std::size_t>(sysWeight)] += 1.0;
+            result.oldBySupport[static_cast<std::size_t>(oldPair.first * result.supportCols + oldWeight)] += 1.0;
+            result.systematicBySupport[static_cast<std::size_t>(sysPair.first * result.supportCols + sysWeight)] += 1.0;
             oldMin = std::min(oldMin, oldWeight);
             sysMin = std::min(sysMin, sysWeight);
         }
@@ -665,6 +674,12 @@ SampleSpectrum sampleRfcSpectra(const Options& opts) {
         value /= static_cast<double>(opts.samples);
     }
     for (auto& value : result.systematicSpectrum) {
+        value /= static_cast<double>(opts.samples);
+    }
+    for (auto& value : result.oldBySupport) {
+        value /= static_cast<double>(opts.samples);
+    }
+    for (auto& value : result.systematicBySupport) {
         value /= static_cast<double>(opts.samples);
     }
     result.oldMinSum /= static_cast<double>(opts.samples);
@@ -713,6 +728,23 @@ int runSampleRfcFirstMoment(const Options& opts) {
         out << std::setprecision(17);
         for (std::size_t h = 0; h < spectra.oldSpectrum.size(); ++h) {
             out << h << ',' << spectra.oldSpectrum[h] << ',' << spectra.systematicSpectrum[h] << '\n';
+        }
+    }
+    if (!opts.supportSpectrumPath.empty()) {
+        std::ofstream out(opts.supportSpectrumPath);
+        if (!out) {
+            throw std::runtime_error("failed to open support spectrum output path");
+        }
+        out << "support,weight,old_expected_count,systematic_expected_count\n";
+        out << std::setprecision(17);
+        const auto messageCount = std::uint64_t{1} << opts.depth;
+        for (std::uint64_t support = 1; support <= messageCount; ++support) {
+            for (std::uint64_t h = 0; h < spectra.oldSpectrum.size(); ++h) {
+                out << support << ',' << h << ','
+                    << spectra.oldBySupport[static_cast<std::size_t>(support * spectra.supportCols + h)] << ','
+                    << spectra.systematicBySupport[static_cast<std::size_t>(support * spectra.supportCols + h)]
+                    << '\n';
+            }
         }
     }
     return 0;
@@ -1101,6 +1133,8 @@ Options parseOptions(int argc, char** argv) {
             opts.seed = static_cast<std::uint64_t>(std::stoull(requireValue(i, argc, argv, arg)));
         } else if (arg == "--spectrum-path") {
             opts.spectrumPath = requireValue(i, argc, argv, arg);
+        } else if (arg == "--support-spectrum-path") {
+            opts.supportSpectrumPath = requireValue(i, argc, argv, arg);
         } else if (arg == "--help" || arg == "-h") {
             std::cout
                 << "systematic_rfc_cert options:\n"
@@ -1111,6 +1145,7 @@ Options parseOptions(int argc, char** argv) {
                 << "  --total-expansion N                total expansion for first-moment baselines\n"
                 << "  --prime P --samples N --seed N     sampler parameters\n"
                 << "  --spectrum-path path               write sampled spectrum CSV\n"
+                << "  --support-spectrum-path path       write sampled support-stratified spectrum CSV\n"
                 << "  --field-bits B                     field size log2, default 128\n"
                 << "  --security-bits B                  per-transition security bits\n"
                 << "  --compare                          print non-systematic comparison columns\n"

@@ -86,6 +86,34 @@ RFC baseline and the systematic affine RFC. Two plausible paths:
 The original non-systematic RFC should be analyzed with the same first-moment machinery. That is
 the only fair baseline for deciding how much of the systematic gap is real.
 
+## Local Category Law
+
+The exact first-moment recurrence should preserve at least the following one-coordinate category
+law. Write the affine parent pair as:
+
+```text
+Y_0 = L + T D
+Y_1 = L + (T+1)D
+```
+
+where `D = R-L` and `T` is uniform in `F^*`. For a non-common-zero coordinate:
+
+```text
+category                         output-weight law
+L = 0, D = 0                     wt(Y_0,Y_1) = 0
+L != 0, D = 0                    wt(Y_0,Y_1) = 2
+L = 0, D != 0                    wt = 1 with prob 1/(|F|-1), else 2
+L != 0, D != 0, L+D = 0          wt = 1 with prob 1/(|F|-1), else 2
+L != 0, D != 0, L+D != 0         wt = 1 with prob 2/(|F|-1), else 2
+```
+
+This law is exact for both odd and binary characteristic when `T` is sampled from `F^*`; in binary
+fields the two generic roots are still distinct because they differ by `1`.
+
+The issue is not the local law. The issue is closure: to know the category distribution of
+`(P_i(l), P_i(r))`, the next layer asks about joint distributions of four grandchildren. That is
+the concrete form of the replica hierarchy.
+
 ## Tiny-Field Sampled Spectra
 
 As a calibration tool, the C++ executable now has a sampled tiny-field mode:
@@ -121,6 +149,19 @@ original average minimum distance:     18.870000 / 64 = 0.29484375
 original first-moment crossing:        17
 systematic average minimum distance:   22.840000 / 64 = 0.35687500
 systematic first-moment crossing:      20
+```
+
+The depth-3 low-weight mass up to the first-moment crossing is support-localized:
+
+```text
+original, weights <= 17:
+  support 8: 1.68 expected codewords
+  support 4: 0.28 expected codewords
+
+systematic, weights <= 20:
+  support 4: 0.84 expected codewords
+  support 2: 0.16 expected codewords
+  support 8: 0.08 expected codewords
 ```
 
 In this tiny-field sampled regime, the systematic affine construction is not worse than the

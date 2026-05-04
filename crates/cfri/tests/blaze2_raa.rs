@@ -417,45 +417,180 @@ fn exhaustive_backend_blaze2_outer_bytes_with_field_bytes(
             .sum::<usize>()
 }
 
+#[derive(Clone, Copy, Debug, Default, Eq, PartialEq)]
+struct Blaze2BaseFoldProofSizeBreakdown {
+    row_eval_bytes: usize,
+    compiler_parity_root_bytes: usize,
+    eval_sumcheck_bytes: usize,
+    folded_parity_root_bytes: usize,
+    terminal_codeword_bytes: usize,
+    auxiliary_root_bytes: usize,
+    outer_column_value_bytes: usize,
+    outer_column_path_bytes: usize,
+    compiler_parity_query_value_bytes: usize,
+    compiler_parity_query_path_bytes: usize,
+    compiler_parity_fold_value_bytes: usize,
+    compiler_parity_fold_path_bytes: usize,
+    auxiliary_query_value_bytes: usize,
+    auxiliary_query_path_bytes: usize,
+}
+
+impl Blaze2BaseFoldProofSizeBreakdown {
+    fn backend_prequery_bytes(&self) -> usize {
+        self.compiler_parity_root_bytes
+            + self.eval_sumcheck_bytes
+            + self.folded_parity_root_bytes
+            + self.terminal_codeword_bytes
+            + self.auxiliary_root_bytes
+    }
+
+    fn blaze_outer_bytes(&self) -> usize {
+        self.row_eval_bytes
+            + self.backend_prequery_bytes()
+            + self.outer_column_value_bytes
+            + self.outer_column_path_bytes
+    }
+
+    fn backend_query_bytes(&self) -> usize {
+        self.compiler_parity_query_value_bytes
+            + self.compiler_parity_query_path_bytes
+            + self.compiler_parity_fold_value_bytes
+            + self.compiler_parity_fold_path_bytes
+            + self.auxiliary_query_value_bytes
+            + self.auxiliary_query_path_bytes
+    }
+
+    fn total_bytes(&self) -> usize {
+        self.blaze_outer_bytes() + self.backend_query_bytes()
+    }
+}
+
+fn blaze2_basefold_proof_size_breakdown(
+    proof: &Blaze2BaseFoldOpeningProof<Blake2s256>,
+    field_bytes: usize,
+) -> Blaze2BaseFoldProofSizeBreakdown {
+    let row_eval_bytes = proof.row_evals.len() * field_bytes;
+    let compiler_parity_root_bytes = proof.backend_prequery.compiler_parity.root.len();
+    let eval_sumcheck_bytes = proof
+        .backend_prequery
+        .eval_sumcheck
+        .as_ref()
+        .map(|sumcheck| sumcheck.round_polynomials.len() * 3 * field_bytes)
+        .unwrap_or(0);
+    let folded_parity_root_bytes = proof
+        .backend_prequery
+        .folded_parity_layers
+        .iter()
+        .map(|layer| layer.root.len())
+        .sum();
+    let terminal_codeword_bytes = proof.backend_prequery.terminal_codeword.len() * field_bytes;
+    let auxiliary_root_bytes = proof
+        .backend_prequery
+        .auxiliary
+        .as_ref()
+        .map(|auxiliary| auxiliary.root.len())
+        .unwrap_or(0);
+    let outer_column_value_bytes = proof
+        .queries
+        .iter()
+        .map(|query| query.column_opening.values.len() * field_bytes)
+        .sum();
+    let outer_column_path_bytes = proof
+        .queries
+        .iter()
+        .map(|query| {
+            query
+                .column_opening
+                .path
+                .iter()
+                .map(|digest| digest.len())
+                .sum::<usize>()
+        })
+        .sum();
+    let compiler_parity_query_value_bytes =
+        proof.backend_proof.compiler_parity.queries.len() * field_bytes;
+    let compiler_parity_query_path_bytes = proof
+        .backend_proof
+        .compiler_parity
+        .queries
+        .iter()
+        .map(|query| query.path.iter().map(|digest| digest.len()).sum::<usize>())
+        .sum();
+    let compiler_parity_fold_value_bytes = proof
+        .backend_proof
+        .compiler_parity_folds
+        .paths
+        .iter()
+        .map(|path| path.steps.len() * 3 * field_bytes)
+        .sum();
+    let compiler_parity_fold_path_bytes = proof
+        .backend_proof
+        .compiler_parity_folds
+        .paths
+        .iter()
+        .map(|path| {
+            path.steps
+                .iter()
+                .map(|step| {
+                    step.left_path
+                        .iter()
+                        .map(|digest| digest.len())
+                        .sum::<usize>()
+                        + step
+                            .right_path
+                            .iter()
+                            .map(|digest| digest.len())
+                            .sum::<usize>()
+                        + step
+                            .folded_path
+                            .iter()
+                            .map(|digest| digest.len())
+                            .sum::<usize>()
+                })
+                .sum::<usize>()
+        })
+        .sum();
+    let auxiliary_query_value_bytes = proof
+        .backend_proof
+        .auxiliary
+        .as_ref()
+        .map(|auxiliary| auxiliary.query_count() * field_bytes)
+        .unwrap_or(0);
+    let auxiliary_query_path_bytes = proof
+        .backend_proof
+        .auxiliary
+        .as_ref()
+        .map(|auxiliary| {
+            auxiliary
+                .all_queries()
+                .map(|query| query.path.iter().map(|digest| digest.len()).sum::<usize>())
+                .sum()
+        })
+        .unwrap_or(0);
+
+    Blaze2BaseFoldProofSizeBreakdown {
+        row_eval_bytes,
+        compiler_parity_root_bytes,
+        eval_sumcheck_bytes,
+        folded_parity_root_bytes,
+        terminal_codeword_bytes,
+        auxiliary_root_bytes,
+        outer_column_value_bytes,
+        outer_column_path_bytes,
+        compiler_parity_query_value_bytes,
+        compiler_parity_query_path_bytes,
+        compiler_parity_fold_value_bytes,
+        compiler_parity_fold_path_bytes,
+        auxiliary_query_value_bytes,
+        auxiliary_query_path_bytes,
+    }
+}
+
 fn blaze2_basefold_outer_bytes_with_field_bytes(
     proof: &Blaze2BaseFoldOpeningProof<Blake2s256>,
     field_bytes: usize,
 ) -> usize {
-    let backend_prequery_bytes = proof.backend_prequery.compiler_parity.root.len()
-        + proof
-            .backend_prequery
-            .eval_sumcheck
-            .as_ref()
-            .map(|sumcheck| sumcheck.round_polynomials.len() * 3 * field_bytes)
-            .unwrap_or(0)
-        + proof
-            .backend_prequery
-            .folded_parity_layers
-            .iter()
-            .map(|layer| layer.root.len())
-            .sum::<usize>()
-        + proof.backend_prequery.terminal_codeword.len() * field_bytes
-        + proof
-            .backend_prequery
-            .auxiliary
-            .as_ref()
-            .map(|auxiliary| auxiliary.root.len())
-            .unwrap_or(0);
-    proof.row_evals.len() * field_bytes
-        + backend_prequery_bytes
-        + proof
-            .queries
-            .iter()
-            .map(|query| {
-                query.column_opening.values.len() * field_bytes
-                    + query
-                        .column_opening
-                        .path
-                        .iter()
-                        .map(|digest| digest.len())
-                        .sum::<usize>()
-            })
-            .sum::<usize>()
+    blaze2_basefold_proof_size_breakdown(proof, field_bytes).blaze_outer_bytes()
 }
 
 fn replay_blaze2_basefold_schedule(
@@ -496,55 +631,7 @@ fn blaze2_basefold_backend_query_bytes_with_field_bytes(
     proof: &Blaze2BaseFoldOpeningProof<Blake2s256>,
     field_bytes: usize,
 ) -> usize {
-    proof
-        .backend_proof
-        .compiler_parity
-        .queries
-        .iter()
-        .map(|query| field_bytes + query.path.iter().map(|digest| digest.len()).sum::<usize>())
-        .sum::<usize>()
-        + proof
-            .backend_proof
-            .compiler_parity_folds
-            .paths
-            .iter()
-            .map(|path| {
-                path.steps
-                    .iter()
-                    .map(|step| {
-                        3 * field_bytes
-                            + step
-                                .left_path
-                                .iter()
-                                .map(|digest| digest.len())
-                                .sum::<usize>()
-                            + step
-                                .right_path
-                                .iter()
-                                .map(|digest| digest.len())
-                                .sum::<usize>()
-                            + step
-                                .folded_path
-                                .iter()
-                                .map(|digest| digest.len())
-                                .sum::<usize>()
-                    })
-                    .sum::<usize>()
-            })
-            .sum::<usize>()
-        + proof
-            .backend_proof
-            .auxiliary
-            .as_ref()
-            .map(|auxiliary| {
-                auxiliary
-                    .all_queries()
-                    .map(|query| {
-                        field_bytes + query.path.iter().map(|digest| digest.len()).sum::<usize>()
-                    })
-                    .sum::<usize>()
-            })
-            .unwrap_or(0)
+    blaze2_basefold_proof_size_breakdown(proof, field_bytes).backend_query_bytes()
 }
 
 fn tamper_opened_trace_value<H: Hash>(
@@ -1369,11 +1456,16 @@ fn blaze2_basefold_outer_shape_matches_paper_after_field_byte_correction() {
     let expected_outer = t * paper_field_bytes
         + backend_prequery_bytes
         + q_raa_input * (t * paper_field_bytes + outer_path_len * hash_bytes);
+    let paper_breakdown = blaze2_basefold_proof_size_breakdown(&proof, paper_field_bytes);
 
     assert_eq!(
-        blaze2_basefold_outer_bytes_with_field_bytes(&proof, paper_field_bytes),
+        paper_breakdown.blaze_outer_bytes(),
         expected_outer,
         "systematic BaseFold integration must keep the Blaze outer proof at row evals + backend prequery roots + exactly Q_RAA opened columns"
+    );
+    assert_eq!(
+        blaze2_basefold_outer_bytes_with_field_bytes(&proof, paper_field_bytes),
+        expected_outer
     );
     assert_eq!(
         proof.queries.len(),
@@ -1387,6 +1479,7 @@ fn blaze2_basefold_outer_shape_matches_paper_after_field_byte_correction() {
         .filter(|query| query.domain == BackendProofQueryDomain::CompilerParity)
         .count();
     let relation_auxiliary_query_count = schedule.relation_auxiliary_proof_query_count();
+    let auxiliary_query_count = schedule.expected_auxiliary_query_proof_count();
     assert_eq!(
         compiler_parity_query_count + relation_auxiliary_query_count,
         q_backend_proof,
@@ -1404,7 +1497,7 @@ fn blaze2_basefold_outer_shape_matches_paper_after_field_byte_correction() {
             .as_ref()
             .unwrap()
             .query_count(),
-        schedule.expected_auxiliary_query_proof_count(),
+        auxiliary_query_count,
         "auxiliary proof carries exactly the schedule-required relation openings"
     );
     assert_eq!(
@@ -1412,7 +1505,48 @@ fn blaze2_basefold_outer_shape_matches_paper_after_field_byte_correction() {
         params.compiler_code().layout().num_rounds(),
         "folded-layer roots are backend prequery commitments, not extra Blaze input openings"
     );
-    assert!(blaze2_basefold_backend_query_bytes_with_field_bytes(&proof, paper_field_bytes) > 0);
+    assert_eq!(paper_breakdown.row_eval_bytes, t * paper_field_bytes);
+    assert_eq!(paper_breakdown.compiler_parity_root_bytes, hash_bytes);
+    assert_eq!(paper_breakdown.eval_sumcheck_bytes, eval_sumcheck_bytes);
+    assert_eq!(
+        paper_breakdown.folded_parity_root_bytes,
+        params.compiler_code().layout().num_rounds() * hash_bytes
+    );
+    assert_eq!(
+        paper_breakdown.terminal_codeword_bytes,
+        (params.compiler_code().layout().parity_expansion_factor() + 1) * paper_field_bytes
+    );
+    assert_eq!(paper_breakdown.auxiliary_root_bytes, hash_bytes);
+    assert_eq!(
+        paper_breakdown.outer_column_value_bytes,
+        q_raa_input * t * paper_field_bytes
+    );
+    assert_eq!(
+        paper_breakdown.outer_column_path_bytes,
+        q_raa_input * outer_path_len * hash_bytes
+    );
+    assert_eq!(
+        paper_breakdown.compiler_parity_query_value_bytes,
+        compiler_parity_query_count * paper_field_bytes
+    );
+    assert_eq!(
+        paper_breakdown.auxiliary_query_value_bytes,
+        auxiliary_query_count * paper_field_bytes
+    );
+    assert_eq!(
+        paper_breakdown.backend_query_bytes(),
+        blaze2_basefold_backend_query_bytes_with_field_bytes(&proof, paper_field_bytes)
+    );
+    assert_eq!(
+        paper_breakdown.total_bytes(),
+        11_064,
+        "current small fixture paper-style total should stay explicit until backend proof path reuse changes"
+    );
+    assert_eq!(
+        blaze2_basefold_proof_size_breakdown(&proof, 16).total_bytes(),
+        11_920,
+        "current small fixture B128 total should stay explicit until serialization or backend path reuse changes"
+    );
 }
 
 #[test]

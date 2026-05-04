@@ -46,6 +46,12 @@ distance is at least `D+1` except with probability at most `2^-lambda`.
 This proof shape only union-bounds the final event. It does not require every intermediate layer to
 be good.
 
+A more direct product-recurrence sketch is maintained in:
+
+```text
+docs/rfc_product_recurrence.md
+```
+
 ## Why Zero-Set Shape Matters
 
 RFC coordinates are recursively paired, so a zero set is not described only by its size. At a parent

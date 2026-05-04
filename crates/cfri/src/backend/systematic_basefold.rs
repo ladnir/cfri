@@ -1697,13 +1697,150 @@ impl<H: Hash> AuxiliaryOracleQueryProof<H> {
             ));
         }
 
-        let local_relation = self.raa_relation.local_queries()?;
-        if local_relation.final_accumulator_queries.len() != schedule.raa_final_queries().len() {
+        self.raa_relation.verify_schedule(schedule)
+    }
+
+    fn authentication_queries(
+        &self,
+        schedule: &HolographicQuerySchedule,
+        top_queries: &[TopQuery<B128>],
+    ) -> Result<Vec<(usize, B128)>, Error> {
+        let expected_count = expected_auxiliary_query_proof_count(schedule);
+        let mut queries = Vec::with_capacity(expected_count);
+
+        let mut relation_queries = self.relation_queries.iter();
+        for expected in schedule.proof_queries() {
+            if expected.domain != BackendProofQueryDomain::RelationAuxiliary {
+                continue;
+            }
+            let query = relation_queries.next().ok_or_else(|| {
+                Error::InvalidPcsOpen("relation auxiliary query opening is missing".to_string())
+            })?;
+            if query.logical_index != expected.index {
+                return Err(Error::InvalidPcsOpen(
+                    "auxiliary oracle query index does not match schedule".to_string(),
+                ));
+            }
+            queries.push((query.logical_index, query.value));
+        }
+        if relation_queries.next().is_some() {
+            return Err(Error::InvalidPcsOpen(
+                "too many relation auxiliary query openings".to_string(),
+            ));
+        }
+
+        queries.extend(self.raa_relation.authentication_queries(
+            &self.relation_queries,
+            schedule,
+            top_queries,
+        )?);
+
+        Ok(queries)
+    }
+
+    fn authentication_queries_from_oracle<HH: Hash>(
+        &self,
+        schedule: &HolographicQuerySchedule,
+        oracle: &AuxiliaryOracleCommitment<HH>,
+    ) -> Result<Vec<(usize, B128)>, Error> {
+        let mut queries = Vec::with_capacity(expected_auxiliary_query_proof_count(schedule));
+        queries.extend(
+            self.relation_queries
+                .iter()
+                .map(|query| (query.logical_index, query.value)),
+        );
+        queries.extend(self.raa_relation.authentication_queries_from_oracle(
+            &self.relation_queries,
+            schedule,
+            oracle,
+        )?);
+        Ok(queries)
+    }
+}
+
+impl RaaRelationProof {
+    pub fn local_queries(&self) -> Result<&RaaLocalRelationProof, Error> {
+        match self {
+            Self::LocalQueries(proof) => Ok(proof),
+        }
+    }
+
+    pub fn local_queries_mut(&mut self) -> Result<&mut RaaLocalRelationProof, Error> {
+        match self {
+            Self::LocalQueries(proof) => Ok(proof),
+        }
+    }
+
+    fn query_count(&self) -> usize {
+        match self {
+            Self::LocalQueries(proof) => proof.query_count(),
+        }
+    }
+
+    fn serialized_value_count(&self) -> usize {
+        match self {
+            Self::LocalQueries(proof) => proof.serialized_value_count(),
+        }
+    }
+
+    fn verify_schedule(&self, schedule: &HolographicQuerySchedule) -> Result<(), Error> {
+        match self {
+            Self::LocalQueries(proof) => proof.verify_schedule(schedule),
+        }
+    }
+
+    fn authentication_queries(
+        &self,
+        relation_queries: &[AuxiliaryOracleQuery],
+        schedule: &HolographicQuerySchedule,
+        top_queries: &[TopQuery<B128>],
+    ) -> Result<Vec<(usize, B128)>, Error> {
+        match self {
+            Self::LocalQueries(proof) => {
+                proof.authentication_queries(relation_queries, schedule, top_queries)
+            }
+        }
+    }
+
+    fn authentication_queries_from_oracle<H: Hash>(
+        &self,
+        relation_queries: &[AuxiliaryOracleQuery],
+        schedule: &HolographicQuerySchedule,
+        oracle: &AuxiliaryOracleCommitment<H>,
+    ) -> Result<Vec<(usize, B128)>, Error> {
+        match self {
+            Self::LocalQueries(proof) => {
+                proof.authentication_queries_from_oracle(relation_queries, schedule, oracle)
+            }
+        }
+    }
+}
+
+impl RaaLocalRelationProof {
+    fn query_count(&self) -> usize {
+        self.final_accumulator_queries.len()
+            + self
+                .local_relation_queries
+                .iter()
+                .map(|proof| proof.authentication_query_count())
+                .sum::<usize>()
+    }
+
+    fn serialized_value_count(&self) -> usize {
+        self.local_relation_queries
+            .iter()
+            .map(|proof| proof.serialized_value_count())
+            .sum()
+    }
+
+    fn verify_schedule(&self, schedule: &HolographicQuerySchedule) -> Result<(), Error> {
+        if self.final_accumulator_queries.len() != schedule.raa_final_queries().len() {
             return Err(Error::InvalidPcsOpen(
                 "RAA final accumulator query proof count does not match schedule".to_string(),
             ));
         }
-        let mut local_relation_queries = local_relation.local_relation_queries.iter();
+
+        let mut local_relation_queries = self.local_relation_queries.iter();
         let mut local_authentication_queries =
             schedule.raa_auxiliary_authentication_queries().iter();
         for expected in schedule.raa_auxiliary_queries() {
@@ -1748,43 +1885,17 @@ impl<H: Hash> AuxiliaryOracleQueryProof<H> {
 
     fn authentication_queries(
         &self,
+        relation_queries: &[AuxiliaryOracleQuery],
         schedule: &HolographicQuerySchedule,
         top_queries: &[TopQuery<B128>],
     ) -> Result<Vec<(usize, B128)>, Error> {
-        let expected_count = expected_auxiliary_query_proof_count(schedule);
-        let mut queries = Vec::with_capacity(expected_count);
+        self.verify_schedule(schedule)?;
+        let mut queries = Vec::with_capacity(self.query_count());
 
-        let mut relation_queries = self.relation_queries.iter();
-        for expected in schedule.proof_queries() {
-            if expected.domain != BackendProofQueryDomain::RelationAuxiliary {
-                continue;
-            }
-            let query = relation_queries.next().ok_or_else(|| {
-                Error::InvalidPcsOpen("relation auxiliary query opening is missing".to_string())
-            })?;
-            if query.logical_index != expected.index {
-                return Err(Error::InvalidPcsOpen(
-                    "auxiliary oracle query index does not match schedule".to_string(),
-                ));
-            }
-            queries.push((query.logical_index, query.value));
-        }
-        if relation_queries.next().is_some() {
-            return Err(Error::InvalidPcsOpen(
-                "too many relation auxiliary query openings".to_string(),
-            ));
-        }
-
-        let local_relation = self.raa_relation.local_queries()?;
-        if local_relation.final_accumulator_queries.len() != schedule.raa_final_queries().len() {
-            return Err(Error::InvalidPcsOpen(
-                "RAA final accumulator query proof count does not match schedule".to_string(),
-            ));
-        }
         for (expected, _) in schedule
             .raa_final_queries()
             .iter()
-            .zip(local_relation.final_accumulator_queries.iter())
+            .zip(self.final_accumulator_queries.iter())
         {
             let current = top_queries
                 .get(expected.current_input_query)
@@ -1805,75 +1916,37 @@ impl<H: Hash> AuxiliaryOracleQueryProof<H> {
             queries.push((expected.u4_auxiliary_index, current.value - previous.value));
         }
 
-        let mut local_relation_proofs = local_relation.local_relation_queries.iter();
-        let mut local_authentication_queries =
-            schedule.raa_auxiliary_authentication_queries().iter();
-        for expected in schedule.raa_auxiliary_queries() {
-            let main = self
-                .relation_queries
-                .get(expected.sampled_auxiliary_ordinal)
-                .ok_or_else(|| {
-                    Error::InvalidPcsOpen(
-                        "RAA auxiliary local relation main opening is missing".to_string(),
-                    )
-                })?;
-            let proof = local_relation_proofs.next().ok_or_else(|| {
-                Error::InvalidPcsOpen("RAA auxiliary local relation proof is missing".to_string())
-            })?;
-            for query in proof.authentication_queries(expected, main.value)? {
-                let scheduled = local_authentication_queries.next().ok_or_else(|| {
-                    Error::InvalidPcsOpen(
-                        "RAA auxiliary local authentication query is missing from schedule"
-                            .to_string(),
-                    )
-                })?;
-                if scheduled.domain != BackendProofQueryDomain::RelationAuxiliary
-                    || scheduled.index != query.0
-                {
-                    return Err(Error::InvalidPcsOpen(
-                        "RAA auxiliary local authentication query does not match schedule"
-                            .to_string(),
-                    ));
-                }
-                queries.push(query);
-            }
-        }
-        if local_relation_proofs.next().is_some() {
-            return Err(Error::InvalidPcsOpen(
-                "too many RAA auxiliary local relation openings".to_string(),
-            ));
-        }
-        if local_authentication_queries.next().is_some() {
-            return Err(Error::InvalidPcsOpen(
-                "too many scheduled RAA auxiliary local authentication queries".to_string(),
-            ));
-        }
-
+        self.push_local_relation_authentication_queries(relation_queries, schedule, &mut queries)?;
         Ok(queries)
     }
 
-    fn authentication_queries_from_oracle<HH: Hash>(
+    fn authentication_queries_from_oracle<H: Hash>(
         &self,
+        relation_queries: &[AuxiliaryOracleQuery],
         schedule: &HolographicQuerySchedule,
-        oracle: &AuxiliaryOracleCommitment<HH>,
+        oracle: &AuxiliaryOracleCommitment<H>,
     ) -> Result<Vec<(usize, B128)>, Error> {
-        let mut queries = Vec::with_capacity(expected_auxiliary_query_proof_count(schedule));
-        queries.extend(
-            self.relation_queries
-                .iter()
-                .map(|query| (query.logical_index, query.value)),
-        );
+        self.verify_schedule(schedule)?;
+        let mut queries = Vec::with_capacity(self.query_count());
         for expected in schedule.raa_final_queries() {
             let u4 = oracle.query(expected.u4_auxiliary_index)?;
             queries.push((u4.logical_index, u4.value));
         }
-        let local_relation = self.raa_relation.local_queries()?;
-        let mut local_relation_proofs = local_relation.local_relation_queries.iter();
+        self.push_local_relation_authentication_queries(relation_queries, schedule, &mut queries)?;
+        Ok(queries)
+    }
+
+    fn push_local_relation_authentication_queries(
+        &self,
+        relation_queries: &[AuxiliaryOracleQuery],
+        schedule: &HolographicQuerySchedule,
+        queries: &mut Vec<(usize, B128)>,
+    ) -> Result<(), Error> {
+        let mut local_relation_proofs = self.local_relation_queries.iter();
         let mut local_authentication_queries =
             schedule.raa_auxiliary_authentication_queries().iter();
         for expected in schedule.raa_auxiliary_queries() {
-            let main = self
-                .relation_queries
+            let main = relation_queries
                 .get(expected.sampled_auxiliary_ordinal)
                 .ok_or_else(|| {
                     Error::InvalidPcsOpen(
@@ -1911,51 +1984,7 @@ impl<H: Hash> AuxiliaryOracleQueryProof<H> {
                 "too many scheduled RAA auxiliary local authentication queries".to_string(),
             ));
         }
-        Ok(queries)
-    }
-}
-
-impl RaaRelationProof {
-    pub fn local_queries(&self) -> Result<&RaaLocalRelationProof, Error> {
-        match self {
-            Self::LocalQueries(proof) => Ok(proof),
-        }
-    }
-
-    pub fn local_queries_mut(&mut self) -> Result<&mut RaaLocalRelationProof, Error> {
-        match self {
-            Self::LocalQueries(proof) => Ok(proof),
-        }
-    }
-
-    fn query_count(&self) -> usize {
-        match self {
-            Self::LocalQueries(proof) => proof.query_count(),
-        }
-    }
-
-    fn serialized_value_count(&self) -> usize {
-        match self {
-            Self::LocalQueries(proof) => proof.serialized_value_count(),
-        }
-    }
-}
-
-impl RaaLocalRelationProof {
-    fn query_count(&self) -> usize {
-        self.final_accumulator_queries.len()
-            + self
-                .local_relation_queries
-                .iter()
-                .map(|proof| proof.authentication_query_count())
-                .sum::<usize>()
-    }
-
-    fn serialized_value_count(&self) -> usize {
-        self.local_relation_queries
-            .iter()
-            .map(|proof| proof.serialized_value_count())
-            .sum()
+        Ok(())
     }
 }
 

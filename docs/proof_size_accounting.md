@@ -129,9 +129,9 @@ Blaze2/BaseFold fixture (`t = 2` packed rows, `n_praa = 32`, `Q_RAA = 4`,
 | Blaze-authenticated column values | 128 |
 | Blaze-authenticated column Merkle paths | 640 |
 | Backend compiler-parity query values and multiproof nodes | 384 |
-| Backend compiler-parity fold values and multiproof nodes | 1,152 |
+| Backend compiler-parity fold values and multiproof nodes | 832 |
 | Backend auxiliary query values and multiproof nodes | 1,216 |
-| Total | 4,048 |
+| Total | 3,728 |
 
 For comparison to the Blaze paper's 64-bit field-byte convention, the same proof structure with
 `field_bytes = 8` projects to:
@@ -143,9 +143,9 @@ For comparison to the Blaze paper's 64-bit field-byte convention, the same proof
 | Blaze-authenticated column values | 64 |
 | Blaze-authenticated column Merkle paths | 640 |
 | Backend compiler-parity query values and multiproof nodes | 352 |
-| Backend compiler-parity fold values and multiproof nodes | 832 |
+| Backend compiler-parity fold values and multiproof nodes | 672 |
 | Backend auxiliary query values and multiproof nodes | 1,088 |
-| Total | 3,352 |
+| Total | 3,192 |
 
 This confirms the structural acceptance point: the Blaze outer term is exactly row evaluations plus
 backend prequery material plus `Q_RAA` opened columns and paths. The remaining large term is inside

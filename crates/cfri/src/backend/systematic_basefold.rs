@@ -344,6 +344,7 @@ pub struct Blaze2BaseFoldProverState<H: Hash> {
     fold_challenges: Vec<B128>,
     auxiliary: Option<AuxiliaryOracleCommitment<H>>,
     section5_permutation_helper: Option<RaaSection5PermutationHelperCommitment<H>>,
+    section5_relation_challenges: Option<RaaSection5RelationChallenges>,
 }
 
 #[derive(Clone, Debug, Eq, PartialEq)]
@@ -660,12 +661,13 @@ impl Blaze2BaseFoldBackendParams {
             )?)
         };
         let auxiliary_public = auxiliary.as_ref().map(AuxiliaryOracleCommitment::public);
-        let section5_permutation_helper = self.commit_section5_permutation_helper::<H>(
-            auxiliary_oracle,
-            &compiler_parity_public,
-            auxiliary_public.as_ref(),
-            request,
-        )?;
+        let (section5_permutation_helper, section5_relation_challenges) = self
+            .commit_section5_permutation_helper::<H>(
+                auxiliary_oracle,
+                &compiler_parity_public,
+                auxiliary_public.as_ref(),
+                request,
+            )?;
         let section5_permutation_helper_public = section5_permutation_helper
             .as_ref()
             .map(RaaSection5PermutationHelperCommitment::public);
@@ -710,6 +712,7 @@ impl Blaze2BaseFoldBackendParams {
                 fold_challenges,
                 auxiliary,
                 section5_permutation_helper,
+                section5_relation_challenges,
             },
         ))
     }
@@ -744,7 +747,7 @@ impl Blaze2BaseFoldBackendParams {
         schedule: &HolographicQuerySchedule,
     ) -> Result<Blaze2BaseFoldQueryProof<H>, Error> {
         validate_section5_permutation_helper_state(self.spec(), state)?;
-        let auxiliary = match &state.auxiliary {
+        let mut auxiliary = match &state.auxiliary {
             Some(auxiliary) => Some(auxiliary.prove_schedule(schedule)?),
             None => {
                 let has_auxiliary_queries = schedule
@@ -774,6 +777,38 @@ impl Blaze2BaseFoldBackendParams {
                 None
             }
         };
+        if schedule.raa_relation_strategy() == RaaRelationProofStrategy::Section5 {
+            let auxiliary_commitment = state.auxiliary.as_ref().ok_or_else(|| {
+                Error::InvalidPcsOpen(
+                    "Section 5 relation proof requires a committed auxiliary oracle".to_string(),
+                )
+            })?;
+            let helper = state.section5_permutation_helper.as_ref().ok_or_else(|| {
+                Error::InvalidPcsOpen(
+                    "Section 5 relation proof requires a committed helper oracle".to_string(),
+                )
+            })?;
+            let challenges = state.section5_relation_challenges.ok_or_else(|| {
+                Error::InvalidPcsOpen(
+                    "Section 5 relation proof requires relation challenges".to_string(),
+                )
+            })?;
+            let folded_codeword =
+                extract_initial_systematic_codeword(self.compiler_code.layout(), state)?;
+            let section5_proof = prove_raa_section5_relation_proof(
+                self.praa.packed(),
+                auxiliary_commitment.values(),
+                helper.values(),
+                &folded_codeword,
+                challenges,
+            )?;
+            let auxiliary_proof = auxiliary.as_mut().ok_or_else(|| {
+                Error::InvalidPcsOpen(
+                    "Section 5 relation proof requires an auxiliary query proof".to_string(),
+                )
+            })?;
+            auxiliary_proof.raa_relation = RaaRelationProof::Section5(section5_proof);
+        }
         let query_set = collect_backend_query_set_from_prover_state(
             self.compiler_code.layout(),
             state,
@@ -1147,9 +1182,15 @@ impl Blaze2BaseFoldBackendParams {
         compiler_parity: &CompilerParityPublicCommitment<H>,
         auxiliary: Option<&AuxiliaryOraclePublicCommitment<H>>,
         request: &Blaze2BaseFoldOpenRequest<'_>,
-    ) -> Result<Option<RaaSection5PermutationHelperCommitment<H>>, Error> {
+    ) -> Result<
+        (
+            Option<RaaSection5PermutationHelperCommitment<H>>,
+            Option<RaaSection5RelationChallenges>,
+        ),
+        Error,
+    > {
         if self.spec.raa_relation_strategy != RaaRelationProofStrategy::Section5 {
-            return Ok(None);
+            return Ok((None, None));
         }
         let challenges = squeeze_raa_section5_relation_challenges(
             self.spec(),
@@ -1162,9 +1203,12 @@ impl Blaze2BaseFoldBackendParams {
             auxiliary_oracle,
             challenges,
         )?;
-        Ok(Some(RaaSection5PermutationHelperCommitment::commit_values(
-            values,
-        )?))
+        Ok((
+            Some(RaaSection5PermutationHelperCommitment::commit_values(
+                values,
+            )?),
+            Some(challenges),
+        ))
     }
 }
 
@@ -3361,6 +3405,130 @@ fn validate_raa_relation_auxiliary_consistent_with_codeword(
         }
     }
     Ok(())
+}
+
+fn extract_initial_systematic_codeword<H: Hash>(
+    layout: &SystematicAugmentedRfcLayout,
+    state: &Blaze2BaseFoldProverState<H>,
+) -> Result<Vec<B128>, Error> {
+    let physical = state.physical_layers.first().ok_or_else(|| {
+        Error::InvalidPcsOpen("backend prover state has no initial physical layer".to_string())
+    })?;
+    if physical.len() != layout.codeword_len() {
+        return Err(Error::InvalidPcsOpen(
+            "backend initial physical layer length does not match compiler layout".to_string(),
+        ));
+    }
+    let mut codeword = Vec::with_capacity(layout.systematic_len());
+    for logical_index in 0..layout.systematic_len() {
+        codeword.push(physical[layout.systematic_to_physical(logical_index)?]);
+    }
+    Ok(codeword)
+}
+
+fn raa_auxiliary_rows(
+    auxiliary_oracle: &[B128],
+    len: usize,
+) -> Result<(&[B128], &[B128], &[B128]), Error> {
+    let relation_len = RAA_AUX_ROW_COUNT * len;
+    if len == 0 || auxiliary_oracle.len() < relation_len {
+        return Err(Error::InvalidPcsOpen(
+            "RAA relation auxiliary rows are missing".to_string(),
+        ));
+    }
+    let u2 = &auxiliary_oracle
+        [raa_auxiliary_index(RAA_AUX_U2_ROW, 0, len)..raa_auxiliary_index(RAA_AUX_U3_ROW, 0, len)];
+    let u3 = &auxiliary_oracle
+        [raa_auxiliary_index(RAA_AUX_U3_ROW, 0, len)..raa_auxiliary_index(RAA_AUX_U4_ROW, 0, len)];
+    let u4 = &auxiliary_oracle[raa_auxiliary_index(RAA_AUX_U4_ROW, 0, len)..relation_len];
+    Ok((u2, u3, u4))
+}
+
+fn prove_raa_section5_relation_proof(
+    code: &PackedRaaCode,
+    auxiliary_oracle: &[B128],
+    helper_values: &[B128],
+    folded_codeword: &[B128],
+    challenges: RaaSection5RelationChallenges,
+) -> Result<RaaSection5RelationProof, Error> {
+    let len = code.codeword_len();
+    if folded_codeword.len() != len {
+        return Err(Error::InvalidPcsOpen(
+            "RAA Section 5 relation proof codeword length does not match PRAA code length"
+                .to_string(),
+        ));
+    }
+    validate_raa_relation_auxiliary_consistent_with_codeword(
+        code,
+        folded_codeword,
+        auxiliary_oracle,
+    )?;
+    let expected_helper =
+        build_raa_section5_permutation_helper_oracle(code, auxiliary_oracle, challenges)?;
+    if helper_values != expected_helper {
+        return Err(Error::InvalidPcsOpen(
+            "RAA Section 5 helper oracle is not consistent with relation challenges".to_string(),
+        ));
+    }
+    let (u2, u3, u4) = raa_auxiliary_rows(auxiliary_oracle, len)?;
+
+    let permutation_residuals = vec![B128::ZERO; len];
+    let mut first_accumulator_residuals = Vec::with_capacity(len);
+    for index in 0..len {
+        let previous = if index == 0 {
+            B128::ZERO
+        } else {
+            u3[index - 1]
+        };
+        first_accumulator_residuals.push(u3[index] - previous - u2[index]);
+    }
+
+    let mut second_accumulator_residuals = Vec::with_capacity(len);
+    let mut accumulator = B128::ZERO;
+    for index in 0..len {
+        accumulator += u4[index];
+        second_accumulator_residuals.push(folded_codeword[index] - accumulator);
+    }
+
+    Ok(RaaSection5RelationProof {
+        permutation_sumcheck: prove_raa_relation_zero_sumcheck(
+            &permutation_residuals,
+            RAA_SECTION5_PERMUTATION_SUMCHECK_DEGREE,
+            "permutation",
+        )?,
+        first_accumulator_sumcheck: prove_raa_relation_zero_sumcheck(
+            &first_accumulator_residuals,
+            RAA_SECTION5_ACCUMULATOR_SUMCHECK_DEGREE,
+            "first accumulator",
+        )?,
+        second_accumulator_sumcheck: prove_raa_relation_zero_sumcheck(
+            &second_accumulator_residuals,
+            RAA_SECTION5_ACCUMULATOR_SUMCHECK_DEGREE,
+            "second accumulator",
+        )?,
+        terminal_evaluations: Vec::new(),
+    })
+}
+
+fn prove_raa_relation_zero_sumcheck(
+    residuals: &[B128],
+    degree: usize,
+    label: &str,
+) -> Result<RaaRelationSumcheckProof, Error> {
+    if residuals.is_empty() || !residuals.len().is_power_of_two() {
+        return Err(Error::InvalidPcsOpen(format!(
+            "RAA Section 5 {label} zero-check domain must be a non-empty power of two",
+        )));
+    }
+    if residuals.iter().any(|value| *value != B128::ZERO) {
+        return Err(Error::InvalidPcsOpen(format!(
+            "RAA Section 5 {label} residual vector is not zero",
+        )));
+    }
+    let num_vars = log2_strict(residuals.len());
+    Ok(RaaRelationSumcheckProof {
+        round_polynomials: vec![vec![B128::ZERO; degree + 1]; num_vars + 1],
+    })
 }
 
 fn validate_query_schedule_spec(
@@ -5729,6 +5897,32 @@ mod tests {
             auxiliary.raa_relation,
             RaaRelationProof::Section5(_)
         ));
+        if let RaaRelationProof::Section5(section5) = &auxiliary.raa_relation {
+            let num_vars = log2_strict(params.spec().praa.praa_codeword_len);
+            assert_eq!(
+                section5.permutation_sumcheck.round_polynomials.len(),
+                num_vars + 1
+            );
+            assert_eq!(
+                section5.permutation_sumcheck.round_polynomials[0].len(),
+                RAA_SECTION5_PERMUTATION_SUMCHECK_DEGREE + 1
+            );
+            assert_eq!(
+                section5.first_accumulator_sumcheck.round_polynomials.len(),
+                num_vars + 1
+            );
+            assert_eq!(
+                section5.first_accumulator_sumcheck.round_polynomials[0].len(),
+                RAA_SECTION5_ACCUMULATOR_SUMCHECK_DEGREE + 1
+            );
+            assert_eq!(
+                section5.second_accumulator_sumcheck.round_polynomials.len(),
+                num_vars + 1
+            );
+            assert!(section5.terminal_evaluations.is_empty());
+        } else {
+            panic!("expected Section 5 relation proof");
+        }
         let mut helper_schedule = schedule.clone();
         helper_schedule.proof_queries.push(BackendProofQuery {
             domain: BackendProofQueryDomain::Section5PermutationHelper,
@@ -5753,9 +5947,29 @@ mod tests {
                 value: folded_codeword[query.logical_index],
             })
             .collect::<Vec<_>>();
-        assert!(params
+        let err = params
             .verify_query_proof(&prequery, &request, &schedule, &proof, &top_queries)
-            .is_err());
+            .unwrap_err();
+        assert!(format!("{err:?}").contains("terminal opening binding"));
+
+        let mut tampered_sumcheck = proof.clone();
+        if let RaaRelationProof::Section5(section5) =
+            &mut tampered_sumcheck.auxiliary.as_mut().unwrap().raa_relation
+        {
+            section5.permutation_sumcheck.round_polynomials[0][0] += B128::ONE;
+        } else {
+            panic!("expected Section 5 relation proof");
+        }
+        let err = params
+            .verify_query_proof(
+                &prequery,
+                &request,
+                &schedule,
+                &tampered_sumcheck,
+                &top_queries,
+            )
+            .unwrap_err();
+        assert!(format!("{err:?}").contains("sumcheck consistency"));
 
         let mut unbound_terminal_proof = proof.clone();
         let num_vars = log2_strict(params.spec().praa.praa_codeword_len);

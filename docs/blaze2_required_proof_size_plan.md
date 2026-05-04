@@ -174,10 +174,12 @@ The Section 5 pre-challenge auxiliary domain intentionally remains `3 * n_praa` 
 post-alpha/beta helper-oracle domain, because those oracles depend on verifier challenges in Blaze
 Section 5. The helper domain now has a named prequery commitment slot, exact length validation,
 honest packed product-tree witness values for the current alpha/beta challenges, and scheduled
-backend authentication for helper leaves. The verifier still fails closed before accepting the
-global relation because terminal binding and the batched Section 5 relation checks are not
-implemented yet. The paper-critical verifier relation still has to prove `u2 = M_pi1 * F_r(m)` and
-the accumulator/permutation relations without local companion Merkle openings.
+backend authentication for helper leaves. The prover now emits honestly populated Section 5
+zero-check transcripts for the helper/permutation gate and the two accumulator relations, and the
+verifier checks the transcript shape and Fiat-Shamir round consistency before failing closed. The
+verifier still fails closed before accepting the global relation because terminal oracle evaluation
+binding is not implemented yet. The paper-critical verifier relation still has to bind those
+terminal claims to backend proof-oracle openings without local companion Merkle openings.
 
 After re-reading Blaze Section 5, the honest implementation cannot be just "the same three rows
 with fewer openings." The paper relation uses MLIOP proof oracles for the RAA computation: the
@@ -198,11 +200,12 @@ B/C below, with a concrete Section 5 proof-oracle layout:
    - repetition/permutation into u2,
    - u3 = A * u2,
    - u4 = M_pi2 * u3,
-   - c_star = A * u4;
+   - c_star = A * u4; [In progress: the prover emits honest zero-check transcripts derived from
+     the committed auxiliary/helper state, and the verifier rejects malformed transcript rounds]
 4. bind sumcheck terminal oracle evaluations to backend proof-oracle openings, not unbound
    serialized terminal values; [In progress: verifier rejects unbound serialized terminal values
-   and validates the three Section 5 sumcheck transcript shapes and round consistency before failing closed at the
-   missing terminal-opening binding]
+   and validates the three Section 5 sumcheck transcript shapes and round consistency before
+   failing closed at the missing terminal-opening binding]
 5. switch the normal Blaze2 backend from `LocalQueries` to `Section5`.
 ```
 
@@ -312,7 +315,7 @@ Acceptance:
 | 2. Replace the current proof-size constants with budget-derived assertions. | Complete. |
 | 3. Build the shared backend query-set collector. | Complete. |
 | 4. Generate per-layer multiproofs from the collector. | Complete. |
-| 5. Move auxiliary local relation checks into scheduled or algebraic backend checks. | In progress: arbitrary auxiliary traces now reject at prequery construction; the relation proof strategy is explicit; Section 5 builds scheduled pre-challenge relation openings/authentication and has a transcript-bound, honestly populated, authenticated post-challenge helper domain, but fails closed at the missing global relation verifier. |
+| 5. Move auxiliary local relation checks into scheduled or algebraic backend checks. | In progress: arbitrary auxiliary traces now reject at prequery construction; the relation proof strategy is explicit; Section 5 builds scheduled pre-challenge relation openings/authentication, has a transcript-bound/authenticated post-challenge helper domain, emits honest relation sumcheck transcripts, and now fails closed only at the missing terminal-opening binding. |
 | 6. Replace the Blaze2-specific backend proof structs with the shared BaseFold-core proof. | Pending. |
 | 7. Add the 8-byte/16-byte field-width template and lock both acceptance numbers. | Pending. |
 

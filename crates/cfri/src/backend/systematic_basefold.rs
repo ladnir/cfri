@@ -2746,6 +2746,30 @@ fn validate_raa_relation_auxiliary_consistent_with_codeword(
     let (u3, u4) = rest.split_at(len);
     let permutation = code.permutation();
 
+    let mut repetition_values = vec![None; code.message_len()];
+    for index in 0..len {
+        let source = permutation.permutation1[index] / code.rate();
+        let slot = repetition_values.get_mut(source).ok_or_else(|| {
+            Error::InvalidPcsOpen(
+                "RAA relation auxiliary u2 row uses an invalid repetition source".to_string(),
+            )
+        })?;
+        match slot {
+            Some(expected) if *expected != u2[index] => {
+                return Err(Error::InvalidPcsOpen(
+                    "RAA relation auxiliary u2 row does not match the repetition layer".to_string(),
+                ));
+            }
+            Some(_) => {}
+            None => *slot = Some(u2[index]),
+        }
+    }
+    if repetition_values.iter().any(Option::is_none) {
+        return Err(Error::InvalidPcsOpen(
+            "RAA relation auxiliary u2 row does not cover every message coordinate".to_string(),
+        ));
+    }
+
     let mut accumulator = B128::ZERO;
     for index in 0..len {
         accumulator += u2[index];
@@ -4863,6 +4887,46 @@ mod tests {
         wrong_u4[2 * len] += B128::ONE;
         assert!(params
             .prove_prequery::<Blake2s>(&folded_codeword, &wrong_u4, &request)
+            .is_err());
+    }
+
+    #[test]
+    fn backend_prequery_rejects_bad_u2_repetition_layer() {
+        let params = Blaze2BaseFoldBackendParams::new(blaze2_backend_spec()).unwrap();
+        let request_point = make_request_point(&params, 23);
+        let (mut codeword, mut auxiliary, _) =
+            folded_codeword_and_auxiliary(&params, 71, &request_point);
+        let code = params.praa().packed();
+        let len = code.codeword_len();
+        let index = (0..len)
+            .find(|&candidate| raa_u2_repetition_peer(code, candidate).is_some())
+            .expect("test code has a repeated RAA source");
+
+        auxiliary[index] += B128::ONE;
+        let mut first_accumulator = B128::ZERO;
+        for row_index in 0..len {
+            first_accumulator += auxiliary[row_index];
+            auxiliary[len + row_index] = first_accumulator;
+        }
+        for row_index in 0..len {
+            let permuted = code.permutation().permutation2[row_index];
+            auxiliary[2 * len + row_index] = auxiliary[len + permuted];
+        }
+        let mut final_accumulator = B128::ZERO;
+        for row_index in 0..len {
+            final_accumulator += auxiliary[2 * len + row_index];
+            codeword[row_index] = final_accumulator;
+        }
+
+        let weights = raa_codeword_eval_weights(code, &request_point).unwrap();
+        let folded_eval = weights
+            .iter()
+            .zip(codeword.iter())
+            .fold(B128::ZERO, |acc, (&weight, &value)| acc + weight * value);
+        let request = open_request_with_eval(&request_point, folded_eval);
+
+        assert!(params
+            .prove_prequery::<Blake2s>(&codeword, &auxiliary, &request)
             .is_err());
     }
 

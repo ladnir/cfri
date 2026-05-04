@@ -8,6 +8,12 @@ The column-level tree algebra is expanded in:
 docs/rfc_column_tensor_structure.md
 ```
 
+The current certificate theorem outline is:
+
+```text
+docs/rfc_rank_certificate_outline.md
+```
+
 Small bad-shape examples can be decoded with:
 
 ```text

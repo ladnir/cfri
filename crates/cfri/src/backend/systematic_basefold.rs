@@ -255,28 +255,33 @@ pub struct Blaze2BaseFoldQueryProof<H: Hash> {
 
 #[derive(Clone, Debug, Eq, PartialEq)]
 pub struct CompilerParityFoldQueryProof<H: Hash> {
-    pub paths: Vec<CompilerParityFoldPath<H>>,
+    pub paths: Vec<CompilerParityFoldPath>,
+    pub layer_authentication: Vec<CompilerParityFoldLayerProof<H>>,
 }
 
 #[derive(Clone, Debug, Eq, PartialEq)]
-pub struct CompilerParityFoldPath<H: Hash> {
+pub struct CompilerParityFoldLayerProof<H: Hash> {
+    pub round: usize,
+    pub authentication_nodes: Vec<Output<H>>,
+}
+
+#[derive(Clone, Debug, Eq, PartialEq)]
+pub struct CompilerParityFoldPath {
     pub top_logical_index: usize,
     pub top_physical_index: usize,
-    pub steps: Vec<CompilerParityFoldStep<H>>,
+    pub steps: Vec<CompilerParityFoldStep>,
 }
 
 #[derive(Clone, Debug, Eq, PartialEq)]
-pub struct CompilerParityFoldStep<H: Hash> {
+pub struct CompilerParityFoldStep {
     pub round: usize,
     pub output_physical_index: usize,
     pub sibling_physical_index: usize,
     pub sibling_logical_index: usize,
     pub sibling_value: B128,
-    pub sibling_path: Vec<Output<H>>,
     pub folded_physical_index: usize,
     pub folded_logical_index: usize,
     pub folded_value: B128,
-    pub folded_path: Vec<Output<H>>,
 }
 
 #[derive(Clone, Debug, Eq, PartialEq)]
@@ -779,7 +784,27 @@ impl Blaze2BaseFoldBackendParams {
                 top_physical_index,
             )?);
         }
-        Ok(CompilerParityFoldQueryProof { paths })
+        let layout = self.compiler_code.layout();
+        let layer_queries = compiler_parity_fold_layer_queries(layout, &paths)?;
+        let mut layer_authentication = Vec::with_capacity(layout.num_rounds());
+        for (round, queries) in layer_queries.iter().enumerate() {
+            let commitment = parity_commitment_at_round(
+                &state.compiler_parity,
+                &state.folded_parity_layers,
+                round,
+            )?;
+            layer_authentication.push(CompilerParityFoldLayerProof {
+                round,
+                authentication_nodes: merkle_b128_multiproof_nodes::<H, _>(
+                    &commitment.merkle_tree,
+                    queries.iter().copied(),
+                )?,
+            });
+        }
+        Ok(CompilerParityFoldQueryProof {
+            paths,
+            layer_authentication,
+        })
     }
 
     fn open_compiler_parity_fold_path<H: Hash>(
@@ -787,7 +812,7 @@ impl Blaze2BaseFoldBackendParams {
         state: &Blaze2BaseFoldProverState<H>,
         top_logical_index: usize,
         top_physical_index: usize,
-    ) -> Result<CompilerParityFoldPath<H>, Error> {
+    ) -> Result<CompilerParityFoldPath, Error> {
         let layout = self.compiler_code.layout();
         if state.physical_layers.len() != layout.num_rounds() + 1
             || state.folded_parity_layers.len() != layout.num_rounds()
@@ -815,18 +840,16 @@ impl Blaze2BaseFoldBackendParams {
                         .to_string(),
                 ));
             };
-            let sibling = parity_query_for_physical_index(
+            let sibling = parity_value_for_physical_index(
                 layout,
+                &state.physical_layers,
                 round,
-                &state.compiler_parity,
-                &state.folded_parity_layers,
                 sibling_physical_index,
             )?;
-            let folded = parity_query_for_physical_index(
+            let folded = parity_value_for_physical_index(
                 layout,
+                &state.physical_layers,
                 round + 1,
-                &state.compiler_parity,
-                &state.folded_parity_layers,
                 output_physical_index,
             )?;
             debug_assert_eq!(
@@ -843,11 +866,9 @@ impl Blaze2BaseFoldBackendParams {
                 sibling_physical_index,
                 sibling_logical_index: sibling.logical_index,
                 sibling_value: sibling.value,
-                sibling_path: sibling.path,
                 folded_physical_index: output_physical_index,
                 folded_logical_index: folded.logical_index,
                 folded_value: folded.value,
-                folded_path: folded.path,
             });
             current_physical_index = output_physical_index;
         }
@@ -1207,6 +1228,11 @@ impl<H: Hash> CompilerParityFoldQueryProof<H> {
                 "compiler parity fold path top query count does not match schedule".to_string(),
             ));
         }
+        if self.layer_authentication.len() != layout.num_rounds() {
+            return Err(Error::InvalidPcsOpen(
+                "compiler parity fold layer authentication count does not match layout".to_string(),
+            ));
+        }
 
         let mut supplied = self.paths.iter();
         let mut supplied_top_queries = top_queries.queries.iter();
@@ -1232,12 +1258,32 @@ impl<H: Hash> CompilerParityFoldQueryProof<H> {
             }
             path.verify(prequery, layout, fold_challenges, top_query)?;
         }
+        let layer_queries = compiler_parity_fold_layer_queries(layout, &self.paths)?;
+        for (round, (proof, queries)) in self
+            .layer_authentication
+            .iter()
+            .zip(layer_queries.iter())
+            .enumerate()
+        {
+            if proof.round != round {
+                return Err(Error::InvalidPcsOpen(
+                    "compiler parity fold layer authentication round is out of order".to_string(),
+                ));
+            }
+            let public = parity_public_at_round(prequery, round)?;
+            verify_merkle_b128_multiproof::<H, _>(
+                &public.root,
+                public.len,
+                queries.iter().copied(),
+                &proof.authentication_nodes,
+            )?;
+        }
         Ok(())
     }
 }
 
-impl<H: Hash> CompilerParityFoldPath<H> {
-    fn verify(
+impl CompilerParityFoldPath {
+    fn verify<H: Hash>(
         &self,
         prequery: &Blaze2BaseFoldPrequeryPublic<H>,
         layout: &SystematicAugmentedRfcLayout,
@@ -1287,29 +1333,31 @@ impl<H: Hash> CompilerParityFoldPath<H> {
                 ));
             }
 
-            verify_parity_layer_opening(
-                prequery,
+            validate_parity_layer_address(
                 layout,
                 round,
                 sibling_physical_index,
                 step.sibling_logical_index,
-                step.sibling_value,
-                &step.sibling_path,
             )?;
-            verify_parity_layer_opening(
-                prequery,
+            validate_parity_layer_address(
                 layout,
                 round + 1,
                 output_physical_index,
                 step.folded_logical_index,
-                step.folded_value,
-                &step.folded_path,
             )?;
 
             let folded = fold_rfc_parity_pair(left_value, right_value, fold_challenges[round]);
             if folded != step.folded_value {
                 return Err(Error::InvalidPcsOpen(
                     "compiler parity fold path value does not satisfy fold equation".to_string(),
+                ));
+            }
+            if round + 1 == layout.num_rounds()
+                && prequery.terminal_codeword[output_physical_index] != step.folded_value
+            {
+                return Err(Error::InvalidPcsOpen(
+                    "compiler parity fold path terminal value does not match clear terminal codeword"
+                        .to_string(),
                 ));
             }
             current_value = step.folded_value;
@@ -1395,8 +1443,12 @@ impl<H: Hash> AuxiliaryOracleCommitment<H> {
             local_relation_queries,
             authentication_nodes: Vec::new(),
         };
-        let authentication_nodes =
-            auxiliary_merkle_multiproof_nodes::<H>(&self.merkle_tree, &proof.all_queries_vec())?;
+        let authentication_nodes = merkle_b128_multiproof_nodes::<H, _>(
+            &self.merkle_tree,
+            proof
+                .all_queries()
+                .map(|query| (query.logical_index, query.value)),
+        )?;
 
         Ok(AuxiliaryOracleQueryProof {
             authentication_nodes,
@@ -1423,10 +1475,6 @@ impl<H: Hash> AuxiliaryOracleQueryProof<H> {
             .chain(self.local_relation_queries.iter())
     }
 
-    fn all_queries_vec(&self) -> Vec<AuxiliaryOracleQuery> {
-        self.all_queries().cloned().collect()
-    }
-
     pub fn verify(
         &self,
         public: &AuxiliaryOraclePublicCommitment<H>,
@@ -1438,7 +1486,13 @@ impl<H: Hash> AuxiliaryOracleQueryProof<H> {
                 "auxiliary oracle commitment length does not match backend spec".to_string(),
             ));
         }
-        verify_auxiliary_merkle_multiproof(public, self.all_queries(), &self.authentication_nodes)?;
+        verify_merkle_b128_multiproof::<H, _>(
+            &public.root,
+            public.len,
+            self.all_queries()
+                .map(|query| (query.logical_index, query.value)),
+            &self.authentication_nodes,
+        )?;
 
         let expected_count = expected_auxiliary_query_proof_count(schedule);
         if self.query_count() != expected_count {
@@ -2259,6 +2313,73 @@ fn parity_query_for_physical_index<H: Hash>(
     parity_commitment_at_round(top, folded, round)?.query(address.local_index)
 }
 
+#[derive(Clone, Copy, Debug, Eq, PartialEq)]
+struct ParityLayerOpening {
+    logical_index: usize,
+    value: B128,
+}
+
+fn parity_value_for_physical_index(
+    layout: &SystematicAugmentedRfcLayout,
+    physical_layers: &[Vec<B128>],
+    round: usize,
+    physical_index: usize,
+) -> Result<ParityLayerOpening, Error> {
+    let address = layout.physical_to_logical_at_round(round, physical_index)?;
+    if address.part != CodewordPart::Parity {
+        return Err(Error::InvalidPcsOpen(
+            "compiler parity fold path tried to open a systematic position as parity".to_string(),
+        ));
+    }
+    let layer = physical_layers.get(round).ok_or_else(|| {
+        Error::InvalidPcsOpen(format!(
+            "missing physical folded codeword for round {round}"
+        ))
+    })?;
+    let value = *layer.get(physical_index).ok_or_else(|| {
+        Error::InvalidPcsOpen(format!(
+            "physical index {physical_index} is outside physical folded codeword for round {round}"
+        ))
+    })?;
+    Ok(ParityLayerOpening {
+        logical_index: address.local_index,
+        value,
+    })
+}
+
+fn compiler_parity_fold_layer_queries(
+    layout: &SystematicAugmentedRfcLayout,
+    paths: &[CompilerParityFoldPath],
+) -> Result<Vec<Vec<(usize, B128)>>, Error> {
+    let mut queries = vec![Vec::new(); layout.num_rounds()];
+    for path in paths {
+        if path.steps.len() != layout.num_rounds() {
+            return Err(Error::InvalidPcsOpen(
+                "compiler parity fold path has wrong round count".to_string(),
+            ));
+        }
+        for step in &path.steps {
+            validate_parity_layer_address(
+                layout,
+                step.round,
+                step.sibling_physical_index,
+                step.sibling_logical_index,
+            )?;
+            queries[step.round].push((step.sibling_logical_index, step.sibling_value));
+            if step.round + 1 < layout.num_rounds() {
+                validate_parity_layer_address(
+                    layout,
+                    step.round + 1,
+                    step.folded_physical_index,
+                    step.folded_logical_index,
+                )?;
+                queries[step.round + 1].push((step.folded_logical_index, step.folded_value));
+            }
+        }
+    }
+    Ok(queries)
+}
+
 fn parity_commitment_at_round<'a, H: Hash>(
     top: &'a CompilerParityCommitment<H>,
     folded: &'a [CompilerParityCommitment<H>],
@@ -2288,14 +2409,11 @@ fn parity_public_at_round<'a, H: Hash>(
     })
 }
 
-fn verify_parity_layer_opening<H: Hash>(
-    prequery: &Blaze2BaseFoldPrequeryPublic<H>,
+fn validate_parity_layer_address(
     layout: &SystematicAugmentedRfcLayout,
     round: usize,
     physical_index: usize,
     logical_index: usize,
-    value: B128,
-    path: &[Output<H>],
 ) -> Result<(), Error> {
     let address = layout.physical_to_logical_at_round(round, physical_index)?;
     if address.part != CodewordPart::Parity || address.local_index != logical_index {
@@ -2303,12 +2421,7 @@ fn verify_parity_layer_opening<H: Hash>(
             "parity layer opening does not match the fold-path physical address".to_string(),
         ));
     }
-    CompilerParityQuery {
-        logical_index,
-        value,
-        path: path.to_vec(),
-    }
-    .authenticate(parity_public_at_round(prequery, round)?)
+    Ok(())
 }
 
 fn verify_terminal_codeword<H: Hash>(
@@ -2805,24 +2918,24 @@ fn merkle_padded_sibling_path<H: Hash>(
     path
 }
 
-fn auxiliary_merkle_multiproof_nodes<H: Hash>(
+fn merkle_b128_multiproof_nodes<H: Hash, I: IntoIterator<Item = (usize, B128)>>(
     tree: &[Vec<Output<H>>],
-    queries: &[AuxiliaryOracleQuery],
+    queries: I,
 ) -> Result<Vec<Output<H>>, Error> {
-    if queries.is_empty() {
-        return Ok(Vec::new());
-    }
     let mut known = BTreeMap::new();
-    for query in queries {
-        validate_auxiliary_query_index(query.logical_index, tree[0].len())?;
-        let hash = hash_b128_leaf::<H>(&query.value);
-        if let Some(existing) = known.insert(query.logical_index, hash.clone()) {
+    for (logical_index, value) in queries {
+        validate_merkle_b128_query_index(logical_index, tree[0].len())?;
+        let hash = hash_b128_leaf::<H>(&value);
+        if let Some(existing) = known.insert(logical_index, hash.clone()) {
             if existing != hash {
                 return Err(Error::InvalidPcsOpen(
-                    "duplicate auxiliary query index has conflicting values".to_string(),
+                    "duplicate Merkle query index has conflicting values".to_string(),
                 ));
             }
         }
+    }
+    if known.is_empty() {
+        return Ok(Vec::new());
     }
 
     let mut authentication_nodes = Vec::new();
@@ -2852,19 +2965,20 @@ fn auxiliary_merkle_multiproof_nodes<H: Hash>(
     Ok(authentication_nodes)
 }
 
-fn verify_auxiliary_merkle_multiproof<'a, H: Hash>(
-    public: &AuxiliaryOraclePublicCommitment<H>,
-    queries: impl Iterator<Item = &'a AuxiliaryOracleQuery>,
+fn verify_merkle_b128_multiproof<H: Hash, I: IntoIterator<Item = (usize, B128)>>(
+    root: &Output<H>,
+    len: usize,
+    queries: I,
     authentication_nodes: &[Output<H>],
 ) -> Result<(), Error> {
     let mut known = BTreeMap::new();
-    for query in queries {
-        validate_auxiliary_query_index(query.logical_index, public.len)?;
-        let hash = hash_b128_leaf::<H>(&query.value);
-        if let Some(existing) = known.insert(query.logical_index, hash.clone()) {
+    for (logical_index, value) in queries {
+        validate_merkle_b128_query_index(logical_index, len)?;
+        let hash = hash_b128_leaf::<H>(&value);
+        if let Some(existing) = known.insert(logical_index, hash.clone()) {
             if existing != hash {
                 return Err(Error::InvalidPcsOpen(
-                    "duplicate auxiliary query index has conflicting values".to_string(),
+                    "duplicate Merkle query index has conflicting values".to_string(),
                 ));
             }
         }
@@ -2874,11 +2988,11 @@ fn verify_auxiliary_merkle_multiproof<'a, H: Hash>(
             return Ok(());
         }
         return Err(Error::InvalidPcsOpen(
-            "auxiliary Merkle multiproof has authentication nodes but no queries".to_string(),
+            "Merkle multiproof has authentication nodes but no queries".to_string(),
         ));
     }
 
-    let padded_len = public.len.next_power_of_two();
+    let padded_len = len.next_power_of_two();
     let expected_rounds = log2_strict(padded_len);
     let mut supplied = authentication_nodes.iter();
     for _ in 0..expected_rounds {
@@ -2895,8 +3009,7 @@ fn verify_auxiliary_merkle_multiproof<'a, H: Hash>(
                     .next()
                     .ok_or_else(|| {
                         Error::InvalidPcsOpen(
-                            "auxiliary Merkle multiproof is missing an authentication node"
-                                .to_string(),
+                            "Merkle multiproof is missing an authentication node".to_string(),
                         )
                     })?
                     .clone()
@@ -2912,13 +3025,27 @@ fn verify_auxiliary_merkle_multiproof<'a, H: Hash>(
     }
     if supplied.next().is_some() {
         return Err(Error::InvalidPcsOpen(
-            "auxiliary Merkle multiproof has too many authentication nodes".to_string(),
+            "Merkle multiproof has too many authentication nodes".to_string(),
         ));
     }
-    if known.len() != 1 || *known.values().next().expect("known root exists") != public.root {
+    if known.len() != 1 || known.values().next().expect("known root exists") != root {
         return Err(Error::InvalidPcsOpen(
-            "auxiliary Merkle multiproof does not authenticate".to_string(),
+            "Merkle multiproof does not authenticate".to_string(),
         ));
+    }
+    Ok(())
+}
+
+fn validate_merkle_b128_query_index(index: usize, len: usize) -> Result<(), Error> {
+    if len == 0 {
+        return Err(Error::InvalidPcsOpen(
+            "Merkle query domain is empty".to_string(),
+        ));
+    }
+    if index >= len {
+        return Err(Error::InvalidPcsOpen(format!(
+            "Merkle query index {index} is outside length {len}"
+        )));
     }
     Ok(())
 }
@@ -3656,7 +3783,7 @@ mod tests {
             .is_err());
 
         let mut tampered_path = proof.clone();
-        tampered_path.compiler_parity_folds.paths[0].steps[0].sibling_path[0][0] ^= 1;
+        tampered_path.compiler_parity_folds.layer_authentication[0].authentication_nodes[0][0] ^= 1;
         assert!(params
             .verify_query_proof(&prequery, &request, &schedule, &tampered_path, &top_queries)
             .is_err());

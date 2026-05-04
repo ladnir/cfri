@@ -725,6 +725,33 @@ fn replay_blaze2_basefold_schedule(
         .unwrap()
 }
 
+fn replay_blaze2_basefold_folding_challenges_and_eval(
+    params: &Blaze2BaseFoldBackendParams,
+    commitment: &Blaze2InterleavedCodewordCommitment<Blake2s256>,
+    claim: &Blaze2OpeningClaim,
+    proof: &Blaze2BaseFoldOpeningProof<Blake2s256>,
+) -> (Vec<B128>, B128) {
+    let mut transcript = CfriTranscript::<Blake2s256>::new();
+    absorb_blaze2_opening_public_with_code_spec(
+        &mut transcript,
+        params.praa(),
+        &commitment.public(),
+        claim,
+        params.spec().q_raa_input,
+    );
+    absorb_blaze2_opening_row_evals(&mut transcript, &proof.row_evals);
+    let mut folding_challenges = vec![B128::ZERO; commitment.num_rows()];
+    squeeze_blaze2_opening_folding_challenges(&mut transcript, &mut folding_challenges);
+    let folded_eval = proof
+        .row_evals
+        .iter()
+        .zip(folding_challenges.iter())
+        .fold(B128::ZERO, |acc, (&eval, &challenge)| {
+            acc + eval * challenge
+        });
+    (folding_challenges, folded_eval)
+}
+
 fn blaze2_basefold_backend_query_bytes_with_field_bytes(
     proof: &Blaze2BaseFoldOpeningProof<Blake2s256>,
     field_bytes: usize,
@@ -1636,6 +1663,29 @@ fn blaze2_basefold_b128_proof_size_accounting_is_exact() {
     );
     let paper_breakdown = blaze2_basefold_proof_size_breakdown(&proof, paper_field_bytes);
     let b128_breakdown = blaze2_basefold_proof_size_breakdown(&proof, b128_field_bytes);
+    let (folding_challenges, folded_eval) =
+        replay_blaze2_basefold_folding_challenges_and_eval(&params, &commitment, &claim, &proof);
+    let backend_request = Blaze2BaseFoldOpenRequest {
+        col_point: &claim.col_point,
+        folded_eval,
+    };
+    let column_openings = proof
+        .queries
+        .iter()
+        .map(|query| query.column_opening.clone())
+        .collect::<Vec<_>>();
+    let top_queries = params
+        .top_queries_from_interleaved_columns(&schedule, &column_openings, &folding_challenges)
+        .unwrap();
+    let backend_query_set = params
+        .collect_backend_query_set(
+            &proof.backend_prequery,
+            &backend_request,
+            &schedule,
+            &proof.backend_proof,
+            &top_queries,
+        )
+        .unwrap();
 
     assert_eq!(
         b128_breakdown.blaze_outer_bytes(),
@@ -1657,6 +1707,21 @@ fn blaze2_basefold_b128_proof_size_accounting_is_exact() {
     assert_eq!(
         b128_budget.auxiliary_query_path_bytes, 960,
         "current auxiliary authentication budget is pinned until auxiliary openings move into the final BaseFold core"
+    );
+    assert_eq!(
+        backend_query_set.compiler_parity_queries.len(),
+        proof.backend_proof.compiler_parity.queries.len(),
+        "shared backend query-set collector must include all compiler-parity top queries"
+    );
+    assert_eq!(
+        backend_query_set.compiler_parity_fold_layer_queries.len(),
+        compiler_rounds,
+        "shared backend query-set collector must produce one fold query set per compiler round"
+    );
+    assert_eq!(
+        backend_query_set.auxiliary_queries.len(),
+        auxiliary_query_count,
+        "shared backend query-set collector must include all authenticated auxiliary leaves"
     );
     assert_eq!(
         b128_breakdown,

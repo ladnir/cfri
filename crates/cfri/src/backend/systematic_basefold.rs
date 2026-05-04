@@ -257,6 +257,28 @@ pub struct Blaze2BaseFoldQueryProof<H: Hash> {
     pub auxiliary: Option<AuxiliaryOracleQueryProof<H>>,
 }
 
+#[derive(Clone, Debug, Default, Eq, PartialEq)]
+pub struct BackendProofOracleQuerySet {
+    pub compiler_parity_queries: Vec<(usize, B128)>,
+    pub compiler_parity_fold_layer_queries: Vec<Vec<(usize, B128)>>,
+    pub auxiliary_queries: Vec<(usize, B128)>,
+}
+
+impl BackendProofOracleQuerySet {
+    pub fn compiler_parity_fold_query_count(&self) -> usize {
+        self.compiler_parity_fold_layer_queries
+            .iter()
+            .map(Vec::len)
+            .sum()
+    }
+
+    pub fn total_query_count(&self) -> usize {
+        self.compiler_parity_queries.len()
+            + self.compiler_parity_fold_query_count()
+            + self.auxiliary_queries.len()
+    }
+}
+
 #[derive(Clone, Debug, Eq, PartialEq)]
 pub struct CompilerParityFoldQueryProof<H: Hash> {
     pub paths: Vec<CompilerParityFoldPath>,
@@ -650,6 +672,24 @@ impl Blaze2BaseFoldBackendParams {
             proof.auxiliary.as_ref(),
             self.spec.auxiliary_oracle_len,
             schedule,
+            top_queries,
+        )
+    }
+
+    pub fn collect_backend_query_set<H: Hash>(
+        &self,
+        prequery: &Blaze2BaseFoldPrequeryPublic<H>,
+        request: &Blaze2BaseFoldOpenRequest<'_>,
+        schedule: &HolographicQuerySchedule,
+        proof: &Blaze2BaseFoldQueryProof<H>,
+        top_queries: &[TopQuery<B128>],
+    ) -> Result<BackendProofOracleQuerySet, Error> {
+        let fold_challenges = fold_challenges_from_prequery(self.spec(), prequery, request)?;
+        proof.collect_backend_query_set(
+            self.compiler_code.layout(),
+            schedule,
+            &fold_challenges,
+            Some(&prequery.terminal_codeword),
             top_queries,
         )
     }
@@ -1179,6 +1219,49 @@ impl<H: Hash> CompilerParityQueryProof<H> {
             &self.authentication_nodes,
         )?;
         Ok(())
+    }
+}
+
+impl<H: Hash> Blaze2BaseFoldQueryProof<H> {
+    pub fn collect_backend_query_set(
+        &self,
+        layout: &SystematicAugmentedRfcLayout,
+        schedule: &HolographicQuerySchedule,
+        fold_challenges: &[B128],
+        terminal_codeword: Option<&[B128]>,
+        top_queries: &[TopQuery<B128>],
+    ) -> Result<BackendProofOracleQuerySet, Error> {
+        let compiler_parity_queries = self
+            .compiler_parity
+            .queries
+            .iter()
+            .map(|query| (query.logical_index, query.value))
+            .collect();
+        let compiler_parity_fold_layer_queries = compiler_parity_fold_layer_queries(
+            layout,
+            &self.compiler_parity_folds.paths,
+            &self.compiler_parity.queries,
+            fold_challenges,
+            terminal_codeword,
+        )?;
+        let auxiliary_queries = match &self.auxiliary {
+            Some(auxiliary) => auxiliary.authentication_queries(schedule, top_queries)?,
+            None => {
+                if expected_auxiliary_query_proof_count(schedule) != 0 {
+                    return Err(Error::InvalidPcsOpen(
+                        "backend schedule contains auxiliary queries, but auxiliary query proof is absent"
+                            .to_string(),
+                    ));
+                }
+                Vec::new()
+            }
+        };
+
+        Ok(BackendProofOracleQuerySet {
+            compiler_parity_queries,
+            compiler_parity_fold_layer_queries,
+            auxiliary_queries,
+        })
     }
 }
 

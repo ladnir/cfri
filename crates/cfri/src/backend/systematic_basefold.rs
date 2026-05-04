@@ -1,6 +1,7 @@
 use crate::backend::{
     arithmetic::Field,
     binary_extension_fields::B128,
+    blaze::permutation_check::ProductTree,
     blaze2::{
         absorb_blaze2_code_spec, fold_interleaved_column, raa_codeword_eval_weights, Blaze2Code,
         Blaze2CodeSpec, Blaze2InterleavedColumnQuery,
@@ -295,6 +296,12 @@ pub enum RaaAuxiliaryLocalRelationProof {
 #[derive(Clone, Debug, Default, Eq, PartialEq)]
 pub struct RaaEvalSumcheckProof {
     pub round_polynomials: Vec<[B128; 3]>,
+}
+
+#[derive(Clone, Copy, Debug, Eq, PartialEq)]
+pub struct RaaSection5RelationChallenges {
+    pub alpha: B128,
+    pub beta: B128,
 }
 
 #[derive(Clone, Copy, Debug)]
@@ -624,6 +631,7 @@ impl Blaze2BaseFoldBackendParams {
             auxiliary_oracle,
         )?;
         let compiler_parity = self.compiler_code.commit_parity(folded_codeword)?;
+        let compiler_parity_public = compiler_parity.public();
         let auxiliary = if self.spec.auxiliary_oracle_len == 0 {
             None
         } else {
@@ -632,8 +640,12 @@ impl Blaze2BaseFoldBackendParams {
             )?)
         };
         let auxiliary_public = auxiliary.as_ref().map(AuxiliaryOracleCommitment::public);
-        let section5_permutation_helper =
-            self.commit_section5_permutation_helper_placeholder::<H>()?;
+        let section5_permutation_helper = self.commit_section5_permutation_helper::<H>(
+            auxiliary_oracle,
+            &compiler_parity_public,
+            auxiliary_public.as_ref(),
+            request,
+        )?;
         let section5_permutation_helper_public = section5_permutation_helper
             .as_ref()
             .map(RaaSection5PermutationHelperCommitment::public);
@@ -642,7 +654,7 @@ impl Blaze2BaseFoldBackendParams {
         } else {
             let (proof, challenges) = prove_raa_eval_sumcheck::<H>(
                 self.spec(),
-                &compiler_parity.public(),
+                &compiler_parity_public,
                 auxiliary_public.as_ref(),
                 request,
                 self.praa.packed(),
@@ -653,13 +665,13 @@ impl Blaze2BaseFoldBackendParams {
         let (folded_parity_layers, folded_parity_public, physical_layers, fold_challenges) = self
             .prove_folded_parity_layers::<H>(
             folded_codeword,
-            &compiler_parity.public(),
+            &compiler_parity_public,
             auxiliary_public.as_ref(),
             request,
             eval_sumcheck_challenges.as_deref(),
         )?;
         let public = Blaze2BaseFoldPrequeryPublic {
-            compiler_parity: compiler_parity.public(),
+            compiler_parity: compiler_parity_public,
             eval_sumcheck,
             folded_parity_layers: folded_parity_public,
             terminal_codeword: physical_layers
@@ -1070,15 +1082,27 @@ impl Blaze2BaseFoldBackendParams {
         })
     }
 
-    fn commit_section5_permutation_helper_placeholder<H: Hash>(
+    fn commit_section5_permutation_helper<H: Hash>(
         &self,
+        auxiliary_oracle: &[B128],
+        compiler_parity: &CompilerParityPublicCommitment<H>,
+        auxiliary: Option<&AuxiliaryOraclePublicCommitment<H>>,
+        request: &Blaze2BaseFoldOpenRequest<'_>,
     ) -> Result<Option<RaaSection5PermutationHelperCommitment<H>>, Error> {
         if self.spec.raa_relation_strategy != RaaRelationProofStrategy::Section5 {
             return Ok(None);
         }
-        let helper_len =
-            required_blaze2_basefold_section5_permutation_helper_oracle_len(self.praa.spec());
-        let values = vec![B128::ZERO; helper_len];
+        let challenges = squeeze_raa_section5_relation_challenges(
+            self.spec(),
+            compiler_parity,
+            auxiliary,
+            request,
+        );
+        let values = build_raa_section5_permutation_helper_oracle(
+            self.praa.packed(),
+            auxiliary_oracle,
+            challenges,
+        )?;
         Ok(Some(RaaSection5PermutationHelperCommitment::commit_values(
             values,
         )?))
@@ -1758,6 +1782,10 @@ impl<H: Hash> RaaSection5PermutationHelperCommitment<H> {
 
     pub fn is_empty(&self) -> bool {
         self.inner.is_empty()
+    }
+
+    pub fn values(&self) -> &[B128] {
+        self.inner.values()
     }
 }
 
@@ -2490,6 +2518,27 @@ fn absorb_blaze2_basefold_fold_chain_prefix<H: Hash, S>(
             absorb_auxiliary_oracle_public_commitment(transcript, auxiliary);
         }
         None => transcript.absorb("auxiliary-oracle-absent"),
+    }
+}
+
+fn squeeze_raa_section5_relation_challenges<H: Hash>(
+    spec: &Blaze2BaseFoldBackendSpec,
+    compiler_parity: &CompilerParityPublicCommitment<H>,
+    auxiliary: Option<&AuxiliaryOraclePublicCommitment<H>>,
+    request: &Blaze2BaseFoldOpenRequest<'_>,
+) -> RaaSection5RelationChallenges {
+    let mut transcript = CfriTranscript::<H>::new();
+    absorb_blaze2_basefold_fold_chain_prefix(
+        &mut transcript,
+        spec,
+        compiler_parity,
+        auxiliary,
+        request,
+    );
+    transcript.absorb("raa-section5-relation-challenges-v1");
+    RaaSection5RelationChallenges {
+        alpha: transcript.squeeze(),
+        beta: transcript.squeeze(),
     }
 }
 
@@ -3796,6 +3845,111 @@ fn raa_section5_permutation_helper_rows() -> [usize; RAA_SECTION5_PERMUTATION_HE
     ]
 }
 
+fn build_raa_section5_permutation_helper_oracle(
+    code: &PackedRaaCode,
+    auxiliary_oracle: &[B128],
+    challenges: RaaSection5RelationChallenges,
+) -> Result<Vec<B128>, Error> {
+    let len = code.codeword_len();
+    let relation_len = RAA_AUX_ROW_COUNT * len;
+    if auxiliary_oracle.len() < relation_len {
+        return Err(Error::InvalidPcsOpen(
+            "RAA Section 5 helper oracle requires u2/u3/u4 auxiliary rows".to_string(),
+        ));
+    }
+    let auxiliary = &auxiliary_oracle[..relation_len];
+    let u2 = &auxiliary
+        [raa_auxiliary_index(RAA_AUX_U2_ROW, 0, len)..raa_auxiliary_index(RAA_AUX_U3_ROW, 0, len)];
+    let u3 = &auxiliary
+        [raa_auxiliary_index(RAA_AUX_U3_ROW, 0, len)..raa_auxiliary_index(RAA_AUX_U4_ROW, 0, len)];
+    let u4 = &auxiliary[raa_auxiliary_index(RAA_AUX_U4_ROW, 0, len)..relation_len];
+
+    let mut u1 = vec![B128::ZERO; len];
+    let permutation = code.permutation();
+    for (index, value) in u2.iter().enumerate() {
+        let target = permutation.permutation1[index];
+        if target >= len {
+            return Err(Error::InvalidPcsOpen(
+                "RAA first permutation index is outside the helper domain".to_string(),
+            ));
+        }
+        u1[target] = *value;
+    }
+
+    let mut values = Vec::with_capacity(len * RAA_SECTION5_PERMUTATION_HELPER_ROW_COUNT);
+    append_raa_section5_permutation_helper_witness(
+        &mut values,
+        &u1,
+        Some(&permutation.permutation1),
+        challenges,
+    )?;
+    append_raa_section5_permutation_helper_witness(&mut values, u2, None, challenges)?;
+    append_raa_section5_permutation_helper_witness(
+        &mut values,
+        u3,
+        Some(&permutation.permutation2),
+        challenges,
+    )?;
+    append_raa_section5_permutation_helper_witness(&mut values, u4, None, challenges)?;
+    let expected_len = len * RAA_SECTION5_PERMUTATION_HELPER_ROW_COUNT;
+    if values.len() != expected_len {
+        return Err(Error::InvalidPcsOpen(
+            "RAA Section 5 helper oracle length does not match its packed row layout".to_string(),
+        ));
+    }
+    Ok(values)
+}
+
+fn append_raa_section5_permutation_helper_witness(
+    values: &mut Vec<B128>,
+    poly: &[B128],
+    permutation: Option<&[usize]>,
+    challenges: RaaSection5RelationChallenges,
+) -> Result<(), Error> {
+    let len = poly.len();
+    if len == 0 || !len.is_power_of_two() {
+        return Err(Error::InvalidPcsOpen(
+            "RAA Section 5 helper witness expects a non-empty power-of-two domain".to_string(),
+        ));
+    }
+    if let Some(permutation) = permutation {
+        if permutation.len() != len {
+            return Err(Error::InvalidPcsOpen(
+                "RAA Section 5 helper permutation length does not match the witness domain"
+                    .to_string(),
+            ));
+        }
+    }
+
+    let mut leaves = Vec::with_capacity(len);
+    match permutation {
+        Some(permutation) => {
+            for (index, value) in poly.iter().enumerate() {
+                let permuted = permutation[index];
+                if permuted >= len {
+                    return Err(Error::InvalidPcsOpen(
+                        "RAA Section 5 helper permutation index is outside the witness domain"
+                            .to_string(),
+                    ));
+                }
+                leaves.push(
+                    challenges.alpha - (*value + challenges.beta * B128::from(permuted as u64)),
+                );
+            }
+        }
+        None => {
+            for (index, value) in poly.iter().enumerate() {
+                leaves
+                    .push(challenges.alpha - (*value + challenges.beta * B128::from(index as u64)));
+            }
+        }
+    }
+
+    let tree = ProductTree::new(leaves)?;
+    values.extend_from_slice(&tree.packed_witness_evals());
+    Ok(())
+}
+
 fn raa_relation_auxiliary_len(auxiliary_oracle_len: usize) -> usize {
     auxiliary_oracle_len
 }
@@ -4466,6 +4620,23 @@ mod tests {
             state.section5_permutation_helper.as_ref().unwrap().len(),
             helper_len
         );
+        let challenges = squeeze_raa_section5_relation_challenges(
+            params.spec(),
+            &prequery.compiler_parity,
+            prequery.auxiliary.as_ref(),
+            &request,
+        );
+        let expected_helper = build_raa_section5_permutation_helper_oracle(
+            params.praa().packed(),
+            &auxiliary,
+            challenges,
+        )
+        .unwrap();
+        assert_eq!(
+            state.section5_permutation_helper.as_ref().unwrap().values(),
+            expected_helper
+        );
+        assert!(expected_helper.iter().any(|value| *value != B128::ZERO));
     }
 
     #[test]

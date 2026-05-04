@@ -260,6 +260,32 @@ structural tree defects: counted combinatorially
 accidental determinant zeros: charged by large-field Schwartz-Zippel
 ```
 
+Resampling every bad shape in the three exact depth-3 rows gives the same split:
+
+```text
+row s=6, z_p=2:  560 / 560 bad shapes persistent across 20 samples
+row s=6, z_p=3:  224 / 224 bad shapes persistent across 20 samples
+row s=5, z_p=3:  12992 / 13027 bad shapes persistent across 20 samples
+                 35 / 13027 disappeared in every resample
+```
+
+The persistent counts exactly match the pure tree-signature buckets in
+`docs/rank_signature_row_*`. The 35 disappearing cases are best treated as accidental zeros of
+nonzero determinant polynomials in the large-field proof.
+
+The resulting structural summary for the exact depth-3 rows is:
+
+```text
+s_identity  z_parity  total z  checked   persistent structural  structural fraction
+6           2         8        43120     560                    0.0129870
+5           3         8        1552320   12992                  0.0083694
+6           3         9        776160    224                    0.0002886
+```
+
+This is the first concrete combinatorial object to bound: persistent structural defects are sparse
+and described by recursive sibling/collision signatures. Accidental failures are much rarer and
+should vanish at `q=2^128` after a Schwartz-Zippel union bound.
+
 ## Depth-4 Shape Sampling
 
 A light depth-4 pass used `1000` stratified shapes per row around the dimension boundary:

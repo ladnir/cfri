@@ -1,0 +1,4 @@
+s_identity,z_parity,total_z,checked_shapes,rank_deficient_shapes,persistent_structural_shapes,accidental_or_unstable_shapes,structural_fraction,min_rank
+6,2,8,43120,560,560,0,0.012987012987012988,7
+5,3,8,1552320,13027,12992,35,0.00836940836940837,7
+6,3,9,776160,224,224,0,0.0002886002886002886,7

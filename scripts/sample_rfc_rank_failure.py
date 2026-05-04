@@ -7,7 +7,8 @@ sets:
 
     E[# Z, |Z|=z, rank(G_Z) < k].
 
-It is a design/calibration tool for a possible rank-first-moment certificate.
+It is a design/calibration tool for a possible rank-first-moment certificate. It also has exact
+small-depth profile modes for finding structural deficient zero-set shapes.
 """
 
 from __future__ import annotations
@@ -97,6 +98,8 @@ def main() -> None:
     parser.add_argument("--seed", type=int, default=1)
     parser.add_argument("--systematic", action="store_true")
     parser.add_argument("--exact-k-subsets", action="store_true")
+    parser.add_argument("--exact-rank-profile", action="store_true")
+    parser.add_argument("--systematic-shape-profile", action="store_true")
     args = parser.parse_args()
 
     rng = random.Random(args.seed)
@@ -104,6 +107,74 @@ def main() -> None:
     n = args.total_expansion * k
     if args.zero_count < 1 or args.zero_count > n:
         raise SystemExit("--zero-count must be in 1..N")
+
+    if args.systematic_shape_profile:
+        if not args.systematic:
+            raise SystemExit("--systematic-shape-profile requires --systematic")
+        generator = systematic_generator_prime(args.depth, args.total_expansion, args.prime, rng)
+        parity_n = n - k
+        print(
+            "ensemble,prime,depth,k,n,parity_n,s_identity,z_parity,"
+            "checked_shapes,rank_deficient_shapes,min_rank,first_bad"
+        )
+        for s_identity in range(k + 1):
+            identity_combinations = list(itertools.combinations(range(k), s_identity))
+            found_full_cover = False
+            for z_parity in range(parity_n + 1):
+                if found_full_cover:
+                    break
+                failures = 0
+                checked = 0
+                min_rank = k
+                first_bad: tuple[int, ...] | None = None
+                for identity_columns in identity_combinations:
+                    for parity_columns in itertools.combinations(range(parity_n), z_parity):
+                        columns = list(identity_columns) + [k + column for column in parity_columns]
+                        rank = rank_selected_columns(generator, columns, args.prime)
+                        checked += 1
+                        min_rank = min(min_rank, rank)
+                        if rank < k:
+                            failures += 1
+                            if first_bad is None:
+                                first_bad = tuple(columns)
+                first_bad_text = "" if first_bad is None else ":".join(str(column) for column in first_bad)
+                print(
+                    f"systematic,{args.prime},{args.depth},{k},{n},{parity_n},"
+                    f"{s_identity},{z_parity},{checked},{failures},{min_rank},{first_bad_text}"
+                )
+                if failures == 0:
+                    found_full_cover = True
+        return
+
+    if args.exact_rank_profile:
+        generator = (
+            systematic_generator_prime(args.depth, args.total_expansion, args.prime, rng)
+            if args.systematic
+            else rfc_generator_prime(args.depth, args.total_expansion, args.prime, rng)
+        )
+        ensemble = "systematic" if args.systematic else "original"
+        print("ensemble,prime,depth,k,n,zero_count,checked_shapes,rank_deficient_shapes,min_rank,first_bad")
+        for zero_count in range(n + 1):
+            failures = 0
+            checked = 0
+            min_rank = k
+            first_bad: tuple[int, ...] | None = None
+            for columns_tuple in itertools.combinations(range(n), zero_count):
+                rank = rank_selected_columns(generator, list(columns_tuple), args.prime)
+                checked += 1
+                min_rank = min(min_rank, rank)
+                if rank < k:
+                    failures += 1
+                    if first_bad is None:
+                        first_bad = columns_tuple
+            first_bad_text = "" if first_bad is None else ":".join(str(column) for column in first_bad)
+            print(
+                f"{ensemble},{args.prime},{args.depth},{k},{n},{zero_count},"
+                f"{checked},{failures},{min_rank},{first_bad_text}"
+            )
+            if failures == 0:
+                break
+        return
 
     if args.exact_k_subsets:
         generator = (

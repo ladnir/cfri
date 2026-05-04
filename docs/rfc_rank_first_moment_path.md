@@ -110,6 +110,57 @@ zero sets of size `z > k` to span, and systematic identity columns should be con
 than treated as random parity columns. But it does rule out the simplest possible proof statement
 that every `k` final coordinates are independent.
 
+The aggregate rank profile is sharper:
+
+```text
+original:
+  z=0,1,2,3: all deficient for dimension reasons
+  z=4:       0 deficient among 35960
+
+systematic:
+  z=0,1,2,3: all deficient for dimension reasons
+  z=4:       28 deficient among 35960
+  z=5:       0 deficient among 201376
+```
+
+Thus, in this large-prime depth-2 check, the original RFC is MDS while the systematic RFC is
+one-symbol below MDS:
+
+```text
+original distance:    29 / 32
+systematic distance:  28 / 32
+```
+
+This is much better than the threshold certificate shape and suggests the real large-field
+systematic tax may be small.
+
+The systematic shape profile explains the one-symbol loss. For `s_identity` selected identity
+columns and `z_parity` selected parity columns:
+
+```text
+s_identity  first z_parity with no deficient shapes
+0           4
+1           3
+2           3    (not 2: there are 28 bad shapes)
+3           1
+4           0
+```
+
+The only extra obstruction beyond the dimension count is the `s=2, z_p=2` slice. Once one more
+parity column is added, every shape spans.
+
+The bad `s=2, z_p=2` shapes are structured, not noisy. They are exactly:
+
+```text
+identity pair:  (0,1) or (2,3)
+parity pair:    (j, j+14), for 0 <= j < 14
+```
+
+in parity-local indexing. This is a sibling/tree-half obstruction: after two systematic coordinates
+pin a depth-1 sibling pair, the two parity columns selected from matching positions in the two
+top-level halves do not give two independent remaining constraints. This is the first concrete
+shape the proof has to account for.
+
 ## Proof Obligation
 
 A strong certificate would prove something like:

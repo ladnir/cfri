@@ -95,6 +95,7 @@ pub enum SystematicFoldRule {
 pub enum BackendProofQueryDomain {
     CompilerParity,
     RelationAuxiliary,
+    Section5PermutationHelper,
 }
 
 #[derive(Clone, Copy, Debug, Eq, PartialEq)]
@@ -254,6 +255,12 @@ pub struct AuxiliaryOracleQueryProof<H: Hash> {
 }
 
 #[derive(Clone, Debug, Eq, PartialEq)]
+pub struct RaaSection5PermutationHelperQueryProof<H: Hash> {
+    pub queries: Vec<AuxiliaryOracleQuery>,
+    pub authentication_nodes: Vec<Output<H>>,
+}
+
+#[derive(Clone, Debug, Eq, PartialEq)]
 pub struct RaaFinalAccumulatorQueryProof;
 
 #[derive(Clone, Copy, Debug, Eq, PartialEq)]
@@ -335,6 +342,7 @@ pub struct Blaze2BaseFoldQueryProof<H: Hash> {
     pub compiler_parity: CompilerParityQueryProof<H>,
     pub compiler_parity_folds: CompilerParityFoldQueryProof<H>,
     pub auxiliary: Option<AuxiliaryOracleQueryProof<H>>,
+    pub section5_permutation_helper: Option<RaaSection5PermutationHelperQueryProof<H>>,
     pub authentication: BackendProofOracleAuthentication<H>,
 }
 
@@ -343,6 +351,7 @@ pub struct BackendProofOracleQuerySet {
     pub compiler_parity_queries: Vec<(usize, B128)>,
     pub compiler_parity_fold_layer_queries: Vec<Vec<(usize, B128)>>,
     pub auxiliary_queries: Vec<(usize, B128)>,
+    pub section5_permutation_helper_queries: Vec<(usize, B128)>,
 }
 
 impl BackendProofOracleQuerySet {
@@ -357,6 +366,7 @@ impl BackendProofOracleQuerySet {
         self.compiler_parity_queries.len()
             + self.compiler_parity_fold_query_count()
             + self.auxiliary_queries.len()
+            + self.section5_permutation_helper_queries.len()
     }
 }
 
@@ -364,6 +374,7 @@ impl BackendProofOracleQuerySet {
 pub struct BackendProofOracleAuthentication<H: Hash> {
     pub compiler_parity_layers: Vec<CompilerParityFoldLayerProof<H>>,
     pub auxiliary_nodes: Vec<Output<H>>,
+    pub section5_permutation_helper_nodes: Vec<Output<H>>,
 }
 
 #[derive(Clone, Debug, Eq, PartialEq)]
@@ -742,6 +753,18 @@ impl Blaze2BaseFoldBackendParams {
         };
         let compiler_parity = state.compiler_parity.prove_schedule(schedule)?;
         let compiler_parity_folds = self.open_compiler_parity_fold_paths(state, schedule)?;
+        let section5_permutation_helper = match &state.section5_permutation_helper {
+            Some(helper) => Some(helper.prove_schedule(schedule)?),
+            None => {
+                if schedule.section5_permutation_helper_proof_query_count() != 0 {
+                    return Err(Error::InvalidPcsOpen(
+                        "backend schedule contains Section 5 helper queries but no helper oracle is committed"
+                            .to_string(),
+                    ));
+                }
+                None
+            }
+        };
         let query_set = collect_backend_query_set_from_prover_state(
             self.compiler_code.layout(),
             state,
@@ -749,12 +772,14 @@ impl Blaze2BaseFoldBackendParams {
             &compiler_parity,
             &compiler_parity_folds,
             auxiliary.as_ref(),
+            section5_permutation_helper.as_ref(),
         )?;
         let authentication = self.open_backend_query_set_authentication(state, &query_set)?;
         Ok(Blaze2BaseFoldQueryProof {
             compiler_parity,
             compiler_parity_folds,
             auxiliary,
+            section5_permutation_helper,
             authentication,
         })
     }
@@ -788,6 +813,11 @@ impl Blaze2BaseFoldBackendParams {
             self.spec.auxiliary_oracle_len,
             schedule,
             top_queries,
+        )?;
+        verify_section5_permutation_helper_query_proof(
+            prequery.section5_permutation_helper.as_ref(),
+            proof.section5_permutation_helper.as_ref(),
+            schedule,
         )?;
         let query_set =
             self.collect_backend_query_set(prequery, request, schedule, proof, top_queries)?;
@@ -845,10 +875,30 @@ impl Blaze2BaseFoldBackendParams {
                 ));
             }
         };
+        let section5_permutation_helper_nodes = match (
+            &state.section5_permutation_helper,
+            query_set.section5_permutation_helper_queries.is_empty(),
+        ) {
+            (Some(helper), _) => merkle_b128_multiproof_nodes::<H, _>(
+                &helper.inner.merkle_tree,
+                query_set
+                    .section5_permutation_helper_queries
+                    .iter()
+                    .copied(),
+            )?,
+            (None, true) => Vec::new(),
+            (None, false) => {
+                return Err(Error::InvalidPcsOpen(
+                    "backend query set contains Section 5 helper leaves but no helper oracle is committed"
+                        .to_string(),
+                ));
+            }
+        };
 
         Ok(BackendProofOracleAuthentication {
             compiler_parity_layers,
             auxiliary_nodes,
+            section5_permutation_helper_nodes,
         })
     }
 
@@ -1426,11 +1476,24 @@ impl<H: Hash> Blaze2BaseFoldQueryProof<H> {
                 Vec::new()
             }
         };
+        let section5_permutation_helper_queries = match &self.section5_permutation_helper {
+            Some(helper) => helper.authentication_queries(schedule)?,
+            None => {
+                if schedule.section5_permutation_helper_proof_query_count() != 0 {
+                    return Err(Error::InvalidPcsOpen(
+                        "backend schedule contains Section 5 helper queries, but helper query proof is absent"
+                            .to_string(),
+                    ));
+                }
+                Vec::new()
+            }
+        };
 
         Ok(BackendProofOracleQuerySet {
             compiler_parity_queries,
             compiler_parity_fold_layer_queries,
             auxiliary_queries,
+            section5_permutation_helper_queries,
         })
     }
 }
@@ -1442,6 +1505,7 @@ impl<H: Hash> BackendProofOracleAuthentication<H> {
             .map(|layer| layer.authentication_nodes.len())
             .sum::<usize>()
             + self.auxiliary_nodes.len()
+            + self.section5_permutation_helper_nodes.len()
     }
 
     pub fn verify(
@@ -1490,6 +1554,27 @@ impl<H: Hash> BackendProofOracleAuthentication<H> {
             (None, _) => {
                 return Err(Error::InvalidPcsOpen(
                     "backend proof oracle contains auxiliary authentication without an auxiliary commitment"
+                        .to_string(),
+                ));
+            }
+        }
+        match (
+            &prequery.section5_permutation_helper,
+            query_set.section5_permutation_helper_queries.is_empty(),
+        ) {
+            (Some(public), _) => verify_merkle_b128_multiproof::<H, _>(
+                &public.root,
+                public.len,
+                query_set
+                    .section5_permutation_helper_queries
+                    .iter()
+                    .copied(),
+                &self.section5_permutation_helper_nodes,
+            )?,
+            (None, true) if self.section5_permutation_helper_nodes.is_empty() => {}
+            (None, _) => {
+                return Err(Error::InvalidPcsOpen(
+                    "backend proof oracle contains Section 5 helper authentication without a helper commitment"
                         .to_string(),
                 ));
             }
@@ -1786,6 +1871,102 @@ impl<H: Hash> RaaSection5PermutationHelperCommitment<H> {
 
     pub fn values(&self) -> &[B128] {
         self.inner.values()
+    }
+
+    pub fn query(&self, logical_index: usize) -> Result<AuxiliaryOracleQuery, Error> {
+        self.inner.query(logical_index)
+    }
+
+    pub fn prove_schedule(
+        &self,
+        schedule: &HolographicQuerySchedule,
+    ) -> Result<RaaSection5PermutationHelperQueryProof<H>, Error> {
+        let mut queries = Vec::new();
+        for query in schedule.proof_queries() {
+            if query.domain == BackendProofQueryDomain::Section5PermutationHelper {
+                queries.push(self.query(query.index)?);
+            }
+        }
+        Ok(RaaSection5PermutationHelperQueryProof {
+            queries,
+            authentication_nodes: Vec::new(),
+        })
+    }
+}
+
+impl<H: Hash> RaaSection5PermutationHelperQueryProof<H> {
+    pub fn query_count(&self) -> usize {
+        self.queries.len()
+    }
+
+    pub fn serialized_value_count(&self) -> usize {
+        self.queries.len()
+    }
+
+    fn verify_schedule(
+        &self,
+        public: &RaaSection5PermutationHelperPublicCommitment<H>,
+        schedule: &HolographicQuerySchedule,
+    ) -> Result<(), Error> {
+        if !self.authentication_nodes.is_empty() {
+            return Err(Error::InvalidPcsOpen(
+                "Section 5 helper authentication must be carried by the backend proof oracle"
+                    .to_string(),
+            ));
+        }
+        if self.query_count() != schedule.section5_permutation_helper_proof_query_count() {
+            return Err(Error::InvalidPcsOpen(
+                "Section 5 helper query proof count does not match schedule".to_string(),
+            ));
+        }
+        let mut queries = self.queries.iter();
+        for expected in schedule.proof_queries() {
+            if expected.domain != BackendProofQueryDomain::Section5PermutationHelper {
+                continue;
+            }
+            let query = queries.next().ok_or_else(|| {
+                Error::InvalidPcsOpen("Section 5 helper query opening is missing".to_string())
+            })?;
+            if query.logical_index != expected.index || query.logical_index >= public.len {
+                return Err(Error::InvalidPcsOpen(
+                    "Section 5 helper query index does not match schedule".to_string(),
+                ));
+            }
+        }
+        if queries.next().is_some() {
+            return Err(Error::InvalidPcsOpen(
+                "too many Section 5 helper query openings".to_string(),
+            ));
+        }
+        Ok(())
+    }
+
+    fn authentication_queries(
+        &self,
+        schedule: &HolographicQuerySchedule,
+    ) -> Result<Vec<(usize, B128)>, Error> {
+        let mut queries = Vec::with_capacity(self.queries.len());
+        let mut supplied = self.queries.iter();
+        for expected in schedule.proof_queries() {
+            if expected.domain != BackendProofQueryDomain::Section5PermutationHelper {
+                continue;
+            }
+            let query = supplied.next().ok_or_else(|| {
+                Error::InvalidPcsOpen("Section 5 helper query opening is missing".to_string())
+            })?;
+            if query.logical_index != expected.index {
+                return Err(Error::InvalidPcsOpen(
+                    "Section 5 helper query index does not match schedule".to_string(),
+                ));
+            }
+            queries.push((query.logical_index, query.value));
+        }
+        if supplied.next().is_some() {
+            return Err(Error::InvalidPcsOpen(
+                "too many Section 5 helper query openings".to_string(),
+            ));
+        }
+        Ok(queries)
     }
 }
 
@@ -2636,7 +2817,8 @@ impl HolographicQuerySchedule {
         }
 
         let auxiliary_proof_len = raa_relation_auxiliary_len(spec.auxiliary_oracle_len);
-        let proof_domain_len = layout.parity_len() + auxiliary_proof_len;
+        let section5_helper_len = section5_permutation_helper_len_for_schedule(layout, &spec);
+        let proof_domain_len = layout.parity_len() + auxiliary_proof_len + section5_helper_len;
         let mut proof_queries = Vec::with_capacity(spec.q_backend_proof);
         if spec.q_backend_proof != 0 {
             let parity_index = squeeze_bounded_index(transcript, layout.parity_len())?;
@@ -2651,6 +2833,7 @@ impl HolographicQuerySchedule {
             proof_queries.push(proof_query_from_sampled_index(
                 layout,
                 spec.auxiliary_oracle_len,
+                section5_helper_len,
                 sampled_index,
             )?);
         }
@@ -2697,6 +2880,13 @@ impl HolographicQuerySchedule {
         self.proof_queries
             .iter()
             .filter(|query| query.domain == BackendProofQueryDomain::RelationAuxiliary)
+            .count()
+    }
+
+    pub fn section5_permutation_helper_proof_query_count(&self) -> usize {
+        self.proof_queries
+            .iter()
+            .filter(|query| query.domain == BackendProofQueryDomain::Section5PermutationHelper)
             .count()
     }
 
@@ -3382,6 +3572,7 @@ fn collect_backend_query_set_from_prover_state<H: Hash>(
     compiler_parity: &CompilerParityQueryProof<H>,
     compiler_parity_folds: &CompilerParityFoldQueryProof<H>,
     auxiliary: Option<&AuxiliaryOracleQueryProof<H>>,
+    section5_permutation_helper: Option<&RaaSection5PermutationHelperQueryProof<H>>,
 ) -> Result<BackendProofOracleQuerySet, Error> {
     let compiler_parity_queries = compiler_parity
         .queries
@@ -3424,11 +3615,42 @@ fn collect_backend_query_set_from_prover_state<H: Hash>(
             ));
         }
     };
+    let section5_permutation_helper_queries = match (
+        &state.section5_permutation_helper,
+        section5_permutation_helper,
+    ) {
+        (Some(_oracle), Some(proof)) => proof.authentication_queries(schedule)?,
+        (None, None) => {
+            if schedule.section5_permutation_helper_proof_query_count() != 0 {
+                return Err(Error::InvalidPcsOpen(
+                    "backend schedule contains Section 5 helper queries, but helper query proof is absent"
+                        .to_string(),
+                ));
+            }
+            Vec::new()
+        }
+        (Some(_), None) => {
+            if schedule.section5_permutation_helper_proof_query_count() == 0 {
+                Vec::new()
+            } else {
+                return Err(Error::InvalidPcsOpen(
+                    "backend schedule contains Section 5 helper queries, but helper query proof is absent"
+                        .to_string(),
+                ));
+            }
+        }
+        (None, Some(_)) => {
+            return Err(Error::InvalidPcsOpen(
+                "Section 5 helper query proof supplied without a helper oracle".to_string(),
+            ));
+        }
+    };
 
     Ok(BackendProofOracleQuerySet {
         compiler_parity_queries,
         compiler_parity_fold_layer_queries,
         auxiliary_queries,
+        section5_permutation_helper_queries,
     })
 }
 
@@ -3657,9 +3879,11 @@ fn squeeze_bounded_index<H: Hash, S>(
 fn proof_query_from_sampled_index(
     layout: &SystematicAugmentedRfcLayout,
     auxiliary_oracle_len: usize,
+    section5_helper_len: usize,
     sampled_index: usize,
 ) -> Result<BackendProofQuery, Error> {
-    let proof_domain_len = layout.parity_len() + raa_relation_auxiliary_len(auxiliary_oracle_len);
+    let auxiliary_len = raa_relation_auxiliary_len(auxiliary_oracle_len);
+    let proof_domain_len = layout.parity_len() + auxiliary_len + section5_helper_len;
     if sampled_index >= proof_domain_len {
         return Err(Error::InvalidPcsParam(format!(
             "proof query index {sampled_index} is outside proof query domain {proof_domain_len}"
@@ -3672,9 +3896,17 @@ fn proof_query_from_sampled_index(
             physical_index: Some(layout.parity_to_physical(sampled_index)?),
         })
     } else {
+        let auxiliary_index = sampled_index - layout.parity_len();
+        if auxiliary_index < auxiliary_len {
+            return Ok(BackendProofQuery {
+                domain: BackendProofQueryDomain::RelationAuxiliary,
+                index: auxiliary_index,
+                physical_index: None,
+            });
+        }
         Ok(BackendProofQuery {
-            domain: BackendProofQueryDomain::RelationAuxiliary,
-            index: sampled_index - layout.parity_len(),
+            domain: BackendProofQueryDomain::Section5PermutationHelper,
+            index: auxiliary_index - auxiliary_len,
             physical_index: None,
         })
     }
@@ -3954,6 +4186,17 @@ fn raa_relation_auxiliary_len(auxiliary_oracle_len: usize) -> usize {
     auxiliary_oracle_len
 }
 
+fn section5_permutation_helper_len_for_schedule(
+    layout: &SystematicAugmentedRfcLayout,
+    spec: &HolographicQueryScheduleSpec,
+) -> usize {
+    if spec.raa_relation_strategy == RaaRelationProofStrategy::Section5 {
+        layout.systematic_len() * RAA_SECTION5_PERMUTATION_HELPER_ROW_COUNT
+    } else {
+        0
+    }
+}
+
 fn b128_to_u128(value: B128) -> u128 {
     u128::from(value.value[0]) | (u128::from(value.value[1]) << 64)
 }
@@ -4057,6 +4300,30 @@ fn verify_auxiliary_query_proof<H: Hash>(
         )
     })?;
     proof.verify_schedule(public, auxiliary_oracle_len, schedule, top_queries)
+}
+
+fn verify_section5_permutation_helper_query_proof<H: Hash>(
+    public: Option<&RaaSection5PermutationHelperPublicCommitment<H>>,
+    proof: Option<&RaaSection5PermutationHelperQueryProof<H>>,
+    schedule: &HolographicQuerySchedule,
+) -> Result<(), Error> {
+    let expected_count = schedule.section5_permutation_helper_proof_query_count();
+    match (public, proof, expected_count) {
+        (None, None, 0) => Ok(()),
+        (None, Some(_), _) => Err(Error::InvalidPcsOpen(
+            "Section 5 helper query proof was supplied without a helper commitment".to_string(),
+        )),
+        (Some(_), None, 0) => Ok(()),
+        (Some(_), None, _) => Err(Error::InvalidPcsOpen(
+            "backend schedule contains Section 5 helper queries, but helper query proof is absent"
+                .to_string(),
+        )),
+        (Some(public), Some(proof), _) => proof.verify_schedule(public, schedule),
+        (None, None, _) => Err(Error::InvalidPcsOpen(
+            "backend schedule contains Section 5 helper queries, but no helper commitment is present"
+                .to_string(),
+        )),
+    }
 }
 
 fn verify_raa_relation_openings<H: Hash>(
@@ -5282,6 +5549,21 @@ mod tests {
             auxiliary.raa_relation,
             RaaRelationProof::Section5(_)
         ));
+        let mut helper_schedule = schedule.clone();
+        helper_schedule.proof_queries.push(BackendProofQuery {
+            domain: BackendProofQueryDomain::Section5PermutationHelper,
+            index: 0,
+            physical_index: None,
+        });
+        let helper_proof = params.open_query_proof(&state, &helper_schedule).unwrap();
+        let helper = helper_proof
+            .section5_permutation_helper
+            .as_ref()
+            .expect("explicit Section 5 helper query must be opened");
+        assert_eq!(
+            helper.query_count(),
+            helper_schedule.section5_permutation_helper_proof_query_count()
+        );
 
         let top_queries = schedule
             .input_queries()
@@ -5293,6 +5575,66 @@ mod tests {
             .collect::<Vec<_>>();
         assert!(params
             .verify_query_proof(&prequery, &request, &schedule, &proof, &top_queries)
+            .is_err());
+
+        let helper_top_queries = helper_schedule
+            .input_queries()
+            .iter()
+            .map(|query| TopQuery {
+                index: query.logical_index,
+                value: folded_codeword[query.logical_index],
+            })
+            .collect::<Vec<_>>();
+        let query_set = helper_proof
+            .collect_backend_query_set(
+                params.compiler_code.layout(),
+                &helper_schedule,
+                &fold_challenges_from_prequery(params.spec(), &prequery, &request).unwrap(),
+                Some(&prequery.terminal_codeword),
+                &helper_top_queries,
+            )
+            .unwrap();
+        assert_eq!(
+            query_set.section5_permutation_helper_queries.len(),
+            helper_schedule.section5_permutation_helper_proof_query_count()
+        );
+        assert!(query_set
+            .section5_permutation_helper_queries
+            .iter()
+            .any(|(index, _)| *index == 0));
+        helper_proof
+            .authentication
+            .verify(&prequery, &query_set)
+            .unwrap();
+
+        let mut tampered_helper_value = helper_proof.clone();
+        tampered_helper_value
+            .section5_permutation_helper
+            .as_mut()
+            .unwrap()
+            .queries[0]
+            .value += B128::ONE;
+        let tampered_query_set = tampered_helper_value
+            .collect_backend_query_set(
+                params.compiler_code.layout(),
+                &helper_schedule,
+                &fold_challenges_from_prequery(params.spec(), &prequery, &request).unwrap(),
+                Some(&prequery.terminal_codeword),
+                &helper_top_queries,
+            )
+            .unwrap();
+        assert!(tampered_helper_value
+            .authentication
+            .verify(&prequery, &tampered_query_set)
+            .is_err());
+
+        let mut tampered_helper_node = helper_proof;
+        tampered_helper_node
+            .authentication
+            .section5_permutation_helper_nodes[0][0] ^= 1;
+        assert!(tampered_helper_node
+            .authentication
+            .verify(&prequery, &query_set)
             .is_err());
     }
 
@@ -5514,6 +5856,17 @@ mod tests {
                     assert!(query.index < spec.auxiliary_oracle_len);
                     assert_eq!(query.physical_index, None);
                 }
+                BackendProofQueryDomain::Section5PermutationHelper => {
+                    assert_eq!(
+                        spec.raa_relation_strategy,
+                        RaaRelationProofStrategy::Section5
+                    );
+                    assert!(
+                        query.index
+                            < layout.systematic_len() * RAA_SECTION5_PERMUTATION_HELPER_ROW_COUNT
+                    );
+                    assert_eq!(query.physical_index, None);
+                }
             }
         }
         for query in schedule.raa_final_queries() {
@@ -5540,7 +5893,8 @@ mod tests {
     #[test]
     fn proof_query_classification_splits_parity_and_auxiliary_domains() {
         let layout = layout(16, 3);
-        let parity = proof_query_from_sampled_index(&layout, 11, layout.parity_len() - 1).unwrap();
+        let parity =
+            proof_query_from_sampled_index(&layout, 11, 0, layout.parity_len() - 1).unwrap();
         assert_eq!(parity.domain, BackendProofQueryDomain::CompilerParity);
         assert_eq!(parity.index, layout.parity_len() - 1);
         assert_eq!(
@@ -5548,10 +5902,25 @@ mod tests {
             Some(layout.parity_to_physical(layout.parity_len() - 1).unwrap())
         );
 
-        let auxiliary = proof_query_from_sampled_index(&layout, 11, layout.parity_len()).unwrap();
+        let auxiliary =
+            proof_query_from_sampled_index(&layout, 11, 0, layout.parity_len()).unwrap();
         assert_eq!(auxiliary.domain, BackendProofQueryDomain::RelationAuxiliary);
         assert_eq!(auxiliary.index, 0);
         assert_eq!(auxiliary.physical_index, None);
+
+        let helper = proof_query_from_sampled_index(
+            &layout,
+            11,
+            layout.systematic_len() * RAA_SECTION5_PERMUTATION_HELPER_ROW_COUNT,
+            layout.parity_len() + 11,
+        )
+        .unwrap();
+        assert_eq!(
+            helper.domain,
+            BackendProofQueryDomain::Section5PermutationHelper
+        );
+        assert_eq!(helper.index, 0);
+        assert_eq!(helper.physical_index, None);
     }
 
     #[test]

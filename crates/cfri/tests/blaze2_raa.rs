@@ -1423,7 +1423,7 @@ fn blaze2_basefold_opening_verifies_with_typed_backend_schedule() {
 }
 
 #[test]
-fn blaze2_basefold_outer_shape_matches_paper_after_field_byte_correction() {
+fn blaze2_basefold_b128_proof_size_accounting_is_exact() {
     let (_, _, packed, commitment, claim, _) = opening_fixture(51);
     let q_raa_input = 4;
     let q_backend_proof = 9;
@@ -1431,28 +1431,36 @@ fn blaze2_basefold_outer_shape_matches_paper_after_field_byte_correction() {
     let proof = prove_blaze2_basefold_opening(&params, &packed, &commitment, &claim, &[]).unwrap();
 
     let t = commitment.num_rows();
+    let b128_field_bytes = 16;
     let paper_field_bytes = 8;
     let hash_bytes = 32;
     let outer_path_len = params.praa().packed().codeword_len().trailing_zeros() as usize;
+    let compiler_parity_path_len = params
+        .compiler_code()
+        .layout()
+        .parity_len()
+        .trailing_zeros() as usize;
+    let compiler_rounds = params.compiler_code().layout().num_rounds();
+    let terminal_word_len = params.compiler_code().layout().parity_expansion_factor() + 1;
     let eval_sumcheck_bytes =
-        params.praa().packed().codeword_len().trailing_zeros() as usize * 3 * paper_field_bytes;
-    let backend_prequery_bytes = (1 + params.compiler_code().layout().num_rounds()) * hash_bytes
+        params.praa().packed().codeword_len().trailing_zeros() as usize * 3 * b128_field_bytes;
+    let backend_prequery_bytes = (1 + compiler_rounds) * hash_bytes
         + eval_sumcheck_bytes
         + hash_bytes
-        + (params.compiler_code().layout().parity_expansion_factor() + 1) * paper_field_bytes;
-    let expected_outer = t * paper_field_bytes
-        + backend_prequery_bytes
-        + q_raa_input * (t * paper_field_bytes + outer_path_len * hash_bytes);
+        + terminal_word_len * b128_field_bytes;
     let paper_breakdown = blaze2_basefold_proof_size_breakdown(&proof, paper_field_bytes);
+    let b128_breakdown = blaze2_basefold_proof_size_breakdown(&proof, b128_field_bytes);
 
     assert_eq!(
-        paper_breakdown.blaze_outer_bytes(),
-        expected_outer,
+        b128_breakdown.blaze_outer_bytes(),
+        t * b128_field_bytes
+            + backend_prequery_bytes
+            + q_raa_input * (t * b128_field_bytes + outer_path_len * hash_bytes),
         "systematic BaseFold integration must keep the Blaze outer proof at row evals + backend prequery roots + exactly Q_RAA opened columns"
     );
     assert_eq!(
-        blaze2_basefold_outer_bytes_with_field_bytes(&proof, paper_field_bytes),
-        expected_outer
+        blaze2_basefold_outer_bytes_with_field_bytes(&proof, b128_field_bytes),
+        b128_breakdown.blaze_outer_bytes()
     );
     assert_eq!(
         proof.queries.len(),
@@ -1492,47 +1500,98 @@ fn blaze2_basefold_outer_shape_matches_paper_after_field_byte_correction() {
         params.compiler_code().layout().num_rounds(),
         "folded-layer roots are backend prequery commitments, not extra Blaze input openings"
     );
-    assert_eq!(paper_breakdown.row_eval_bytes, t * paper_field_bytes);
-    assert_eq!(paper_breakdown.compiler_parity_root_bytes, hash_bytes);
-    assert_eq!(paper_breakdown.eval_sumcheck_bytes, eval_sumcheck_bytes);
     assert_eq!(
-        paper_breakdown.folded_parity_root_bytes,
-        params.compiler_code().layout().num_rounds() * hash_bytes
+        proof.backend_proof.compiler_parity_folds.paths.len(),
+        compiler_parity_query_count,
+        "each compiler-parity opening carries exactly one fold-authentication path"
     );
     assert_eq!(
-        paper_breakdown.terminal_codeword_bytes,
-        (params.compiler_code().layout().parity_expansion_factor() + 1) * paper_field_bytes
-    );
-    assert_eq!(paper_breakdown.auxiliary_root_bytes, hash_bytes);
-    assert_eq!(
-        paper_breakdown.outer_column_value_bytes,
-        q_raa_input * t * paper_field_bytes
-    );
-    assert_eq!(
-        paper_breakdown.outer_column_path_bytes,
-        q_raa_input * outer_path_len * hash_bytes
+        proof
+            .backend_proof
+            .compiler_parity_folds
+            .paths
+            .iter()
+            .map(|path| path.steps.len())
+            .sum::<usize>(),
+        compiler_parity_query_count * compiler_rounds,
+        "compiler-parity fold paths must cover every compiler fold round exactly once"
     );
     assert_eq!(
-        paper_breakdown.compiler_parity_query_value_bytes,
-        compiler_parity_query_count * paper_field_bytes
+        proof
+            .backend_proof
+            .compiler_parity_folds
+            .layer_authentication
+            .len(),
+        compiler_rounds,
+        "compiler-parity fold authentication is shared per folded layer"
+    );
+
+    let expected_b128_breakdown = Blaze2BaseFoldProofSizeBreakdown {
+        row_eval_bytes: t * b128_field_bytes,
+        compiler_parity_root_bytes: hash_bytes,
+        eval_sumcheck_bytes,
+        folded_parity_root_bytes: compiler_rounds * hash_bytes,
+        terminal_codeword_bytes: terminal_word_len * b128_field_bytes,
+        auxiliary_root_bytes: hash_bytes,
+        outer_column_value_bytes: q_raa_input * t * b128_field_bytes,
+        outer_column_path_bytes: q_raa_input * outer_path_len * hash_bytes,
+        compiler_parity_query_value_bytes: compiler_parity_query_count * b128_field_bytes,
+        compiler_parity_query_path_bytes: compiler_parity_query_count
+            * compiler_parity_path_len
+            * hash_bytes,
+        compiler_parity_fold_value_bytes: compiler_parity_query_count
+            * compiler_rounds
+            * 2
+            * b128_field_bytes,
+        compiler_parity_fold_path_bytes: 512,
+        auxiliary_query_value_bytes: auxiliary_query_count * b128_field_bytes,
+        auxiliary_query_path_bytes: 960,
+    };
+    assert_eq!(
+        b128_breakdown, expected_b128_breakdown,
+        "B128 proof-size accounting must match the concrete proof structure component by component"
+    );
+
+    let expected_paper_projection = Blaze2BaseFoldProofSizeBreakdown {
+        row_eval_bytes: t * paper_field_bytes,
+        compiler_parity_root_bytes: hash_bytes,
+        eval_sumcheck_bytes: params.praa().packed().codeword_len().trailing_zeros() as usize
+            * 3
+            * paper_field_bytes,
+        folded_parity_root_bytes: compiler_rounds * hash_bytes,
+        terminal_codeword_bytes: terminal_word_len * paper_field_bytes,
+        auxiliary_root_bytes: hash_bytes,
+        outer_column_value_bytes: q_raa_input * t * paper_field_bytes,
+        outer_column_path_bytes: q_raa_input * outer_path_len * hash_bytes,
+        compiler_parity_query_value_bytes: compiler_parity_query_count * paper_field_bytes,
+        compiler_parity_query_path_bytes: compiler_parity_query_count
+            * compiler_parity_path_len
+            * hash_bytes,
+        compiler_parity_fold_value_bytes: compiler_parity_query_count
+            * compiler_rounds
+            * 2
+            * paper_field_bytes,
+        compiler_parity_fold_path_bytes: expected_b128_breakdown.compiler_parity_fold_path_bytes,
+        auxiliary_query_value_bytes: auxiliary_query_count * paper_field_bytes,
+        auxiliary_query_path_bytes: expected_b128_breakdown.auxiliary_query_path_bytes,
+    };
+    assert_eq!(
+        paper_breakdown, expected_paper_projection,
+        "the 8-byte paper projection may differ only in field-element byte width"
     );
     assert_eq!(
-        paper_breakdown.auxiliary_query_value_bytes,
-        auxiliary_query_count * paper_field_bytes
+        b128_breakdown.backend_query_bytes(),
+        blaze2_basefold_backend_query_bytes_with_field_bytes(&proof, b128_field_bytes)
     );
     assert_eq!(
-        paper_breakdown.backend_query_bytes(),
-        blaze2_basefold_backend_query_bytes_with_field_bytes(&proof, paper_field_bytes)
+        b128_breakdown.total_bytes(),
+        4_368,
+        "current small fixture B128 total is the primary acceptance number for the implemented proof"
     );
     assert_eq!(
         paper_breakdown.total_bytes(),
         3_672,
-        "current small fixture paper-style total should stay explicit until backend proof path reuse changes"
-    );
-    assert_eq!(
-        blaze2_basefold_proof_size_breakdown(&proof, 16).total_bytes(),
-        4_368,
-        "current small fixture B128 total should stay explicit until serialization or backend path reuse changes"
+        "current small fixture 8-byte projection is reported only for Blaze-paper comparison"
     );
 }
 

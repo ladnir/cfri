@@ -117,9 +117,24 @@ The current Blaze2 holographic backend carries an eval-binding product sumcheck 
 `3 * log2(n_praa) * field_bytes` before serialization framing. This is a backend prequery term, not
 an additional Blaze input-column opening.
 
-The implementation regression test also keeps an explicit byte decomposition for the current small
+The implementation regression test keeps an explicit byte decomposition for the current small
 Blaze2/BaseFold fixture (`t = 2` packed rows, `n_praa = 32`, `Q_RAA = 4`,
-`Q_backend = 9`). With the paper-style `field_bytes = 8` correction, it currently breaks down as:
+`Q_backend = 9`). The implemented proof uses GF(2^128) elements, so the primary pinned total uses
+`field_bytes = 16`:
+
+| Component | Bytes |
+|---|---:|
+| Row evaluations | 32 |
+| Backend prequery roots, eval sumcheck, terminal word | 496 |
+| Blaze-authenticated column values | 128 |
+| Blaze-authenticated column Merkle paths | 640 |
+| Backend compiler-parity query values and paths | 704 |
+| Backend compiler-parity fold values and multiproof nodes | 1,152 |
+| Backend auxiliary query values and multiproof nodes | 1,216 |
+| Total | 4,368 |
+
+For comparison to the Blaze paper's 64-bit field-byte convention, the same proof structure with
+`field_bytes = 8` projects to:
 
 | Component | Bytes |
 |---|---:|

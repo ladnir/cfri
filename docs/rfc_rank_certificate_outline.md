@@ -159,6 +159,12 @@ rho_d(S,P) > 0  =>  structural rank loss can occur
 Then test on all exact depth-2 rows and exact depth-3 rows already enumerated. The score should
 separate persistent structural defects from accidental finite-field determinant zeros.
 
+The current restricted-rank conjecture is stated in:
+
+```text
+docs/rfc_restricted_rank_conjecture.md
+```
+
 The first useful finite-depth approximation is level-aware:
 
 ```text

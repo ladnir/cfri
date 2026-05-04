@@ -201,7 +201,7 @@ B/C below, with a concrete Section 5 proof-oracle layout:
    - c_star = A * u4;
 4. bind sumcheck terminal oracle evaluations to backend proof-oracle openings, not unbound
    serialized terminal values; [In progress: verifier rejects unbound serialized terminal values
-   and validates the three Section 5 sumcheck transcript shapes before failing closed at the
+   and validates the three Section 5 sumcheck transcript shapes and round consistency before failing closed at the
    missing terminal-opening binding]
 5. switch the normal Blaze2 backend from `LocalQueries` to `Section5`.
 ```

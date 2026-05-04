@@ -297,6 +297,13 @@ pub struct RaaRelationSumcheckProof {
 }
 
 #[derive(Clone, Debug, Eq, PartialEq)]
+struct RaaRelationSumcheckCheck {
+    challenges: Vec<B128>,
+    initial_sum: B128,
+    terminal_claim: B128,
+}
+
+#[derive(Clone, Debug, Eq, PartialEq)]
 pub enum RaaAuxiliaryLocalRelationProof {
     Equality,
     FirstAccumulatorStep { previous_value: B128 },
@@ -2159,7 +2166,7 @@ impl RaaRelationProof {
         }
     }
 
-    fn verify_openings(
+    fn verify_openings<H: Hash>(
         &self,
         relation_queries: &[AuxiliaryOracleQuery],
         auxiliary_oracle_len: usize,
@@ -2170,7 +2177,7 @@ impl RaaRelationProof {
             Self::LocalQueries(proof) => {
                 proof.verify_openings(relation_queries, schedule, top_queries)
             }
-            Self::Section5(proof) => proof.verify_openings(
+            Self::Section5(proof) => proof.verify_openings::<H>(
                 relation_queries,
                 auxiliary_oracle_len,
                 schedule,
@@ -2509,7 +2516,7 @@ impl RaaSection5RelationProof {
         Ok(Vec::new())
     }
 
-    fn verify_openings(
+    fn verify_openings<H: Hash>(
         &self,
         _relation_queries: &[AuxiliaryOracleQuery],
         auxiliary_oracle_len: usize,
@@ -2517,7 +2524,7 @@ impl RaaSection5RelationProof {
         _top_queries: &[TopQuery<B128>],
     ) -> Result<(), Error> {
         self.verify_schedule_shape(schedule)?;
-        self.verify_sumcheck_shapes(auxiliary_oracle_len)?;
+        self.verify_sumcheck_transcripts::<H>(auxiliary_oracle_len)?;
         if !self.terminal_evaluations.is_empty() {
             return Err(Error::InvalidPcsOpen(
                 "unbound serialized RAA Section 5 terminal evaluations are not accepted"
@@ -2529,7 +2536,10 @@ impl RaaSection5RelationProof {
         ))
     }
 
-    fn verify_sumcheck_shapes(&self, auxiliary_oracle_len: usize) -> Result<(), Error> {
+    fn verify_sumcheck_transcripts<H: Hash>(
+        &self,
+        auxiliary_oracle_len: usize,
+    ) -> Result<(), Error> {
         if auxiliary_oracle_len % RAA_SECTION5_AUX_ROW_COUNT != 0 {
             return Err(Error::InvalidPcsOpen(
                 "RAA Section 5 auxiliary oracle length is not row-aligned".to_string(),
@@ -2542,21 +2552,22 @@ impl RaaSection5RelationProof {
             ));
         }
         let num_vars = log2_strict(domain_len);
-        self.permutation_sumcheck.verify_shape(
+        self.permutation_sumcheck.verify_transcript::<H>(
             num_vars,
             RAA_SECTION5_PERMUTATION_SUMCHECK_DEGREE,
             "permutation",
         )?;
-        self.first_accumulator_sumcheck.verify_shape(
+        self.first_accumulator_sumcheck.verify_transcript::<H>(
             num_vars,
             RAA_SECTION5_ACCUMULATOR_SUMCHECK_DEGREE,
             "first accumulator",
         )?;
-        self.second_accumulator_sumcheck.verify_shape(
+        self.second_accumulator_sumcheck.verify_transcript::<H>(
             num_vars,
             RAA_SECTION5_ACCUMULATOR_SUMCHECK_DEGREE,
             "second accumulator",
-        )
+        )?;
+        Ok(())
     }
 }
 
@@ -2584,6 +2595,73 @@ impl RaaRelationSumcheckProof {
             )));
         }
         Ok(())
+    }
+
+    fn verify_transcript<H: Hash>(
+        &self,
+        num_vars: usize,
+        degree: usize,
+        label: &str,
+    ) -> Result<RaaRelationSumcheckCheck, Error> {
+        self.verify_shape(num_vars, degree, label)?;
+        let mut transcript = CfriTranscript::<H>::new();
+        transcript.absorb("raa-section5-relation-sumcheck-v1");
+        transcript.absorb(label);
+        absorb_usize(&mut transcript, num_vars);
+        absorb_usize(&mut transcript, degree);
+
+        let mut challenges = Vec::with_capacity(num_vars);
+        for round in 0..num_vars {
+            absorb_raa_relation_sumcheck_round(
+                &mut transcript,
+                label,
+                round,
+                &self.round_polynomials[round],
+            );
+            challenges.push(transcript.squeeze());
+        }
+        absorb_raa_relation_sumcheck_round(
+            &mut transcript,
+            label,
+            num_vars,
+            &self.round_polynomials[num_vars],
+        );
+
+        let initial_sum = raa_relation_sumcheck_zero_plus_one(&self.round_polynomials[0]);
+        for round in 0..num_vars {
+            let next_sum = raa_relation_sumcheck_zero_plus_one(&self.round_polynomials[round + 1]);
+            let current_at_challenge =
+                raa_relation_sumcheck_evaluate(&self.round_polynomials[round], challenges[round]);
+            if current_at_challenge != next_sum {
+                return Err(Error::InvalidPcsOpen(format!(
+                    "RAA Section 5 {label} sumcheck consistency check failed at round {round}"
+                )));
+            }
+        }
+
+        let terminal = self
+            .round_polynomials
+            .last()
+            .expect("sumcheck shape checked");
+        let terminal_claim = if num_vars == 0 {
+            terminal[0]
+        } else {
+            raa_relation_sumcheck_evaluate(
+                &self.round_polynomials[num_vars - 1],
+                challenges[num_vars - 1],
+            )
+        };
+        if terminal[0] != terminal_claim || terminal[1..].iter().any(|value| *value != B128::ZERO) {
+            return Err(Error::InvalidPcsOpen(format!(
+                "RAA Section 5 {label} sumcheck terminal claim check failed",
+            )));
+        }
+
+        Ok(RaaRelationSumcheckCheck {
+            challenges,
+            initial_sum,
+            terminal_claim,
+        })
     }
 }
 
@@ -3562,6 +3640,32 @@ fn raa_eval_sumcheck_zero_plus_one(coeffs: &[B128; 3]) -> B128 {
     coeffs[0] + raa_eval_sumcheck_evaluate(coeffs, B128::ONE)
 }
 
+fn absorb_raa_relation_sumcheck_round<H: Hash, S>(
+    transcript: &mut CfriTranscript<H, S>,
+    label: &str,
+    round: usize,
+    coeffs: &[B128],
+) {
+    transcript.absorb("raa-section5-relation-sumcheck-round-v1");
+    transcript.absorb(label);
+    absorb_usize(transcript, round);
+    absorb_usize(transcript, coeffs.len());
+    for coeff in coeffs {
+        transcript.absorb(coeff);
+    }
+}
+
+fn raa_relation_sumcheck_evaluate(coeffs: &[B128], point: B128) -> B128 {
+    coeffs
+        .iter()
+        .rev()
+        .fold(B128::ZERO, |acc, coeff| acc * point + *coeff)
+}
+
+fn raa_relation_sumcheck_zero_plus_one(coeffs: &[B128]) -> B128 {
+    coeffs[0] + raa_relation_sumcheck_evaluate(coeffs, B128::ONE)
+}
+
 fn parity_values_at_round(
     layout: &SystematicAugmentedRfcLayout,
     round: usize,
@@ -4413,7 +4517,7 @@ fn verify_raa_relation_openings<H: Hash>(
     let proof = proof.ok_or_else(|| {
         Error::InvalidPcsOpen("RAA relation checks require auxiliary query openings".to_string())
     })?;
-    proof.raa_relation.verify_openings(
+    proof.raa_relation.verify_openings::<H>(
         &proof.relation_queries,
         auxiliary_oracle_len,
         schedule,

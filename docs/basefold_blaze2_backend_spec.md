@@ -534,6 +534,12 @@ input_queries.len() == q_raa_input
 proof_queries.len() == q_backend_proof
 ```
 
+At least one backend proof query must be in the compiler-parity domain, so every accepted Blaze2
+BaseFold proof includes a parity fold path tying the clear terminal base-code word back to committed
+folded parity layers. The current schedule uses the first backend proof query for this parity
+fold-chain guard, then samples the remaining backend proof queries over the parity and auxiliary
+proof-oracle domains.
+
 The eval-binding path must include a global degree-2 sumcheck for:
 
 ```text

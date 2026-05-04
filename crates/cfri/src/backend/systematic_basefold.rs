@@ -1730,7 +1730,15 @@ impl HolographicQuerySchedule {
         let auxiliary_proof_len = raa_relation_auxiliary_len(spec.auxiliary_oracle_len);
         let proof_domain_len = layout.parity_len() + auxiliary_proof_len;
         let mut proof_queries = Vec::with_capacity(spec.q_backend_proof);
-        for _ in 0..spec.q_backend_proof {
+        if spec.q_backend_proof != 0 {
+            let parity_index = squeeze_bounded_index(transcript, layout.parity_len())?;
+            proof_queries.push(BackendProofQuery {
+                domain: BackendProofQueryDomain::CompilerParity,
+                index: parity_index,
+                physical_index: Some(layout.parity_to_physical(parity_index)?),
+            });
+        }
+        for _ in proof_queries.len()..spec.q_backend_proof {
             let sampled_index = squeeze_bounded_index(transcript, proof_domain_len)?;
             proof_queries.push(proof_query_from_sampled_index(
                 layout,
@@ -3792,6 +3800,10 @@ mod tests {
         assert_eq!(schedule.input_queries().len(), spec.q_raa_input);
         assert_eq!(schedule.proof_queries().len(), spec.q_backend_proof);
         assert_eq!(schedule.raa_final_queries().len(), spec.q_raa_input >> 1);
+        assert_eq!(
+            schedule.proof_queries()[0].domain,
+            BackendProofQueryDomain::CompilerParity
+        );
         for query in schedule.input_queries() {
             assert!(query.logical_index < layout.systematic_len());
             assert_eq!(

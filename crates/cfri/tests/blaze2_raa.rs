@@ -1405,7 +1405,7 @@ fn blaze2_basefold_outer_shape_matches_paper_after_field_byte_correction() {
             .unwrap()
             .query_count(),
         schedule.expected_auxiliary_query_proof_count(),
-        "auxiliary proof carries exactly the schedule-required relation and eval-accumulator openings"
+        "auxiliary proof carries exactly the schedule-required relation openings"
     );
     assert_eq!(
         proof.backend_prequery.folded_parity_layers.len(),

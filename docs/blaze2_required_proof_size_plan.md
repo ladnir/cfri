@@ -70,6 +70,10 @@ a separate folded-codeword commitment plus openings duplicating Blaze column ope
 
 ### 1. Add A First-Class Proof-Size Budget
 
+Status: In progress. The exact Blaze2/BaseFold regression now uses a first-class
+`Blaze2BaseFoldProofSizeBudget` for B128 and 8-byte projections. A byte-level serialized proof
+format test is still pending.
+
 Add a checked budget object for the Blaze2/BaseFold path instead of scattering constants through
 tests. It should compute:
 
@@ -94,6 +98,10 @@ Acceptance:
 - Every moved byte bucket has a named reason in the budget test.
 
 ### 2. Replace Bespoke Backend Query Proofs With One BaseFold-Core Proof
+
+Status: Pending. The current proof-size constants have been moved behind the budget model, but the
+backend proof object is still the stabilization-era split of compiler parity queries, parity fold
+paths, and auxiliary oracle queries.
 
 The current implementation has separate proof objects for:
 
@@ -247,13 +255,15 @@ Acceptance:
 
 ## Landing Order
 
-1. Add the budget object and byte-level serialization expectations.
-2. Replace the current proof-size constants with budget-derived assertions.
-3. Build the shared backend query-set collector.
-4. Generate per-layer multiproofs from the collector.
-5. Move auxiliary local relation checks into scheduled or algebraic backend checks.
-6. Replace the Blaze2-specific backend proof structs with the shared BaseFold-core proof.
-7. Add the 8-byte/16-byte field-width template and lock both acceptance numbers.
+| Step | Status |
+| --- | --- |
+| 1. Add the budget object and byte-level serialization expectations. | In progress: budget object added; byte-level serialization expectations pending. |
+| 2. Replace the current proof-size constants with budget-derived assertions. | Complete. |
+| 3. Build the shared backend query-set collector. | Pending. |
+| 4. Generate per-layer multiproofs from the collector. | Pending. |
+| 5. Move auxiliary local relation checks into scheduled or algebraic backend checks. | Pending. |
+| 6. Replace the Blaze2-specific backend proof structs with the shared BaseFold-core proof. | Pending. |
+| 7. Add the 8-byte/16-byte field-width template and lock both acceptance numbers. | Pending. |
 
 This order keeps the current hard structural wins intact while making each remaining byte movement
 auditable.

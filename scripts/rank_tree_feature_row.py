@@ -48,6 +48,7 @@ def main() -> None:
     parser.add_argument("--seed", type=int, default=1)
     parser.add_argument("--s-identity", type=int, required=True)
     parser.add_argument("--z-parity", type=int, required=True)
+    parser.add_argument("--shape-samples", type=int, default=0)
     parser.add_argument("--out", required=True)
     args = parser.parse_args()
 
@@ -62,14 +63,27 @@ def main() -> None:
     bad_by_feature: Counter[tuple[int, ...]] = Counter()
     first_bad: dict[tuple[int, ...], str] = {}
 
-    for identity_columns in itertools.combinations(range(k), args.s_identity):
-        for parity_columns in itertools.combinations(range(parity_n), args.z_parity):
-            columns = tuple(identity_columns) + tuple(k + column for column in parity_columns)
-            key = feature(columns, k, parity_n, parity_expansion)
-            total_by_feature[key] += 1
-            if rank_selected_columns(generator, list(columns), args.prime) < k:
-                bad_by_feature[key] += 1
-                first_bad.setdefault(key, ":".join(str(column) for column in columns))
+    if args.shape_samples > 0:
+        shape_iter = (
+            (
+                tuple(sorted(rng.sample(range(k), args.s_identity))),
+                tuple(sorted(rng.sample(range(parity_n), args.z_parity))),
+            )
+            for _ in range(args.shape_samples)
+        )
+    else:
+        shape_iter = itertools.product(
+            itertools.combinations(range(k), args.s_identity),
+            itertools.combinations(range(parity_n), args.z_parity),
+        )
+
+    for identity_columns, parity_columns in shape_iter:
+        columns = tuple(identity_columns) + tuple(k + column for column in parity_columns)
+        key = feature(columns, k, parity_n, parity_expansion)
+        total_by_feature[key] += 1
+        if rank_selected_columns(generator, list(columns), args.prime) < k:
+            bad_by_feature[key] += 1
+            first_bad.setdefault(key, ":".join(str(column) for column in columns))
 
     with Path(args.out).open("w", newline="") as handle:
         writer = csv.writer(handle)

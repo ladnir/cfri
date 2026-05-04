@@ -199,3 +199,21 @@ s_identity=2, z_parity=2:
 This gives the base case for the recursive collision family: a complete systematic sibling pair
 combined with a parity sibling collision in the same projection class causes a deterministic rank
 loss.
+
+Sampled depth-4 feature rows also line up with this score. For example:
+
+```text
+python scripts/rank_tree_feature_row.py \
+  --depth 4 \
+  --total-expansion 8 \
+  --prime 65537 \
+  --seed 307 \
+  --s-identity 11 \
+  --z-parity 5 \
+  --shape-samples 20000 \
+  --out docs/rank_tree_feature_sample_s11_zp5_systematic_p65537_depth4_c8.csv
+```
+
+The sampled bad buckets all have multiple complete identity subtrees and parity projection
+collisions across several levels. This is not exact enumeration, but it supports the same recursive
+collision-score direction at one higher depth.

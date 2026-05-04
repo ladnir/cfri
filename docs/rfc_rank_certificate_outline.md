@@ -187,3 +187,15 @@ false negatives: 35
 
 and those 35 false negatives are precisely the accidental finite-field zeros that disappeared under
 resampling. This makes the level-aware score the current best candidate for `rho_d`.
+
+The same feature language catches the exact depth-2 obstruction:
+
+```text
+s_identity=2, z_parity=2:
+  I_1=1 and P_1=1: 28/28 bad
+  all other buckets: 0 bad
+```
+
+This gives the base case for the recursive collision family: a complete systematic sibling pair
+combined with a parity sibling collision in the same projection class causes a deterministic rank
+loss.

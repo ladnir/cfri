@@ -1,0 +1,5 @@
+s_identity,z_parity,identity_full_level_1,identity_full_level_2,parity_collision_level_1,parity_collision_level_2,total_count,bad_count,bad_fraction,first_bad
+2,2,0,0,0,0,1456,0,0.0,
+2,2,1,0,0,0,728,0,0.0,
+2,2,0,0,1,0,56,0,0.0,
+2,2,1,0,1,0,28,28,1.0,0:1:4:18

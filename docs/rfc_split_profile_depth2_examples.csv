@@ -1,0 +1,3 @@
+shape,columns,is_bad,full_child_blocks_level_0,full_child_blocks_level_1,sibling_groups_level_1,sibling_groups_level_2,dead_sibling_groups_level_1,dead_sibling_groups_level_2,one_live_sibling_groups_level_1,one_live_sibling_groups_level_2,singleton_groups_level_1,singleton_groups_level_2,zero_singleton_groups_level_1,zero_singleton_groups_level_2
+bad,0:1:4:18,,2,1,0,1,0,1,0,1,2,0,1,0
+good,0:2:4:18,,2,0,0,1,0,0,0,0,2,0,0,0

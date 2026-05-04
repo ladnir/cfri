@@ -1,0 +1,11 @@
+full_child_blocks_level_0,full_child_blocks_level_1,full_child_blocks_level_2,sibling_groups_level_1,sibling_groups_level_2,sibling_groups_level_3,dead_sibling_groups_level_1,dead_sibling_groups_level_2,dead_sibling_groups_level_3,one_live_sibling_groups_level_1,one_live_sibling_groups_level_2,one_live_sibling_groups_level_3,singleton_groups_level_1,singleton_groups_level_2,singleton_groups_level_3,zero_singleton_groups_level_1,zero_singleton_groups_level_2,zero_singleton_groups_level_3,unknown_count,good_count,bad_count,total_count
+5,2,1,0,0,1,0,0,1,0,0,1,4,3,1,0,1,0,0,0,10752,10752
+5,2,0,0,2,1,0,2,0,0,2,0,4,0,1,2,0,0,0,0,896,896
+5,2,1,2,0,1,1,0,1,1,0,1,0,3,1,0,1,0,0,0,896,896
+5,2,1,0,1,1,0,0,1,0,0,1,2,1,1,0,1,0,0,0,448,448
+5,2,1,0,0,0,0,0,0,0,0,0,6,3,3,0,0,0,0,16,0,16
+5,1,0,0,0,0,0,0,0,0,0,0,9,6,3,0,0,0,0,7,0,7
+5,2,0,2,0,0,1,0,0,1,0,0,2,6,3,0,0,0,0,4,0,4
+5,1,0,0,2,0,0,1,0,0,1,0,7,2,3,1,0,0,0,3,0,3
+5,2,0,0,0,0,0,0,0,0,0,0,6,6,3,0,0,0,0,3,0,3
+5,1,0,3,0,0,3,0,0,3,0,0,3,6,3,0,0,0,0,2,0,2

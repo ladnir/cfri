@@ -156,3 +156,9 @@ where `Q_0,Q_1` are parity columns separated by the top path bit and `Q_cross` a
 collisions that survive after deleting complete systematic subtrees. The proof should show that if
 both child restrictions have full generic rank and no cross-collision survives, then the parent
 restriction also has full generic rank.
+
+The local determinant-`1` sibling split and the current recursive diagnostics are developed in:
+
+```text
+docs/rfc_restricted_rank_induction.md
+```

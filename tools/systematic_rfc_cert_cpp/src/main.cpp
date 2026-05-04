@@ -34,6 +34,7 @@ struct Options {
     std::string verifyPath;
     bool idealFirstMoment = false;
     bool sampleRfcFirstMoment = false;
+    bool sampleRfcProductFirstMoment = false;
     bool sampleRfcOneStep = false;
     int totalExpansion = 8;
     int prime = 5;
@@ -698,6 +699,188 @@ int firstCumulativeAtLeastOne(const std::vector<double>& spectrum) {
         }
     }
     return -1;
+}
+
+std::uint64_t integerPow(std::uint64_t base, std::uint64_t exponent) {
+    std::uint64_t out = 1;
+    while (exponent-- != 0) {
+        out *= base;
+    }
+    return out;
+}
+
+std::vector<double> convolveDistribution(
+    const std::vector<double>& lhs,
+    const std::vector<double>& rhs,
+    std::uint64_t maxDegree) {
+    std::vector<double> out(static_cast<std::size_t>(maxDegree + 1), 0.0);
+    for (std::uint64_t i = 0; i < lhs.size(); ++i) {
+        const auto left = lhs[static_cast<std::size_t>(i)];
+        if (left == 0.0) {
+            continue;
+        }
+        const auto maxJ = std::min<std::uint64_t>(rhs.size() - 1, maxDegree - i);
+        for (std::uint64_t j = 0; j <= maxJ; ++j) {
+            const auto right = rhs[static_cast<std::size_t>(j)];
+            if (right == 0.0) {
+                continue;
+            }
+            out[static_cast<std::size_t>(i + j)] += left * right;
+        }
+    }
+    return out;
+}
+
+std::vector<double> powerDistribution(
+    const std::vector<double>& base,
+    int exponent,
+    std::uint64_t maxDegree) {
+    std::vector<double> out(static_cast<std::size_t>(maxDegree + 1), 0.0);
+    out[0] = 1.0;
+    auto cur = base;
+    auto exp = exponent;
+    while (exp != 0) {
+        if ((exp & 1) != 0) {
+            out = convolveDistribution(out, cur, maxDegree);
+        }
+        exp >>= 1;
+        if (exp != 0) {
+            cur = convolveDistribution(cur, cur, maxDegree);
+        }
+    }
+    return out;
+}
+
+SampleSpectrum sampleRfcProductSpectra(const Options& opts) {
+    if (opts.depth < 0) {
+        throw std::runtime_error("--depth is required for --sample-rfc-product-first-moment");
+    }
+    if (opts.totalExpansion <= 1) {
+        throw std::runtime_error("--total-expansion must be greater than 1");
+    }
+    if (opts.prime <= 2) {
+        throw std::runtime_error("--prime must be an odd prime for this sampler");
+    }
+    if (opts.samples <= 0) {
+        throw std::runtime_error("--samples must be positive");
+    }
+
+    const auto k = std::uint64_t{1} << opts.depth;
+    const auto treeN = k;
+    const auto totalN = static_cast<std::uint64_t>(opts.totalExpansion) * k;
+    const auto numMessages = integerPow(static_cast<std::uint64_t>(opts.prime), k);
+
+    SampleSpectrum result;
+    result.oldSpectrum.assign(static_cast<std::size_t>(totalN + 1), 0.0);
+    result.systematicSpectrum.assign(static_cast<std::size_t>(totalN + 1), 0.0);
+    result.supportCols = totalN + 1;
+    result.oldBySupport.assign(static_cast<std::size_t>((k + 1) * result.supportCols), 0.0);
+    result.systematicBySupport.assign(static_cast<std::size_t>((k + 1) * result.supportCols), 0.0);
+
+    const auto singleCols = treeN + 1;
+    std::vector<std::uint32_t> singleCounts(static_cast<std::size_t>(numMessages * singleCols), 0);
+    std::vector<std::uint8_t> supports(static_cast<std::size_t>(numMessages), 0);
+    std::mt19937_64 rng(opts.seed);
+    std::vector<int> message(static_cast<std::size_t>(k), 0);
+    std::vector<int> scratch(static_cast<std::size_t>(treeN), 0);
+
+    for (int sample = 0; sample < opts.samples; ++sample) {
+        const auto generator = rfcGeneratorPrime(opts.depth, 1, opts.prime, rng);
+        std::fill(message.begin(), message.end(), 0);
+        std::uint64_t messageIndex = 0;
+        while (incrementMessage(message, opts.prime)) {
+            ++messageIndex;
+            const auto [support, encodedWeight] =
+                messageSupportAndEncodedWeight(message, generator, treeN, opts.prime, scratch);
+            supports[static_cast<std::size_t>(messageIndex)] = static_cast<std::uint8_t>(support);
+            ++singleCounts[static_cast<std::size_t>(messageIndex * singleCols + encodedWeight)];
+        }
+        if (messageIndex + 1 != numMessages) {
+            throw std::runtime_error("message enumeration count mismatch");
+        }
+        if (opts.samples >= 10 && (sample + 1) % std::max(1, opts.samples / 10) == 0) {
+            std::cerr << "single_tree_sample=" << (sample + 1) << "/" << opts.samples << '\n';
+        }
+    }
+
+    std::vector<double> single(static_cast<std::size_t>(singleCols), 0.0);
+    const auto invSamples = 1.0 / static_cast<double>(opts.samples);
+    for (std::uint64_t messageIndex = 1; messageIndex < numMessages; ++messageIndex) {
+        const auto support = static_cast<std::uint64_t>(supports[static_cast<std::size_t>(messageIndex)]);
+        std::fill(single.begin(), single.end(), 0.0);
+        for (std::uint64_t h = 0; h <= treeN; ++h) {
+            single[static_cast<std::size_t>(h)] =
+                static_cast<double>(singleCounts[static_cast<std::size_t>(messageIndex * singleCols + h)]) *
+                invSamples;
+        }
+
+        const auto oldDist = powerDistribution(single, opts.totalExpansion, totalN);
+        const auto sysDist = powerDistribution(single, opts.totalExpansion - 1, totalN);
+        for (std::uint64_t h = 0; h <= totalN; ++h) {
+            const auto oldValue = oldDist[static_cast<std::size_t>(h)];
+            if (oldValue != 0.0) {
+                result.oldSpectrum[static_cast<std::size_t>(h)] += oldValue;
+                result.oldBySupport[static_cast<std::size_t>(support * result.supportCols + h)] += oldValue;
+            }
+            if (support + h <= totalN) {
+                const auto sysValue = sysDist[static_cast<std::size_t>(h)];
+                if (sysValue != 0.0) {
+                    result.systematicSpectrum[static_cast<std::size_t>(support + h)] += sysValue;
+                    result.systematicBySupport[
+                        static_cast<std::size_t>(support * result.supportCols + support + h)] += sysValue;
+                }
+            }
+        }
+    }
+
+    return result;
+}
+
+int runSampleRfcProductFirstMoment(const Options& opts) {
+    const auto k = std::uint64_t{1} << opts.depth;
+    const auto totalN = static_cast<std::uint64_t>(opts.totalExpansion) * k;
+    const auto spectra = sampleRfcProductSpectra(opts);
+    std::cout << "p=" << opts.prime << " depth=" << opts.depth << " k=" << k << " total_n=" << totalN
+              << " single_tree_samples=" << opts.samples << " total_expansion=" << opts.totalExpansion << '\n';
+    std::cout << "old_product_first_moment_crossing=" << firstCumulativeAtLeastOne(spectra.oldSpectrum) << '\n';
+    std::cout << "systematic_product_first_moment_crossing="
+              << firstCumulativeAtLeastOne(spectra.systematicSpectrum) << '\n';
+    std::cout << "weight,old_expected_count,systematic_expected_count\n";
+    for (std::size_t h = 0; h < spectra.oldSpectrum.size(); ++h) {
+        if (spectra.oldSpectrum[h] != 0.0 || spectra.systematicSpectrum[h] != 0.0) {
+            std::cout << h << ',' << std::setprecision(12) << spectra.oldSpectrum[h] << ','
+                      << spectra.systematicSpectrum[h] << '\n';
+        }
+    }
+
+    if (!opts.spectrumPath.empty()) {
+        std::ofstream out(opts.spectrumPath);
+        if (!out) {
+            throw std::runtime_error("failed to open spectrum output path");
+        }
+        out << "weight,old_expected_count,systematic_expected_count\n";
+        out << std::setprecision(17);
+        for (std::size_t h = 0; h < spectra.oldSpectrum.size(); ++h) {
+            out << h << ',' << spectra.oldSpectrum[h] << ',' << spectra.systematicSpectrum[h] << '\n';
+        }
+    }
+    if (!opts.supportSpectrumPath.empty()) {
+        std::ofstream out(opts.supportSpectrumPath);
+        if (!out) {
+            throw std::runtime_error("failed to open support spectrum output path");
+        }
+        out << "support,weight,old_expected_count,systematic_expected_count\n";
+        out << std::setprecision(17);
+        for (std::uint64_t support = 1; support <= k; ++support) {
+            for (std::uint64_t h = 0; h < spectra.oldSpectrum.size(); ++h) {
+                out << support << ',' << h << ','
+                    << spectra.oldBySupport[static_cast<std::size_t>(support * spectra.supportCols + h)] << ','
+                    << spectra.systematicBySupport[static_cast<std::size_t>(support * spectra.supportCols + h)]
+                    << '\n';
+            }
+        }
+    }
+    return 0;
 }
 
 int runSampleRfcFirstMoment(const Options& opts) {
@@ -1390,6 +1573,8 @@ Options parseOptions(int argc, char** argv) {
             opts.idealFirstMoment = true;
         } else if (arg == "--sample-rfc-first-moment") {
             opts.sampleRfcFirstMoment = true;
+        } else if (arg == "--sample-rfc-product-first-moment") {
+            opts.sampleRfcProductFirstMoment = true;
         } else if (arg == "--sample-rfc-one-step") {
             opts.sampleRfcOneStep = true;
         } else if (arg == "--total-expansion") {
@@ -1413,6 +1598,7 @@ Options parseOptions(int argc, char** argv) {
                 << "  --verify path                      verify threshold CSV\n"
                 << "  --ideal-first-moment               print ideal random-code first-moment baselines\n"
                 << "  --sample-rfc-first-moment          sample tiny-field RFC first-moment spectra\n"
+                << "  --sample-rfc-product-first-moment  sample one-tree laws and product them to expansion\n"
                 << "  --sample-rfc-one-step              sample child-pair one-step RFC first-moment spectra\n"
                 << "  --total-expansion N                total expansion for first-moment baselines\n"
                 << "  --prime P --samples N --seed N     sampler parameters\n"
@@ -1446,6 +1632,9 @@ int main(int argc, char** argv) {
         }
         if (opts.sampleRfcFirstMoment) {
             return runSampleRfcFirstMoment(opts);
+        }
+        if (opts.sampleRfcProductFirstMoment) {
+            return runSampleRfcProductFirstMoment(opts);
         }
         if (opts.sampleRfcOneStep) {
             return runSampleRfcOneStep(opts);

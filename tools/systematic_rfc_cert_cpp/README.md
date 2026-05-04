@@ -61,6 +61,24 @@ build/systematic_rfc_cert_cpp/systematic_rfc_cert.exe ^
   --support-spectrum-path docs/sample_first_moment_gf5_depth3_c8_by_support_cpp.csv
 ```
 
+Tiny-field product first-moment calibration:
+
+```text
+build/systematic_rfc_cert_cpp/systematic_rfc_cert.exe ^
+  --sample-rfc-product-first-moment ^
+  --prime 5 ^
+  --depth 3 ^
+  --total-expansion 8 ^
+  --samples 1000 ^
+  --seed 29 ^
+  --spectrum-path docs/sample_product_first_moment_gf5_depth3_c8_cpp.csv ^
+  --support-spectrum-path docs/sample_product_first_moment_gf5_depth3_c8_by_support_cpp.csv
+```
+
+This samples the single-tree output-weight law for each message and then raises that law to the
+requested expansion. It estimates the same first-moment target as full RFC sampling, but separates
+the single-tree shape problem from the independent expansion product.
+
 One-step child-pair first-moment transition:
 
 ```text

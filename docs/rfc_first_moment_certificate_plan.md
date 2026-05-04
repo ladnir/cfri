@@ -173,14 +173,91 @@ The same first-moment machinery must be run for:
 
 Only then is the systematic/non-systematic gap meaningful.
 
+## Single-Tree Product Formulation
+
+The expansion copies are independent RFC trees. For a fixed nonzero message `m`, let:
+
+```text
+G_m(x) = sum_w Pr[single RFC tree sends m to weight w] x^w.
+```
+
+Then the non-systematic expansion-`c` first moment uses `G_m(x)^c`, while the systematic version
+with parity expansion `c-1` uses:
+
+```text
+x^wt(m) G_m(x)^(c-1).
+```
+
+This is a sharper way to separate the problem. The expansion product is easy once the single-tree
+law is known; the real certificate problem is to upper-bound the distribution of `G_m` over all
+messages without enumerating messages.
+
+The exact tiny-field script:
+
+```text
+python scripts/single_tree_product_first_moment.py \
+  --p 5 \
+  --depth 2 \
+  --total-expansion 8 \
+  --max-print-weight 24
+```
+
+enumerates all one-tree randomizer assignments at GF(5), depth 2. It gives:
+
+```text
+old_crossing=13
+systematic_crossing=14
+```
+
+matching the earlier full-expansion calibration at this depth.
+
+The C++ product sampler:
+
+```text
+build/systematic_rfc_cert_cpp/systematic_rfc_cert.exe \
+  --sample-rfc-product-first-moment \
+  --prime 5 \
+  --depth 3 \
+  --total-expansion 8 \
+  --samples 1000 \
+  --seed 29 \
+  --spectrum-path docs/sample_product_first_moment_gf5_depth3_c8_cpp.csv \
+  --support-spectrum-path docs/sample_product_first_moment_gf5_depth3_c8_by_support_cpp.csv
+```
+
+gives:
+
+```text
+old_product_first_moment_crossing=17
+systematic_product_first_moment_crossing=20
+```
+
+At the crossing cutoffs, the support contributions are:
+
+```text
+old cutoff <= 17:
+  support 8: 86.76%
+  support 4: 12.98%
+
+systematic cutoff <= 20:
+  support 4: 71.31%
+  support 2: 14.81%
+  support 8: 13.63%
+```
+
+So the cleaner product estimator preserves the same qualitative picture: the original low tail is
+mostly full-support messages, while the systematic low tail is mostly medium-support messages.
+Support alone still cannot be the certificate state; at GF(5), depth 2, fixed-support messages split
+into many different single-tree laws.
+
 ## Immediate Next Tasks
 
-1. Add a postprocessor for `sample_one_step_categories_*` that evaluates candidate compressed
-   upper bounds against the exact one-step low-tail contribution.
-2. Keep parent support in the state; the depth-3 data shows support is where the systematic and
-   original low tails differ.
-3. Derive a recursive upper-bound version of `K_i(s,z)` using zero-set shapes, then compare it to
-   the sampled one-step spectrum before scaling to `q=2^128`.
+1. Build a recursive upper bound for the single-tree law `G_m(x)` using the compressed
+   `(support, single_root, double_root)` state.
+2. Keep parent support in the state; the depth-3 product data shows support is where the systematic
+   and original low tails differ.
+3. Compare the recursive single-tree-law bound against the product sampler before scaling to
+   `q=2^128`.
 
 ## Projection Test: GF(5), Depth 3
 

@@ -1610,9 +1610,11 @@ impl<H: Hash> AuxiliaryOracleCommitment<H> {
             }
         }
         if schedule.raa_relation_strategy() == RaaRelationProofStrategy::Section5 {
-            return Err(Error::InvalidPcsOpen(
-                "RAA Section 5 relation proof is not implemented yet".to_string(),
-            ));
+            return Ok(AuxiliaryOracleQueryProof {
+                relation_queries,
+                raa_relation: RaaRelationProof::Section5(RaaSection5RelationProof::default()),
+                authentication_nodes: Vec::new(),
+            });
         }
         let mut final_accumulator_queries = Vec::with_capacity(schedule.raa_final_queries().len());
         for query in schedule.raa_final_queries() {
@@ -2160,6 +2162,10 @@ impl RaaSection5RelationProof {
     }
 
     fn verify_schedule(&self, schedule: &HolographicQuerySchedule) -> Result<(), Error> {
+        self.verify_schedule_shape(schedule)
+    }
+
+    fn verify_schedule_shape(&self, schedule: &HolographicQuerySchedule) -> Result<(), Error> {
         if schedule.raa_relation_strategy() != RaaRelationProofStrategy::Section5 {
             return Err(Error::InvalidPcsOpen(
                 "RAA Section 5 proof supplied for a non-Section 5 schedule".to_string(),
@@ -2173,9 +2179,7 @@ impl RaaSection5RelationProof {
                 "RAA Section 5 schedule must not carry local companion queries".to_string(),
             ));
         }
-        Err(Error::InvalidPcsOpen(
-            "RAA Section 5 relation proof verification is not implemented yet".to_string(),
-        ))
+        Ok(())
     }
 
     fn authentication_queries(
@@ -2184,7 +2188,7 @@ impl RaaSection5RelationProof {
         schedule: &HolographicQuerySchedule,
         _top_queries: &[TopQuery<B128>],
     ) -> Result<Vec<(usize, B128)>, Error> {
-        self.verify_schedule(schedule)?;
+        self.verify_schedule_shape(schedule)?;
         Ok(Vec::new())
     }
 
@@ -2194,7 +2198,7 @@ impl RaaSection5RelationProof {
         schedule: &HolographicQuerySchedule,
         _oracle: &AuxiliaryOracleCommitment<H>,
     ) -> Result<Vec<(usize, B128)>, Error> {
-        self.verify_schedule(schedule)?;
+        self.verify_schedule_shape(schedule)?;
         Ok(Vec::new())
     }
 
@@ -2204,7 +2208,10 @@ impl RaaSection5RelationProof {
         schedule: &HolographicQuerySchedule,
         _top_queries: &[TopQuery<B128>],
     ) -> Result<(), Error> {
-        self.verify_schedule(schedule)
+        self.verify_schedule_shape(schedule)?;
+        Err(Error::InvalidPcsOpen(
+            "RAA Section 5 relation proof verification is not implemented yet".to_string(),
+        ))
     }
 }
 
@@ -3713,7 +3720,10 @@ fn verify_raa_relation_openings<H: Hash>(
     schedule: &HolographicQuerySchedule,
     top_queries: &[TopQuery<B128>],
 ) -> Result<(), Error> {
-    if schedule.raa_final_queries().is_empty() && schedule.raa_auxiliary_queries().is_empty() {
+    if schedule.raa_final_queries().is_empty()
+        && schedule.raa_auxiliary_queries().is_empty()
+        && schedule.raa_relation_strategy() != RaaRelationProofStrategy::Section5
+    {
         return Ok(());
     }
     if auxiliary_oracle_len == 0 {
@@ -4839,7 +4849,31 @@ mod tests {
             schedule.expected_auxiliary_query_proof_count(),
             schedule.relation_auxiliary_proof_query_count()
         );
-        assert!(params.open_query_proof(&state, &schedule).is_err());
+        let proof = params.open_query_proof(&state, &schedule).unwrap();
+        let auxiliary = proof
+            .auxiliary
+            .as_ref()
+            .expect("Section 5 still opens scheduled relation auxiliary proof queries");
+        assert_eq!(
+            auxiliary.query_count(),
+            schedule.relation_auxiliary_proof_query_count()
+        );
+        assert!(matches!(
+            auxiliary.raa_relation,
+            RaaRelationProof::Section5(_)
+        ));
+
+        let top_queries = schedule
+            .input_queries()
+            .iter()
+            .map(|query| TopQuery {
+                index: query.logical_index,
+                value: folded_codeword[query.logical_index],
+            })
+            .collect::<Vec<_>>();
+        assert!(params
+            .verify_query_proof(&prequery, &request, &schedule, &proof, &top_queries)
+            .is_err());
     }
 
     #[test]

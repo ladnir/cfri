@@ -167,10 +167,31 @@ proof-object multiplier, but it does not yet achieve the paper-size target becau
 leaves are still Merkle-authenticated. The backend prequery path now also rejects arbitrary
 auxiliary traces whose `u3 = A * u2`, `u4 = M_pi2 * u3`, and `c_star = A * u4` rows do not match
 the folded PRAA codeword. The relation proof variant is now explicit (`LocalQueries` versus
-`Section5`), and the Section 5 mode fails closed until its verifier relation is implemented. That
-is only a prover/API guardrail: the paper-critical verifier relation still has to prove
+`Section5`), and the Section 5 mode now routes through the normal scheduled relation-query and
+backend authentication machinery while still failing closed at the missing global relation verifier.
+That is only a prover/API guardrail: the paper-critical verifier relation still has to prove
 `u2 = M_pi1 * F_r(m)` and the accumulator/permutation relations without local companion Merkle
-openings. The remaining target is Option B or C below.
+openings.
+
+After re-reading Blaze Section 5, the honest implementation cannot be just "the same three rows
+with fewer openings." The paper relation uses MLIOP proof oracles for the RAA computation: the
+`u2/u3/u4` computation rows plus the permutation/grand-product helper oracles, packed as the
+constant-number multilinear proof oracles from Lemma 5.1, and then compiled to backend
+proof-oracle queries by the MLIOP-to-IOPP/BaseFold layer. The remaining target is therefore Option
+B/C below, with a concrete Section 5 proof-oracle layout:
+
+```text
+1. define the packed Section 5 proof-oracle rows;
+2. commit/authenticate those rows through the shared backend query-set collector;
+3. implement the alpha/beta/r transcript rounds and batched sumcheck checks for:
+   - repetition/permutation into u2,
+   - u3 = A * u2,
+   - u4 = M_pi2 * u3,
+   - c_star = A * u4;
+4. bind sumcheck terminal oracle evaluations to backend proof-oracle openings, not unbound
+   serialized terminal values;
+5. switch the normal Blaze2 backend from `LocalQueries` to `Section5`.
+```
 
 The auxiliary term is currently the largest remaining bucket. Values have been tightened, but the
 proof still authenticates auxiliary companion leaves for local RAA relations. The final design must
@@ -278,7 +299,7 @@ Acceptance:
 | 2. Replace the current proof-size constants with budget-derived assertions. | Complete. |
 | 3. Build the shared backend query-set collector. | Complete. |
 | 4. Generate per-layer multiproofs from the collector. | Complete. |
-| 5. Move auxiliary local relation checks into scheduled or algebraic backend checks. | In progress: arbitrary auxiliary traces now reject at prequery construction; the relation proof strategy is explicit and Section 5 fails closed; verifier-side Section 5 relation proof still pending. |
+| 5. Move auxiliary local relation checks into scheduled or algebraic backend checks. | In progress: arbitrary auxiliary traces now reject at prequery construction; the relation proof strategy is explicit; Section 5 now builds scheduled relation openings and backend authentication but fails closed at the missing global relation verifier. |
 | 6. Replace the Blaze2-specific backend proof structs with the shared BaseFold-core proof. | Pending. |
 | 7. Add the 8-byte/16-byte field-width template and lock both acceptance numbers. | Pending. |
 

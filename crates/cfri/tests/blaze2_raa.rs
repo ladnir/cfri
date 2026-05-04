@@ -1920,6 +1920,7 @@ fn blaze2_basefold_opening_derives_configured_auxiliary_trace() {
         .auxiliary
         .as_mut()
         .unwrap()
+        .raa_relation
         .final_accumulator_queries
         .pop();
     assert!(verify_blaze2_basefold_opening(

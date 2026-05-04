@@ -207,13 +207,18 @@ pub struct AuxiliaryOracleQuery {
 #[derive(Clone, Debug, Eq, PartialEq)]
 pub struct AuxiliaryOracleQueryProof<H: Hash> {
     pub relation_queries: Vec<AuxiliaryOracleQuery>,
-    pub final_accumulator_queries: Vec<RaaFinalAccumulatorQueryProof>,
-    pub local_relation_queries: Vec<RaaAuxiliaryLocalRelationProof>,
+    pub raa_relation: RaaRelationProof,
     pub authentication_nodes: Vec<Output<H>>,
 }
 
 #[derive(Clone, Debug, Eq, PartialEq)]
 pub struct RaaFinalAccumulatorQueryProof;
+
+#[derive(Clone, Debug, Default, Eq, PartialEq)]
+pub struct RaaRelationProof {
+    pub final_accumulator_queries: Vec<RaaFinalAccumulatorQueryProof>,
+    pub local_relation_queries: Vec<RaaAuxiliaryLocalRelationProof>,
+}
 
 #[derive(Clone, Debug, Eq, PartialEq)]
 pub enum RaaAuxiliaryLocalRelationProof {
@@ -1589,8 +1594,10 @@ impl<H: Hash> AuxiliaryOracleCommitment<H> {
         }
         let proof = AuxiliaryOracleQueryProof {
             relation_queries,
-            final_accumulator_queries,
-            local_relation_queries,
+            raa_relation: RaaRelationProof {
+                final_accumulator_queries,
+                local_relation_queries,
+            },
             authentication_nodes: Vec::new(),
         };
         Ok(AuxiliaryOracleQueryProof { ..proof })
@@ -1633,22 +1640,11 @@ impl<H: Hash> AuxiliaryOracleCommitment<H> {
 
 impl<H: Hash> AuxiliaryOracleQueryProof<H> {
     pub fn query_count(&self) -> usize {
-        self.relation_queries.len()
-            + self.final_accumulator_queries.len()
-            + self
-                .local_relation_queries
-                .iter()
-                .map(|proof| proof.authentication_query_count())
-                .sum::<usize>()
+        self.relation_queries.len() + self.raa_relation.query_count()
     }
 
     pub fn serialized_value_count(&self) -> usize {
-        self.relation_queries.len()
-            + self
-                .local_relation_queries
-                .iter()
-                .map(|proof| proof.serialized_value_count())
-                .sum::<usize>()
+        self.relation_queries.len() + self.raa_relation.serialized_value_count()
     }
 
     fn verify_schedule(
@@ -1696,12 +1692,12 @@ impl<H: Hash> AuxiliaryOracleQueryProof<H> {
             ));
         }
 
-        if self.final_accumulator_queries.len() != schedule.raa_final_queries().len() {
+        if self.raa_relation.final_accumulator_queries.len() != schedule.raa_final_queries().len() {
             return Err(Error::InvalidPcsOpen(
                 "RAA final accumulator query proof count does not match schedule".to_string(),
             ));
         }
-        let mut local_relation_queries = self.local_relation_queries.iter();
+        let mut local_relation_queries = self.raa_relation.local_relation_queries.iter();
         let mut local_authentication_queries =
             schedule.raa_auxiliary_authentication_queries().iter();
         for expected in schedule.raa_auxiliary_queries() {
@@ -1773,7 +1769,7 @@ impl<H: Hash> AuxiliaryOracleQueryProof<H> {
             ));
         }
 
-        if self.final_accumulator_queries.len() != schedule.raa_final_queries().len() {
+        if self.raa_relation.final_accumulator_queries.len() != schedule.raa_final_queries().len() {
             return Err(Error::InvalidPcsOpen(
                 "RAA final accumulator query proof count does not match schedule".to_string(),
             ));
@@ -1781,7 +1777,7 @@ impl<H: Hash> AuxiliaryOracleQueryProof<H> {
         for (expected, _) in schedule
             .raa_final_queries()
             .iter()
-            .zip(self.final_accumulator_queries.iter())
+            .zip(self.raa_relation.final_accumulator_queries.iter())
         {
             let current = top_queries
                 .get(expected.current_input_query)
@@ -1802,7 +1798,7 @@ impl<H: Hash> AuxiliaryOracleQueryProof<H> {
             queries.push((expected.u4_auxiliary_index, current.value - previous.value));
         }
 
-        let mut local_relation_proofs = self.local_relation_queries.iter();
+        let mut local_relation_proofs = self.raa_relation.local_relation_queries.iter();
         let mut local_authentication_queries =
             schedule.raa_auxiliary_authentication_queries().iter();
         for expected in schedule.raa_auxiliary_queries() {
@@ -1864,7 +1860,7 @@ impl<H: Hash> AuxiliaryOracleQueryProof<H> {
             let u4 = oracle.query(expected.u4_auxiliary_index)?;
             queries.push((u4.logical_index, u4.value));
         }
-        let mut local_relation_proofs = self.local_relation_queries.iter();
+        let mut local_relation_proofs = self.raa_relation.local_relation_queries.iter();
         let mut local_authentication_queries =
             schedule.raa_auxiliary_authentication_queries().iter();
         for expected in schedule.raa_auxiliary_queries() {
@@ -1908,6 +1904,24 @@ impl<H: Hash> AuxiliaryOracleQueryProof<H> {
             ));
         }
         Ok(queries)
+    }
+}
+
+impl RaaRelationProof {
+    fn query_count(&self) -> usize {
+        self.final_accumulator_queries.len()
+            + self
+                .local_relation_queries
+                .iter()
+                .map(|proof| proof.authentication_query_count())
+                .sum::<usize>()
+    }
+
+    fn serialized_value_count(&self) -> usize {
+        self.local_relation_queries
+            .iter()
+            .map(|proof| proof.serialized_value_count())
+            .sum()
     }
 }
 
@@ -3379,6 +3393,7 @@ fn verify_raa_final_accumulator_queries<H: Hash>(
             ));
         }
         proof
+            .raa_relation
             .final_accumulator_queries
             .get(relative_index)
             .ok_or_else(|| {
@@ -3407,7 +3422,7 @@ fn verify_raa_auxiliary_local_queries<H: Hash>(
         )
     })?;
 
-    let mut local_relation_queries = proof.local_relation_queries.iter();
+    let mut local_relation_queries = proof.raa_relation.local_relation_queries.iter();
     for expected in schedule.raa_auxiliary_queries() {
         let main = proof
             .relation_queries
@@ -4512,6 +4527,7 @@ mod tests {
                 .auxiliary
                 .as_mut()
                 .unwrap()
+                .raa_relation
                 .local_relation_queries[0]
         {
             *previous_value += B128::ONE;

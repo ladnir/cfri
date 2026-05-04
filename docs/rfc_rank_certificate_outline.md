@@ -158,3 +158,32 @@ rho_d(S,P) > 0  =>  structural rank loss can occur
 
 Then test on all exact depth-2 rows and exact depth-3 rows already enumerated. The score should
 separate persistent structural defects from accidental finite-field determinant zeros.
+
+The first useful finite-depth approximation is level-aware:
+
+```text
+I_l = number of complete systematic subtrees of size 2^l
+P_l = number of parity collisions after projecting paths modulo level l
+```
+
+For the exact depth-3 rows, the feature tables in `docs/rank_tree_feature_row_*` show that
+persistent defects are isolated by a small number of `(s_identity, z_parity, I_l, P_l)` buckets.
+The regression script:
+
+```text
+python scripts/test_tree_collision_rule.py \
+  docs/rank_tree_feature_row_s6_zp2_systematic_p65537_depth3_c8.csv \
+  docs/rank_tree_feature_row_s5_zp3_systematic_p65537_depth3_c8.csv \
+  docs/rank_tree_feature_row_s6_zp3_systematic_p65537_depth3_c8.csv \
+  --out docs/rank_tree_collision_rule_depth3_exact_rows.csv
+```
+
+has:
+
+```text
+false positives: 0
+false negatives: 35
+```
+
+and those 35 false negatives are precisely the accidental finite-field zeros that disappeared under
+resampling. This makes the level-aware score the current best candidate for `rho_d`.

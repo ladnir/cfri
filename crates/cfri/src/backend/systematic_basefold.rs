@@ -541,6 +541,11 @@ impl Blaze2BaseFoldBackendParams {
     > {
         validate_blaze2_basefold_open_request(self, request)?;
         validate_auxiliary_oracle_shape(self.spec.auxiliary_oracle_len, auxiliary_oracle)?;
+        validate_raa_relation_auxiliary_consistent_with_codeword(
+            self.praa.packed(),
+            folded_codeword,
+            auxiliary_oracle,
+        )?;
         let compiler_parity = self.compiler_code.commit_parity(folded_codeword)?;
         let auxiliary = if self.spec.auxiliary_oracle_len == 0 {
             None
@@ -2383,6 +2388,56 @@ fn validate_auxiliary_oracle_shape(expected_len: usize, values: &[B128]) -> Resu
             "auxiliary oracle has length {}, expected {expected_len}",
             values.len()
         )));
+    }
+    Ok(())
+}
+
+fn validate_raa_relation_auxiliary_consistent_with_codeword(
+    code: &PackedRaaCode,
+    codeword: &[B128],
+    auxiliary_oracle: &[B128],
+) -> Result<(), Error> {
+    if auxiliary_oracle.is_empty() {
+        return Ok(());
+    }
+    let len = code.codeword_len();
+    if codeword.len() != len || auxiliary_oracle.len() != RAA_AUX_ROW_COUNT * len {
+        return Err(Error::InvalidPcsOpen(
+            "RAA relation auxiliary oracle shape does not match folded codeword".to_string(),
+        ));
+    }
+
+    let (u2, rest) = auxiliary_oracle.split_at(len);
+    let (u3, u4) = rest.split_at(len);
+    let permutation = code.permutation();
+
+    let mut accumulator = B128::ZERO;
+    for index in 0..len {
+        accumulator += u2[index];
+        if u3[index] != accumulator {
+            return Err(Error::InvalidPcsOpen(
+                "RAA relation auxiliary u3 row does not match first accumulator".to_string(),
+            ));
+        }
+    }
+
+    for index in 0..len {
+        if u4[index] != u3[permutation.permutation2[index]] {
+            return Err(Error::InvalidPcsOpen(
+                "RAA relation auxiliary u4 row does not match second permutation".to_string(),
+            ));
+        }
+    }
+
+    accumulator = B128::ZERO;
+    for index in 0..len {
+        accumulator += u4[index];
+        if codeword[index] != accumulator {
+            return Err(Error::InvalidPcsOpen(
+                "RAA relation auxiliary u4 row does not accumulate to the folded codeword"
+                    .to_string(),
+            ));
+        }
     }
     Ok(())
 }
@@ -4507,6 +4562,25 @@ mod tests {
         assert!(params
             .prove_prequery::<Blake2s>(&folded_codeword, &wrong_len, &request)
             .is_err());
+
+        let mut wrong_u2 = auxiliary.clone();
+        wrong_u2[0] += B128::ONE;
+        assert!(params
+            .prove_prequery::<Blake2s>(&folded_codeword, &wrong_u2, &request)
+            .is_err());
+
+        let len = params.praa().packed().codeword_len();
+        let mut wrong_u3 = auxiliary.clone();
+        wrong_u3[len] += B128::ONE;
+        assert!(params
+            .prove_prequery::<Blake2s>(&folded_codeword, &wrong_u3, &request)
+            .is_err());
+
+        let mut wrong_u4 = auxiliary.clone();
+        wrong_u4[2 * len] += B128::ONE;
+        assert!(params
+            .prove_prequery::<Blake2s>(&folded_codeword, &wrong_u4, &request)
+            .is_err());
     }
 
     #[test]
@@ -4573,14 +4647,9 @@ mod tests {
         assert_ne!(lhs_schedule, changed_schedule);
 
         let changed_auxiliary = message(params.spec().auxiliary_oracle_len, 211);
-        let (changed_prequery, _) = params
+        assert!(params
             .prove_prequery::<Blake2s>(&folded_codeword, &changed_auxiliary, &request)
-            .unwrap();
-        let mut changed = CfriTranscript::<Blake2s>::new();
-        let changed_schedule = params
-            .sample_query_schedule(&mut changed, &changed_prequery, &request)
-            .unwrap();
-        assert_ne!(lhs_schedule, changed_schedule);
+            .is_err());
 
         let mut changed_spec = params.spec().clone();
         changed_spec.q_backend_proof += 1;

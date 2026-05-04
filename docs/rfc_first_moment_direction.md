@@ -85,3 +85,45 @@ RFC baseline and the systematic affine RFC. Two plausible paths:
 
 The original non-systematic RFC should be analyzed with the same first-moment machinery. That is
 the only fair baseline for deciding how much of the systematic gap is real.
+
+## Tiny-Field Sampled Spectra
+
+As a calibration tool, the C++ executable now has a sampled tiny-field mode:
+
+```text
+build/systematic_rfc_cert_cpp/systematic_rfc_cert.exe \
+  --sample-rfc-first-moment \
+  --prime 5 \
+  --depth 3 \
+  --total-expansion 8 \
+  --samples 100 \
+  --seed 11 \
+  --spectrum-path docs/sample_first_moment_gf5_depth3_c8_cpp.csv
+```
+
+This samples affine RFC constructions with `T` uniform in `GF(5)^*`, exhausts every message, and
+averages the nonzero-codeword spectrum. It is not a certificate, but it gives a concrete target for
+the exact first-moment recurrence.
+
+For `GF(5)`, `c=8`, depth 2, 500 samples:
+
+```text
+original average minimum distance:     14.290000 / 32 = 0.44656250
+original first-moment crossing:        13
+systematic average minimum distance:   15.760000 / 32 = 0.49250000
+systematic first-moment crossing:      14
+```
+
+For `GF(5)`, `c=8`, depth 3, 100 samples:
+
+```text
+original average minimum distance:     18.870000 / 64 = 0.29484375
+original first-moment crossing:        17
+systematic average minimum distance:   22.840000 / 64 = 0.35687500
+systematic first-moment crossing:      20
+```
+
+In this tiny-field sampled regime, the systematic affine construction is not worse than the
+original; it is better. That does not prove anything for the target binary-extension-field setting,
+but it strengthens the suspicion that the large certified systematic/non-systematic gap is mostly
+proof architecture and counting slack rather than an unavoidable systematicity tax.

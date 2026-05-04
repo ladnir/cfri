@@ -46,3 +46,16 @@ build/systematic_rfc_cert_cpp/systematic_rfc_cert.exe ^
   --field-bits 128 ^
   --security-bits 80
 ```
+
+Tiny-field sampled RFC first-moment calibration:
+
+```text
+build/systematic_rfc_cert_cpp/systematic_rfc_cert.exe ^
+  --sample-rfc-first-moment ^
+  --prime 5 ^
+  --depth 3 ^
+  --total-expansion 8 ^
+  --samples 100 ^
+  --seed 11 ^
+  --spectrum-path docs/sample_first_moment_gf5_depth3_c8_cpp.csv
+```

@@ -7,6 +7,7 @@
 #include <iostream>
 #include <limits>
 #include <map>
+#include <random>
 #include <sstream>
 #include <stdexcept>
 #include <string>
@@ -32,7 +33,12 @@ struct Options {
     std::string fullThresholdsPath;
     std::string verifyPath;
     bool idealFirstMoment = false;
+    bool sampleRfcFirstMoment = false;
     int totalExpansion = 8;
+    int prime = 5;
+    int samples = 100;
+    std::uint64_t seed = 1;
+    std::string spectrumPath;
 };
 
 struct RoundState {
@@ -514,6 +520,204 @@ int runIdealFirstMoment(const Options& opts) {
     return 0;
 }
 
+int modPrime(int value, int prime) {
+    value %= prime;
+    return value < 0 ? value + prime : value;
+}
+
+std::vector<int> rfcGeneratorPrime(
+    int depth,
+    int expansion,
+    int prime,
+    std::mt19937_64& rng) {
+    std::uint64_t k = 1;
+    std::uint64_t n = static_cast<std::uint64_t>(expansion);
+    std::vector<int> generator(static_cast<std::size_t>(k * n), 1);
+    std::uniform_int_distribution<int> nonzero(1, prime - 1);
+
+    for (int round = 0; round < depth; ++round) {
+        const auto nextK = 2 * k;
+        const auto nextN = 2 * n;
+        std::vector<int> next(static_cast<std::size_t>(nextK * nextN), 0);
+        std::vector<int> diagonal(static_cast<std::size_t>(n));
+        for (std::uint64_t j = 0; j < n; ++j) {
+            diagonal[static_cast<std::size_t>(j)] = nonzero(rng);
+        }
+
+        for (std::uint64_t row = 0; row < k; ++row) {
+            const auto topRow = row;
+            const auto bottomRow = row + k;
+            for (std::uint64_t j = 0; j < n; ++j) {
+                const auto entry = generator[static_cast<std::size_t>(row * n + j)];
+                const auto t = diagonal[static_cast<std::size_t>(j)];
+                next[static_cast<std::size_t>(topRow * nextN + j)] = modPrime((1 - t) * entry, prime);
+                next[static_cast<std::size_t>(topRow * nextN + n + j)] = modPrime((1 - (t + 1)) * entry, prime);
+                next[static_cast<std::size_t>(bottomRow * nextN + j)] = modPrime(t * entry, prime);
+                next[static_cast<std::size_t>(bottomRow * nextN + n + j)] = modPrime((t + 1) * entry, prime);
+            }
+        }
+        generator = std::move(next);
+        k = nextK;
+        n = nextN;
+    }
+    return generator;
+}
+
+bool incrementMessage(std::vector<int>& message, int prime) {
+    for (auto& digit : message) {
+        ++digit;
+        if (digit < prime) {
+            return true;
+        }
+        digit = 0;
+    }
+    return false;
+}
+
+std::pair<int, int> messageSupportAndEncodedWeight(
+    const std::vector<int>& message,
+    const std::vector<int>& generator,
+    std::uint64_t n,
+    int prime,
+    std::vector<int>& scratch) {
+    std::fill(scratch.begin(), scratch.end(), 0);
+    int support = 0;
+    for (std::uint64_t row = 0; row < message.size(); ++row) {
+        const auto value = message[static_cast<std::size_t>(row)];
+        if (value == 0) {
+            continue;
+        }
+        ++support;
+        const auto* rowPtr = generator.data() + static_cast<std::ptrdiff_t>(row * n);
+        for (std::uint64_t j = 0; j < n; ++j) {
+            scratch[static_cast<std::size_t>(j)] =
+                (scratch[static_cast<std::size_t>(j)] + value * rowPtr[j]) % prime;
+        }
+    }
+    int encodedWeight = 0;
+    for (const auto value : scratch) {
+        encodedWeight += value != 0;
+    }
+    return {support, encodedWeight};
+}
+
+struct SampleSpectrum {
+    std::vector<double> oldSpectrum;
+    std::vector<double> systematicSpectrum;
+    double oldMinSum = 0.0;
+    double systematicMinSum = 0.0;
+};
+
+SampleSpectrum sampleRfcSpectra(const Options& opts) {
+    if (opts.depth < 0) {
+        throw std::runtime_error("--depth is required for --sample-rfc-first-moment");
+    }
+    if (opts.totalExpansion <= 1) {
+        throw std::runtime_error("--total-expansion must be greater than 1");
+    }
+    if (opts.prime <= 2) {
+        throw std::runtime_error("--prime must be an odd prime for this sampler");
+    }
+    if (opts.samples <= 0) {
+        throw std::runtime_error("--samples must be positive");
+    }
+
+    const auto k = std::uint64_t{1} << opts.depth;
+    const auto totalN = static_cast<std::uint64_t>(opts.totalExpansion) * k;
+    const auto parityN = static_cast<std::uint64_t>(opts.totalExpansion - 1) * k;
+    SampleSpectrum result;
+    result.oldSpectrum.assign(static_cast<std::size_t>(totalN + 1), 0.0);
+    result.systematicSpectrum.assign(static_cast<std::size_t>(totalN + 1), 0.0);
+
+    std::mt19937_64 rng(opts.seed);
+    std::vector<int> message(static_cast<std::size_t>(k), 0);
+    std::vector<int> oldScratch(static_cast<std::size_t>(totalN), 0);
+    std::vector<int> sysScratch(static_cast<std::size_t>(parityN), 0);
+
+    for (int sample = 0; sample < opts.samples; ++sample) {
+        const auto oldGenerator = rfcGeneratorPrime(opts.depth, opts.totalExpansion, opts.prime, rng);
+        const auto sysParityGenerator = rfcGeneratorPrime(opts.depth, opts.totalExpansion - 1, opts.prime, rng);
+        std::fill(message.begin(), message.end(), 0);
+
+        int oldMin = static_cast<int>(totalN + 1);
+        int sysMin = static_cast<int>(totalN + 1);
+        while (incrementMessage(message, opts.prime)) {
+            const auto oldPair =
+                messageSupportAndEncodedWeight(message, oldGenerator, totalN, opts.prime, oldScratch);
+            const auto sysPair =
+                messageSupportAndEncodedWeight(message, sysParityGenerator, parityN, opts.prime, sysScratch);
+            const auto oldWeight = oldPair.second;
+            const auto sysWeight = sysPair.first + sysPair.second;
+            result.oldSpectrum[static_cast<std::size_t>(oldWeight)] += 1.0;
+            result.systematicSpectrum[static_cast<std::size_t>(sysWeight)] += 1.0;
+            oldMin = std::min(oldMin, oldWeight);
+            sysMin = std::min(sysMin, sysWeight);
+        }
+        result.oldMinSum += oldMin;
+        result.systematicMinSum += sysMin;
+
+        if (opts.samples >= 10 && (sample + 1) % std::max(1, opts.samples / 10) == 0) {
+            std::cerr << "sample=" << (sample + 1) << "/" << opts.samples << '\n';
+        }
+    }
+
+    for (auto& value : result.oldSpectrum) {
+        value /= static_cast<double>(opts.samples);
+    }
+    for (auto& value : result.systematicSpectrum) {
+        value /= static_cast<double>(opts.samples);
+    }
+    result.oldMinSum /= static_cast<double>(opts.samples);
+    result.systematicMinSum /= static_cast<double>(opts.samples);
+    return result;
+}
+
+int firstCumulativeAtLeastOne(const std::vector<double>& spectrum) {
+    double total = 0.0;
+    for (std::size_t i = 1; i < spectrum.size(); ++i) {
+        total += spectrum[i];
+        if (total >= 1.0) {
+            return static_cast<int>(i);
+        }
+    }
+    return -1;
+}
+
+int runSampleRfcFirstMoment(const Options& opts) {
+    const auto k = std::uint64_t{1} << opts.depth;
+    const auto totalN = static_cast<std::uint64_t>(opts.totalExpansion) * k;
+    const auto spectra = sampleRfcSpectra(opts);
+    std::cout << "p=" << opts.prime << " depth=" << opts.depth << " k=" << k << " total_n=" << totalN
+              << " samples=" << opts.samples << " total_expansion=" << opts.totalExpansion << '\n';
+    std::cout << "old_average_min_distance=" << std::fixed << std::setprecision(6) << spectra.oldMinSum
+              << " relative=" << std::setprecision(8) << spectra.oldMinSum / static_cast<double>(totalN)
+              << " first_moment_crossing=" << firstCumulativeAtLeastOne(spectra.oldSpectrum) << '\n';
+    std::cout << "systematic_average_min_distance=" << std::fixed << std::setprecision(6)
+              << spectra.systematicMinSum << " relative=" << std::setprecision(8)
+              << spectra.systematicMinSum / static_cast<double>(totalN)
+              << " first_moment_crossing=" << firstCumulativeAtLeastOne(spectra.systematicSpectrum) << '\n';
+    std::cout << "weight,old_expected_count,systematic_expected_count\n";
+    for (std::size_t h = 0; h < spectra.oldSpectrum.size(); ++h) {
+        if (spectra.oldSpectrum[h] != 0.0 || spectra.systematicSpectrum[h] != 0.0) {
+            std::cout << h << ',' << std::setprecision(12) << spectra.oldSpectrum[h] << ','
+                      << spectra.systematicSpectrum[h] << '\n';
+        }
+    }
+
+    if (!opts.spectrumPath.empty()) {
+        std::ofstream out(opts.spectrumPath);
+        if (!out) {
+            throw std::runtime_error("failed to open spectrum output path");
+        }
+        out << "weight,old_expected_count,systematic_expected_count\n";
+        out << std::setprecision(17);
+        for (std::size_t h = 0; h < spectra.oldSpectrum.size(); ++h) {
+            out << h << ',' << spectra.oldSpectrum[h] << ',' << spectra.systematicSpectrum[h] << '\n';
+        }
+    }
+    return 0;
+}
+
 std::vector<std::string> splitCsvLine(const std::string& line) {
     std::vector<std::string> out;
     std::string cell;
@@ -885,15 +1089,28 @@ Options parseOptions(int argc, char** argv) {
             opts.verifyPath = requireValue(i, argc, argv, arg);
         } else if (arg == "--ideal-first-moment") {
             opts.idealFirstMoment = true;
+        } else if (arg == "--sample-rfc-first-moment") {
+            opts.sampleRfcFirstMoment = true;
         } else if (arg == "--total-expansion") {
             opts.totalExpansion = std::stoi(requireValue(i, argc, argv, arg));
+        } else if (arg == "--prime") {
+            opts.prime = std::stoi(requireValue(i, argc, argv, arg));
+        } else if (arg == "--samples") {
+            opts.samples = std::stoi(requireValue(i, argc, argv, arg));
+        } else if (arg == "--seed") {
+            opts.seed = static_cast<std::uint64_t>(std::stoull(requireValue(i, argc, argv, arg)));
+        } else if (arg == "--spectrum-path") {
+            opts.spectrumPath = requireValue(i, argc, argv, arg);
         } else if (arg == "--help" || arg == "-h") {
             std::cout
                 << "systematic_rfc_cert options:\n"
                 << "  --depth N --parity-expansion N     generate thresholds\n"
                 << "  --verify path                      verify threshold CSV\n"
                 << "  --ideal-first-moment               print ideal random-code first-moment baselines\n"
+                << "  --sample-rfc-first-moment          sample tiny-field RFC first-moment spectra\n"
                 << "  --total-expansion N                total expansion for first-moment baselines\n"
+                << "  --prime P --samples N --seed N     sampler parameters\n"
+                << "  --spectrum-path path               write sampled spectrum CSV\n"
                 << "  --field-bits B                     field size log2, default 128\n"
                 << "  --security-bits B                  per-transition security bits\n"
                 << "  --compare                          print non-systematic comparison columns\n"
@@ -918,6 +1135,9 @@ int main(int argc, char** argv) {
         }
         if (opts.idealFirstMoment) {
             return runIdealFirstMoment(opts);
+        }
+        if (opts.sampleRfcFirstMoment) {
+            return runSampleRfcFirstMoment(opts);
         }
         return runGenerate(opts);
     } catch (const std::exception& e) {

@@ -2,7 +2,7 @@
 """Exhaustive toy distances for systematic RFC candidates over small prime fields.
 
 This is a research sanity-check script. It builds paper-style RFC generator matrices with
-T' = -T over GF(p), then compares:
+the affine T,T+1 construction over GF(p), then compares:
 
   non-systematic RFC at total expansion c
   systematic code (m, RFC parity at expansion c-1)
@@ -40,7 +40,7 @@ def rfc_generator(k0: int, depth: int, expansion: int, p: int, rng: random.Rando
     g = [[1 for _ in range(expansion)]]
     n = expansion
     for _ in range(depth):
-        t = [rng.randrange(p) for _ in range(n)]
+        t = [rng.randrange(1, p) for _ in range(n)]
         top = []
         bottom = []
         for row in g:

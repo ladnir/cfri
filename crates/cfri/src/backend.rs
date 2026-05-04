@@ -20,6 +20,7 @@ pub mod piop;
 pub mod play_field;
 pub mod poly;
 mod support;
+pub mod systematic_basefold;
 mod timer;
 pub mod transcript;
 

@@ -235,6 +235,31 @@ parity_mod_quarter_collisions = 2
 So the obstruction is not arbitrary rank failure; it is tied to selecting many systematic sibling
 pairs together with parity columns that collide under recursive halves/quarters.
 
+The distinction between structural defects and accidental finite-field zeros is visible by
+resampling selected shapes:
+
+```text
+python scripts/resample_rank_shapes.py \
+  --depth 3 \
+  --total-expansion 8 \
+  --prime 65537 \
+  --seed-start 230 \
+  --samples 20 \
+  --shape sporadic1=0:1:2:4:7:13:15:32 \
+  --shape pure_bad=0:1:2:3:4:8:9:36 \
+  --shape pure_good=0:1:2:4:6:8:9:36 \
+  --out docs/rank_resample_shapes_systematic_p65537_depth3_c8.csv
+```
+
+The structural bad shape stayed rank `7` in all 20 samples. The sporadic bad shapes from the first
+depth-3 row run became rank `8` in all 20 samples, as did the pure-good control. Thus the proof
+should separate:
+
+```text
+structural tree defects: counted combinatorially
+accidental determinant zeros: charged by large-field Schwartz-Zippel
+```
+
 ## Depth-4 Shape Sampling
 
 A light depth-4 pass used `1000` stratified shapes per row around the dimension boundary:

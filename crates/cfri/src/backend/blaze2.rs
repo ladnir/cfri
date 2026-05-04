@@ -1547,14 +1547,8 @@ pub fn prove_blaze2_basefold_opening<H: Blaze2HashSpec>(
         folded_eval,
     };
     let folded_codeword = packed_code.encode_row(&folded_message);
-    let auxiliary_values = blaze2_basefold_auxiliary_oracle(
-        packed_code,
-        &folded_message,
-        &folded_codeword,
-        &backend_request,
-        auxiliary_oracle,
-        params,
-    )?;
+    let auxiliary_values =
+        blaze2_basefold_auxiliary_oracle(packed_code, &folded_message, auxiliary_oracle, params)?;
     let (backend_prequery, backend_state) =
         params.prove_prequery::<H>(&folded_codeword, &auxiliary_values, &backend_request)?;
     let schedule =
@@ -1812,8 +1806,6 @@ pub fn verify_blaze2_opening_with_code_spec<H: Blaze2HashSpec, B: Blaze2FoldedMe
 fn blaze2_basefold_auxiliary_oracle(
     code: &PackedRaaCode,
     folded_message: &[B128],
-    folded_codeword: &[B128],
-    request: &Blaze2BaseFoldOpenRequest<'_>,
     caller_auxiliary: &[B128],
     params: &Blaze2BaseFoldBackendParams,
 ) -> Result<Vec<B128>, Error> {
@@ -1832,8 +1824,6 @@ fn blaze2_basefold_auxiliary_oracle(
     auxiliary.extend_from_slice(&trace.u2);
     auxiliary.extend_from_slice(&trace.u3);
     auxiliary.extend_from_slice(&trace.u4);
-    let eval_accumulator = build_raa_eval_accumulator(code, folded_codeword, request)?;
-    auxiliary.extend_from_slice(&eval_accumulator);
     if auxiliary.len() != expected_len {
         return Err(Error::InvalidPcsOpen(format!(
             "derived Blaze2 BaseFold auxiliary trace has {} entries but backend expects {expected_len}",
@@ -1847,33 +1837,6 @@ fn blaze2_basefold_auxiliary_oracle(
         ));
     }
     Ok(auxiliary)
-}
-
-pub fn build_raa_eval_accumulator(
-    code: &PackedRaaCode,
-    codeword: &[B128],
-    request: &Blaze2BaseFoldOpenRequest<'_>,
-) -> Result<Vec<B128>, Error> {
-    let len = code.codeword_len();
-    if codeword.len() != len {
-        return Err(Error::InvalidPcsOpen(format!(
-            "RAA evaluation accumulator codeword has length {}, expected {len}",
-            codeword.len()
-        )));
-    }
-    let weights = raa_codeword_eval_weights(code, request.col_point)?;
-    let mut accumulator = vec![B128::ZERO; len];
-    let mut running = B128::ZERO;
-    for i in 0..len {
-        running += weights[i] * codeword[i];
-        accumulator[i] = running;
-    }
-    if accumulator.last().copied().unwrap_or(B128::ZERO) != request.folded_eval {
-        return Err(Error::InvalidPcsOpen(
-            "RAA evaluation accumulator terminal value does not match folded eval".to_string(),
-        ));
-    }
-    Ok(accumulator)
 }
 
 pub fn raa_codeword_eval_weights(code: &PackedRaaCode, point: &[B128]) -> Result<Vec<B128>, Error> {

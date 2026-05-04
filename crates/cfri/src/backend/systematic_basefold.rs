@@ -14,10 +14,9 @@ use crate::transcript::Transcript as CfriTranscript;
 const RAA_AUX_U2_ROW: usize = 0;
 const RAA_AUX_U3_ROW: usize = 1;
 const RAA_AUX_U4_ROW: usize = 2;
-const RAA_AUX_EVAL_ROW: usize = 3;
 const RAA_AUX_RELATION_ROW_COUNT: usize = 3;
-const RAA_AUX_EVAL_BINDING_ROW_COUNT: usize = 1;
-const RAA_AUX_ROW_COUNT: usize = 4;
+const RAA_AUX_EVAL_BINDING_ROW_COUNT: usize = 0;
+const RAA_AUX_ROW_COUNT: usize = RAA_AUX_RELATION_ROW_COUNT;
 
 pub const BLAZE2_BASEFOLD_RELATION_AUXILIARY_ROW_COUNT: usize = RAA_AUX_RELATION_ROW_COUNT;
 pub const BLAZE2_BASEFOLD_EVAL_BINDING_ROW_COUNT: usize = RAA_AUX_EVAL_BINDING_ROW_COUNT;
@@ -25,7 +24,6 @@ pub const BLAZE2_BASEFOLD_AUXILIARY_ROW_COUNT: usize = RAA_AUX_ROW_COUNT;
 
 pub fn required_blaze2_basefold_auxiliary_oracle_len(spec: &Blaze2CodeSpec) -> usize {
     required_blaze2_basefold_relation_auxiliary_len(spec)
-        + required_blaze2_basefold_eval_binding_len(spec)
 }
 
 pub fn required_blaze2_basefold_relation_auxiliary_len(spec: &Blaze2CodeSpec) -> usize {
@@ -33,7 +31,8 @@ pub fn required_blaze2_basefold_relation_auxiliary_len(spec: &Blaze2CodeSpec) ->
 }
 
 pub fn required_blaze2_basefold_eval_binding_len(spec: &Blaze2CodeSpec) -> usize {
-    spec.praa_codeword_len * BLAZE2_BASEFOLD_EVAL_BINDING_ROW_COUNT
+    let _ = spec;
+    0
 }
 
 #[derive(Clone, Copy, Debug, Eq, PartialEq)]
@@ -91,8 +90,6 @@ pub struct RaaFinalAccumulatorQuery {
     pub current_input_query: usize,
     pub previous_input_query: usize,
     pub u4_auxiliary_index: usize,
-    pub eval_current_auxiliary_index: usize,
-    pub eval_previous_auxiliary_index: usize,
 }
 
 #[derive(Clone, Copy, Debug, Eq, PartialEq)]
@@ -211,15 +208,12 @@ pub struct AuxiliaryOracleQuery<H: Hash> {
 pub struct AuxiliaryOracleQueryProof<H: Hash> {
     pub relation_queries: Vec<AuxiliaryOracleQuery<H>>,
     pub final_accumulator_queries: Vec<RaaFinalAccumulatorQueryProof<H>>,
-    pub eval_terminal_query: Option<AuxiliaryOracleQuery<H>>,
     pub local_relation_queries: Vec<AuxiliaryOracleQuery<H>>,
 }
 
 #[derive(Clone, Debug, Eq, PartialEq)]
 pub struct RaaFinalAccumulatorQueryProof<H: Hash> {
     pub u4: AuxiliaryOracleQuery<H>,
-    pub eval_current: AuxiliaryOracleQuery<H>,
-    pub eval_previous: AuxiliaryOracleQuery<H>,
 }
 
 #[derive(Clone, Debug, Eq, PartialEq)]
@@ -648,8 +642,6 @@ impl Blaze2BaseFoldBackendParams {
         verify_raa_final_accumulator_queries(
             proof.auxiliary.as_ref(),
             self.spec.auxiliary_oracle_len,
-            self.praa.packed(),
-            request,
             schedule,
             top_queries,
         )
@@ -1369,16 +1361,8 @@ impl<H: Hash> AuxiliaryOracleCommitment<H> {
         for query in schedule.raa_final_queries() {
             final_accumulator_queries.push(RaaFinalAccumulatorQueryProof {
                 u4: self.query(query.u4_auxiliary_index)?,
-                eval_current: self.query(query.eval_current_auxiliary_index)?,
-                eval_previous: self.query(query.eval_previous_auxiliary_index)?,
             });
         }
-        let eval_terminal_query = if !schedule.raa_final_queries().is_empty() {
-            let len = self.len() / RAA_AUX_ROW_COUNT;
-            Some(self.query(raa_auxiliary_index(RAA_AUX_EVAL_ROW, len - 1, len))?)
-        } else {
-            None
-        };
         let mut local_relation_queries = Vec::new();
         for query in schedule.raa_auxiliary_queries() {
             for index in 0..query.extra_count() {
@@ -1391,7 +1375,6 @@ impl<H: Hash> AuxiliaryOracleCommitment<H> {
         Ok(AuxiliaryOracleQueryProof {
             relation_queries,
             final_accumulator_queries,
-            eval_terminal_query,
             local_relation_queries,
         })
     }
@@ -1437,8 +1420,7 @@ impl<H: Hash> AuxiliaryOracleQuery<H> {
 impl<H: Hash> AuxiliaryOracleQueryProof<H> {
     pub fn query_count(&self) -> usize {
         self.relation_queries.len()
-            + 3 * self.final_accumulator_queries.len()
-            + usize::from(self.eval_terminal_query.is_some())
+            + self.final_accumulator_queries.len()
             + self.local_relation_queries.len()
     }
 
@@ -1450,7 +1432,6 @@ impl<H: Hash> AuxiliaryOracleQueryProof<H> {
                     .iter()
                     .flat_map(RaaFinalAccumulatorQueryProof::queries),
             )
-            .chain(self.eval_terminal_query.iter())
             .chain(self.local_relation_queries.iter())
     }
 
@@ -1512,42 +1493,6 @@ impl<H: Hash> AuxiliaryOracleQueryProof<H> {
                 ));
             }
             u4.authenticate(public)?;
-            let eval_current = &supplied.eval_current;
-            if eval_current.logical_index != expected.eval_current_auxiliary_index {
-                return Err(Error::InvalidPcsOpen(
-                    "RAA evaluation accumulator current query index does not match schedule"
-                        .to_string(),
-                ));
-            }
-            eval_current.authenticate(public)?;
-            let eval_previous = &supplied.eval_previous;
-            if eval_previous.logical_index != expected.eval_previous_auxiliary_index {
-                return Err(Error::InvalidPcsOpen(
-                    "RAA evaluation accumulator previous query index does not match schedule"
-                        .to_string(),
-                ));
-            }
-            eval_previous.authenticate(public)?;
-        }
-        if !schedule.raa_final_queries().is_empty() {
-            let len = auxiliary_oracle_len / RAA_AUX_ROW_COUNT;
-            let terminal = self.eval_terminal_query.as_ref().ok_or_else(|| {
-                Error::InvalidPcsOpen(
-                    "RAA evaluation accumulator terminal query is missing".to_string(),
-                )
-            })?;
-            if terminal.logical_index != raa_auxiliary_index(RAA_AUX_EVAL_ROW, len - 1, len) {
-                return Err(Error::InvalidPcsOpen(
-                    "RAA evaluation accumulator terminal query index does not match schedule"
-                        .to_string(),
-                ));
-            }
-            terminal.authenticate(public)?;
-        } else if self.eval_terminal_query.is_some() {
-            return Err(Error::InvalidPcsOpen(
-                "RAA evaluation accumulator terminal query was supplied without final checks"
-                    .to_string(),
-            ));
         }
         let mut local_relation_queries = self.local_relation_queries.iter();
         for expected in schedule.raa_auxiliary_queries() {
@@ -1580,7 +1525,7 @@ impl<H: Hash> AuxiliaryOracleQueryProof<H> {
 
 impl<H: Hash> RaaFinalAccumulatorQueryProof<H> {
     pub fn queries(&self) -> impl Iterator<Item = &AuxiliaryOracleQuery<H>> {
-        [&self.u4, &self.eval_current, &self.eval_previous].into_iter()
+        [&self.u4].into_iter()
     }
 }
 
@@ -1757,7 +1702,6 @@ impl HolographicQuerySchedule {
             raa_final_queries.reserve(spot_count);
             let len = layout.systematic_len();
             let u4_offset = raa_auxiliary_index(RAA_AUX_U4_ROW, 0, len);
-            let eval_offset = raa_auxiliary_index(RAA_AUX_EVAL_ROW, 0, len);
             for spot in 0..spot_count {
                 let index = if spot == 0 {
                     len - 1
@@ -1779,8 +1723,6 @@ impl HolographicQuerySchedule {
                     current_input_query,
                     previous_input_query,
                     u4_auxiliary_index: u4_offset + index,
-                    eval_current_auxiliary_index: eval_offset + index,
-                    eval_previous_auxiliary_index: eval_offset + index - 1,
                 });
             }
         }
@@ -1830,8 +1772,7 @@ impl HolographicQuerySchedule {
 
     pub fn expected_auxiliary_query_proof_count(&self) -> usize {
         self.relation_auxiliary_proof_query_count()
-            + 3 * self.raa_final_queries.len()
-            + usize::from(!self.raa_final_queries.is_empty())
+            + self.raa_final_queries.len()
             + self
                 .raa_auxiliary_queries
                 .iter()
@@ -1940,12 +1881,12 @@ fn validate_blaze2_backend_spec(spec: &Blaze2BaseFoldBackendSpec) -> Result<(), 
     let expected_auxiliary_len = expected_relation_auxiliary_len + expected_eval_binding_len;
     if spec.auxiliary_oracle_len == 0 {
         return Err(Error::InvalidPcsParam(format!(
-            "Blaze2 BaseFold backend needs {expected_relation_auxiliary_len} relation auxiliary entries plus {expected_eval_binding_len} eval-binding entries"
+            "Blaze2 BaseFold backend needs {expected_relation_auxiliary_len} relation auxiliary entries"
         )));
     }
     if spec.auxiliary_oracle_len != expected_auxiliary_len {
         return Err(Error::InvalidPcsParam(format!(
-            "auxiliary oracle length must be {expected_auxiliary_len}: {expected_relation_auxiliary_len} relation auxiliary entries plus {expected_eval_binding_len} eval-binding entries"
+            "auxiliary oracle length must be {expected_auxiliary_len}: {expected_relation_auxiliary_len} relation auxiliary entries"
         )));
     }
     if spec.q_raa_input & 1 != 0 {
@@ -2023,7 +1964,7 @@ fn validate_query_schedule_spec(
         && spec.auxiliary_oracle_len != RAA_AUX_ROW_COUNT * layout.systematic_len()
     {
         return Err(Error::InvalidPcsParam(
-            "auxiliary-enabled systematic BaseFold schedule expects a flattened RAA auxiliary/evaluation trace"
+            "auxiliary-enabled systematic BaseFold schedule expects a flattened RAA relation auxiliary trace"
                 .to_string(),
         ));
     }
@@ -2568,11 +2509,7 @@ fn raa_auxiliary_index(row: usize, index: usize, len: usize) -> usize {
 }
 
 fn raa_relation_auxiliary_len(auxiliary_oracle_len: usize) -> usize {
-    if auxiliary_oracle_len == 0 {
-        0
-    } else {
-        auxiliary_oracle_len * RAA_AUX_RELATION_ROW_COUNT / RAA_AUX_ROW_COUNT
-    }
+    auxiliary_oracle_len
 }
 
 fn b128_to_u128(value: B128) -> u128 {
@@ -2682,8 +2619,6 @@ fn verify_auxiliary_query_proof<H: Hash>(
 fn verify_raa_final_accumulator_queries<H: Hash>(
     proof: Option<&AuxiliaryOracleQueryProof<H>>,
     auxiliary_oracle_len: usize,
-    code: &PackedRaaCode,
-    request: &Blaze2BaseFoldOpenRequest<'_>,
     schedule: &HolographicQuerySchedule,
     top_queries: &[TopQuery<B128>],
 ) -> Result<(), Error> {
@@ -2701,7 +2636,6 @@ fn verify_raa_final_accumulator_queries<H: Hash>(
         )
     })?;
 
-    let eval_weights = raa_codeword_eval_weights(code, request.col_point)?;
     for (relative_index, expected) in schedule.raa_final_queries().iter().enumerate() {
         let current = top_queries
             .get(expected.current_input_query)
@@ -2732,57 +2666,6 @@ fn verify_raa_final_accumulator_queries<H: Hash>(
                 "RAA final accumulator relation failed".to_string(),
             ));
         }
-        let eval_current = &final_accumulator.eval_current;
-        if eval_current.logical_index != expected.eval_current_auxiliary_index {
-            return Err(Error::InvalidPcsOpen(
-                "RAA evaluation accumulator current opening index does not match schedule"
-                    .to_string(),
-            ));
-        }
-        let eval_previous = &final_accumulator.eval_previous;
-        if eval_previous.logical_index != expected.eval_previous_auxiliary_index {
-            return Err(Error::InvalidPcsOpen(
-                "RAA evaluation accumulator previous opening index does not match schedule"
-                    .to_string(),
-            ));
-        }
-        if eval_current.value != eval_previous.value + eval_weights[expected.index] * current.value
-        {
-            return Err(Error::InvalidPcsOpen(
-                "RAA evaluation accumulator relation failed".to_string(),
-            ));
-        }
-    }
-    verify_raa_eval_accumulator_terminal(proof, auxiliary_oracle_len, code, request)?;
-    Ok(())
-}
-
-fn verify_raa_eval_accumulator_terminal<H: Hash>(
-    proof: &AuxiliaryOracleQueryProof<H>,
-    auxiliary_oracle_len: usize,
-    code: &PackedRaaCode,
-    request: &Blaze2BaseFoldOpenRequest<'_>,
-) -> Result<(), Error> {
-    let len = code.codeword_len();
-    if auxiliary_oracle_len != RAA_AUX_ROW_COUNT * len {
-        return Err(Error::InvalidPcsOpen(
-            "RAA evaluation accumulator terminal check has incompatible auxiliary length"
-                .to_string(),
-        ));
-    }
-    let terminal_index = raa_auxiliary_index(RAA_AUX_EVAL_ROW, len - 1, len);
-    let terminal = proof.eval_terminal_query.as_ref().ok_or_else(|| {
-        Error::InvalidPcsOpen("RAA evaluation accumulator terminal opening is missing".to_string())
-    })?;
-    if terminal.logical_index != terminal_index {
-        return Err(Error::InvalidPcsOpen(
-            "RAA evaluation accumulator terminal opening index does not match schedule".to_string(),
-        ));
-    }
-    if terminal.value != request.folded_eval {
-        return Err(Error::InvalidPcsOpen(
-            "RAA evaluation accumulator terminal value does not match folded eval".to_string(),
-        ));
     }
     Ok(())
 }
@@ -3029,8 +2912,8 @@ fn log2_strict(value: usize) -> usize {
 mod tests {
     use super::*;
     use crate::backend::blaze2::{
-        build_raa_aux_trace, build_raa_eval_accumulator, evaluate_multilinear, Blaze2CodeSeed,
-        Blaze2FieldId, Blaze2HashId, Blaze2LeafLayout, Blaze2PackingLayout, RaaVariant,
+        build_raa_aux_trace, evaluate_multilinear, Blaze2CodeSeed, Blaze2FieldId, Blaze2HashId,
+        Blaze2LeafLayout, Blaze2PackingLayout, RaaVariant,
     };
     use crate::backend::hash::Blake2s;
 
@@ -3100,19 +2983,12 @@ mod tests {
         let mut scratch = vec![B128::ZERO; folded_message.len()];
         let folded_eval =
             evaluate_multilinear(&folded_message, request_point, &mut scratch).unwrap();
-        let request = Blaze2BaseFoldOpenRequest {
-            col_point: request_point,
-            folded_eval,
-        };
         let folded_codeword = params.praa().packed().encode_row(&folded_message);
         let trace = build_raa_aux_trace(params.praa().packed(), &folded_message).unwrap();
-        let eval_accumulator =
-            build_raa_eval_accumulator(params.praa().packed(), &folded_codeword, &request).unwrap();
         let mut auxiliary = Vec::with_capacity(params.spec().auxiliary_oracle_len);
         auxiliary.extend_from_slice(&trace.u2);
         auxiliary.extend_from_slice(&trace.u3);
         auxiliary.extend_from_slice(&trace.u4);
-        auxiliary.extend_from_slice(&eval_accumulator);
         assert_eq!(auxiliary.len(), params.spec().auxiliary_oracle_len);
         (folded_codeword, auxiliary, folded_eval)
     }
@@ -3964,17 +3840,9 @@ mod tests {
                 query.u4_auxiliary_index
                     >= raa_auxiliary_index(RAA_AUX_U4_ROW, 0, auxiliary_row_len)
             );
-            assert!(
-                query.u4_auxiliary_index
-                    < raa_auxiliary_index(RAA_AUX_EVAL_ROW, 0, auxiliary_row_len)
-            );
             assert_eq!(
-                query.eval_current_auxiliary_index,
-                raa_auxiliary_index(RAA_AUX_EVAL_ROW, query.index, auxiliary_row_len)
-            );
-            assert_eq!(
-                query.eval_previous_auxiliary_index,
-                raa_auxiliary_index(RAA_AUX_EVAL_ROW, query.index - 1, auxiliary_row_len)
+                query.u4_auxiliary_index,
+                raa_auxiliary_index(RAA_AUX_U4_ROW, query.index, auxiliary_row_len)
             );
         }
     }

@@ -1520,24 +1520,10 @@ fn blaze2_basefold_opening_rejects_terminal_only_eval_binding_defect() {
     };
     let folded_codeword = code.encode_row(&folded_message);
     let trace = build_raa_aux_trace(code, &folded_message).unwrap();
-    let weights = raa_codeword_eval_weights(code, backend_request.col_point).unwrap();
-    let mut eval_accumulator = vec![B128::ZERO; code.codeword_len()];
-    let mut running = B128::ZERO;
-    for i in 0..code.codeword_len() {
-        running += weights[i] * folded_codeword[i];
-        eval_accumulator[i] = running;
-    }
-    assert_eq!(
-        eval_accumulator[code.codeword_len() - 1],
-        actual_folded_eval
-    );
-    eval_accumulator[code.codeword_len() - 1] = claimed_folded_eval;
-
     let mut auxiliary = Vec::with_capacity(params.spec().auxiliary_oracle_len);
     auxiliary.extend_from_slice(&trace.u2);
     auxiliary.extend_from_slice(&trace.u3);
     auxiliary.extend_from_slice(&trace.u4);
-    auxiliary.extend_from_slice(&eval_accumulator);
     assert!(
         params
             .prove_prequery::<Blake2s256>(&folded_codeword, &auxiliary, &backend_request)
@@ -1595,20 +1581,24 @@ fn blaze2_basefold_opening_derives_configured_auxiliary_trace() {
     )
     .is_err());
 
-    let mut bad_relation = proof.clone();
-    bad_relation
+    let mut bad_final_accumulator = proof.clone();
+    bad_final_accumulator
         .backend_proof
         .auxiliary
         .as_mut()
         .unwrap()
-        .eval_terminal_query
-        .as_mut()
+        .final_accumulator_queries
+        .first_mut()
         .unwrap()
+        .u4
         .value += B128::ONE;
-    assert!(
-        verify_blaze2_basefold_opening(&params, &commitment.public(), &claim, &bad_relation)
-            .is_err()
-    );
+    assert!(verify_blaze2_basefold_opening(
+        &params,
+        &commitment.public(),
+        &claim,
+        &bad_final_accumulator
+    )
+    .is_err());
 
     let bad_auxiliary = vec![B128::ONE; auxiliary_len];
     assert!(
@@ -1642,20 +1632,16 @@ fn blaze2_basefold_backend_rejects_arbitrary_auxiliary_length() {
 }
 
 #[test]
-fn blaze2_basefold_auxiliary_length_splits_relation_and_eval_binding_rows() {
+fn blaze2_basefold_auxiliary_length_uses_relation_rows_only() {
     let spec = blaze2_code_spec(57);
     assert_eq!(
         required_blaze2_basefold_relation_auxiliary_len(&spec),
         3 * spec.praa_codeword_len
     );
-    assert_eq!(
-        required_blaze2_basefold_eval_binding_len(&spec),
-        spec.praa_codeword_len
-    );
+    assert_eq!(required_blaze2_basefold_eval_binding_len(&spec), 0);
     assert_eq!(
         required_blaze2_basefold_auxiliary_oracle_len(&spec),
         required_blaze2_basefold_relation_auxiliary_len(&spec)
-            + required_blaze2_basefold_eval_binding_len(&spec)
     );
 }
 

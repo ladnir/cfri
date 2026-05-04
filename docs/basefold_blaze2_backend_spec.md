@@ -477,11 +477,12 @@ compiler_code.parity_expansion_factor + 1 is a power of two
 auxiliary_oracle_len == praa_codeword_len * backend_auxiliary_row_count
 ```
 
-For the current Blaze2 BaseFold backend, `backend_auxiliary_row_count = 4`: the three PRAA relation
-rows plus the request-dependent evaluation accumulator row. `auxiliary_oracle_len = 0` is not an
-accepted Blaze2 backend configuration, because it skips the folded-relation and `folded_eval`
-binding checks. A standalone/generic scheduler may still model a no-auxiliary query domain for
-isolated tests, but the Blaze2 backend constructor must reject it.
+For the current Blaze2 BaseFold backend, `backend_auxiliary_row_count = 3`: the three PRAA relation
+rows `u2`, `u3`, and `u4`. `folded_eval` is bound by the global eval-binding sumcheck, not by an
+extra request-dependent auxiliary row. `auxiliary_oracle_len = 0` is not an accepted Blaze2 backend
+configuration, because it skips the folded-relation checks. A standalone/generic scheduler may still
+model a no-auxiliary query domain for isolated tests, but the Blaze2 backend constructor must reject
+it.
 
 For the initial transparent Blaze2 path, `praa_message_len`, `praa_codeword_len`,
 `compiler_message_len`, `compiler_codeword_len`, and `t` must be non-zero powers of two unless an
@@ -542,8 +543,8 @@ sum_i eval_weight[i] * c_star[i] == folded_eval
 where `eval_weight` is verifier-derived from the PRAA code and the multilinear opening point. The
 round polynomials are backend prequery messages. Their Fiat-Shamir challenges are also the
 systematic fold-chain challenges, so the sumcheck terminal check uses the clear terminal systematic
-symbol of `C_sys(c_star)` as `c_star(r)`. The first RAA final-accumulator spot is still fixed to the
-terminal transition `(n_praa - 2, n_praa - 1)` as a local guard for the legacy accumulator row; the
+symbol of `C_sys(c_star)` as `c_star(r)`. The first RAA final-accumulator spot is fixed to the
+terminal transition `(n_praa - 2, n_praa - 1)` as a boundary guard for the `u4` relation; the
 remaining RAA final spots are sampled by the transcript. This still consumes exactly two
 `input_queries` per final-accumulator spot and preserves the configured `q_raa_input`.
 

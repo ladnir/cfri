@@ -223,6 +223,39 @@ parity_mod_quarter_collisions = 2
 So the obstruction is not arbitrary rank failure; it is tied to selecting many systematic sibling
 pairs together with parity columns that collide under recursive halves/quarters.
 
+## Depth-4 Shape Sampling
+
+A light depth-4 pass used `1000` stratified shapes per row around the dimension boundary:
+
+```text
+python scripts/sample_rfc_rank_failure.py \
+  --systematic \
+  --systematic-shape-sample-profile \
+  --prime 65537 \
+  --depth 4 \
+  --total-expansion 8 \
+  --zero-count 1 \
+  --seed 307 \
+  --shape-samples 1000 \
+  --shape-extra-max 3
+```
+
+Aggregating by total zero count:
+
+```text
+total z  sampled failures / sampled shapes
+15       16000 / 16000    (dimension-deficient, since z < k=16)
+16       25 / 17000
+17       1 / 17000
+18       0 / 17000
+19       0 / 17000
+```
+
+This is only a sampled check, but it is consistent with the depth-3 picture: the observed
+systematic obstruction is concentrated near `z=k` and `z=k+1`, and no sampled failures appeared by
+`z=k+2`. If this persists, the systematic distance loss may be only a couple of symbols, not a
+growing fraction of block length.
+
 ## Proof Obligation
 
 A strong certificate would prove something like:

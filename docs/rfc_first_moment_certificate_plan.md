@@ -317,3 +317,64 @@ systematic    support, single_root, double    19        -1
 So `(support, single_root, double_root)` loses only one symbol on the systematic one-step crossing,
 and loses nothing on the original one-step crossing. This is the best current candidate compressed
 state.
+
+The corresponding cumulative curves are plotted in:
+
+```text
+docs/sample_one_step_compressed_crossing_gf5_depth3_c8_cpp.png
+```
+
+The plot makes the main failure mode visually clear: support-only compression crosses far too early,
+while both `(support, active)` and `(support, single_root, double_root)` track the exact category
+curve near the crossing.
+
+## Recursive State Equations To Derive
+
+The candidate state should be phrased as a pair enumerator for one parity tree:
+
+```text
+E_i(u,v; s, a, b)
+```
+
+where:
+
+```text
+u = wt(l)
+v = wt(r)
+s = u + v
+a = number of one-root coordinates in (P_i(l), P_i(r)-P_i(l))
+b = number of two-root coordinates in (P_i(l), P_i(r)-P_i(l))
+```
+
+The forced/equal-nonzero coordinates contribute a deterministic parity-weight offset:
+
+```text
+f = n_i - common_zero_count - a - b.
+```
+
+For a parent layer, a coordinate of type:
+
+```text
+one-root     contributes one zero with probability 1/(q-1)
+two-root     contributes one zero with probability 2/(q-1)
+forced       contributes no zero
+common zero  contributes two zeros
+```
+
+Thus once `(common_zero_count, a, b, f)` is known, the parent low-tail probability is a product of
+two binomial tails. The hard part is recursively upper-bounding the number of child pairs with each
+tuple.
+
+A first recursive upper-bound target is:
+
+```text
+Pair_i(u,v,c,a,b)
+  = E[# ordered child pairs (l,r)
+       with wt(l)=u, wt(r)=v,
+       common_zero_count=c,
+       one_root_count=a,
+       two_root_count=b]
+```
+
+This is exact enough to recover the one-step transition. To make it scalable, we likely need an
+entropy/log-domain upper bound for `Pair_i` rather than exact enumeration.

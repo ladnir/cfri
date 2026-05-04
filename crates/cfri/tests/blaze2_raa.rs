@@ -512,9 +512,9 @@ fn blaze2_basefold_proof_size_breakdown(
     let compiler_parity_query_path_bytes = proof
         .backend_proof
         .compiler_parity
-        .queries
+        .authentication_nodes
         .iter()
-        .map(|query| query.path.iter().map(|digest| digest.len()).sum::<usize>())
+        .map(|digest| digest.len())
         .sum();
     let compiler_parity_fold_value_bytes = proof
         .backend_proof
@@ -1435,11 +1435,6 @@ fn blaze2_basefold_b128_proof_size_accounting_is_exact() {
     let paper_field_bytes = 8;
     let hash_bytes = 32;
     let outer_path_len = params.praa().packed().codeword_len().trailing_zeros() as usize;
-    let compiler_parity_path_len = params
-        .compiler_code()
-        .layout()
-        .parity_len()
-        .trailing_zeros() as usize;
     let compiler_rounds = params.compiler_code().layout().num_rounds();
     let terminal_word_len = params.compiler_code().layout().parity_expansion_factor() + 1;
     let eval_sumcheck_bytes =
@@ -1525,6 +1520,15 @@ fn blaze2_basefold_b128_proof_size_accounting_is_exact() {
         compiler_rounds,
         "compiler-parity fold authentication is shared per folded layer"
     );
+    assert_eq!(
+        proof
+            .backend_proof
+            .compiler_parity
+            .authentication_nodes
+            .len(),
+        10,
+        "compiler-parity query authentication is shared as one multiproof"
+    );
 
     let expected_b128_breakdown = Blaze2BaseFoldProofSizeBreakdown {
         row_eval_bytes: t * b128_field_bytes,
@@ -1536,9 +1540,7 @@ fn blaze2_basefold_b128_proof_size_accounting_is_exact() {
         outer_column_value_bytes: q_raa_input * t * b128_field_bytes,
         outer_column_path_bytes: q_raa_input * outer_path_len * hash_bytes,
         compiler_parity_query_value_bytes: compiler_parity_query_count * b128_field_bytes,
-        compiler_parity_query_path_bytes: compiler_parity_query_count
-            * compiler_parity_path_len
-            * hash_bytes,
+        compiler_parity_query_path_bytes: 320,
         compiler_parity_fold_value_bytes: compiler_parity_query_count
             * compiler_rounds
             * 2
@@ -1564,9 +1566,7 @@ fn blaze2_basefold_b128_proof_size_accounting_is_exact() {
         outer_column_value_bytes: q_raa_input * t * paper_field_bytes,
         outer_column_path_bytes: q_raa_input * outer_path_len * hash_bytes,
         compiler_parity_query_value_bytes: compiler_parity_query_count * paper_field_bytes,
-        compiler_parity_query_path_bytes: compiler_parity_query_count
-            * compiler_parity_path_len
-            * hash_bytes,
+        compiler_parity_query_path_bytes: expected_b128_breakdown.compiler_parity_query_path_bytes,
         compiler_parity_fold_value_bytes: compiler_parity_query_count
             * compiler_rounds
             * 2
@@ -1585,12 +1585,12 @@ fn blaze2_basefold_b128_proof_size_accounting_is_exact() {
     );
     assert_eq!(
         b128_breakdown.total_bytes(),
-        4_368,
+        4_048,
         "current small fixture B128 total is the primary acceptance number for the implemented proof"
     );
     assert_eq!(
         paper_breakdown.total_bytes(),
-        3_672,
+        3_352,
         "current small fixture 8-byte projection is reported only for Blaze-paper comparison"
     );
 }

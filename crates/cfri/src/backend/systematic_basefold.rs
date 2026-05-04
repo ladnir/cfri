@@ -175,15 +175,15 @@ pub struct CompilerParityPublicCommitment<H: Hash> {
 }
 
 #[derive(Clone, Debug, Eq, PartialEq)]
-pub struct CompilerParityQuery<H: Hash> {
+pub struct CompilerParityQuery {
     pub logical_index: usize,
     pub value: B128,
-    pub path: Vec<Output<H>>,
 }
 
 #[derive(Clone, Debug, Eq, PartialEq)]
 pub struct CompilerParityQueryProof<H: Hash> {
-    pub queries: Vec<CompilerParityQuery<H>>,
+    pub queries: Vec<CompilerParityQuery>,
+    pub authentication_nodes: Vec<Output<H>>,
 }
 
 #[derive(Clone, Debug)]
@@ -1093,12 +1093,11 @@ impl<H: Hash> CompilerParityCommitment<H> {
         &self.values
     }
 
-    pub fn query(&self, logical_index: usize) -> Result<CompilerParityQuery<H>, Error> {
+    pub fn query(&self, logical_index: usize) -> Result<CompilerParityQuery, Error> {
         validate_parity_query_index(logical_index, self.len())?;
         Ok(CompilerParityQuery {
             logical_index,
             value: self.values[logical_index],
-            path: merkle_padded_sibling_path::<H>(&self.merkle_tree, logical_index),
         })
     }
 
@@ -1112,44 +1111,16 @@ impl<H: Hash> CompilerParityCommitment<H> {
                 queries.push(self.query(query.index)?);
             }
         }
-        Ok(CompilerParityQueryProof { queries })
-    }
-}
-
-impl<H: Hash> CompilerParityQuery<H> {
-    pub fn authenticate(&self, public: &CompilerParityPublicCommitment<H>) -> Result<(), Error> {
-        validate_parity_query_index(self.logical_index, public.len)?;
-        let padded_len = public.len.next_power_of_two();
-        let expected_path_len = log2_strict(padded_len);
-        if self.path.len() != expected_path_len {
-            return Err(Error::InvalidPcsOpen(
-                "compiler parity query path has incompatible length".to_string(),
-            ));
-        }
-
-        let mut hash = hash_b128_leaf::<H>(&self.value);
-        let mut query_index = self.logical_index;
-        for sibling in &self.path {
-            let mut hasher = H::new();
-            let mut next = Output::<H>::default();
-            if query_index & 1 == 0 {
-                hasher.update(&hash);
-                hasher.update(sibling);
-            } else {
-                hasher.update(sibling);
-                hasher.update(&hash);
-            }
-            hasher.finalize_into_reset(&mut next);
-            hash = next;
-            query_index >>= 1;
-        }
-
-        if hash != public.root {
-            return Err(Error::InvalidPcsOpen(
-                "compiler parity query does not authenticate".to_string(),
-            ));
-        }
-        Ok(())
+        let authentication_nodes = merkle_b128_multiproof_nodes::<H, _>(
+            &self.merkle_tree,
+            queries
+                .iter()
+                .map(|query| (query.logical_index, query.value)),
+        )?;
+        Ok(CompilerParityQueryProof {
+            queries,
+            authentication_nodes,
+        })
     }
 }
 
@@ -1188,8 +1159,15 @@ impl<H: Hash> CompilerParityQueryProof<H> {
                     "compiler parity query index does not match schedule".to_string(),
                 ));
             }
-            query.authenticate(public)?;
         }
+        verify_merkle_b128_multiproof::<H, _>(
+            &public.root,
+            public.len,
+            self.queries
+                .iter()
+                .map(|query| (query.logical_index, query.value)),
+            &self.authentication_nodes,
+        )?;
         Ok(())
     }
 }
@@ -1228,6 +1206,7 @@ impl<H: Hash> CompilerParityFoldQueryProof<H> {
                 "compiler parity fold path top query count does not match schedule".to_string(),
             ));
         }
+        top_queries.verify(&prequery.compiler_parity, layout, schedule)?;
         if self.layer_authentication.len() != layout.num_rounds() {
             return Err(Error::InvalidPcsOpen(
                 "compiler parity fold layer authentication count does not match layout".to_string(),
@@ -1288,7 +1267,7 @@ impl CompilerParityFoldPath {
         prequery: &Blaze2BaseFoldPrequeryPublic<H>,
         layout: &SystematicAugmentedRfcLayout,
         fold_challenges: &[B128],
-        top_query: &CompilerParityQuery<H>,
+        top_query: &CompilerParityQuery,
     ) -> Result<(), Error> {
         if self.steps.len() != layout.num_rounds() {
             return Err(Error::InvalidPcsOpen(
@@ -1300,7 +1279,6 @@ impl CompilerParityFoldPath {
                 "compiler parity fold path top query does not match path index".to_string(),
             ));
         }
-        top_query.authenticate(&prequery.compiler_parity)?;
         let mut current_value = top_query.value;
         let mut current_physical_index = self.top_physical_index;
         for (round, step) in self.steps.iter().enumerate() {
@@ -2294,23 +2272,6 @@ fn parity_values_at_round(
         }
     }
     Ok(parity)
-}
-
-fn parity_query_for_physical_index<H: Hash>(
-    layout: &SystematicAugmentedRfcLayout,
-    round: usize,
-    top: &CompilerParityCommitment<H>,
-    folded: &[CompilerParityCommitment<H>],
-    physical_index: usize,
-) -> Result<CompilerParityQuery<H>, Error> {
-    let address = layout.physical_to_logical_at_round(round, physical_index)?;
-    if address.part != CodewordPart::Parity {
-        return Err(Error::InvalidPcsOpen(
-            "compiler parity fold path tried to authenticate a systematic position as parity"
-                .to_string(),
-        ));
-    }
-    parity_commitment_at_round(top, folded, round)?.query(address.local_index)
 }
 
 #[derive(Clone, Copy, Debug, Eq, PartialEq)]
@@ -3628,7 +3589,18 @@ mod tests {
         for index in [0usize, 1, 7, code.layout().parity_len() - 1] {
             let query = commitment.query(index).unwrap();
             assert_eq!(query.value, commitment.values()[index]);
-            query.authenticate(&public).unwrap();
+            let authentication_nodes = merkle_b128_multiproof_nodes::<Blake2s, _>(
+                &commitment.merkle_tree,
+                [(query.logical_index, query.value)],
+            )
+            .unwrap();
+            verify_merkle_b128_multiproof::<Blake2s, _>(
+                &public.root,
+                public.len,
+                [(query.logical_index, query.value)],
+                &authentication_nodes,
+            )
+            .unwrap();
         }
     }
 
@@ -3660,7 +3632,7 @@ mod tests {
             .is_err());
 
         let mut tampered_path = proof;
-        tampered_path.queries[0].path[0][0] ^= 1;
+        tampered_path.authentication_nodes[0][0] ^= 1;
         assert!(tampered_path
             .verify(&public, code.layout(), &schedule)
             .is_err());

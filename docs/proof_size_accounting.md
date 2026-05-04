@@ -7,6 +7,7 @@ Sources:
 
 - BaseFold: <https://eprint.iacr.org/2023/1705.pdf>
 - Blaze: <https://eprint.iacr.org/2024/1609.pdf>
+- Remaining implementation plan: `docs/blaze2_required_proof_size_plan.md`
 
 ## Shared Byte Model
 

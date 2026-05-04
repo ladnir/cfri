@@ -2,6 +2,18 @@
 
 This note records an alternate but compatible proof view.
 
+The column-level tree algebra is expanded in:
+
+```text
+docs/rfc_column_tensor_structure.md
+```
+
+Small bad-shape examples can be decoded with:
+
+```text
+python scripts/describe_rfc_columns.py --systematic --depth 3 --parity-expansion 7 --columns 0:1:2:3:4:5:8:22:36
+```
+
 ## Rank Formulation
 
 For a linear generator matrix `G` with `k` message rows and `N` coordinate columns, a codeword has

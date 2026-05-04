@@ -161,6 +161,45 @@ pin a depth-1 sibling pair, the two parity columns selected from matching positi
 top-level halves do not give two independent remaining constraints. This is the first concrete
 shape the proof has to account for.
 
+## Depth-3 Shape Sampling
+
+Exact shape enumeration is too large at depth 3 (`k=8`, `N=64`, parity length `56`), so the script
+also has a stratified sampler:
+
+```text
+python scripts/sample_rfc_rank_failure.py \
+  --systematic \
+  --systematic-shape-sample-profile \
+  --prime 65537 \
+  --depth 3 \
+  --total-expansion 8 \
+  --zero-count 1 \
+  --seed 223 \
+  --shape-samples 2000 \
+  --shape-extra-max 2
+```
+
+For each `s_identity`, it samples around the dimension threshold `z_parity = k - s_identity`.
+The results are:
+
+```text
+total zero count 7: all sampled shapes deficient, as expected since z < k
+total zero count 8: rare structured deficiencies for s=3,4,5,6
+total zero count 9: very rare sampled deficiencies
+total zero count 10: no sampled deficiencies
+```
+
+This suggests a possible pattern:
+
+```text
+depth 2: systematic large-field distance appears Singleton - 1
+depth 3: sampled obstruction appears to disappear by Singleton - 2
+```
+
+That is only a hypothesis, not a proof. But if the true structural loss is `O(depth)`, the target
+parameters would still be close to the ideal random-parity first-moment distance and far above the
+current threshold certificate.
+
 ## Proof Obligation
 
 A strong certificate would prove something like:

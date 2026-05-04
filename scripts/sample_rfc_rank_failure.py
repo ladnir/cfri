@@ -100,6 +100,9 @@ def main() -> None:
     parser.add_argument("--exact-k-subsets", action="store_true")
     parser.add_argument("--exact-rank-profile", action="store_true")
     parser.add_argument("--systematic-shape-profile", action="store_true")
+    parser.add_argument("--systematic-shape-sample-profile", action="store_true")
+    parser.add_argument("--shape-samples", type=int, default=1000)
+    parser.add_argument("--shape-extra-max", type=int, default=1)
     args = parser.parse_args()
 
     rng = random.Random(args.seed)
@@ -107,6 +110,45 @@ def main() -> None:
     n = args.total_expansion * k
     if args.zero_count < 1 or args.zero_count > n:
         raise SystemExit("--zero-count must be in 1..N")
+
+    if args.systematic_shape_sample_profile:
+        if not args.systematic:
+            raise SystemExit("--systematic-shape-sample-profile requires --systematic")
+        if args.shape_samples <= 0:
+            raise SystemExit("--shape-samples must be positive")
+        generator = systematic_generator_prime(args.depth, args.total_expansion, args.prime, rng)
+        parity_n = n - k
+        print(
+            "ensemble,prime,depth,k,n,parity_n,s_identity,z_parity,"
+            "sampled_shapes,rank_deficient_shapes,min_rank,first_bad"
+        )
+        for s_identity in range(k + 1):
+            base_z_parity = max(0, k - s_identity)
+            z_values = [base_z_parity + extra for extra in range(args.shape_extra_max + 1)]
+            if base_z_parity > 0:
+                z_values.insert(0, base_z_parity - 1)
+            for z_parity in z_values:
+                if z_parity > parity_n:
+                    continue
+                failures = 0
+                min_rank = k
+                first_bad: tuple[int, ...] | None = None
+                for _ in range(args.shape_samples):
+                    identity_columns = sorted(rng.sample(range(k), s_identity))
+                    parity_columns = sorted(rng.sample(range(parity_n), z_parity))
+                    columns = identity_columns + [k + column for column in parity_columns]
+                    rank = rank_selected_columns(generator, columns, args.prime)
+                    min_rank = min(min_rank, rank)
+                    if rank < k:
+                        failures += 1
+                        if first_bad is None:
+                            first_bad = tuple(columns)
+                first_bad_text = "" if first_bad is None else ":".join(str(column) for column in first_bad)
+                print(
+                    f"systematic,{args.prime},{args.depth},{k},{n},{parity_n},"
+                    f"{s_identity},{z_parity},{args.shape_samples},{failures},{min_rank},{first_bad_text}"
+                )
+        return
 
     if args.systematic_shape_profile:
         if not args.systematic:

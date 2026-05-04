@@ -166,9 +166,11 @@ the derived companion values match those scheduled authentication leaves. This r
 proof-object multiplier, but it does not yet achieve the paper-size target because those companion
 leaves are still Merkle-authenticated. The backend prequery path now also rejects arbitrary
 auxiliary traces whose `u3 = A * u2`, `u4 = M_pi2 * u3`, and `c_star = A * u4` rows do not match
-the folded PRAA codeword. That is only a prover/API guardrail: the paper-critical verifier relation
-still has to prove `u2 = M_pi1 * F_r(m)` and the accumulator/permutation relations without local
-companion Merkle openings. The remaining target is Option B or C below.
+the folded PRAA codeword. The relation proof variant is now explicit (`LocalQueries` versus
+`Section5`), and the Section 5 mode fails closed until its verifier relation is implemented. That
+is only a prover/API guardrail: the paper-critical verifier relation still has to prove
+`u2 = M_pi1 * F_r(m)` and the accumulator/permutation relations without local companion Merkle
+openings. The remaining target is Option B or C below.
 
 The auxiliary term is currently the largest remaining bucket. Values have been tightened, but the
 proof still authenticates auxiliary companion leaves for local RAA relations. The final design must
@@ -276,7 +278,7 @@ Acceptance:
 | 2. Replace the current proof-size constants with budget-derived assertions. | Complete. |
 | 3. Build the shared backend query-set collector. | Complete. |
 | 4. Generate per-layer multiproofs from the collector. | Complete. |
-| 5. Move auxiliary local relation checks into scheduled or algebraic backend checks. | In progress: arbitrary auxiliary traces now reject at prequery construction; verifier-side Section 5 relation proof still pending. |
+| 5. Move auxiliary local relation checks into scheduled or algebraic backend checks. | In progress: arbitrary auxiliary traces now reject at prequery construction; the relation proof strategy is explicit and Section 5 fails closed; verifier-side Section 5 relation proof still pending. |
 | 6. Replace the Blaze2-specific backend proof structs with the shared BaseFold-core proof. | Pending. |
 | 7. Add the 8-byte/16-byte field-width template and lock both acceptance numbers. | Pending. |
 

@@ -214,9 +214,16 @@ pub struct AuxiliaryOracleQueryProof<H: Hash> {
 #[derive(Clone, Debug, Eq, PartialEq)]
 pub struct RaaFinalAccumulatorQueryProof;
 
+#[derive(Clone, Copy, Debug, Eq, PartialEq)]
+pub enum RaaRelationProofStrategy {
+    LocalQueries,
+    Section5,
+}
+
 #[derive(Clone, Debug, Eq, PartialEq)]
 pub enum RaaRelationProof {
     LocalQueries(RaaLocalRelationProof),
+    Section5(RaaSection5RelationProof),
 }
 
 #[derive(Clone, Debug, Default, Eq, PartialEq)]
@@ -225,13 +232,26 @@ pub struct RaaLocalRelationProof {
     pub local_relation_queries: Vec<RaaAuxiliaryLocalRelationProof>,
 }
 
+#[derive(Clone, Debug, Default, Eq, PartialEq)]
+pub struct RaaSection5RelationProof {
+    pub permutation_sumcheck: RaaRelationSumcheckProof,
+    pub first_accumulator_sumcheck: RaaRelationSumcheckProof,
+    pub second_accumulator_sumcheck: RaaRelationSumcheckProof,
+    pub terminal_evaluations: Vec<B128>,
+}
+
+#[derive(Clone, Debug, Default, Eq, PartialEq)]
+pub struct RaaRelationSumcheckProof {
+    pub round_polynomials: Vec<Vec<B128>>,
+}
+
 #[derive(Clone, Debug, Eq, PartialEq)]
 pub enum RaaAuxiliaryLocalRelationProof {
     Equality,
     FirstAccumulatorStep { previous_value: B128 },
 }
 
-#[derive(Clone, Debug, Eq, PartialEq)]
+#[derive(Clone, Debug, Default, Eq, PartialEq)]
 pub struct RaaEvalSumcheckProof {
     pub round_polynomials: Vec<[B128; 3]>,
 }
@@ -330,6 +350,7 @@ pub struct CompilerParityFoldStep {
 pub struct HolographicQuerySchedule {
     input_queries: Vec<SystematicInputQuery>,
     proof_queries: Vec<BackendProofQuery>,
+    raa_relation_strategy: RaaRelationProofStrategy,
     raa_final_queries: Vec<RaaFinalAccumulatorQuery>,
     raa_auxiliary_queries: Vec<RaaAuxiliaryLocalQuery>,
     raa_auxiliary_authentication_queries: Vec<BackendProofQuery>,
@@ -340,6 +361,7 @@ pub struct HolographicQueryScheduleSpec {
     pub q_raa_input: usize,
     pub q_backend_proof: usize,
     pub auxiliary_oracle_len: usize,
+    pub raa_relation_strategy: RaaRelationProofStrategy,
 }
 
 #[derive(Clone, Debug, Eq, PartialEq)]
@@ -360,6 +382,7 @@ pub struct Blaze2BaseFoldBackendSpec {
     pub q_raa_input: usize,
     pub q_backend_proof: usize,
     pub auxiliary_oracle_len: usize,
+    pub raa_relation_strategy: RaaRelationProofStrategy,
 }
 
 #[derive(Clone, Debug, Eq, PartialEq)]
@@ -534,6 +557,7 @@ impl Blaze2BaseFoldBackendParams {
             q_raa_input: self.spec.q_raa_input,
             q_backend_proof: self.spec.q_backend_proof,
             auxiliary_oracle_len: self.spec.auxiliary_oracle_len,
+            raa_relation_strategy: self.spec.raa_relation_strategy,
         }
     }
 
@@ -623,7 +647,9 @@ impl Blaze2BaseFoldBackendParams {
             self.compiler_code.layout(),
             self.query_schedule_spec(),
         )?;
-        if self.spec.auxiliary_oracle_len != 0 {
+        if self.spec.auxiliary_oracle_len != 0
+            && self.spec.raa_relation_strategy == RaaRelationProofStrategy::LocalQueries
+        {
             schedule.attach_raa_auxiliary_local_queries(self.praa.packed())?;
         }
         Ok(schedule)
@@ -1583,6 +1609,11 @@ impl<H: Hash> AuxiliaryOracleCommitment<H> {
                 relation_queries.push(self.query(query.index)?);
             }
         }
+        if schedule.raa_relation_strategy() == RaaRelationProofStrategy::Section5 {
+            return Err(Error::InvalidPcsOpen(
+                "RAA Section 5 relation proof is not implemented yet".to_string(),
+            ));
+        }
         let mut final_accumulator_queries = Vec::with_capacity(schedule.raa_final_queries().len());
         for query in schedule.raa_final_queries() {
             self.query(query.u4_auxiliary_index)?;
@@ -1757,30 +1788,39 @@ impl RaaRelationProof {
     pub fn local_queries(&self) -> Result<&RaaLocalRelationProof, Error> {
         match self {
             Self::LocalQueries(proof) => Ok(proof),
+            Self::Section5(_) => Err(Error::InvalidPcsOpen(
+                "RAA relation proof uses Section 5, not local queries".to_string(),
+            )),
         }
     }
 
     pub fn local_queries_mut(&mut self) -> Result<&mut RaaLocalRelationProof, Error> {
         match self {
             Self::LocalQueries(proof) => Ok(proof),
+            Self::Section5(_) => Err(Error::InvalidPcsOpen(
+                "RAA relation proof uses Section 5, not local queries".to_string(),
+            )),
         }
     }
 
     fn query_count(&self) -> usize {
         match self {
             Self::LocalQueries(proof) => proof.query_count(),
+            Self::Section5(proof) => proof.query_count(),
         }
     }
 
     fn serialized_value_count(&self) -> usize {
         match self {
             Self::LocalQueries(proof) => proof.serialized_value_count(),
+            Self::Section5(proof) => proof.serialized_value_count(),
         }
     }
 
     fn verify_schedule(&self, schedule: &HolographicQuerySchedule) -> Result<(), Error> {
         match self {
             Self::LocalQueries(proof) => proof.verify_schedule(schedule),
+            Self::Section5(proof) => proof.verify_schedule(schedule),
         }
     }
 
@@ -1792,6 +1832,9 @@ impl RaaRelationProof {
     ) -> Result<Vec<(usize, B128)>, Error> {
         match self {
             Self::LocalQueries(proof) => {
+                proof.authentication_queries(relation_queries, schedule, top_queries)
+            }
+            Self::Section5(proof) => {
                 proof.authentication_queries(relation_queries, schedule, top_queries)
             }
         }
@@ -1807,6 +1850,9 @@ impl RaaRelationProof {
             Self::LocalQueries(proof) => {
                 proof.authentication_queries_from_oracle(relation_queries, schedule, oracle)
             }
+            Self::Section5(proof) => {
+                proof.authentication_queries_from_oracle(relation_queries, schedule, oracle)
+            }
         }
     }
 
@@ -1820,6 +1866,7 @@ impl RaaRelationProof {
             Self::LocalQueries(proof) => {
                 proof.verify_openings(relation_queries, schedule, top_queries)
             }
+            Self::Section5(proof) => proof.verify_openings(relation_queries, schedule, top_queries),
         }
     }
 }
@@ -2100,6 +2147,73 @@ impl RaaLocalRelationProof {
     }
 }
 
+impl RaaSection5RelationProof {
+    fn query_count(&self) -> usize {
+        0
+    }
+
+    fn serialized_value_count(&self) -> usize {
+        self.permutation_sumcheck.serialized_value_count()
+            + self.first_accumulator_sumcheck.serialized_value_count()
+            + self.second_accumulator_sumcheck.serialized_value_count()
+            + self.terminal_evaluations.len()
+    }
+
+    fn verify_schedule(&self, schedule: &HolographicQuerySchedule) -> Result<(), Error> {
+        if schedule.raa_relation_strategy() != RaaRelationProofStrategy::Section5 {
+            return Err(Error::InvalidPcsOpen(
+                "RAA Section 5 proof supplied for a non-Section 5 schedule".to_string(),
+            ));
+        }
+        if !schedule.raa_auxiliary_queries().is_empty()
+            || !schedule.raa_auxiliary_authentication_queries().is_empty()
+            || !schedule.raa_final_queries().is_empty()
+        {
+            return Err(Error::InvalidPcsOpen(
+                "RAA Section 5 schedule must not carry local companion queries".to_string(),
+            ));
+        }
+        Err(Error::InvalidPcsOpen(
+            "RAA Section 5 relation proof verification is not implemented yet".to_string(),
+        ))
+    }
+
+    fn authentication_queries(
+        &self,
+        _relation_queries: &[AuxiliaryOracleQuery],
+        schedule: &HolographicQuerySchedule,
+        _top_queries: &[TopQuery<B128>],
+    ) -> Result<Vec<(usize, B128)>, Error> {
+        self.verify_schedule(schedule)?;
+        Ok(Vec::new())
+    }
+
+    fn authentication_queries_from_oracle<H: Hash>(
+        &self,
+        _relation_queries: &[AuxiliaryOracleQuery],
+        schedule: &HolographicQuerySchedule,
+        _oracle: &AuxiliaryOracleCommitment<H>,
+    ) -> Result<Vec<(usize, B128)>, Error> {
+        self.verify_schedule(schedule)?;
+        Ok(Vec::new())
+    }
+
+    fn verify_openings(
+        &self,
+        _relation_queries: &[AuxiliaryOracleQuery],
+        schedule: &HolographicQuerySchedule,
+        _top_queries: &[TopQuery<B128>],
+    ) -> Result<(), Error> {
+        self.verify_schedule(schedule)
+    }
+}
+
+impl RaaRelationSumcheckProof {
+    fn serialized_value_count(&self) -> usize {
+        self.round_polynomials.iter().map(Vec::len).sum()
+    }
+}
+
 impl RaaAuxiliaryLocalRelationProof {
     fn authentication_query_count(&self) -> usize {
         match self {
@@ -2182,6 +2296,7 @@ pub fn absorb_blaze2_basefold_backend_spec<H: Hash, S>(
     absorb_usize(transcript, spec.q_raa_input);
     absorb_usize(transcript, spec.q_backend_proof);
     absorb_usize(transcript, spec.auxiliary_oracle_len);
+    absorb_raa_relation_proof_strategy(transcript, spec.raa_relation_strategy);
 }
 
 pub fn absorb_blaze2_basefold_open_request<H: Hash, S>(
@@ -2277,6 +2392,16 @@ fn absorb_blaze2_basefold_fold_chain_prefix<H: Hash, S>(
     }
 }
 
+fn absorb_raa_relation_proof_strategy<H: Hash, S>(
+    transcript: &mut CfriTranscript<H, S>,
+    strategy: RaaRelationProofStrategy,
+) {
+    if strategy == RaaRelationProofStrategy::Section5 {
+        transcript.absorb("raa-relation-proof-strategy-v1");
+        absorb_usize(transcript, 1);
+    }
+}
+
 fn absorb_folded_parity_public_commitment<H: Hash, S>(
     transcript: &mut CfriTranscript<H, S>,
     round: usize,
@@ -2307,10 +2432,13 @@ impl HolographicQuerySchedule {
         absorb_usize(transcript, spec.q_raa_input);
         absorb_usize(transcript, spec.q_backend_proof);
         absorb_usize(transcript, spec.auxiliary_oracle_len);
+        absorb_raa_relation_proof_strategy(transcript, spec.raa_relation_strategy);
 
         let mut input_queries = Vec::with_capacity(spec.q_raa_input);
         let mut raa_final_queries = Vec::new();
-        if spec.auxiliary_oracle_len == 0 {
+        if spec.auxiliary_oracle_len == 0
+            || spec.raa_relation_strategy == RaaRelationProofStrategy::Section5
+        {
             for _ in 0..spec.q_raa_input {
                 let logical_index = squeeze_bounded_index(transcript, layout.systematic_len())?;
                 input_queries.push(SystematicInputQuery {
@@ -2371,6 +2499,7 @@ impl HolographicQuerySchedule {
         Ok(Self {
             input_queries,
             proof_queries,
+            raa_relation_strategy: spec.raa_relation_strategy,
             raa_final_queries,
             raa_auxiliary_queries: Vec::new(),
             raa_auxiliary_authentication_queries: Vec::new(),
@@ -2387,6 +2516,10 @@ impl HolographicQuerySchedule {
 
     pub fn raa_final_queries(&self) -> &[RaaFinalAccumulatorQuery] {
         &self.raa_final_queries
+    }
+
+    pub fn raa_relation_strategy(&self) -> RaaRelationProofStrategy {
+        self.raa_relation_strategy
     }
 
     pub fn raa_auxiliary_queries(&self) -> &[RaaAuxiliaryLocalQuery] {
@@ -2409,15 +2542,26 @@ impl HolographicQuerySchedule {
     }
 
     pub fn expected_auxiliary_query_proof_count(&self) -> usize {
-        self.relation_auxiliary_proof_query_count()
-            + self.raa_final_queries.len()
-            + self.raa_auxiliary_authentication_queries.len()
+        match self.raa_relation_strategy {
+            RaaRelationProofStrategy::LocalQueries => {
+                self.relation_auxiliary_proof_query_count()
+                    + self.raa_final_queries.len()
+                    + self.raa_auxiliary_authentication_queries.len()
+            }
+            RaaRelationProofStrategy::Section5 => self.relation_auxiliary_proof_query_count(),
+        }
     }
 
     pub fn attach_raa_auxiliary_local_queries(
         &mut self,
         code: &PackedRaaCode,
     ) -> Result<(), Error> {
+        if self.raa_relation_strategy != RaaRelationProofStrategy::LocalQueries {
+            return Err(Error::InvalidPcsParam(
+                "RAA local auxiliary queries cannot be attached to a non-local relation strategy"
+                    .to_string(),
+            ));
+        }
         self.raa_auxiliary_queries = build_raa_auxiliary_local_queries(code, &self.proof_queries)?;
         self.raa_auxiliary_authentication_queries =
             build_raa_auxiliary_authentication_queries(&self.raa_auxiliary_queries)?;
@@ -2525,7 +2669,9 @@ fn validate_blaze2_backend_spec(spec: &Blaze2BaseFoldBackendSpec) -> Result<(), 
             "auxiliary oracle length must be {expected_auxiliary_len}: {expected_relation_auxiliary_len} relation auxiliary entries"
         )));
     }
-    if spec.q_raa_input & 1 != 0 {
+    if spec.raa_relation_strategy == RaaRelationProofStrategy::LocalQueries
+        && spec.q_raa_input & 1 != 0
+    {
         return Err(Error::InvalidPcsParam(
             "auxiliary-enabled Blaze2 BaseFold backend needs an even RAA input query count"
                 .to_string(),
@@ -2640,7 +2786,10 @@ fn validate_query_schedule_spec(
             "systematic BaseFold schedule needs at least one input query".to_string(),
         ));
     }
-    if spec.auxiliary_oracle_len != 0 && spec.q_raa_input & 1 != 0 {
+    if spec.auxiliary_oracle_len != 0
+        && spec.raa_relation_strategy == RaaRelationProofStrategy::LocalQueries
+        && spec.q_raa_input & 1 != 0
+    {
         return Err(Error::InvalidPcsParam(
             "auxiliary-enabled systematic BaseFold schedule needs an even RAA input query count"
                 .to_string(),
@@ -3872,6 +4021,7 @@ mod tests {
             q_raa_input: 6,
             q_backend_proof: 7,
             auxiliary_oracle_len: 16 * BLAZE2_BASEFOLD_AUXILIARY_ROW_COUNT,
+            raa_relation_strategy: RaaRelationProofStrategy::LocalQueries,
         }
     }
 
@@ -3908,6 +4058,7 @@ mod tests {
             q_raa_input: 6,
             q_backend_proof: 7,
             auxiliary_oracle_len: required_blaze2_basefold_auxiliary_oracle_len(&praa),
+            raa_relation_strategy: RaaRelationProofStrategy::LocalQueries,
         }
     }
 
@@ -3982,6 +4133,7 @@ mod tests {
                     ),
                 },
             ],
+            raa_relation_strategy: RaaRelationProofStrategy::LocalQueries,
             raa_final_queries: Vec::new(),
             raa_auxiliary_queries: Vec::new(),
             raa_auxiliary_authentication_queries: Vec::new(),
@@ -4040,6 +4192,7 @@ mod tests {
                 q_raa_input: spec.q_raa_input,
                 q_backend_proof: spec.q_backend_proof,
                 auxiliary_oracle_len: spec.auxiliary_oracle_len,
+                raa_relation_strategy: spec.raa_relation_strategy,
             }
         );
     }
@@ -4576,6 +4729,7 @@ mod tests {
                     physical_index: None,
                 },
             ],
+            raa_relation_strategy: RaaRelationProofStrategy::LocalQueries,
             raa_final_queries: Vec::new(),
             raa_auxiliary_queries: Vec::new(),
             raa_auxiliary_authentication_queries: Vec::new(),
@@ -4629,6 +4783,39 @@ mod tests {
         assert!(params
             .verify_query_proof(&prequery, &request, &schedule, &tampered_permutation, &[])
             .is_err());
+    }
+
+    #[test]
+    fn backend_section5_relation_strategy_fails_closed_until_implemented() {
+        let mut spec = blaze2_backend_spec();
+        spec.raa_relation_strategy = RaaRelationProofStrategy::Section5;
+        spec.q_raa_input = 5;
+        let params = Blaze2BaseFoldBackendParams::new(spec).unwrap();
+        let request_point = make_request_point(&params, 17);
+        let (folded_codeword, auxiliary, folded_eval) =
+            folded_codeword_and_auxiliary(&params, 89, &request_point);
+        let request = open_request_with_eval(&request_point, folded_eval);
+        let (prequery, state) = params
+            .prove_prequery::<Blake2s>(&folded_codeword, &auxiliary, &request)
+            .unwrap();
+        let mut transcript = CfriTranscript::<Blake2s>::new();
+        let schedule = params
+            .sample_query_schedule(&mut transcript, &prequery, &request)
+            .unwrap();
+
+        assert_eq!(
+            schedule.raa_relation_strategy(),
+            RaaRelationProofStrategy::Section5
+        );
+        assert_eq!(schedule.input_queries().len(), 5);
+        assert!(schedule.raa_final_queries().is_empty());
+        assert!(schedule.raa_auxiliary_queries().is_empty());
+        assert!(schedule.raa_auxiliary_authentication_queries().is_empty());
+        assert_eq!(
+            schedule.expected_auxiliary_query_proof_count(),
+            schedule.relation_auxiliary_proof_query_count()
+        );
+        assert!(params.open_query_proof(&state, &schedule).is_err());
     }
 
     #[test]

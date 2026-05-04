@@ -27,7 +27,7 @@ use cfri::backend::{
         required_blaze2_basefold_auxiliary_oracle_len, required_blaze2_basefold_eval_binding_len,
         required_blaze2_basefold_relation_auxiliary_len, BackendProofQueryDomain,
         Blaze2BaseFoldBackendParams, Blaze2BaseFoldBackendSpec, Blaze2BaseFoldOpenRequest,
-        HolographicQuerySchedule, SystematicFoldableCodeSpec,
+        HolographicQuerySchedule, RaaRelationProofStrategy, SystematicFoldableCodeSpec,
     },
     transcript::InMemoryTranscript as _,
     Error,
@@ -300,6 +300,7 @@ fn blaze2_basefold_backend_params_with_auxiliary_len(
         q_raa_input,
         q_backend_proof,
         auxiliary_oracle_len,
+        raa_relation_strategy: RaaRelationProofStrategy::LocalQueries,
     })
     .unwrap()
 }
@@ -1959,6 +1960,7 @@ fn blaze2_basefold_backend_rejects_arbitrary_auxiliary_length() {
         q_raa_input: 4,
         q_backend_proof: 7,
         auxiliary_oracle_len: 1,
+        raa_relation_strategy: RaaRelationProofStrategy::LocalQueries,
     };
 
     assert!(Blaze2BaseFoldBackendParams::new(spec).is_err());

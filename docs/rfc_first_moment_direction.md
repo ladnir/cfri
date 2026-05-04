@@ -201,3 +201,29 @@ exactly; the original crossing differs by one symbol, plausibly because the one-
 averages over the parent diagonal instead of sampling it. This is a useful intermediate target:
 the next rigorous recurrence should reproduce this pair-transition calculation without sampling
 the child code.
+
+The one-step category and low-tail decompositions are saved in:
+
+```text
+docs/sample_one_step_categories_gf5_depth3_c8_cpp.csv
+docs/sample_one_step_low_tail_contrib_gf5_depth3_c8_cpp.csv
+```
+
+For the low-tail cutoffs above, the expected low-tail contribution by parent support is:
+
+```text
+original, cutoff <= 16:
+  support 8: 0.920535
+  support 4: 0.101784
+  support 2: 0.000316
+
+systematic, cutoff <= 20:
+  support 4: 1.220223
+  support 8: 0.317051
+  support 2: 0.161279
+```
+
+This is qualitatively important. The original low tail is driven mostly by full parent support,
+whereas the systematic low tail is driven by medium support. Any tight first-moment certificate
+should therefore stay support-stratified; a scalar weight enumerator will blur exactly the part of
+the distribution that matters.

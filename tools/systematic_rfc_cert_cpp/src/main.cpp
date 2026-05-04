@@ -41,6 +41,7 @@ struct Options {
     std::uint64_t seed = 1;
     std::string spectrumPath;
     std::string supportSpectrumPath;
+    std::string categoryPath;
 };
 
 struct RoundState {
@@ -823,13 +824,21 @@ std::uint64_t categoryKey(int equalNonzero, int singleRoot, int doubleRoot) {
            (static_cast<std::uint64_t>(doubleRoot) << 32);
 }
 
+std::uint64_t categorySupportKey(int support, int equalNonzero, int singleRoot, int doubleRoot) {
+    return static_cast<std::uint64_t>(support) |
+           (static_cast<std::uint64_t>(equalNonzero) << 16) |
+           (static_cast<std::uint64_t>(singleRoot) << 32) |
+           (static_cast<std::uint64_t>(doubleRoot) << 48);
+}
+
 void accumulateOneStepPairSpectrum(
     const std::vector<EncodedMessage>& messages,
     std::uint64_t childN,
     int prime,
     bool systematic,
     std::vector<double>& spectrum,
-    std::unordered_map<std::uint64_t, std::vector<double>>& localCache) {
+    std::unordered_map<std::uint64_t, std::vector<double>>& localCache,
+    std::unordered_map<std::uint64_t, double>* categoryCounts) {
     for (const auto& left : messages) {
         for (const auto& right : messages) {
             if (left.support == 0 && right.support == 0) {
@@ -854,7 +863,11 @@ void accumulateOneStepPairSpectrum(
                 }
             }
 
+            const auto parentSupport = left.support + right.support;
             const auto key = categoryKey(equalNonzero, singleRoot, doubleRoot);
+            if (categoryCounts != nullptr) {
+                (*categoryCounts)[categorySupportKey(parentSupport, equalNonzero, singleRoot, doubleRoot)] += 1.0;
+            }
             auto it = localCache.find(key);
             if (it == localCache.end()) {
                 it = localCache
@@ -864,7 +877,7 @@ void accumulateOneStepPairSpectrum(
                          .first;
             }
 
-            const auto systematicWeight = systematic ? left.support + right.support : 0;
+            const auto systematicWeight = systematic ? parentSupport : 0;
             const auto& local = it->second;
             for (std::size_t h = 0; h < local.size(); ++h) {
                 const auto totalWeight = systematicWeight + static_cast<int>(h);
@@ -900,6 +913,8 @@ int runSampleRfcOneStep(const Options& opts) {
 
     std::vector<double> oldSpectrum(static_cast<std::size_t>(totalN + 1), 0.0);
     std::vector<double> sysSpectrum(static_cast<std::size_t>(totalN + 1), 0.0);
+    std::unordered_map<std::uint64_t, double> oldCategoryCounts;
+    std::unordered_map<std::uint64_t, double> sysCategoryCounts;
     std::mt19937_64 rng(opts.seed);
 
     for (int sample = 0; sample < opts.samples; ++sample) {
@@ -909,8 +924,22 @@ int runSampleRfcOneStep(const Options& opts) {
         const auto sysMessages = enumerateEncodedMessages(sysChild, childK, sysChildN, opts.prime);
         std::unordered_map<std::uint64_t, std::vector<double>> oldCache;
         std::unordered_map<std::uint64_t, std::vector<double>> sysCache;
-        accumulateOneStepPairSpectrum(oldMessages, oldChildN, opts.prime, false, oldSpectrum, oldCache);
-        accumulateOneStepPairSpectrum(sysMessages, sysChildN, opts.prime, true, sysSpectrum, sysCache);
+        accumulateOneStepPairSpectrum(
+            oldMessages,
+            oldChildN,
+            opts.prime,
+            false,
+            oldSpectrum,
+            oldCache,
+            &oldCategoryCounts);
+        accumulateOneStepPairSpectrum(
+            sysMessages,
+            sysChildN,
+            opts.prime,
+            true,
+            sysSpectrum,
+            sysCache,
+            &sysCategoryCounts);
         if (opts.samples >= 10 && (sample + 1) % std::max(1, opts.samples / 10) == 0) {
             std::cerr << "sample=" << (sample + 1) << "/" << opts.samples << '\n';
         }
@@ -921,6 +950,12 @@ int runSampleRfcOneStep(const Options& opts) {
     }
     for (auto& value : sysSpectrum) {
         value /= static_cast<double>(opts.samples);
+    }
+    for (auto& item : oldCategoryCounts) {
+        item.second /= static_cast<double>(opts.samples);
+    }
+    for (auto& item : sysCategoryCounts) {
+        item.second /= static_cast<double>(opts.samples);
     }
 
     std::cout << "p=" << opts.prime << " parent_depth=" << parentDepth << " parent_k=" << parentK
@@ -946,6 +981,38 @@ int runSampleRfcOneStep(const Options& opts) {
         for (std::size_t h = 0; h < oldSpectrum.size(); ++h) {
             out << h << ',' << oldSpectrum[h] << ',' << sysSpectrum[h] << '\n';
         }
+    }
+    if (!opts.categoryPath.empty()) {
+        std::ofstream out(opts.categoryPath);
+        if (!out) {
+            throw std::runtime_error("failed to open category output path");
+        }
+        out << "ensemble,parent_support,equal_nonzero,single_root,double_root,expected_pair_count,"
+               "min_parity_weight,max_parity_weight,min_total_weight,max_total_weight\n";
+        out << std::setprecision(17);
+        auto writeCategoryRows = [&](const char* ensemble, const auto& counts) {
+            std::vector<std::pair<std::uint64_t, double>> rows(counts.begin(), counts.end());
+            std::sort(rows.begin(), rows.end(), [](const auto& a, const auto& b) {
+                return a.second > b.second;
+            });
+            for (const auto& row : rows) {
+                const auto support = static_cast<int>(row.first & 0xffff);
+                const auto equalNonzero = static_cast<int>((row.first >> 16) & 0xffff);
+                const auto singleRoot = static_cast<int>((row.first >> 32) & 0xffff);
+                const auto doubleRoot = static_cast<int>((row.first >> 48) & 0xffff);
+                const auto maxParityWeight = 2 * (equalNonzero + singleRoot + doubleRoot);
+                const auto minParityWeight = maxParityWeight - singleRoot - doubleRoot;
+                const auto minTotalWeight =
+                    std::string_view(ensemble) == "systematic" ? minParityWeight + support : minParityWeight;
+                const auto maxTotalWeight =
+                    std::string_view(ensemble) == "systematic" ? maxParityWeight + support : maxParityWeight;
+                out << ensemble << ',' << support << ',' << equalNonzero << ',' << singleRoot << ','
+                    << doubleRoot << ',' << row.second << ',' << minParityWeight << ',' << maxParityWeight
+                    << ',' << minTotalWeight << ',' << maxTotalWeight << '\n';
+            }
+        };
+        writeCategoryRows("original", oldCategoryCounts);
+        writeCategoryRows("systematic", sysCategoryCounts);
     }
     return 0;
 }
@@ -1337,6 +1404,8 @@ Options parseOptions(int argc, char** argv) {
             opts.spectrumPath = requireValue(i, argc, argv, arg);
         } else if (arg == "--support-spectrum-path") {
             opts.supportSpectrumPath = requireValue(i, argc, argv, arg);
+        } else if (arg == "--category-path") {
+            opts.categoryPath = requireValue(i, argc, argv, arg);
         } else if (arg == "--help" || arg == "-h") {
             std::cout
                 << "systematic_rfc_cert options:\n"
@@ -1349,6 +1418,7 @@ Options parseOptions(int argc, char** argv) {
                 << "  --prime P --samples N --seed N     sampler parameters\n"
                 << "  --spectrum-path path               write sampled spectrum CSV\n"
                 << "  --support-spectrum-path path       write sampled support-stratified spectrum CSV\n"
+                << "  --category-path path               write sampled one-step category CSV\n"
                 << "  --field-bits B                     field size log2, default 128\n"
                 << "  --security-bits B                  per-transition security bits\n"
                 << "  --compare                          print non-systematic comparison columns\n"

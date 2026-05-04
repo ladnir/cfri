@@ -71,5 +71,6 @@ build/systematic_rfc_cert_cpp/systematic_rfc_cert.exe ^
   --total-expansion 8 ^
   --samples 100 ^
   --seed 11 ^
-  --spectrum-path docs/sample_one_step_first_moment_gf5_depth3_c8_cpp.csv
+  --spectrum-path docs/sample_one_step_first_moment_gf5_depth3_c8_cpp.csv ^
+  --category-path docs/sample_one_step_categories_gf5_depth3_c8_cpp.csv
 ```

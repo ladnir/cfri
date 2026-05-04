@@ -239,3 +239,38 @@ systematic:
 In the top low-tail projected states, `equal_nonzero=0`. This suggests a compressed state based on
 `(support, root_capable_count)` may be a good first upper-bound target, with `equal_nonzero` tracked
 only as a forced-weight offset.
+
+The same postprocessor also evaluates a certificate-like upper bound: for each projected bucket,
+multiply the total pair count in the bucket by the maximum low-tail probability of any exact
+category inside it. This tests how much slack a compressed state would introduce if it forgot the
+finer category split.
+
+For the same artifact, the upper-bound slack factors are:
+
+```text
+projection                       original slack     systematic slack
+support only                     56999.47x          35316.85x
+support, active                  1.5893x            2.6584x
+support, equal_nonzero, active   1.2731x            2.4801x
+support, single_root, double     1.7457x            1.4669x
+full category                    1.0000x            1.0000x
+```
+
+This is the strongest compression signal so far:
+
+1. Support alone is hopeless.
+2. Tracking only total active/root-capable coordinates is already close for the original but loses a
+   factor `~2.7` on systematic.
+3. Tracking the split between `single_root` and `double_root` is better for systematic, with only
+   `~1.47x` slack, even without tracking `equal_nonzero`.
+
+So a plausible next certificate state is:
+
+```text
+parent support,
+single-root capable coordinate count,
+double-root capable coordinate count,
+forced nonzero/equal offset as a coarse penalty.
+```
+
+The challenge is to derive this state recursively without sampling child codes.

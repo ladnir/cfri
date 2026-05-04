@@ -64,6 +64,8 @@ def projection_key(row: dict[str, int | float | str], mode: str) -> tuple[int, .
         return (support, active)
     if mode == "support_equal_root":
         return (support, equal_nonzero, root_capable)
+    if mode == "support_single_double":
+        return (support, single_root, double_root)
     if mode == "support_equal_single_double":
         return (support, equal_nonzero, single_root, double_root)
     raise ValueError(f"unknown projection mode {mode}")
@@ -83,10 +85,12 @@ def main() -> None:
         "support",
         "support_active",
         "support_equal_root",
+        "support_single_double",
         "support_equal_single_double",
     ]
     totals: dict[str, dict[str, float]] = {mode: defaultdict(float) for mode in modes}
     pair_counts: dict[str, dict[str, float]] = {mode: defaultdict(float) for mode in modes}
+    max_tail_probability: dict[str, dict[str, float]] = {mode: defaultdict(float) for mode in modes}
     exact_total = defaultdict(float)
 
     with Path(args.category_csv).open(newline="") as handle:
@@ -120,12 +124,15 @@ def main() -> None:
                 key = (ensemble, *projection_key(typed_row, mode))
                 totals[mode][key] += contribution
                 pair_counts[mode][key] += pair_count
+                if probability > max_tail_probability[mode][key]:
+                    max_tail_probability[mode][key] = probability
 
     rows: list[dict[str, str | int | float]] = []
     for mode in modes:
         for key, contribution in sorted(totals[mode].items(), key=lambda item: item[1], reverse=True):
             ensemble = key[0]
             projected = key[1:]
+            projected_upper = pair_counts[mode][key] * max_tail_probability[mode][key]
             rows.append(
                 {
                     "mode": mode,
@@ -136,6 +143,9 @@ def main() -> None:
                     "fraction_of_low_tail": contribution / exact_total[ensemble]
                     if exact_total[ensemble]
                     else 0.0,
+                    "max_tail_probability": max_tail_probability[mode][key],
+                    "projected_upper_contribution": projected_upper,
+                    "projected_slack_factor": projected_upper / contribution if contribution else 0.0,
                 }
             )
 
@@ -145,6 +155,21 @@ def main() -> None:
     print()
     for mode in modes:
         print(f"mode={mode}")
+        upper_total = sum(
+            row["projected_upper_contribution"]
+            for row in rows
+            if row["mode"] == mode
+        )
+        upper_by_ensemble = defaultdict(float)
+        for row in rows:
+            if row["mode"] == mode:
+                upper_by_ensemble[row["ensemble"]] += row["projected_upper_contribution"]
+        for ensemble, total in sorted(upper_by_ensemble.items()):
+            denominator = exact_total[ensemble]
+            print(
+                f"upper_total,{ensemble},{total:.12g},"
+                f"slack_factor={total / denominator if denominator else 0.0:.6f}"
+            )
         shown = 0
         for row in rows:
             if row["mode"] != mode:
@@ -152,7 +177,9 @@ def main() -> None:
             print(
                 f"{row['ensemble']},{row['projected_state']},"
                 f"{row['expected_low_tail_contribution']:.12g},"
-                f"{row['fraction_of_low_tail']:.6f}"
+                f"{row['fraction_of_low_tail']:.6f},"
+                f"upper={row['projected_upper_contribution']:.12g},"
+                f"slack={row['projected_slack_factor']:.6f}"
             )
             shown += 1
             if shown >= 12:
@@ -170,6 +197,9 @@ def main() -> None:
                     "expected_pair_count",
                     "expected_low_tail_contribution",
                     "fraction_of_low_tail",
+                    "max_tail_probability",
+                    "projected_upper_contribution",
+                    "projected_slack_factor",
                 ],
             )
             writer.writeheader()

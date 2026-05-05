@@ -468,20 +468,12 @@ pub struct CompilerParityFoldLayerProof<H: Hash> {
 
 #[derive(Clone, Debug, Eq, PartialEq)]
 pub struct CompilerParityFoldPath {
-    pub top_logical_index: usize,
-    pub top_physical_index: usize,
     pub steps: Vec<CompilerParityFoldStep>,
 }
 
 #[derive(Clone, Debug, Eq, PartialEq)]
 pub struct CompilerParityFoldStep {
-    pub round: usize,
-    pub output_physical_index: usize,
-    pub sibling_physical_index: usize,
-    pub sibling_logical_index: usize,
     pub sibling_value: B128,
-    pub folded_physical_index: usize,
-    pub folded_logical_index: usize,
 }
 
 #[derive(Clone, Debug, Eq, PartialEq)]
@@ -1246,11 +1238,7 @@ impl Blaze2BaseFoldBackendParams {
                     "compiler parity query is missing its physical index".to_string(),
                 )
             })?;
-            paths.push(self.open_compiler_parity_fold_path(
-                state,
-                query.index,
-                top_physical_index,
-            )?);
+            paths.push(self.open_compiler_parity_fold_path(state, top_physical_index)?);
         }
         Ok(CompilerParityFoldQueryProof {
             paths,
@@ -1261,7 +1249,6 @@ impl Blaze2BaseFoldBackendParams {
     fn open_compiler_parity_fold_path<H: Hash>(
         &self,
         state: &Blaze2BaseFoldProverState<H>,
-        top_logical_index: usize,
         top_physical_index: usize,
     ) -> Result<CompilerParityFoldPath, Error> {
         let layout = self.compiler_code.layout();
@@ -1312,22 +1299,12 @@ impl Blaze2BaseFoldBackendParams {
                 state.physical_layers[round + 1][output_physical_index]
             );
             steps.push(CompilerParityFoldStep {
-                round,
-                output_physical_index,
-                sibling_physical_index,
-                sibling_logical_index: sibling.logical_index,
                 sibling_value: sibling.value,
-                folded_physical_index: output_physical_index,
-                folded_logical_index: folded.logical_index,
             });
             current_physical_index = output_physical_index;
         }
 
-        Ok(CompilerParityFoldPath {
-            top_logical_index,
-            top_physical_index,
-            steps,
-        })
+        Ok(CompilerParityFoldPath { steps })
     }
 
     fn commit_section5_permutation_helper<H: Hash>(
@@ -1904,14 +1881,12 @@ impl<H: Hash> CompilerParityFoldQueryProof<H> {
                     "compiler parity query is missing its physical index".to_string(),
                 )
             })?;
-            if path.top_logical_index != expected.index
-                || path.top_physical_index != expected_physical
-            {
+            if top_query.logical_index != expected.index {
                 return Err(Error::InvalidPcsOpen(
                     "compiler parity fold path does not match schedule".to_string(),
                 ));
             }
-            path.verify(layout, fold_challenges, top_query)?;
+            path.verify(layout, fold_challenges, top_query, expected_physical)?;
         }
         compiler_parity_fold_layer_queries(
             layout,
@@ -1930,25 +1905,16 @@ impl CompilerParityFoldPath {
         layout: &SystematicAugmentedRfcLayout,
         fold_challenges: &[B128],
         top_query: &CompilerParityQuery,
+        top_physical_index: usize,
     ) -> Result<(), Error> {
         if self.steps.len() != layout.num_rounds() {
             return Err(Error::InvalidPcsOpen(
                 "compiler parity fold path has wrong round count".to_string(),
             ));
         }
-        if top_query.logical_index != self.top_logical_index {
-            return Err(Error::InvalidPcsOpen(
-                "compiler parity fold path top query does not match path index".to_string(),
-            ));
-        }
         let mut current_value = top_query.value;
-        let mut current_physical_index = self.top_physical_index;
+        let mut current_physical_index = top_physical_index;
         for (round, step) in self.steps.iter().enumerate() {
-            if step.round != round {
-                return Err(Error::InvalidPcsOpen(
-                    "compiler parity fold path round is out of order".to_string(),
-                ));
-            }
             let current_len = layout.codeword_len() >> round;
             let half_len = current_len >> 1;
             let output_physical_index = current_physical_index & (half_len - 1);
@@ -1964,27 +1930,8 @@ impl CompilerParityFoldPath {
                             .to_string(),
                     ));
                 };
-            if step.output_physical_index != output_physical_index
-                || step.sibling_physical_index != sibling_physical_index
-                || step.folded_physical_index != output_physical_index
-            {
-                return Err(Error::InvalidPcsOpen(
-                    "compiler parity fold path indices do not follow the fold pair".to_string(),
-                ));
-            }
-
-            validate_parity_layer_address(
-                layout,
-                round,
-                sibling_physical_index,
-                step.sibling_logical_index,
-            )?;
-            validate_parity_layer_address(
-                layout,
-                round + 1,
-                output_physical_index,
-                step.folded_logical_index,
-            )?;
+            parity_logical_index_at_round(layout, round, sibling_physical_index)?;
+            parity_logical_index_at_round(layout, round + 1, output_physical_index)?;
 
             let folded = fold_rfc_parity_pair(left_value, right_value, fold_challenges[round]);
             current_value = folded;
@@ -5227,17 +5174,6 @@ fn parity_value_for_physical_index(
     })
 }
 
-fn compiler_parity_fold_top_queries<H: Hash>(
-    commitment: &CompilerParityCommitment<H>,
-    paths: &[CompilerParityFoldPath],
-) -> Result<Vec<CompilerParityQuery>, Error> {
-    let mut queries = Vec::with_capacity(paths.len());
-    for path in paths {
-        queries.push(commitment.query(path.top_logical_index)?);
-    }
-    Ok(queries)
-}
-
 fn collect_backend_query_set_from_prover_state<H: Hash>(
     layout: &SystematicAugmentedRfcLayout,
     state: &Blaze2BaseFoldProverState<H>,
@@ -5394,19 +5330,9 @@ fn compiler_parity_fold_layer_queries(
                 "compiler parity fold path has wrong round count".to_string(),
             ));
         }
-        if top_query.logical_index != path.top_logical_index {
-            return Err(Error::InvalidPcsOpen(
-                "compiler parity fold path top query does not match path index".to_string(),
-            ));
-        }
         let mut current_value = top_query.value;
-        let mut current_physical_index = path.top_physical_index;
+        let mut current_physical_index = layout.parity_to_physical(top_query.logical_index)?;
         for (round, step) in path.steps.iter().enumerate() {
-            if step.round != round {
-                return Err(Error::InvalidPcsOpen(
-                    "compiler parity fold path round is out of order".to_string(),
-                ));
-            }
             let current_len = layout.codeword_len() >> round;
             let half_len = current_len >> 1;
             let output_physical_index = current_physical_index & (half_len - 1);
@@ -5422,30 +5348,14 @@ fn compiler_parity_fold_layer_queries(
                             .to_string(),
                     ));
                 };
-            if step.output_physical_index != output_physical_index
-                || step.sibling_physical_index != sibling_physical_index
-                || step.folded_physical_index != output_physical_index
-            {
-                return Err(Error::InvalidPcsOpen(
-                    "compiler parity fold path indices do not follow the fold pair".to_string(),
-                ));
-            }
-            validate_parity_layer_address(
-                layout,
-                step.round,
-                step.sibling_physical_index,
-                step.sibling_logical_index,
-            )?;
-            queries[step.round].push((step.sibling_logical_index, step.sibling_value));
+            let sibling_logical_index =
+                parity_logical_index_at_round(layout, round, sibling_physical_index)?;
+            queries[round].push((sibling_logical_index, step.sibling_value));
             let folded = fold_rfc_parity_pair(left_value, right_value, fold_challenges[round]);
-            if step.round + 1 < layout.num_rounds() {
-                validate_parity_layer_address(
-                    layout,
-                    step.round + 1,
-                    step.folded_physical_index,
-                    step.folded_logical_index,
-                )?;
-                queries[step.round + 1].push((step.folded_logical_index, folded));
+            if round + 1 < layout.num_rounds() {
+                let folded_logical_index =
+                    parity_logical_index_at_round(layout, round + 1, output_physical_index)?;
+                queries[round + 1].push((folded_logical_index, folded));
             } else if let Some(terminal_codeword) = terminal_codeword {
                 let terminal_value =
                     terminal_codeword
@@ -5499,19 +5409,18 @@ fn parity_public_at_round<'a, H: Hash>(
     })
 }
 
-fn validate_parity_layer_address(
+fn parity_logical_index_at_round(
     layout: &SystematicAugmentedRfcLayout,
     round: usize,
     physical_index: usize,
-    logical_index: usize,
-) -> Result<(), Error> {
+) -> Result<usize, Error> {
     let address = layout.physical_to_logical_at_round(round, physical_index)?;
-    if address.part != CodewordPart::Parity || address.local_index != logical_index {
+    if address.part != CodewordPart::Parity {
         return Err(Error::InvalidPcsOpen(
-            "parity layer opening does not match the fold-path physical address".to_string(),
+            "compiler parity fold path tried to open a systematic position as parity".to_string(),
         ));
     }
-    Ok(())
+    Ok(address.local_index)
 }
 
 fn verify_terminal_codeword<H: Hash>(

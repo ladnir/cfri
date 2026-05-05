@@ -301,6 +301,12 @@ Current byte tests count field elements and Merkle nodes, not Rust struct metada
 serialization is accepted, indices that are fully determined by the transcript schedule must not be
 serialized as proof payload.
 
+Status: In progress. Terminal fold path top indices and compiler-parity fold-path top/round/
+physical/logical indices are now verifier-derived instead of proof-carried. The byte-template test
+already excludes transcript-derived indices. Remaining metadata cleanup should focus on any
+commitment-layer round tags or other fields that are still present only to restate verifier-known
+schedule order.
+
 The final serialization should derive:
 
 ```text

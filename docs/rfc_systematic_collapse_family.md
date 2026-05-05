@@ -258,6 +258,15 @@ z = 52
 rank = 31 over five sampled large-prime challenge assignments.
 ```
 
+At depth `4`, `c=8`, `t=2`, it gives:
+
+```text
+k = 16
+m = 4
+z = 24
+rank = 15 over five sampled large-prime challenge assignments.
+```
+
 At depth `6`, `c=8`, `t=3`, it gives:
 
 ```text
@@ -270,6 +279,8 @@ rank = 63 over three sampled large-prime challenge assignments.
 The artifacts are:
 
 ```text
+docs/rfc_systematic_collapse_family_depth4_c8_livebits2.csv
+docs/rfc_systematic_collapse_family_depth4_c8_livebits2_rank.csv
 docs/rfc_systematic_collapse_family_depth5_c8_livebits2.csv
 docs/rfc_systematic_collapse_family_depth5_c8_livebits2_rank.csv
 docs/rfc_systematic_collapse_family_depth6_c8_livebits3.csv
@@ -303,3 +314,105 @@ relative distance for this exact all-level systematic structure is at most:
 ```
 
 For `c=8`, this means an upper ceiling near `0.75`, compared to original MDS near `0.875`.
+
+## Optimality Within Live-Subcube Collapses
+
+The generalized family is optimal among collapses of this specific live-subcube form.
+
+Fix a live subcube of size:
+
+```text
+m = 2^t.
+```
+
+After restricting to that live subcube, every selected parity column factors as:
+
+```text
+scalar depending on fixed coordinates
+  *
+depth-t original RFC column type.
+```
+
+The column type is indexed by:
+
+```text
+(copy, live_direction).
+```
+
+For each selected type there are:
+
+```text
+k/m
+```
+
+duplicate scalar multiples, one for each complementary parity path. Therefore, to maximize the
+number of selected parity columns while keeping restricted rank below `m`, it is enough to maximize
+the number of selected depth-`t` original RFC column types whose span has rank below `m`.
+
+By the original RFC MDS theorem, every `m` such types are independent. Hence any rank-deficient type
+set has size at most:
+
+```text
+m - 1.
+```
+
+The generalized collapse construction selects exactly `m-1` types and all `k/m` duplicates of each
+type, so within the live-subcube collapse model it is optimal:
+
+```text
+max |Q| = (m-1) k/m = k - k/m.
+```
+
+Thus:
+
+```text
+max z(m) = k - m + k - k/m = 2k - m - k/m.
+```
+
+The remaining lower-bound challenge is broader: prove that every systematic structural rank defect
+is bounded by this live-subcube envelope, or identify an even more global obstruction. The original
+MDS theorem strongly suggests this is the right envelope, because any quotient obstruction must
+ultimately come from deleting systematic rows until many parity columns project onto fewer than
+their required number of original-RFC column types.
+
+## Gap To Current Lower Certificate
+
+The comparison table:
+
+```text
+docs/rfc_systematic_threshold_vs_collapse_ceiling_c8_depth1_to_11.csv
+```
+
+compares the old systematic threshold certificate to this collapse-family upper ceiling.
+
+At depth `11`, `c=8`:
+
+```text
+old systematic threshold certificate: 0.57482910
+collapse-family upper ceiling:        0.75585938
+headroom:                             0.18103028
+```
+
+So there is still a lot of room for a sharper systematic lower-bound proof. The realistic target is
+no longer near-MDS, but it may still be close to the collapse ceiling around `0.75` for `c=8`.
+
+## Proof Route After The Collapse
+
+The cleaner lower-bound route is now separated into:
+
+```text
+docs/rfc_systematic_uncertainty_route.md
+```
+
+The key reframing is that a systematic rank defect is the same thing as a nonzero message, supported
+on the live systematic rows, whose parity outputs vanish on the selected parity coordinates. A
+single RFC parity copy should satisfy the sharp uncertainty law:
+
+```text
+wt(x) * wt(Ax) >= k.
+```
+
+The live-subcube collapse achieves equality for one copy. Therefore the remaining proof problem is
+not one-copy algebra; it is multi-copy intersection. To beat the `1-2/c` ceiling, the same message
+would have to be simultaneously sparse in two or more independent RFC parity copies. That is the
+right place to use a first-moment/kernel-intersection count over the large field.

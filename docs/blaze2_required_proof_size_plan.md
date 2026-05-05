@@ -33,7 +33,7 @@ terminal folded-layer commitments/authentication across the three residual rows:
 | Backend compiler-parity fold values and multiproof nodes | 544 | 464 | Uses one shared multiproof per compiler commitment layer. |
 | Backend auxiliary relation values and multiproof nodes | 960 | 480 | Only sampled Section 5 relation-auxiliary leaves remain in this bucket. |
 | Section 5 residual values and shared residual multiproof nodes | 1,136 | 984 | Terminal base leaves now use the shared residual lane and terminal query count is tied to the residual query budget. |
-| Section 5 terminal folded-layer roots and authentication | 1,408 | 1,408 | Blocked as a local deletion: these roots/nodes bind the residual terminal paths under the current residual-Merkle scaffold. Removing this bucket soundly requires replacing that scaffold with the final shared BaseFold terminal-clear core. |
+| BaseFold terminal-core folded-layer roots and authentication | 1,408 | 1,408 | Still structurally required: these roots/nodes bind folded siblings for the residual terminal paths. The ownership has moved into `BaseFoldTerminalCoreAuthentication`, but deleting the bytes is sound only after those residual rows are proved by a shared BaseFold fold-query verifier rather than a residual-only Merkle scaffold. |
 | Section 5 helper values and multiproof nodes | 928 | 880 | Helper leaves are committed in a product-tree-aware physical layout while retaining logical helper indices. |
 | Total | 6,368 | 5,376 | Current pinned honest Section 5 implementation total. |
 
@@ -205,19 +205,21 @@ roots, authenticates the base residual leaves through the shared backend residua
 authenticates folded-layer siblings, and rejects missing or tampered terminal paths. Those
 folded-layer commitments and multiproofs are now shared across the three residual rows instead of
 being emitted independently per row, and both folded-layer roots and authentication nodes now live in
-the shared backend authentication object rather than inside the terminal proof object. This closes
-the old trusted/in-memory terminal binding gap. The terminal path witness has also been
+`BaseFoldTerminalCoreAuthentication` rather than Section 5-specific backend fields or the terminal
+proof object. This closes the old trusted/in-memory terminal binding gap and completes the first two
+terminal-core ownership hops. The terminal path witness has also been
 canonicalized: the proof now serializes the unique set of non-derived terminal value openings keyed
 by `(round, row, index)`, rejects duplicate or missing openings, and derives folded current values
 from earlier openings instead of serializing them. This keeps the wire shape honest, but it does not
-remove the terminal folded-layer bucket because that bucket is the separate commitment/authentication
-chain itself. After the shared-lane refactor, the remaining terminal blocker is no longer code
-plumbing: deleting the folded-layer roots/authentication while the residual rows are only Merkle
-committed would make the terminal fold siblings unbound. The existing tamper tests for folded-layer
-roots and authentication nodes are the regression guard for that fact. The sound proof-size move is
-to replace the residual-Merkle terminal scaffold with the final holographic BaseFold terminal-clear
-core, where the terminal word and fold queries are part of the shared backend proof rather than a
-Section 5 side chain. The permutation
+remove the terminal folded-layer bucket because that bucket is the commitment/authentication chain
+that binds non-base folded siblings. After the shared-lane and terminal-core ownership refactors, the
+remaining terminal blocker is exact: deleting `BaseFoldTerminalCoreAuthentication.folded_layers` or
+`.layer_authentication` while the residual rows are only Merkle committed would make later-round fold
+siblings unbound. The existing tamper tests for folded-layer roots and authentication nodes are the
+regression guard for that fact. The sound proof-size move is to replace the residual-Merkle terminal
+scaffold with the final holographic BaseFold terminal-clear core, where the residual rows themselves
+are opened by a shared BaseFold fold-query verifier rather than by a Section 5 side chain. The
+permutation
 residual row is no longer a placeholder:
 alpha/beta/gamma are squeezed before helper construction, the helper product-tree witnesses are
 committed after alpha/beta, and the residual commitment now contains a gamma-batched product-tree
@@ -356,10 +358,11 @@ B/C below, with a concrete Section 5 proof-oracle layout:
    from committed residual rows instead of full in-memory residual vectors; terminal folding queries
    are budgeted by the residual query domain rather than all backend query domains; base residual
   leaves for those terminal paths are now authenticated by the shared backend residual multiproof
-  collector, while folded-layer roots and authentication nodes are carried by the shared backend
-  authentication object; terminal path values are canonical unique openings rather than per-path
-  duplicates, but the terminal folded-layer lane still has to be folded into the final shared
-  proof-oracle/accounting model; helper product-tree local query derivation is tested and wired
+  collector, while folded-layer roots and authentication nodes are owned by
+  `BaseFoldTerminalCoreAuthentication`; terminal path values are canonical unique openings rather
+  than per-path duplicates, but the terminal folded-layer lane still has to be replaced by the final
+  shared BaseFold fold-query verifier before the 1,408-byte bucket can be removed; helper
+  product-tree local query derivation is tested and wired
   into the residual/helper verifier relation for sampled permutation residual rows; those helper
   leaves are now transcript-schedule-derived authentication queries rather than inferred from proof
   contents, and the helper query proof serializes the canonical unique set of needed leaves; the
@@ -482,7 +485,7 @@ Acceptance:
 | 3. Build the shared backend query-set collector. | Complete. |
 | 4. Generate per-layer multiproofs from the collector. | Complete. |
 | 5. Move auxiliary local relation checks into scheduled or algebraic backend checks. | In progress: arbitrary auxiliary traces now reject at prequery construction; the relation proof strategy is explicit; the normal Blaze2/BaseFold fixture uses Section 5; Section 5 builds scheduled pre-challenge relation openings/authentication, has a transcript-bound/authenticated post-challenge helper domain, emits prequery-bound honest relation sumcheck transcripts, and binds terminal residual evaluations through authenticated residual-terminal fold paths. |
-| 6. Replace the Blaze2-specific backend proof structs with the shared BaseFold-core proof. | In progress: the terminal-core replacement target is now specified, including the verifier equation, ownership move, tests, and exact 1,408-byte side-chain reduction condition. |
+| 6. Replace the Blaze2-specific backend proof structs with the shared BaseFold-core proof. | In progress: shared terminal-core proof/value types exist, folded-layer roots/authentication are owned by `BaseFoldTerminalCoreAuthentication`, and the exact 1,408-byte reduction blocker is pinned: no deletion until residual terminal rows are checked by a shared BaseFold fold-query verifier. |
 | 7. Add the 8-byte/16-byte field-width template and lock both acceptance numbers. | In progress: the current budget and byte-template test are parameterized by field byte width; a concrete 8-byte backend is still future work. |
 
 This order keeps the current hard structural wins intact while making each remaining byte movement

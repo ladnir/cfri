@@ -2077,7 +2077,7 @@ fn blaze2_basefold_b128_proof_size_accounting_is_exact() {
     );
     assert_eq!(
         b128_budget.section5_relation_terminal_path_bytes, 1408,
-        "Section 5 terminal folded-layer authentication is shared across residual rows until it moves into the shared BaseFold core"
+        "BaseFold terminal-core folded-layer authentication remains until residual terminal rows are opened by a shared fold-query verifier"
     );
     assert_eq!(
         b128_budget.section5_permutation_helper_path_bytes, 832,

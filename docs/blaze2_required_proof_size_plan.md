@@ -20,7 +20,8 @@ field_bytes = 8 for the Blaze-paper projection
 ```
 
 Current exact totals after switching the normal Blaze2/BaseFold fixture to the honest Section 5
-relation proof and budgeting the residual-terminal folding proof by the residual query domain:
+relation proof, budgeting residual-terminal folding by the residual query domain, and sharing the
+terminal folded-layer commitments/authentication across the three residual rows:
 
 | Component | B128 bytes | 8-byte projection | Status |
 | --- | ---: | ---: | --- |
@@ -31,10 +32,10 @@ relation proof and budgeting the residual-terminal folding proof by the residual
 | Backend compiler-parity query values and multiproof nodes | 16 | 8 | Top authentication is merged into the shared round-0 backend layer proof. |
 | Backend compiler-parity fold values and multiproof nodes | 720 | 680 | Uses one shared multiproof per compiler commitment layer. |
 | Backend auxiliary relation values and multiproof nodes | 1,200 | 712 | Only sampled Section 5 relation-auxiliary leaves remain in this bucket. |
-| Section 5 residual values and shared residual multiproof nodes | 1,136 | 984 | Terminal base leaves now use the shared residual lane and terminal query count is tied to the residual query budget. |
-| Section 5 terminal folded-layer roots and authentication | 1,536 | 1,536 | Remaining local scaffolding until terminal folding is part of the shared BaseFold core. |
+| Section 5 residual values and shared residual multiproof nodes | 1,168 | 1,016 | Terminal base leaves now use the shared residual lane and terminal query count is tied to the residual query budget. |
+| Section 5 terminal folded-layer roots and authentication | 1,408 | 1,408 | Commitments/authentication are shared across residual rows, but still remain local scaffolding until terminal folding is part of the shared BaseFold core. |
 | Section 5 helper values and multiproof nodes | 1,056 | 1,008 | Remaining helper-oracle bucket. |
-| Total | 6,960 | 6,008 | Current pinned honest Section 5 implementation total. |
+| Total | 6,864 | 5,912 | Current pinned honest Section 5 implementation total. |
 
 The Blaze outer term is already in the required shape. The remaining work is inside the
 holographic BaseFold backend term and in making the implementation proof object match the byte model
@@ -97,7 +98,7 @@ be two instantiations of the same budget.
 
 Acceptance:
 
-- The current fixture remains pinned at `6,960` B128 bytes and `6,008` projected bytes until a
+- The current fixture remains pinned at `6,864` B128 bytes and `5,912` projected bytes until a
   structural change intentionally moves it.
 - Every moved byte bucket has a named reason in the budget test.
 
@@ -201,11 +202,12 @@ claim. This helper is unit-tested for honest nonzero claims, tampered claims, ta
 shapes, and the Section 5 verifier now consumes a residual-terminal fold proof tied to the committed
 residual oracle: the prover commits folded residual layers, derives path query indices from those
 roots, authenticates the base residual leaves through the shared backend residual multiproof lane,
-authenticates folded-layer siblings, and rejects missing or tampered terminal paths. This closes the
-old trusted/in-memory terminal binding gap. The remaining accounting work is to move the
-folded-layer authentication into the shared backend proof-oracle budget/final holographic BaseFold
-core rather than leaving it as Section 5-local scaffolding. The permutation residual row is no
-longer a placeholder:
+authenticates folded-layer siblings, and rejects missing or tampered terminal paths. Those
+folded-layer commitments and multiproofs are now shared across the three residual rows instead of
+being emitted independently per row. This closes the old trusted/in-memory terminal binding gap. The
+remaining accounting work is to move the folded-layer authentication into the shared backend
+proof-oracle budget/final holographic BaseFold core rather than leaving it as Section 5-local
+scaffolding. The permutation residual row is no longer a placeholder:
 alpha/beta/gamma are squeezed before helper construction, the helper product-tree witnesses are
 committed after alpha/beta, and the residual commitment now contains a gamma-batched product-tree
 relation/root equality residual derived from those helper witnesses plus the two accumulator
@@ -245,8 +247,8 @@ B/C below, with a concrete Section 5 proof-oracle layout:
    from committed residual rows instead of full in-memory residual vectors; terminal folding queries
    are budgeted by the residual query domain rather than all backend query domains; base residual
    leaves for those terminal paths are now authenticated by the shared backend residual multiproof
-   collector, while folded-layer authentication still has to be folded into the final shared
-   proof-oracle/accounting model]
+   collector, while folded-layer commitments/authentication are shared across residual rows but still
+   have to be folded into the final shared proof-oracle/accounting model]
 5. switch the normal Blaze2 backend from `LocalQueries` to `Section5`; [Done for the normal
    Blaze2/BaseFold fixture]
 ```

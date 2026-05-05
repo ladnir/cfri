@@ -11,7 +11,7 @@ use crate::backend::{
     Error,
 };
 use crate::transcript::Transcript as CfriTranscript;
-use std::collections::BTreeMap;
+use std::{collections::BTreeMap, marker::PhantomData};
 
 const RAA_AUX_U2_ROW: usize = 0;
 const RAA_AUX_U3_ROW: usize = 1;
@@ -288,13 +288,14 @@ pub struct RaaSection5RelationResidualQueryProof<H: Hash> {
 #[derive(Clone, Debug, Default, Eq, PartialEq)]
 pub struct RaaSection5RelationTerminalProof<H: Hash> {
     pub rows: Vec<RaaSection5RelationTerminalRowProof<H>>,
+    pub folded_layers: Vec<AuxiliaryOraclePublicCommitment<H>>,
+    pub folded_layer_authentication: Vec<RaaSection5RelationTerminalLayerProof<H>>,
 }
 
 #[derive(Clone, Debug, Default, Eq, PartialEq)]
 pub struct RaaSection5RelationTerminalRowProof<H: Hash> {
-    pub folded_layers: Vec<AuxiliaryOraclePublicCommitment<H>>,
     pub paths: Vec<RaaSection5RelationTerminalPath>,
-    pub folded_layer_authentication: Vec<RaaSection5RelationTerminalLayerProof<H>>,
+    _hash_marker: PhantomData<H>,
 }
 
 #[derive(Clone, Debug, Eq, PartialEq)]
@@ -4503,54 +4504,92 @@ fn prove_section5_relation_terminal_proof<H: Hash>(
     let public = residual.public();
     let (permutation_row, rest) = residual.values().split_at(domain_len);
     let (first_accumulator_row, second_accumulator_row) = rest.split_at(domain_len);
+    let row_inputs = [
+        (
+            RAA_SECTION5_PERMUTATION_RESIDUAL_ROW,
+            &checks.permutation,
+            permutation_row,
+        ),
+        (
+            RAA_SECTION5_FIRST_ACCUMULATOR_RESIDUAL_ROW,
+            &checks.first_accumulator,
+            first_accumulator_row,
+        ),
+        (
+            RAA_SECTION5_SECOND_ACCUMULATOR_RESIDUAL_ROW,
+            &checks.second_accumulator,
+            second_accumulator_row,
+        ),
+    ];
+    let row_folded_values = row_inputs
+        .iter()
+        .map(|(_, check, row)| section5_relation_terminal_fold_row_values(check, row, domain_len))
+        .collect::<Result<Vec<_>, _>>()?;
+    let folded_rounds = log2_strict(domain_len).saturating_sub(1);
+    let mut folded_commitments = Vec::with_capacity(folded_rounds);
+    let mut folded_layers = Vec::with_capacity(folded_rounds);
+    for round_offset in 0..folded_rounds {
+        let layer_len = domain_len >> (round_offset + 1);
+        let mut layer_values =
+            Vec::with_capacity(RAA_SECTION5_RELATION_RESIDUAL_ROW_COUNT * layer_len);
+        for row_values in &row_folded_values {
+            layer_values.extend_from_slice(&row_values[round_offset]);
+        }
+        let commitment = AuxiliaryOracleCommitment::<H>::commit_values(layer_values)?;
+        folded_layers.push(commitment.public());
+        folded_commitments.push(commitment);
+    }
+    let rows = row_inputs
+        .iter()
+        .zip(row_folded_values.iter())
+        .map(|((row_index, check, row), folded_values)| {
+            prove_section5_relation_terminal_row_proof::<H>(
+                *row_index,
+                check,
+                &public,
+                row,
+                folded_values,
+                &folded_layers,
+                domain_len,
+                query_count,
+            )
+        })
+        .collect::<Result<Vec<_>, _>>()?;
+
+    let mut folded_layer_authentication = Vec::with_capacity(folded_commitments.len());
+    for (round_offset, commitment) in folded_commitments.iter().enumerate() {
+        let round = round_offset + 1;
+        let queries = section5_relation_terminal_combined_folded_layer_queries(
+            round, &rows, checks, domain_len,
+        )?;
+        folded_layer_authentication.push(RaaSection5RelationTerminalLayerProof {
+            round,
+            authentication_nodes: merkle_b128_multiproof_nodes::<H, _>(
+                &commitment.merkle_tree,
+                queries,
+            )?,
+        });
+    }
+
     Ok(RaaSection5RelationTerminalProof {
-        rows: vec![
-            prove_section5_relation_terminal_row_proof::<H>(
-                RAA_SECTION5_PERMUTATION_RESIDUAL_ROW,
-                &checks.permutation,
-                &public,
-                permutation_row,
-                domain_len,
-                query_count,
-            )?,
-            prove_section5_relation_terminal_row_proof::<H>(
-                RAA_SECTION5_FIRST_ACCUMULATOR_RESIDUAL_ROW,
-                &checks.first_accumulator,
-                &public,
-                first_accumulator_row,
-                domain_len,
-                query_count,
-            )?,
-            prove_section5_relation_terminal_row_proof::<H>(
-                RAA_SECTION5_SECOND_ACCUMULATOR_RESIDUAL_ROW,
-                &checks.second_accumulator,
-                &public,
-                second_accumulator_row,
-                domain_len,
-                query_count,
-            )?,
-        ],
+        rows,
+        folded_layers,
+        folded_layer_authentication,
     })
 }
 
-fn prove_section5_relation_terminal_row_proof<H: Hash>(
-    row_index: usize,
+fn section5_relation_terminal_fold_row_values(
     check: &RaaRelationSumcheckCheck,
-    residual_public: &RaaSection5RelationResidualPublicCommitment<H>,
     row: &[B128],
     domain_len: usize,
-    query_count: usize,
-) -> Result<RaaSection5RelationTerminalRowProof<H>, Error> {
+) -> Result<Vec<Vec<B128>>, Error> {
     let num_vars = log2_strict(domain_len);
-    if check.challenges.len() != num_vars {
+    if row.len() != domain_len || check.challenges.len() != num_vars {
         return Err(Error::InvalidPcsOpen(
-            "RAA Section 5 terminal proof challenge length is invalid".to_string(),
+            "RAA Section 5 terminal proof row shape is invalid".to_string(),
         ));
     }
-
     let mut folded_values = Vec::with_capacity(num_vars.saturating_sub(1));
-    let mut folded_commitments = Vec::with_capacity(num_vars.saturating_sub(1));
-    let mut folded_layers = Vec::with_capacity(num_vars.saturating_sub(1));
     let mut current = row.to_vec();
     for &challenge in &check.challenges {
         let half = current.len() >> 1;
@@ -4563,9 +4602,6 @@ fn prove_section5_relation_terminal_row_proof<H: Hash>(
             ));
         }
         if next.len() > 1 {
-            let commitment = AuxiliaryOracleCommitment::<H>::commit_values(next.clone())?;
-            folded_layers.push(commitment.public());
-            folded_commitments.push(commitment);
             folded_values.push(next.clone());
         }
         current = next;
@@ -4575,12 +4611,38 @@ fn prove_section5_relation_terminal_row_proof<H: Hash>(
             "RAA Section 5 terminal proof row does not fold to the sumcheck claim".to_string(),
         ));
     }
+    Ok(folded_values)
+}
+
+fn prove_section5_relation_terminal_row_proof<H: Hash>(
+    row_index: usize,
+    check: &RaaRelationSumcheckCheck,
+    residual_public: &RaaSection5RelationResidualPublicCommitment<H>,
+    row: &[B128],
+    folded_values: &[Vec<B128>],
+    folded_layers: &[AuxiliaryOraclePublicCommitment<H>],
+    domain_len: usize,
+    query_count: usize,
+) -> Result<RaaSection5RelationTerminalRowProof<H>, Error> {
+    let num_vars = log2_strict(domain_len);
+    if check.challenges.len() != num_vars {
+        return Err(Error::InvalidPcsOpen(
+            "RAA Section 5 terminal proof challenge length is invalid".to_string(),
+        ));
+    }
+    if folded_values.len() != num_vars.saturating_sub(1)
+        || folded_layers.len() != num_vars.saturating_sub(1)
+    {
+        return Err(Error::InvalidPcsOpen(
+            "RAA Section 5 terminal proof folded layer count is invalid".to_string(),
+        ));
+    }
 
     let query_indices = section5_relation_terminal_query_indices::<H>(
         row_index,
         check,
         residual_public,
-        &folded_layers,
+        folded_layers,
         domain_len,
         query_count,
     )?;
@@ -4588,30 +4650,15 @@ fn prove_section5_relation_terminal_row_proof<H: Hash>(
     for top_index in query_indices {
         paths.push(section5_relation_terminal_path(
             row,
-            &folded_values,
+            folded_values,
             &check.challenges,
             top_index,
         )?);
     }
 
-    let mut folded_layer_authentication = Vec::with_capacity(folded_commitments.len());
-    for (round_offset, commitment) in folded_commitments.iter().enumerate() {
-        let round = round_offset + 1;
-        let queries =
-            section5_relation_terminal_folded_layer_queries(round, &paths, check, domain_len)?;
-        folded_layer_authentication.push(RaaSection5RelationTerminalLayerProof {
-            round,
-            authentication_nodes: merkle_b128_multiproof_nodes::<H, _>(
-                &commitment.merkle_tree,
-                queries,
-            )?,
-        });
-    }
-
     Ok(RaaSection5RelationTerminalRowProof {
-        folded_layers,
         paths,
-        folded_layer_authentication,
+        _hash_marker: PhantomData,
     })
 }
 
@@ -4664,10 +4711,12 @@ impl<H: Hash> RaaSection5RelationTerminalProof<H> {
     }
 
     fn hash_node_count(&self) -> usize {
-        self.rows
-            .iter()
-            .map(RaaSection5RelationTerminalRowProof::hash_node_count)
-            .sum()
+        self.folded_layers.len()
+            + self
+                .folded_layer_authentication
+                .iter()
+                .map(|layer| layer.authentication_nodes.len())
+                .sum::<usize>()
     }
 
     fn residual_authentication_queries(
@@ -4702,10 +4751,25 @@ impl<H: Hash> RaaSection5RelationTerminalProof<H> {
                 "RAA Section 5 terminal proof row count is invalid".to_string(),
             ));
         }
+        let folded_rounds = log2_strict(domain_len).saturating_sub(1);
+        if self.folded_layers.len() != folded_rounds {
+            return Err(Error::InvalidPcsOpen(
+                "RAA Section 5 terminal proof folded layer count is invalid".to_string(),
+            ));
+        }
+        for (offset, layer) in self.folded_layers.iter().enumerate() {
+            let round = offset + 1;
+            if layer.len != RAA_SECTION5_RELATION_RESIDUAL_ROW_COUNT * (domain_len >> round) {
+                return Err(Error::InvalidPcsOpen(
+                    "RAA Section 5 terminal proof folded layer length is invalid".to_string(),
+                ));
+            }
+        }
         self.rows[RAA_SECTION5_PERMUTATION_RESIDUAL_ROW].verify(
             RAA_SECTION5_PERMUTATION_RESIDUAL_ROW,
             &checks.permutation,
             public,
+            &self.folded_layers,
             domain_len,
             query_count,
         )?;
@@ -4713,6 +4777,7 @@ impl<H: Hash> RaaSection5RelationTerminalProof<H> {
             RAA_SECTION5_FIRST_ACCUMULATOR_RESIDUAL_ROW,
             &checks.first_accumulator,
             public,
+            &self.folded_layers,
             domain_len,
             query_count,
         )?;
@@ -4720,77 +4785,10 @@ impl<H: Hash> RaaSection5RelationTerminalProof<H> {
             RAA_SECTION5_SECOND_ACCUMULATOR_RESIDUAL_ROW,
             &checks.second_accumulator,
             public,
-            domain_len,
-            query_count,
-        )
-    }
-}
-
-impl<H: Hash> RaaSection5RelationTerminalRowProof<H> {
-    fn serialized_value_count(&self) -> usize {
-        self.paths
-            .iter()
-            .map(|path| 1 + path.steps.len())
-            .sum::<usize>()
-    }
-
-    fn hash_node_count(&self) -> usize {
-        self.folded_layers.len()
-            + self
-                .folded_layer_authentication
-                .iter()
-                .map(|layer| layer.authentication_nodes.len())
-                .sum::<usize>()
-    }
-
-    fn verify(
-        &self,
-        row_index: usize,
-        check: &RaaRelationSumcheckCheck,
-        public: &RaaSection5RelationResidualPublicCommitment<H>,
-        domain_len: usize,
-        query_count: usize,
-    ) -> Result<(), Error> {
-        let num_vars = log2_strict(domain_len);
-        if check.challenges.len() != num_vars {
-            return Err(Error::InvalidPcsOpen(
-                "RAA Section 5 terminal proof challenge length is invalid".to_string(),
-            ));
-        }
-        if self.folded_layers.len() != num_vars.saturating_sub(1) {
-            return Err(Error::InvalidPcsOpen(
-                "RAA Section 5 terminal proof folded layer count is invalid".to_string(),
-            ));
-        }
-        for (offset, layer) in self.folded_layers.iter().enumerate() {
-            let round = offset + 1;
-            if layer.len != domain_len >> round {
-                return Err(Error::InvalidPcsOpen(
-                    "RAA Section 5 terminal proof folded layer length is invalid".to_string(),
-                ));
-            }
-        }
-        let expected_indices = section5_relation_terminal_query_indices::<H>(
-            row_index,
-            check,
-            public,
             &self.folded_layers,
             domain_len,
             query_count,
         )?;
-        if self.paths.len() != expected_indices.len() {
-            return Err(Error::InvalidPcsOpen(
-                "RAA Section 5 terminal proof path count is invalid".to_string(),
-            ));
-        }
-        for (path, expected_index) in self.paths.iter().zip(expected_indices.iter().copied()) {
-            if path.top_index != expected_index {
-                return Err(Error::InvalidPcsOpen(
-                    "RAA Section 5 terminal proof path index does not match transcript".to_string(),
-                ));
-            }
-            verify_section5_relation_terminal_path(path, check, domain_len)?;
-        }
 
         if self.folded_layer_authentication.len() != self.folded_layers.len() {
             return Err(Error::InvalidPcsOpen(
@@ -4810,11 +4808,8 @@ impl<H: Hash> RaaSection5RelationTerminalRowProof<H> {
                         .to_string(),
                 ));
             }
-            let queries = section5_relation_terminal_folded_layer_queries(
-                round,
-                &self.paths,
-                check,
-                domain_len,
+            let queries = section5_relation_terminal_combined_folded_layer_queries(
+                round, &self.rows, checks, domain_len,
             )?;
             verify_merkle_b128_multiproof::<H, _>(
                 &public.root,
@@ -4822,6 +4817,59 @@ impl<H: Hash> RaaSection5RelationTerminalRowProof<H> {
                 queries,
                 &proof.authentication_nodes,
             )?;
+        }
+        Ok(())
+    }
+}
+
+impl<H: Hash> RaaSection5RelationTerminalRowProof<H> {
+    fn serialized_value_count(&self) -> usize {
+        self.paths
+            .iter()
+            .map(|path| 1 + path.steps.len())
+            .sum::<usize>()
+    }
+
+    fn verify(
+        &self,
+        row_index: usize,
+        check: &RaaRelationSumcheckCheck,
+        public: &RaaSection5RelationResidualPublicCommitment<H>,
+        folded_layers: &[AuxiliaryOraclePublicCommitment<H>],
+        domain_len: usize,
+        query_count: usize,
+    ) -> Result<(), Error> {
+        let num_vars = log2_strict(domain_len);
+        if check.challenges.len() != num_vars {
+            return Err(Error::InvalidPcsOpen(
+                "RAA Section 5 terminal proof challenge length is invalid".to_string(),
+            ));
+        }
+        if folded_layers.len() != num_vars.saturating_sub(1) {
+            return Err(Error::InvalidPcsOpen(
+                "RAA Section 5 terminal proof folded layer count is invalid".to_string(),
+            ));
+        }
+        let expected_indices = section5_relation_terminal_query_indices::<H>(
+            row_index,
+            check,
+            public,
+            folded_layers,
+            domain_len,
+            query_count,
+        )?;
+        if self.paths.len() != expected_indices.len() {
+            return Err(Error::InvalidPcsOpen(
+                "RAA Section 5 terminal proof path count is invalid".to_string(),
+            ));
+        }
+        for (path, expected_index) in self.paths.iter().zip(expected_indices.iter().copied()) {
+            if path.top_index != expected_index {
+                return Err(Error::InvalidPcsOpen(
+                    "RAA Section 5 terminal proof path index does not match transcript".to_string(),
+                ));
+            }
+            verify_section5_relation_terminal_path(path, check, domain_len)?;
         }
         Ok(())
     }
@@ -5024,6 +5072,44 @@ fn section5_relation_terminal_folded_layer_queries(
         queries.push((step.sibling_index, step.sibling_value));
     }
     Ok(queries)
+}
+
+fn section5_relation_terminal_combined_folded_layer_queries<H: Hash>(
+    round: usize,
+    rows: &[RaaSection5RelationTerminalRowProof<H>],
+    checks: &RaaSection5RelationChecks,
+    domain_len: usize,
+) -> Result<Vec<(usize, B128)>, Error> {
+    if rows.len() != RAA_SECTION5_RELATION_RESIDUAL_ROW_COUNT {
+        return Err(Error::InvalidPcsOpen(
+            "RAA Section 5 terminal proof row count is invalid".to_string(),
+        ));
+    }
+    let active_len = domain_len >> round;
+    let mut queries = Vec::new();
+    for (row_index, row) in rows.iter().enumerate() {
+        let check = section5_relation_terminal_row_check(checks, row_index)?;
+        queries.extend(
+            section5_relation_terminal_folded_layer_queries(round, &row.paths, check, domain_len)?
+                .into_iter()
+                .map(|(index, value)| (row_index * active_len + index, value)),
+        );
+    }
+    Ok(queries)
+}
+
+fn section5_relation_terminal_row_check(
+    checks: &RaaSection5RelationChecks,
+    row_index: usize,
+) -> Result<&RaaRelationSumcheckCheck, Error> {
+    match row_index {
+        RAA_SECTION5_PERMUTATION_RESIDUAL_ROW => Ok(&checks.permutation),
+        RAA_SECTION5_FIRST_ACCUMULATOR_RESIDUAL_ROW => Ok(&checks.first_accumulator),
+        RAA_SECTION5_SECOND_ACCUMULATOR_RESIDUAL_ROW => Ok(&checks.second_accumulator),
+        _ => Err(Error::InvalidPcsOpen(
+            "RAA Section 5 terminal proof row index is invalid".to_string(),
+        )),
+    }
 }
 
 fn raa_eval_sumcheck_evaluate(coeffs: &[B128; 3], point: B128) -> B128 {
@@ -7539,6 +7625,30 @@ mod tests {
                 &request,
                 &schedule,
                 &tampered_terminal_value,
+                &top_queries,
+            )
+            .unwrap_err();
+        assert!(format!("{err:?}").contains("Merkle"));
+
+        let mut tampered_terminal_fold_auth = proof.clone();
+        let terminal_proof = tampered_terminal_fold_auth
+            .section5_relation_residual
+            .as_mut()
+            .unwrap()
+            .terminal_proof
+            .as_mut()
+            .unwrap();
+        assert!(!terminal_proof.folded_layer_authentication.is_empty());
+        assert!(!terminal_proof.folded_layer_authentication[0]
+            .authentication_nodes
+            .is_empty());
+        terminal_proof.folded_layer_authentication[0].authentication_nodes[0][0] ^= 1;
+        let err = params
+            .verify_query_proof(
+                &prequery,
+                &request,
+                &schedule,
+                &tampered_terminal_fold_auth,
                 &top_queries,
             )
             .unwrap_err();

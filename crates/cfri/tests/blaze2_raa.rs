@@ -1833,12 +1833,12 @@ fn blaze2_basefold_b128_proof_size_accounting_is_exact() {
         "Section 5 auxiliary authentication is only the sampled relation-auxiliary leaves"
     );
     assert_eq!(
-        b128_budget.section5_relation_residual_path_bytes, 832,
+        b128_budget.section5_relation_residual_path_bytes, 864,
         "Section 5 terminal base leaves are authenticated through the shared residual multiproof lane"
     );
     assert_eq!(
-        b128_budget.section5_relation_terminal_path_bytes, 1536,
-        "current Section 5 terminal folded-layer authentication is pinned until it moves into the shared BaseFold core"
+        b128_budget.section5_relation_terminal_path_bytes, 1408,
+        "Section 5 terminal folded-layer authentication is shared across residual rows until it moves into the shared BaseFold core"
     );
     assert_eq!(
         b128_budget.section5_permutation_helper_path_bytes, 960,
@@ -1875,12 +1875,12 @@ fn blaze2_basefold_b128_proof_size_accounting_is_exact() {
     );
     assert_eq!(
         b128_breakdown.total_bytes(),
-        6_960,
-        "current small fixture B128 total pins the residual-budgeted Section 5 terminal-binding proof shape"
+        6_864,
+        "current small fixture B128 total pins the shared residual-terminal folded-layer proof shape"
     );
     assert_eq!(
         paper_breakdown.total_bytes(),
-        6_008,
+        5_912,
         "current small fixture 8-byte projection keeps the field-width correction explicit"
     );
 }

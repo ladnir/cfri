@@ -20,7 +20,7 @@ field_bytes = 8 for the Blaze-paper projection
 ```
 
 Current exact totals after switching the normal Blaze2/BaseFold fixture to the honest Section 5
-relation proof and residual-terminal binding path:
+relation proof and budgeting the residual-terminal folding proof by the residual query domain:
 
 | Component | B128 bytes | 8-byte projection | Status |
 | --- | ---: | ---: | --- |
@@ -31,10 +31,10 @@ relation proof and residual-terminal binding path:
 | Backend compiler-parity query values and multiproof nodes | 16 | 8 | Top authentication is merged into the shared round-0 backend layer proof. |
 | Backend compiler-parity fold values and multiproof nodes | 720 | 680 | Uses one shared multiproof per compiler commitment layer. |
 | Backend auxiliary relation values and multiproof nodes | 1,200 | 712 | Only sampled Section 5 relation-auxiliary leaves remain in this bucket. |
-| Section 5 residual values and shared residual multiproof nodes | 3,760 | 2,456 | Largest new honest-binding bucket; terminal base leaves now use the shared residual lane. |
-| Section 5 terminal folded-layer roots and authentication | 896 | 896 | Remaining local scaffolding until terminal folding is part of the shared BaseFold core. |
+| Section 5 residual values and shared residual multiproof nodes | 1,136 | 984 | Terminal base leaves now use the shared residual lane and terminal query count is tied to the residual query budget. |
+| Section 5 terminal folded-layer roots and authentication | 1,536 | 1,536 | Remaining local scaffolding until terminal folding is part of the shared BaseFold core. |
 | Section 5 helper values and multiproof nodes | 1,056 | 1,008 | Remaining helper-oracle bucket. |
-| Total | 8,944 | 6,840 | Current pinned honest Section 5 implementation total. |
+| Total | 6,960 | 6,008 | Current pinned honest Section 5 implementation total. |
 
 The Blaze outer term is already in the required shape. The remaining work is inside the
 holographic BaseFold backend term and in making the implementation proof object match the byte model
@@ -97,7 +97,7 @@ be two instantiations of the same budget.
 
 Acceptance:
 
-- The current fixture remains pinned at `8,944` B128 bytes and `6,840` projected bytes until a
+- The current fixture remains pinned at `6,960` B128 bytes and `6,008` projected bytes until a
   structural change intentionally moves it.
 - Every moved byte bucket has a named reason in the budget test.
 
@@ -242,9 +242,10 @@ B/C below, with a concrete Section 5 proof-oracle layout:
    and validates the three Section 5 sumcheck transcript shapes and round consistency, now deriving
    named terminal challenge/claim objects; residual proof-oracle rows are committed and
    query-authenticated, and a tested residual-terminal fold proof now feeds the terminal binding
-   from committed residual rows instead of full in-memory residual vectors; base residual leaves for
-   those terminal paths are now authenticated by the shared backend residual multiproof collector,
-   while folded-layer authentication still has to be folded into the final shared
+   from committed residual rows instead of full in-memory residual vectors; terminal folding queries
+   are budgeted by the residual query domain rather than all backend query domains; base residual
+   leaves for those terminal paths are now authenticated by the shared backend residual multiproof
+   collector, while folded-layer authentication still has to be folded into the final shared
    proof-oracle/accounting model]
 5. switch the normal Blaze2 backend from `LocalQueries` to `Section5`; [Done for the normal
    Blaze2/BaseFold fixture]

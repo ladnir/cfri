@@ -4931,7 +4931,9 @@ fn section5_relation_terminal_domain_len(residual_len: usize) -> Result<usize, E
 }
 
 fn section5_relation_terminal_query_count(schedule: &HolographicQuerySchedule) -> usize {
-    schedule.proof_queries().len().max(1)
+    schedule
+        .section5_relation_residual_proof_query_count()
+        .max(1)
 }
 
 fn section5_relation_terminal_query_indices<H: Hash>(
@@ -7397,10 +7399,10 @@ mod tests {
             residual_terminal.rows.len(),
             RAA_SECTION5_RELATION_RESIDUAL_ROW_COUNT
         );
-        assert!(residual_terminal
-            .rows
-            .iter()
-            .all(|row| row.paths.len() == schedule.proof_queries().len().max(1)));
+        assert!(residual_terminal.rows.iter().all(|row| row.paths.len()
+            == schedule
+                .section5_relation_residual_proof_query_count()
+                .max(1)));
         let auxiliary = proof
             .auxiliary
             .as_ref()

@@ -571,7 +571,15 @@ impl Blaze2BaseFoldProofSizeBudget {
             .section5_relation_residual
             .as_ref()
             .map(|residual| residual.terminal_hash_node_count() * hash_bytes)
-            .unwrap_or(0);
+            .unwrap_or(0)
+            + proof
+                .backend_proof
+                .authentication
+                .section5_relation_terminal_layers
+                .iter()
+                .flat_map(|layer| layer.authentication_nodes.iter())
+                .map(|digest| digest.len())
+                .sum::<usize>();
         let section5_permutation_helper_serialized_value_count = proof
             .backend_proof
             .section5_permutation_helper
@@ -759,7 +767,15 @@ fn blaze2_basefold_proof_size_breakdown(
         .section5_relation_residual
         .as_ref()
         .map(|residual| residual.terminal_hash_node_count() * hash_bytes)
-        .unwrap_or(0);
+        .unwrap_or(0)
+        + proof
+            .backend_proof
+            .authentication
+            .section5_relation_terminal_layers
+            .iter()
+            .flat_map(|layer| layer.authentication_nodes.iter())
+            .map(|digest| digest.len())
+            .sum::<usize>();
     let section5_permutation_helper_value_bytes = proof
         .backend_proof
         .section5_permutation_helper
@@ -1014,9 +1030,6 @@ fn blaze2_basefold_wire_payload_bytes_with_field_bytes(
             for layer in &terminal.folded_layers {
                 push_wire_hash(&mut bytes, &layer.root);
             }
-            for layer in &terminal.folded_layer_authentication {
-                push_wire_hashes(&mut bytes, layer.authentication_nodes.iter());
-            }
         }
     }
     if let Some(helper) = &proof.backend_proof.section5_permutation_helper {
@@ -1040,6 +1053,13 @@ fn blaze2_basefold_wire_payload_bytes_with_field_bytes(
             .section5_relation_residual_nodes
             .iter(),
     );
+    for layer in &proof
+        .backend_proof
+        .authentication
+        .section5_relation_terminal_layers
+    {
+        push_wire_hashes(&mut bytes, layer.authentication_nodes.iter());
+    }
     push_wire_hashes(
         &mut bytes,
         proof

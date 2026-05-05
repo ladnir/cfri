@@ -87,7 +87,14 @@ The original code now looks essentially optimal from a distance perspective. The
 tight; it lost distance through the threshold/union-bound proof architecture. The new certificate
 uses the actual folding algebra and recovers the Singleton-bound distance.
 
-The systematic all-level code is different. It has real structural rank defects at `z=k+2` in
-depth `3`, so its near-MDS target should currently be `k+3` or weaker unless the construction is
-changed. This does not affect the original RFC MDS theorem because the obstruction depends on
-quotienting out systematic row subtrees, which the original code does not have.
+The systematic all-level code is different. It has an explicit live-subcube collapse family with:
+
+```text
+z = 2k - O(sqrt(k))
+delta_sys <= 1 - 2/c.
+```
+
+For `c=8`, that puts the systematic all-level ceiling near `0.75`, still well above the old
+threshold certificate but meaningfully below original MDS. This does not affect the original RFC
+MDS theorem because the obstruction depends on quotienting out systematic row subtrees, which the
+original code does not have.

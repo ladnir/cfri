@@ -439,9 +439,16 @@ instance of the explicit collapse family documented in:
 docs/rfc_systematic_collapse_family.md
 ```
 
-Therefore the `e=3` systematic target is false for the all-level systematic code. The additive loss
-is at least `k/2-2`, giving the asymptotic upper bound:
+Therefore the `e=3` systematic target is false for the all-level systematic code. The first
+two-live-row family gives additive loss at least `k/2-2`, but the generalized live-subcube family
+is stronger: choosing `m` live rows and omitting one of the `m` live parity directions gives:
 
 ```text
-delta_sys <= 1 - 3/(2c).
+z(m) = 2k - m - k/m.
+```
+
+Optimizing `m` near `sqrt(k)` gives the asymptotic upper bound:
+
+```text
+delta_sys <= 1 - 2/c.
 ```

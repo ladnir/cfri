@@ -27,8 +27,8 @@ use cfri::backend::{
         required_blaze2_basefold_auxiliary_oracle_len, required_blaze2_basefold_eval_binding_len,
         required_blaze2_basefold_relation_auxiliary_len, BackendProofQueryDomain,
         Blaze2BaseFoldBackendParams, Blaze2BaseFoldBackendSpec, Blaze2BaseFoldOpenRequest,
-        HolographicQuerySchedule, RaaRelationProof, RaaRelationProofStrategy,
-        SystematicFoldableCodeSpec,
+        HolographicQuerySchedule, RaaAuxiliaryLocalRelationProof, RaaRelationProof,
+        RaaRelationProofStrategy, RaaRelationSumcheckProof, SystematicFoldableCodeSpec,
     },
     transcript::InMemoryTranscript as _,
     Error,
@@ -427,6 +427,8 @@ struct Blaze2BaseFoldProofSizeBreakdown {
     folded_parity_root_bytes: usize,
     terminal_codeword_bytes: usize,
     auxiliary_root_bytes: usize,
+    section5_relation_residual_root_bytes: usize,
+    section5_permutation_helper_root_bytes: usize,
     outer_column_value_bytes: usize,
     outer_column_path_bytes: usize,
     compiler_parity_query_value_bytes: usize,
@@ -449,6 +451,8 @@ impl Blaze2BaseFoldProofSizeBreakdown {
             + self.folded_parity_root_bytes
             + self.terminal_codeword_bytes
             + self.auxiliary_root_bytes
+            + self.section5_relation_residual_root_bytes
+            + self.section5_permutation_helper_root_bytes
     }
 
     fn blaze_outer_bytes(&self) -> usize {
@@ -486,6 +490,8 @@ struct Blaze2BaseFoldProofSizeBudget {
     outer_path_len: usize,
     compiler_rounds: usize,
     terminal_word_len: usize,
+    section5_relation_residual_root_bytes: usize,
+    section5_permutation_helper_root_bytes: usize,
     compiler_parity_query_count: usize,
     compiler_parity_query_path_bytes: usize,
     compiler_parity_fold_path_bytes: usize,
@@ -518,6 +524,18 @@ impl Blaze2BaseFoldProofSizeBudget {
             .auxiliary
             .as_ref()
             .map(|auxiliary| auxiliary.serialized_value_count())
+            .unwrap_or(0);
+        let section5_relation_residual_root_bytes = proof
+            .backend_prequery
+            .section5_relation_residual
+            .as_ref()
+            .map(|public| public.root.len())
+            .unwrap_or(0);
+        let section5_permutation_helper_root_bytes = proof
+            .backend_prequery
+            .section5_permutation_helper
+            .as_ref()
+            .map(|public| public.root.len())
             .unwrap_or(0);
         let compiler_parity_query_path_bytes = 0;
         let compiler_parity_fold_path_bytes = proof
@@ -576,6 +594,8 @@ impl Blaze2BaseFoldProofSizeBudget {
             outer_path_len: params.praa().packed().codeword_len().trailing_zeros() as usize,
             compiler_rounds: params.compiler_code().layout().num_rounds(),
             terminal_word_len: params.compiler_code().layout().parity_expansion_factor() + 1,
+            section5_relation_residual_root_bytes,
+            section5_permutation_helper_root_bytes,
             compiler_parity_query_count,
             compiler_parity_query_path_bytes,
             compiler_parity_fold_path_bytes,
@@ -598,6 +618,8 @@ impl Blaze2BaseFoldProofSizeBudget {
             folded_parity_root_bytes: self.compiler_rounds * self.hash_bytes,
             terminal_codeword_bytes: self.terminal_word_len * self.field_bytes,
             auxiliary_root_bytes: self.hash_bytes,
+            section5_relation_residual_root_bytes: self.section5_relation_residual_root_bytes,
+            section5_permutation_helper_root_bytes: self.section5_permutation_helper_root_bytes,
             outer_column_value_bytes: self.q_raa_input * self.row_count * self.field_bytes,
             outer_column_path_bytes: self.q_raa_input * self.outer_path_len * self.hash_bytes,
             compiler_parity_query_value_bytes: self.compiler_parity_query_count * self.field_bytes,
@@ -653,6 +675,18 @@ fn blaze2_basefold_proof_size_breakdown(
         .auxiliary
         .as_ref()
         .map(|auxiliary| auxiliary.root.len())
+        .unwrap_or(0);
+    let section5_relation_residual_root_bytes = proof
+        .backend_prequery
+        .section5_relation_residual
+        .as_ref()
+        .map(|public| public.root.len())
+        .unwrap_or(0);
+    let section5_permutation_helper_root_bytes = proof
+        .backend_prequery
+        .section5_permutation_helper
+        .as_ref()
+        .map(|public| public.root.len())
         .unwrap_or(0);
     let outer_column_value_bytes = proof
         .queries
@@ -747,6 +781,8 @@ fn blaze2_basefold_proof_size_breakdown(
         folded_parity_root_bytes,
         terminal_codeword_bytes,
         auxiliary_root_bytes,
+        section5_relation_residual_root_bytes,
+        section5_permutation_helper_root_bytes,
         outer_column_value_bytes,
         outer_column_path_bytes,
         compiler_parity_query_value_bytes,
@@ -836,6 +872,184 @@ fn blaze2_basefold_backend_query_bytes_with_field_bytes(
     field_bytes: usize,
 ) -> usize {
     blaze2_basefold_proof_size_breakdown(proof, field_bytes).backend_query_bytes()
+}
+
+fn push_wire_field(bytes: &mut Vec<u8>, value: &B128, field_bytes: usize) {
+    assert!(field_bytes <= 16);
+    let repr = value.to_repr();
+    bytes.extend_from_slice(&repr.as_ref()[..field_bytes]);
+}
+
+fn push_wire_fields(bytes: &mut Vec<u8>, values: &[B128], field_bytes: usize) {
+    for value in values {
+        push_wire_field(bytes, value, field_bytes);
+    }
+}
+
+fn push_wire_hash(bytes: &mut Vec<u8>, digest: &[u8]) {
+    bytes.extend_from_slice(digest);
+}
+
+fn push_wire_hashes<I>(bytes: &mut Vec<u8>, digests: I)
+where
+    I: IntoIterator,
+    I::Item: AsRef<[u8]>,
+{
+    for digest in digests {
+        push_wire_hash(bytes, digest.as_ref());
+    }
+}
+
+fn push_wire_relation_sumcheck(
+    bytes: &mut Vec<u8>,
+    proof: &RaaRelationSumcheckProof,
+    field_bytes: usize,
+) {
+    for round in &proof.round_polynomials {
+        push_wire_fields(bytes, round, field_bytes);
+    }
+}
+
+fn push_wire_relation_proof(bytes: &mut Vec<u8>, proof: &RaaRelationProof, field_bytes: usize) {
+    match proof {
+        RaaRelationProof::LocalQueries(local) => {
+            for query in &local.local_relation_queries {
+                match query {
+                    RaaAuxiliaryLocalRelationProof::Equality => {}
+                    RaaAuxiliaryLocalRelationProof::FirstAccumulatorStep { previous_value } => {
+                        push_wire_field(bytes, previous_value, field_bytes);
+                    }
+                }
+            }
+        }
+        RaaRelationProof::Section5(section5) => {
+            push_wire_relation_sumcheck(bytes, &section5.permutation_sumcheck, field_bytes);
+            push_wire_relation_sumcheck(bytes, &section5.first_accumulator_sumcheck, field_bytes);
+            push_wire_relation_sumcheck(bytes, &section5.second_accumulator_sumcheck, field_bytes);
+            push_wire_fields(bytes, &section5.terminal_evaluations, field_bytes);
+        }
+    }
+}
+
+fn blaze2_basefold_wire_payload_bytes_with_field_bytes(
+    proof: &Blaze2BaseFoldOpeningProof<Blake2s256>,
+    field_bytes: usize,
+) -> usize {
+    let mut bytes = Vec::new();
+
+    push_wire_fields(&mut bytes, &proof.row_evals, field_bytes);
+    push_wire_hash(&mut bytes, &proof.backend_prequery.compiler_parity.root);
+    if let Some(sumcheck) = &proof.backend_prequery.eval_sumcheck {
+        for coeffs in &sumcheck.round_polynomials {
+            push_wire_fields(&mut bytes, coeffs, field_bytes);
+        }
+    }
+    for layer in &proof.backend_prequery.folded_parity_layers {
+        push_wire_hash(&mut bytes, &layer.root);
+    }
+    push_wire_fields(
+        &mut bytes,
+        &proof.backend_prequery.terminal_codeword,
+        field_bytes,
+    );
+    if let Some(auxiliary) = &proof.backend_prequery.auxiliary {
+        push_wire_hash(&mut bytes, &auxiliary.root);
+    }
+    if let Some(residual) = &proof.backend_prequery.section5_relation_residual {
+        push_wire_hash(&mut bytes, &residual.root);
+    }
+    if let Some(helper) = &proof.backend_prequery.section5_permutation_helper {
+        push_wire_hash(&mut bytes, &helper.root);
+    }
+
+    for query in &proof.queries {
+        push_wire_fields(&mut bytes, &query.column_opening.values, field_bytes);
+        push_wire_hashes(&mut bytes, query.column_opening.path.iter());
+    }
+
+    for query in &proof.backend_proof.compiler_parity.queries {
+        push_wire_field(&mut bytes, &query.value, field_bytes);
+    }
+    push_wire_hashes(
+        &mut bytes,
+        proof
+            .backend_proof
+            .compiler_parity
+            .authentication_nodes
+            .iter(),
+    );
+    for path in &proof.backend_proof.compiler_parity_folds.paths {
+        for step in &path.steps {
+            push_wire_field(&mut bytes, &step.sibling_value, field_bytes);
+        }
+    }
+    for layer in &proof
+        .backend_proof
+        .compiler_parity_folds
+        .layer_authentication
+    {
+        push_wire_hashes(&mut bytes, layer.authentication_nodes.iter());
+    }
+    if let Some(auxiliary) = &proof.backend_proof.auxiliary {
+        for query in &auxiliary.relation_queries {
+            push_wire_field(&mut bytes, &query.value, field_bytes);
+        }
+        push_wire_relation_proof(&mut bytes, &auxiliary.raa_relation, field_bytes);
+        push_wire_hashes(&mut bytes, auxiliary.authentication_nodes.iter());
+    }
+    if let Some(residual) = &proof.backend_proof.section5_relation_residual {
+        for query in &residual.queries {
+            push_wire_field(&mut bytes, &query.value, field_bytes);
+        }
+        push_wire_hashes(&mut bytes, residual.authentication_nodes.iter());
+        if let Some(terminal) = &residual.terminal_proof {
+            for row in &terminal.rows {
+                for path in &row.paths {
+                    push_wire_field(&mut bytes, &path.top_value, field_bytes);
+                    for step in &path.steps {
+                        push_wire_field(&mut bytes, &step.sibling_value, field_bytes);
+                    }
+                }
+            }
+            for layer in &terminal.folded_layers {
+                push_wire_hash(&mut bytes, &layer.root);
+            }
+            for layer in &terminal.folded_layer_authentication {
+                push_wire_hashes(&mut bytes, layer.authentication_nodes.iter());
+            }
+        }
+    }
+    if let Some(helper) = &proof.backend_proof.section5_permutation_helper {
+        for query in &helper.queries {
+            push_wire_field(&mut bytes, &query.value, field_bytes);
+        }
+        push_wire_hashes(&mut bytes, helper.authentication_nodes.iter());
+    }
+    for layer in &proof.backend_proof.authentication.compiler_parity_layers {
+        push_wire_hashes(&mut bytes, layer.authentication_nodes.iter());
+    }
+    push_wire_hashes(
+        &mut bytes,
+        proof.backend_proof.authentication.auxiliary_nodes.iter(),
+    );
+    push_wire_hashes(
+        &mut bytes,
+        proof
+            .backend_proof
+            .authentication
+            .section5_relation_residual_nodes
+            .iter(),
+    );
+    push_wire_hashes(
+        &mut bytes,
+        proof
+            .backend_proof
+            .authentication
+            .section5_permutation_helper_nodes
+            .iter(),
+    );
+
+    bytes.len()
 }
 
 fn tamper_opened_trace_value<H: Hash>(
@@ -1874,13 +2088,23 @@ fn blaze2_basefold_b128_proof_size_accounting_is_exact() {
         blaze2_basefold_backend_query_bytes_with_field_bytes(&proof, b128_field_bytes)
     );
     assert_eq!(
+        blaze2_basefold_wire_payload_bytes_with_field_bytes(&proof, b128_field_bytes),
         b128_breakdown.total_bytes(),
-        6_864,
-        "current small fixture B128 total pins the shared residual-terminal folded-layer proof shape"
+        "B128 byte-template serialization must match the proof-size budget without transcript-derived indices"
+    );
+    assert_eq!(
+        blaze2_basefold_wire_payload_bytes_with_field_bytes(&proof, paper_field_bytes),
+        paper_breakdown.total_bytes(),
+        "8-byte projection must be the same wire template with only the field byte width changed"
+    );
+    assert_eq!(
+        b128_breakdown.total_bytes(),
+        6_928,
+        "current small fixture B128 total pins the shared residual-terminal folded-layer proof shape and all prequery roots"
     );
     assert_eq!(
         paper_breakdown.total_bytes(),
-        5_912,
+        5_976,
         "current small fixture 8-byte projection keeps the field-width correction explicit"
     );
 }

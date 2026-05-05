@@ -184,7 +184,12 @@ yet. The paper-critical verifier relation still has to bind those terminal claim
 proof-oracle openings without local companion Merkle openings. The verifier now returns a named
 bundle of Section 5 terminal challenge vectors and terminal claims from the sumcheck transcript
 checks, so the missing binding has concrete proof-oracle evaluation targets instead of living behind
-a generic fail-closed branch.
+a generic fail-closed branch. The Section 5 relation residual rows are also now a named
+proof-oracle commitment: they are transcript-bound before query sampling, included in the typed
+backend proof-query schedule, opened by the query proof, and authenticated through the shared
+backend multiproof collector. This gives the missing terminal binding a committed oracle target,
+although the verifier still has to check the multilinear terminal evaluations against those
+committed residual rows.
 
 After re-reading Blaze Section 5, the honest implementation cannot be just "the same three rows
 with fewer openings." The paper relation uses MLIOP proof oracles for the RAA computation: the
@@ -196,11 +201,13 @@ B/C below, with a concrete Section 5 proof-oracle layout:
 ```text
 1. define the packed Section 5 proof-oracle rows; [In progress: pre-challenge `u2/u3/u4` rows are
    explicit; post-challenge `f/g` helper-row constants, byte budget, commitment slot, and honest
-   challenge-derived product-tree witness values are explicit]
+   challenge-derived product-tree witness values are explicit; relation residual rows have a
+   named commitment/query/authentication lane]
 2. commit/authenticate those rows through the shared backend query-set collector; [Done:
    scheduled pre-challenge Section 5 rows are in the auxiliary query domain; helper commitment is
    transcript-bound before query sampling; helper leaves are opened through the shared backend
-   query set and Merkle multiproof authentication]
+   query set and Merkle multiproof authentication; residual leaves are opened through the same
+   typed query set and Merkle multiproof authentication]
 3. implement the alpha/beta/r transcript rounds and batched sumcheck checks for:
    - repetition/permutation into u2,
    - u3 = A * u2,
@@ -212,7 +219,8 @@ B/C below, with a concrete Section 5 proof-oracle layout:
    serialized terminal values; [In progress: verifier rejects unbound serialized terminal values
    and validates the three Section 5 sumcheck transcript shapes and round consistency, now deriving
    named terminal challenge/claim objects before failing closed at the missing terminal-opening
-   binding]
+   binding; residual proof-oracle rows are committed and query-authenticated, but their multilinear
+   terminal evaluations are not yet verified]
 5. switch the normal Blaze2 backend from `LocalQueries` to `Section5`.
 ```
 

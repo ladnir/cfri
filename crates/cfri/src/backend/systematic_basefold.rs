@@ -25,6 +25,7 @@ const RAA_SECTION5_F2_0_ROW: usize = 7;
 const RAA_SECTION5_F2_1_ROW: usize = 8;
 const RAA_SECTION5_G2_0_ROW: usize = 9;
 const RAA_SECTION5_G2_1_ROW: usize = 10;
+const RAA_SECTION5_RELATION_RESIDUAL_ROW_COUNT: usize = 3;
 const RAA_SECTION5_PERMUTATION_HELPER_ROW_COUNT: usize = 8;
 const RAA_SECTION5_AUX_ROW_COUNT: usize = RAA_AUX_RELATION_ROW_COUNT;
 const RAA_SECTION5_PERMUTATION_SUMCHECK_DEGREE: usize = 3;
@@ -97,6 +98,7 @@ pub enum SystematicFoldRule {
 pub enum BackendProofQueryDomain {
     CompilerParity,
     RelationAuxiliary,
+    Section5RelationResidual,
     Section5PermutationHelper,
 }
 
@@ -231,6 +233,11 @@ pub struct RaaSection5PermutationHelperCommitment<H: Hash> {
     inner: AuxiliaryOracleCommitment<H>,
 }
 
+#[derive(Clone, Debug)]
+pub struct RaaSection5RelationResidualCommitment<H: Hash> {
+    inner: AuxiliaryOracleCommitment<H>,
+}
+
 #[derive(Clone, Debug, Eq, PartialEq)]
 pub struct AuxiliaryOraclePublicCommitment<H: Hash> {
     pub root: Output<H>,
@@ -239,6 +246,12 @@ pub struct AuxiliaryOraclePublicCommitment<H: Hash> {
 
 #[derive(Clone, Debug, Eq, PartialEq)]
 pub struct RaaSection5PermutationHelperPublicCommitment<H: Hash> {
+    pub root: Output<H>,
+    pub len: usize,
+}
+
+#[derive(Clone, Debug, Eq, PartialEq)]
+pub struct RaaSection5RelationResidualPublicCommitment<H: Hash> {
     pub root: Output<H>,
     pub len: usize,
 }
@@ -258,6 +271,12 @@ pub struct AuxiliaryOracleQueryProof<H: Hash> {
 
 #[derive(Clone, Debug, Eq, PartialEq)]
 pub struct RaaSection5PermutationHelperQueryProof<H: Hash> {
+    pub queries: Vec<AuxiliaryOracleQuery>,
+    pub authentication_nodes: Vec<Output<H>>,
+}
+
+#[derive(Clone, Debug, Eq, PartialEq)]
+pub struct RaaSection5RelationResidualQueryProof<H: Hash> {
     pub queries: Vec<AuxiliaryOracleQuery>,
     pub authentication_nodes: Vec<Output<H>>,
 }
@@ -340,6 +359,7 @@ pub struct Blaze2BaseFoldPrequeryPublic<H: Hash> {
     pub folded_parity_layers: Vec<CompilerParityPublicCommitment<H>>,
     pub terminal_codeword: Vec<B128>,
     pub auxiliary: Option<AuxiliaryOraclePublicCommitment<H>>,
+    pub section5_relation_residual: Option<RaaSection5RelationResidualPublicCommitment<H>>,
     pub section5_permutation_helper: Option<RaaSection5PermutationHelperPublicCommitment<H>>,
     pub section5_relation: Option<RaaSection5RelationProof>,
 }
@@ -351,6 +371,7 @@ pub struct Blaze2BaseFoldProverState<H: Hash> {
     physical_layers: Vec<Vec<B128>>,
     fold_challenges: Vec<B128>,
     auxiliary: Option<AuxiliaryOracleCommitment<H>>,
+    section5_relation_residual: Option<RaaSection5RelationResidualCommitment<H>>,
     section5_permutation_helper: Option<RaaSection5PermutationHelperCommitment<H>>,
     section5_relation: Option<RaaSection5RelationProof>,
 }
@@ -360,6 +381,7 @@ pub struct Blaze2BaseFoldQueryProof<H: Hash> {
     pub compiler_parity: CompilerParityQueryProof<H>,
     pub compiler_parity_folds: CompilerParityFoldQueryProof<H>,
     pub auxiliary: Option<AuxiliaryOracleQueryProof<H>>,
+    pub section5_relation_residual: Option<RaaSection5RelationResidualQueryProof<H>>,
     pub section5_permutation_helper: Option<RaaSection5PermutationHelperQueryProof<H>>,
     pub authentication: BackendProofOracleAuthentication<H>,
 }
@@ -369,6 +391,7 @@ pub struct BackendProofOracleQuerySet {
     pub compiler_parity_queries: Vec<(usize, B128)>,
     pub compiler_parity_fold_layer_queries: Vec<Vec<(usize, B128)>>,
     pub auxiliary_queries: Vec<(usize, B128)>,
+    pub section5_relation_residual_queries: Vec<(usize, B128)>,
     pub section5_permutation_helper_queries: Vec<(usize, B128)>,
 }
 
@@ -384,6 +407,7 @@ impl BackendProofOracleQuerySet {
         self.compiler_parity_queries.len()
             + self.compiler_parity_fold_query_count()
             + self.auxiliary_queries.len()
+            + self.section5_relation_residual_queries.len()
             + self.section5_permutation_helper_queries.len()
     }
 }
@@ -392,6 +416,7 @@ impl BackendProofOracleQuerySet {
 pub struct BackendProofOracleAuthentication<H: Hash> {
     pub compiler_parity_layers: Vec<CompilerParityFoldLayerProof<H>>,
     pub auxiliary_nodes: Vec<Output<H>>,
+    pub section5_relation_residual_nodes: Vec<Output<H>>,
     pub section5_permutation_helper_nodes: Vec<Output<H>>,
 }
 
@@ -669,11 +694,27 @@ impl Blaze2BaseFoldBackendParams {
             )?)
         };
         let auxiliary_public = auxiliary.as_ref().map(AuxiliaryOracleCommitment::public);
+        let section5_relation_residual =
+            if self.spec.raa_relation_strategy == RaaRelationProofStrategy::Section5 {
+                Some(RaaSection5RelationResidualCommitment::commit_values(
+                    build_raa_section5_relation_residual_oracle(
+                        self.praa.packed(),
+                        auxiliary_oracle,
+                        folded_codeword,
+                    )?,
+                )?)
+            } else {
+                None
+            };
+        let section5_relation_residual_public = section5_relation_residual
+            .as_ref()
+            .map(RaaSection5RelationResidualCommitment::public);
         let (section5_permutation_helper, section5_relation_challenges) = self
             .commit_section5_permutation_helper::<H>(
                 auxiliary_oracle,
                 &compiler_parity_public,
                 auxiliary_public.as_ref(),
+                section5_relation_residual_public.as_ref(),
                 request,
             )?;
         let section5_permutation_helper_public = section5_permutation_helper
@@ -724,6 +765,7 @@ impl Blaze2BaseFoldBackendParams {
                 .expect("folded parity prover returns at least the top physical layer")
                 .clone(),
             auxiliary: auxiliary_public,
+            section5_relation_residual: section5_relation_residual_public,
             section5_permutation_helper: section5_permutation_helper_public,
             section5_relation: section5_relation.clone(),
         };
@@ -735,6 +777,7 @@ impl Blaze2BaseFoldBackendParams {
                 physical_layers,
                 fold_challenges,
                 auxiliary,
+                section5_relation_residual,
                 section5_permutation_helper,
                 section5_relation,
             },
@@ -789,6 +832,18 @@ impl Blaze2BaseFoldBackendParams {
         };
         let compiler_parity = state.compiler_parity.prove_schedule(schedule)?;
         let compiler_parity_folds = self.open_compiler_parity_fold_paths(state, schedule)?;
+        let section5_relation_residual = match &state.section5_relation_residual {
+            Some(residual) => Some(residual.prove_schedule(schedule)?),
+            None => {
+                if schedule.section5_relation_residual_proof_query_count() != 0 {
+                    return Err(Error::InvalidPcsOpen(
+                        "backend schedule contains Section 5 residual queries but no residual oracle is committed"
+                            .to_string(),
+                    ));
+                }
+                None
+            }
+        };
         let section5_permutation_helper = match &state.section5_permutation_helper {
             Some(helper) => Some(helper.prove_schedule(schedule)?),
             None => {
@@ -821,6 +876,7 @@ impl Blaze2BaseFoldBackendParams {
             &compiler_parity,
             &compiler_parity_folds,
             auxiliary.as_ref(),
+            section5_relation_residual.as_ref(),
             section5_permutation_helper.as_ref(),
         )?;
         let authentication = self.open_backend_query_set_authentication(state, &query_set)?;
@@ -828,6 +884,7 @@ impl Blaze2BaseFoldBackendParams {
             compiler_parity,
             compiler_parity_folds,
             auxiliary,
+            section5_relation_residual,
             section5_permutation_helper,
             authentication,
         })
@@ -866,6 +923,11 @@ impl Blaze2BaseFoldBackendParams {
         verify_section5_relation_query_proof_matches_prequery(
             prequery.section5_relation.as_ref(),
             proof.auxiliary.as_ref(),
+            schedule,
+        )?;
+        verify_section5_relation_residual_query_proof(
+            prequery.section5_relation_residual.as_ref(),
+            proof.section5_relation_residual.as_ref(),
             schedule,
         )?;
         verify_section5_permutation_helper_query_proof(
@@ -929,6 +991,22 @@ impl Blaze2BaseFoldBackendParams {
                 ));
             }
         };
+        let section5_relation_residual_nodes = match (
+            &state.section5_relation_residual,
+            query_set.section5_relation_residual_queries.is_empty(),
+        ) {
+            (Some(residual), _) => merkle_b128_multiproof_nodes::<H, _>(
+                &residual.inner.merkle_tree,
+                query_set.section5_relation_residual_queries.iter().copied(),
+            )?,
+            (None, true) => Vec::new(),
+            (None, false) => {
+                return Err(Error::InvalidPcsOpen(
+                    "backend query set contains Section 5 residual leaves but no residual oracle is committed"
+                        .to_string(),
+                ));
+            }
+        };
         let section5_permutation_helper_nodes = match (
             &state.section5_permutation_helper,
             query_set.section5_permutation_helper_queries.is_empty(),
@@ -952,6 +1030,7 @@ impl Blaze2BaseFoldBackendParams {
         Ok(BackendProofOracleAuthentication {
             compiler_parity_layers,
             auxiliary_nodes,
+            section5_relation_residual_nodes,
             section5_permutation_helper_nodes,
         })
     }
@@ -1191,6 +1270,7 @@ impl Blaze2BaseFoldBackendParams {
         auxiliary_oracle: &[B128],
         compiler_parity: &CompilerParityPublicCommitment<H>,
         auxiliary: Option<&AuxiliaryOraclePublicCommitment<H>>,
+        residual: Option<&RaaSection5RelationResidualPublicCommitment<H>>,
         request: &Blaze2BaseFoldOpenRequest<'_>,
     ) -> Result<
         (
@@ -1206,6 +1286,7 @@ impl Blaze2BaseFoldBackendParams {
             self.spec(),
             compiler_parity,
             auxiliary,
+            residual,
             request,
         );
         let values = build_raa_section5_permutation_helper_oracle(
@@ -1551,11 +1632,24 @@ impl<H: Hash> Blaze2BaseFoldQueryProof<H> {
                 Vec::new()
             }
         };
+        let section5_relation_residual_queries = match &self.section5_relation_residual {
+            Some(residual) => residual.authentication_queries(schedule)?,
+            None => {
+                if schedule.section5_relation_residual_proof_query_count() != 0 {
+                    return Err(Error::InvalidPcsOpen(
+                        "backend schedule contains Section 5 residual queries, but residual query proof is absent"
+                            .to_string(),
+                    ));
+                }
+                Vec::new()
+            }
+        };
 
         Ok(BackendProofOracleQuerySet {
             compiler_parity_queries,
             compiler_parity_fold_layer_queries,
             auxiliary_queries,
+            section5_relation_residual_queries,
             section5_permutation_helper_queries,
         })
     }
@@ -1568,6 +1662,7 @@ impl<H: Hash> BackendProofOracleAuthentication<H> {
             .map(|layer| layer.authentication_nodes.len())
             .sum::<usize>()
             + self.auxiliary_nodes.len()
+            + self.section5_relation_residual_nodes.len()
             + self.section5_permutation_helper_nodes.len()
     }
 
@@ -1617,6 +1712,24 @@ impl<H: Hash> BackendProofOracleAuthentication<H> {
             (None, _) => {
                 return Err(Error::InvalidPcsOpen(
                     "backend proof oracle contains auxiliary authentication without an auxiliary commitment"
+                        .to_string(),
+                ));
+            }
+        }
+        match (
+            &prequery.section5_relation_residual,
+            query_set.section5_relation_residual_queries.is_empty(),
+        ) {
+            (Some(public), _) => verify_merkle_b128_multiproof::<H, _>(
+                &public.root,
+                public.len,
+                query_set.section5_relation_residual_queries.iter().copied(),
+                &self.section5_relation_residual_nodes,
+            )?,
+            (None, true) if self.section5_relation_residual_nodes.is_empty() => {}
+            (None, _) => {
+                return Err(Error::InvalidPcsOpen(
+                    "backend proof oracle contains Section 5 residual authentication without a residual commitment"
                         .to_string(),
                 ));
             }
@@ -1957,6 +2070,49 @@ impl<H: Hash> RaaSection5PermutationHelperCommitment<H> {
     }
 }
 
+impl<H: Hash> RaaSection5RelationResidualCommitment<H> {
+    pub fn commit_values(values: Vec<B128>) -> Result<Self, Error> {
+        Ok(Self {
+            inner: AuxiliaryOracleCommitment::commit_values(values)?,
+        })
+    }
+
+    pub fn public(&self) -> RaaSection5RelationResidualPublicCommitment<H> {
+        RaaSection5RelationResidualPublicCommitment {
+            root: self.inner.root().clone(),
+            len: self.inner.len(),
+        }
+    }
+
+    pub fn len(&self) -> usize {
+        self.inner.len()
+    }
+
+    pub fn values(&self) -> &[B128] {
+        self.inner.values()
+    }
+
+    pub fn query(&self, logical_index: usize) -> Result<AuxiliaryOracleQuery, Error> {
+        self.inner.query(logical_index)
+    }
+
+    pub fn prove_schedule(
+        &self,
+        schedule: &HolographicQuerySchedule,
+    ) -> Result<RaaSection5RelationResidualQueryProof<H>, Error> {
+        let mut queries = Vec::new();
+        for query in schedule.proof_queries() {
+            if query.domain == BackendProofQueryDomain::Section5RelationResidual {
+                queries.push(self.query(query.index)?);
+            }
+        }
+        Ok(RaaSection5RelationResidualQueryProof {
+            queries,
+            authentication_nodes: Vec::new(),
+        })
+    }
+}
+
 impl<H: Hash> RaaSection5PermutationHelperQueryProof<H> {
     pub fn query_count(&self) -> usize {
         self.queries.len()
@@ -2027,6 +2183,86 @@ impl<H: Hash> RaaSection5PermutationHelperQueryProof<H> {
         if supplied.next().is_some() {
             return Err(Error::InvalidPcsOpen(
                 "too many Section 5 helper query openings".to_string(),
+            ));
+        }
+        Ok(queries)
+    }
+}
+
+impl<H: Hash> RaaSection5RelationResidualQueryProof<H> {
+    pub fn query_count(&self) -> usize {
+        self.queries.len()
+    }
+
+    pub fn serialized_value_count(&self) -> usize {
+        self.queries.len()
+    }
+
+    fn verify_schedule(
+        &self,
+        public: &RaaSection5RelationResidualPublicCommitment<H>,
+        schedule: &HolographicQuerySchedule,
+    ) -> Result<(), Error> {
+        if !self.authentication_nodes.is_empty() {
+            return Err(Error::InvalidPcsOpen(
+                "Section 5 relation residual authentication must be carried by the backend proof oracle"
+                    .to_string(),
+            ));
+        }
+        if self.query_count() != schedule.section5_relation_residual_proof_query_count() {
+            return Err(Error::InvalidPcsOpen(
+                "Section 5 relation residual query proof count does not match schedule".to_string(),
+            ));
+        }
+        let mut queries = self.queries.iter();
+        for expected in schedule.proof_queries() {
+            if expected.domain != BackendProofQueryDomain::Section5RelationResidual {
+                continue;
+            }
+            let query = queries.next().ok_or_else(|| {
+                Error::InvalidPcsOpen(
+                    "Section 5 relation residual query opening is missing".to_string(),
+                )
+            })?;
+            if query.logical_index != expected.index || query.logical_index >= public.len {
+                return Err(Error::InvalidPcsOpen(
+                    "Section 5 relation residual query index does not match schedule".to_string(),
+                ));
+            }
+        }
+        if queries.next().is_some() {
+            return Err(Error::InvalidPcsOpen(
+                "too many Section 5 relation residual query openings".to_string(),
+            ));
+        }
+        Ok(())
+    }
+
+    fn authentication_queries(
+        &self,
+        schedule: &HolographicQuerySchedule,
+    ) -> Result<Vec<(usize, B128)>, Error> {
+        let mut queries = Vec::with_capacity(self.queries.len());
+        let mut supplied = self.queries.iter();
+        for expected in schedule.proof_queries() {
+            if expected.domain != BackendProofQueryDomain::Section5RelationResidual {
+                continue;
+            }
+            let query = supplied.next().ok_or_else(|| {
+                Error::InvalidPcsOpen(
+                    "Section 5 relation residual query opening is missing".to_string(),
+                )
+            })?;
+            if query.logical_index != expected.index {
+                return Err(Error::InvalidPcsOpen(
+                    "Section 5 relation residual query index does not match schedule".to_string(),
+                ));
+            }
+            queries.push((query.logical_index, query.value));
+        }
+        if supplied.next().is_some() {
+            return Err(Error::InvalidPcsOpen(
+                "too many Section 5 relation residual query openings".to_string(),
             ));
         }
         Ok(queries)
@@ -2872,6 +3108,10 @@ pub fn absorb_blaze2_basefold_prequery_public<H: Hash, S>(
         }
         None => transcript.absorb("auxiliary-oracle-absent"),
     }
+    if let Some(residual) = &prequery.section5_relation_residual {
+        transcript.absorb("raa-section5-relation-residual-present");
+        absorb_section5_relation_residual_public_commitment(transcript, residual);
+    }
     if let Some(helper) = &prequery.section5_permutation_helper {
         transcript.absorb("raa-section5-permutation-helper-present");
         absorb_section5_permutation_helper_public_commitment(transcript, helper);
@@ -2964,6 +3204,7 @@ fn squeeze_raa_section5_relation_challenges<H: Hash>(
     spec: &Blaze2BaseFoldBackendSpec,
     compiler_parity: &CompilerParityPublicCommitment<H>,
     auxiliary: Option<&AuxiliaryOraclePublicCommitment<H>>,
+    residual: Option<&RaaSection5RelationResidualPublicCommitment<H>>,
     request: &Blaze2BaseFoldOpenRequest<'_>,
 ) -> RaaSection5RelationChallenges {
     let mut transcript = CfriTranscript::<H>::new();
@@ -2974,6 +3215,13 @@ fn squeeze_raa_section5_relation_challenges<H: Hash>(
         auxiliary,
         request,
     );
+    match residual {
+        Some(residual) => {
+            transcript.absorb("raa-section5-relation-residual-present");
+            absorb_section5_relation_residual_public_commitment(&mut transcript, residual);
+        }
+        None => transcript.absorb("raa-section5-relation-residual-absent"),
+    }
     transcript.absorb("raa-section5-relation-challenges-v1");
     RaaSection5RelationChallenges {
         alpha: transcript.squeeze(),
@@ -3015,6 +3263,15 @@ pub fn absorb_section5_permutation_helper_public_commitment<H: Hash, S>(
     public: &RaaSection5PermutationHelperPublicCommitment<H>,
 ) {
     transcript.absorb("raa-section5-permutation-helper-public-commitment-v1");
+    absorb_usize(transcript, public.len);
+    transcript.absorb(&public.root);
+}
+
+pub fn absorb_section5_relation_residual_public_commitment<H: Hash, S>(
+    transcript: &mut CfriTranscript<H, S>,
+    public: &RaaSection5RelationResidualPublicCommitment<H>,
+) {
+    transcript.absorb("raa-section5-relation-residual-public-commitment-v1");
     absorb_usize(transcript, public.len);
     transcript.absorb(&public.root);
 }
@@ -3075,8 +3332,10 @@ impl HolographicQuerySchedule {
         }
 
         let auxiliary_proof_len = raa_relation_auxiliary_len(spec.auxiliary_oracle_len);
+        let section5_residual_len = section5_relation_residual_len_for_schedule(layout, &spec);
         let section5_helper_len = section5_permutation_helper_len_for_schedule(layout, &spec);
-        let proof_domain_len = layout.parity_len() + auxiliary_proof_len + section5_helper_len;
+        let proof_domain_len =
+            layout.parity_len() + auxiliary_proof_len + section5_residual_len + section5_helper_len;
         let mut proof_queries = Vec::with_capacity(spec.q_backend_proof);
         if spec.q_backend_proof != 0 {
             let parity_index = squeeze_bounded_index(transcript, layout.parity_len())?;
@@ -3091,6 +3350,7 @@ impl HolographicQuerySchedule {
             proof_queries.push(proof_query_from_sampled_index(
                 layout,
                 spec.auxiliary_oracle_len,
+                section5_residual_len,
                 section5_helper_len,
                 sampled_index,
             )?);
@@ -3145,6 +3405,13 @@ impl HolographicQuerySchedule {
         self.proof_queries
             .iter()
             .filter(|query| query.domain == BackendProofQueryDomain::Section5PermutationHelper)
+            .count()
+    }
+
+    pub fn section5_relation_residual_proof_query_count(&self) -> usize {
+        self.proof_queries
+            .iter()
+            .filter(|query| query.domain == BackendProofQueryDomain::Section5RelationResidual)
             .count()
     }
 
@@ -3298,23 +3565,40 @@ fn validate_section5_permutation_helper_public<H: Hash>(
 ) -> Result<(), Error> {
     match (
         spec.raa_relation_strategy,
+        &prequery.section5_relation_residual,
         &prequery.section5_permutation_helper,
         &prequery.section5_relation,
     ) {
-        (RaaRelationProofStrategy::LocalQueries, None, None) => Ok(()),
-        (RaaRelationProofStrategy::LocalQueries, Some(_), _) => Err(Error::InvalidPcsOpen(
+        (RaaRelationProofStrategy::LocalQueries, None, None, None) => Ok(()),
+        (RaaRelationProofStrategy::LocalQueries, Some(_), _, _) => Err(Error::InvalidPcsOpen(
+            "RAA Section 5 residual commitment was supplied for local relation mode".to_string(),
+        )),
+        (RaaRelationProofStrategy::LocalQueries, None, Some(_), _) => Err(Error::InvalidPcsOpen(
             "RAA Section 5 helper commitment was supplied for local relation mode".to_string(),
         )),
-        (RaaRelationProofStrategy::LocalQueries, None, Some(_)) => Err(Error::InvalidPcsOpen(
-            "RAA Section 5 relation proof was supplied for local relation mode".to_string(),
+        (RaaRelationProofStrategy::LocalQueries, None, None, Some(_)) => {
+            Err(Error::InvalidPcsOpen(
+                "RAA Section 5 relation proof was supplied for local relation mode".to_string(),
+            ))
+        }
+        (RaaRelationProofStrategy::Section5, None, _, _) => Err(Error::InvalidPcsOpen(
+            "RAA Section 5 residual commitment is missing".to_string(),
         )),
-        (RaaRelationProofStrategy::Section5, None, _) => Err(Error::InvalidPcsOpen(
+        (RaaRelationProofStrategy::Section5, Some(_), None, _) => Err(Error::InvalidPcsOpen(
             "RAA Section 5 helper commitment is missing".to_string(),
         )),
-        (RaaRelationProofStrategy::Section5, Some(_), None) => Err(Error::InvalidPcsOpen(
+        (RaaRelationProofStrategy::Section5, Some(_), Some(_), None) => Err(Error::InvalidPcsOpen(
             "RAA Section 5 relation proof is missing from prequery".to_string(),
         )),
-        (RaaRelationProofStrategy::Section5, Some(helper), Some(relation)) => {
+        (RaaRelationProofStrategy::Section5, Some(residual), Some(helper), Some(relation)) => {
+            let expected_residual_len =
+                spec.praa.praa_codeword_len * RAA_SECTION5_RELATION_RESIDUAL_ROW_COUNT;
+            if residual.len != expected_residual_len {
+                return Err(Error::InvalidPcsOpen(format!(
+                    "RAA Section 5 residual commitment has length {}, expected {expected_residual_len}",
+                    residual.len
+                )));
+            }
             let expected_len =
                 required_blaze2_basefold_section5_permutation_helper_oracle_len(&spec.praa);
             if helper.len != expected_len {
@@ -3335,23 +3619,40 @@ fn validate_section5_permutation_helper_state<H: Hash>(
 ) -> Result<(), Error> {
     match (
         spec.raa_relation_strategy,
+        &state.section5_relation_residual,
         &state.section5_permutation_helper,
         &state.section5_relation,
     ) {
-        (RaaRelationProofStrategy::LocalQueries, None, None) => Ok(()),
-        (RaaRelationProofStrategy::LocalQueries, Some(_), _) => Err(Error::InvalidPcsOpen(
+        (RaaRelationProofStrategy::LocalQueries, None, None, None) => Ok(()),
+        (RaaRelationProofStrategy::LocalQueries, Some(_), _, _) => Err(Error::InvalidPcsOpen(
+            "RAA Section 5 residual oracle was built for local relation mode".to_string(),
+        )),
+        (RaaRelationProofStrategy::LocalQueries, None, Some(_), _) => Err(Error::InvalidPcsOpen(
             "RAA Section 5 helper oracle was built for local relation mode".to_string(),
         )),
-        (RaaRelationProofStrategy::LocalQueries, None, Some(_)) => Err(Error::InvalidPcsOpen(
-            "RAA Section 5 relation proof was built for local relation mode".to_string(),
+        (RaaRelationProofStrategy::LocalQueries, None, None, Some(_)) => {
+            Err(Error::InvalidPcsOpen(
+                "RAA Section 5 relation proof was built for local relation mode".to_string(),
+            ))
+        }
+        (RaaRelationProofStrategy::Section5, None, _, _) => Err(Error::InvalidPcsOpen(
+            "RAA Section 5 residual oracle is missing from prover state".to_string(),
         )),
-        (RaaRelationProofStrategy::Section5, None, _) => Err(Error::InvalidPcsOpen(
+        (RaaRelationProofStrategy::Section5, Some(_), None, _) => Err(Error::InvalidPcsOpen(
             "RAA Section 5 helper oracle is missing from prover state".to_string(),
         )),
-        (RaaRelationProofStrategy::Section5, Some(_), None) => Err(Error::InvalidPcsOpen(
+        (RaaRelationProofStrategy::Section5, Some(_), Some(_), None) => Err(Error::InvalidPcsOpen(
             "RAA Section 5 relation proof is missing from prover state".to_string(),
         )),
-        (RaaRelationProofStrategy::Section5, Some(helper), Some(relation)) => {
+        (RaaRelationProofStrategy::Section5, Some(residual), Some(helper), Some(relation)) => {
+            let expected_residual_len =
+                spec.praa.praa_codeword_len * RAA_SECTION5_RELATION_RESIDUAL_ROW_COUNT;
+            if residual.len() != expected_residual_len {
+                return Err(Error::InvalidPcsOpen(format!(
+                    "RAA Section 5 residual oracle has length {}, expected {expected_residual_len}",
+                    residual.len()
+                )));
+            }
             let expected_len =
                 required_blaze2_basefold_section5_permutation_helper_oracle_len(&spec.praa);
             if helper.len() != expected_len {
@@ -3536,6 +3837,42 @@ fn prove_raa_section5_relation_proof(
             "RAA Section 5 helper oracle is not consistent with relation challenges".to_string(),
         ));
     }
+    let residuals =
+        build_raa_section5_relation_residual_oracle(code, auxiliary_oracle, folded_codeword)?;
+    let len = code.codeword_len();
+
+    Ok(RaaSection5RelationProof {
+        permutation_sumcheck: prove_raa_relation_zero_sumcheck(
+            &residuals[0..len],
+            RAA_SECTION5_PERMUTATION_SUMCHECK_DEGREE,
+            "permutation",
+        )?,
+        first_accumulator_sumcheck: prove_raa_relation_zero_sumcheck(
+            &residuals[len..2 * len],
+            RAA_SECTION5_ACCUMULATOR_SUMCHECK_DEGREE,
+            "first accumulator",
+        )?,
+        second_accumulator_sumcheck: prove_raa_relation_zero_sumcheck(
+            &residuals[2 * len..3 * len],
+            RAA_SECTION5_ACCUMULATOR_SUMCHECK_DEGREE,
+            "second accumulator",
+        )?,
+        terminal_evaluations: Vec::new(),
+    })
+}
+
+fn build_raa_section5_relation_residual_oracle(
+    code: &PackedRaaCode,
+    auxiliary_oracle: &[B128],
+    folded_codeword: &[B128],
+) -> Result<Vec<B128>, Error> {
+    let len = code.codeword_len();
+    if folded_codeword.len() != len {
+        return Err(Error::InvalidPcsOpen(
+            "RAA Section 5 residual oracle codeword length does not match PRAA code length"
+                .to_string(),
+        ));
+    }
     let (u2, u3, u4) = raa_auxiliary_rows(auxiliary_oracle, len)?;
 
     let permutation_residuals = vec![B128::ZERO; len];
@@ -3556,24 +3893,11 @@ fn prove_raa_section5_relation_proof(
         second_accumulator_residuals.push(folded_codeword[index] - accumulator);
     }
 
-    Ok(RaaSection5RelationProof {
-        permutation_sumcheck: prove_raa_relation_zero_sumcheck(
-            &permutation_residuals,
-            RAA_SECTION5_PERMUTATION_SUMCHECK_DEGREE,
-            "permutation",
-        )?,
-        first_accumulator_sumcheck: prove_raa_relation_zero_sumcheck(
-            &first_accumulator_residuals,
-            RAA_SECTION5_ACCUMULATOR_SUMCHECK_DEGREE,
-            "first accumulator",
-        )?,
-        second_accumulator_sumcheck: prove_raa_relation_zero_sumcheck(
-            &second_accumulator_residuals,
-            RAA_SECTION5_ACCUMULATOR_SUMCHECK_DEGREE,
-            "second accumulator",
-        )?,
-        terminal_evaluations: Vec::new(),
-    })
+    let mut residuals = Vec::with_capacity(len * RAA_SECTION5_RELATION_RESIDUAL_ROW_COUNT);
+    residuals.extend(permutation_residuals);
+    residuals.extend(first_accumulator_residuals);
+    residuals.extend(second_accumulator_residuals);
+    Ok(residuals)
 }
 
 fn prove_raa_relation_zero_sumcheck(
@@ -3977,6 +4301,7 @@ fn collect_backend_query_set_from_prover_state<H: Hash>(
     compiler_parity: &CompilerParityQueryProof<H>,
     compiler_parity_folds: &CompilerParityFoldQueryProof<H>,
     auxiliary: Option<&AuxiliaryOracleQueryProof<H>>,
+    section5_relation_residual: Option<&RaaSection5RelationResidualQueryProof<H>>,
     section5_permutation_helper: Option<&RaaSection5PermutationHelperQueryProof<H>>,
 ) -> Result<BackendProofOracleQuerySet, Error> {
     let compiler_parity_queries = compiler_parity
@@ -4020,6 +4345,36 @@ fn collect_backend_query_set_from_prover_state<H: Hash>(
             ));
         }
     };
+    let section5_relation_residual_queries = match (
+        &state.section5_relation_residual,
+        section5_relation_residual,
+    ) {
+        (Some(_oracle), Some(proof)) => proof.authentication_queries(schedule)?,
+        (None, None) => {
+            if schedule.section5_relation_residual_proof_query_count() != 0 {
+                return Err(Error::InvalidPcsOpen(
+                    "backend schedule contains Section 5 residual queries, but residual query proof is absent"
+                        .to_string(),
+                ));
+            }
+            Vec::new()
+        }
+        (Some(_), None) => {
+            if schedule.section5_relation_residual_proof_query_count() == 0 {
+                Vec::new()
+            } else {
+                return Err(Error::InvalidPcsOpen(
+                    "backend schedule contains Section 5 residual queries, but residual query proof is absent"
+                        .to_string(),
+                ));
+            }
+        }
+        (None, Some(_)) => {
+            return Err(Error::InvalidPcsOpen(
+                "Section 5 residual query proof supplied without a residual oracle".to_string(),
+            ));
+        }
+    };
     let section5_permutation_helper_queries = match (
         &state.section5_permutation_helper,
         section5_permutation_helper,
@@ -4055,6 +4410,7 @@ fn collect_backend_query_set_from_prover_state<H: Hash>(
         compiler_parity_queries,
         compiler_parity_fold_layer_queries,
         auxiliary_queries,
+        section5_relation_residual_queries,
         section5_permutation_helper_queries,
     })
 }
@@ -4284,11 +4640,13 @@ fn squeeze_bounded_index<H: Hash, S>(
 fn proof_query_from_sampled_index(
     layout: &SystematicAugmentedRfcLayout,
     auxiliary_oracle_len: usize,
+    section5_residual_len: usize,
     section5_helper_len: usize,
     sampled_index: usize,
 ) -> Result<BackendProofQuery, Error> {
     let auxiliary_len = raa_relation_auxiliary_len(auxiliary_oracle_len);
-    let proof_domain_len = layout.parity_len() + auxiliary_len + section5_helper_len;
+    let proof_domain_len =
+        layout.parity_len() + auxiliary_len + section5_residual_len + section5_helper_len;
     if sampled_index >= proof_domain_len {
         return Err(Error::InvalidPcsParam(format!(
             "proof query index {sampled_index} is outside proof query domain {proof_domain_len}"
@@ -4309,9 +4667,17 @@ fn proof_query_from_sampled_index(
                 physical_index: None,
             });
         }
+        let residual_index = auxiliary_index - auxiliary_len;
+        if residual_index < section5_residual_len {
+            return Ok(BackendProofQuery {
+                domain: BackendProofQueryDomain::Section5RelationResidual,
+                index: residual_index,
+                physical_index: None,
+            });
+        }
         Ok(BackendProofQuery {
             domain: BackendProofQueryDomain::Section5PermutationHelper,
-            index: auxiliary_index - auxiliary_len,
+            index: residual_index - section5_residual_len,
             physical_index: None,
         })
     }
@@ -4591,6 +4957,17 @@ fn raa_relation_auxiliary_len(auxiliary_oracle_len: usize) -> usize {
     auxiliary_oracle_len
 }
 
+fn section5_relation_residual_len_for_schedule(
+    layout: &SystematicAugmentedRfcLayout,
+    spec: &HolographicQueryScheduleSpec,
+) -> usize {
+    if spec.raa_relation_strategy == RaaRelationProofStrategy::Section5 {
+        layout.systematic_len() * RAA_SECTION5_RELATION_RESIDUAL_ROW_COUNT
+    } else {
+        0
+    }
+}
+
 fn section5_permutation_helper_len_for_schedule(
     layout: &SystematicAugmentedRfcLayout,
     spec: &HolographicQueryScheduleSpec,
@@ -4726,6 +5103,30 @@ fn verify_section5_permutation_helper_query_proof<H: Hash>(
         (Some(public), Some(proof), _) => proof.verify_schedule(public, schedule),
         (None, None, _) => Err(Error::InvalidPcsOpen(
             "backend schedule contains Section 5 helper queries, but no helper commitment is present"
+                .to_string(),
+        )),
+    }
+}
+
+fn verify_section5_relation_residual_query_proof<H: Hash>(
+    public: Option<&RaaSection5RelationResidualPublicCommitment<H>>,
+    proof: Option<&RaaSection5RelationResidualQueryProof<H>>,
+    schedule: &HolographicQuerySchedule,
+) -> Result<(), Error> {
+    let expected_count = schedule.section5_relation_residual_proof_query_count();
+    match (public, proof, expected_count) {
+        (None, None, 0) => Ok(()),
+        (None, Some(_), _) => Err(Error::InvalidPcsOpen(
+            "Section 5 residual query proof was supplied without a residual commitment".to_string(),
+        )),
+        (Some(_), None, 0) => Ok(()),
+        (Some(_), None, _) => Err(Error::InvalidPcsOpen(
+            "backend schedule contains Section 5 residual queries, but residual query proof is absent"
+                .to_string(),
+        )),
+        (Some(public), Some(proof), _) => proof.verify_schedule(public, schedule),
+        (None, None, _) => Err(Error::InvalidPcsOpen(
+            "backend schedule contains Section 5 residual queries, but no residual commitment is present"
                 .to_string(),
         )),
     }
@@ -5330,6 +5731,7 @@ mod tests {
             params.spec(),
             &prequery.compiler_parity,
             prequery.auxiliary.as_ref(),
+            prequery.section5_relation_residual.as_ref(),
             &request,
         );
         let expected_helper = build_raa_section5_permutation_helper_oracle(
@@ -5952,6 +6354,10 @@ mod tests {
             prequery.section5_permutation_helper.as_ref().unwrap().len,
             required_blaze2_basefold_section5_permutation_helper_oracle_len(&params.spec().praa)
         );
+        assert_eq!(
+            prequery.section5_relation_residual.as_ref().unwrap().len,
+            params.spec().praa.praa_codeword_len * RAA_SECTION5_RELATION_RESIDUAL_ROW_COUNT
+        );
         assert!(prequery.section5_relation.is_some());
         let mut missing_helper = prequery.clone();
         missing_helper.section5_permutation_helper = None;
@@ -6033,6 +6439,11 @@ mod tests {
         }
         let mut helper_schedule = schedule.clone();
         helper_schedule.proof_queries.push(BackendProofQuery {
+            domain: BackendProofQueryDomain::Section5RelationResidual,
+            index: 0,
+            physical_index: None,
+        });
+        helper_schedule.proof_queries.push(BackendProofQuery {
             domain: BackendProofQueryDomain::Section5PermutationHelper,
             index: 0,
             physical_index: None,
@@ -6045,6 +6456,14 @@ mod tests {
         assert_eq!(
             helper.query_count(),
             helper_schedule.section5_permutation_helper_proof_query_count()
+        );
+        let residual = helper_proof
+            .section5_relation_residual
+            .as_ref()
+            .expect("explicit Section 5 residual query must be opened");
+        assert_eq!(
+            residual.query_count(),
+            helper_schedule.section5_relation_residual_proof_query_count()
         );
 
         let top_queries = schedule
@@ -6113,14 +6532,52 @@ mod tests {
             query_set.section5_permutation_helper_queries.len(),
             helper_schedule.section5_permutation_helper_proof_query_count()
         );
+        assert_eq!(
+            query_set.section5_relation_residual_queries.len(),
+            helper_schedule.section5_relation_residual_proof_query_count()
+        );
         assert!(query_set
             .section5_permutation_helper_queries
+            .iter()
+            .any(|(index, _)| *index == 0));
+        assert!(query_set
+            .section5_relation_residual_queries
             .iter()
             .any(|(index, _)| *index == 0));
         helper_proof
             .authentication
             .verify(&prequery, &query_set)
             .unwrap();
+
+        let mut tampered_residual_value = helper_proof.clone();
+        tampered_residual_value
+            .section5_relation_residual
+            .as_mut()
+            .unwrap()
+            .queries[0]
+            .value += B128::ONE;
+        let tampered_query_set = tampered_residual_value
+            .collect_backend_query_set(
+                params.compiler_code.layout(),
+                &helper_schedule,
+                &fold_challenges_from_prequery(params.spec(), &prequery, &request).unwrap(),
+                Some(&prequery.terminal_codeword),
+                &helper_top_queries,
+            )
+            .unwrap();
+        assert!(tampered_residual_value
+            .authentication
+            .verify(&prequery, &tampered_query_set)
+            .is_err());
+
+        let mut tampered_residual_node = helper_proof.clone();
+        tampered_residual_node
+            .authentication
+            .section5_relation_residual_nodes[0][0] ^= 1;
+        assert!(tampered_residual_node
+            .authentication
+            .verify(&prequery, &query_set)
+            .is_err());
 
         let mut tampered_helper_value = helper_proof.clone();
         tampered_helper_value
@@ -6371,6 +6828,17 @@ mod tests {
                     assert!(query.index < spec.auxiliary_oracle_len);
                     assert_eq!(query.physical_index, None);
                 }
+                BackendProofQueryDomain::Section5RelationResidual => {
+                    assert_eq!(
+                        spec.raa_relation_strategy,
+                        RaaRelationProofStrategy::Section5
+                    );
+                    assert!(
+                        query.index
+                            < layout.systematic_len() * RAA_SECTION5_RELATION_RESIDUAL_ROW_COUNT
+                    );
+                    assert_eq!(query.physical_index, None);
+                }
                 BackendProofQueryDomain::Section5PermutationHelper => {
                     assert_eq!(
                         spec.raa_relation_strategy,
@@ -6409,7 +6877,7 @@ mod tests {
     fn proof_query_classification_splits_parity_and_auxiliary_domains() {
         let layout = layout(16, 3);
         let parity =
-            proof_query_from_sampled_index(&layout, 11, 0, layout.parity_len() - 1).unwrap();
+            proof_query_from_sampled_index(&layout, 11, 0, 0, layout.parity_len() - 1).unwrap();
         assert_eq!(parity.domain, BackendProofQueryDomain::CompilerParity);
         assert_eq!(parity.index, layout.parity_len() - 1);
         assert_eq!(
@@ -6418,7 +6886,7 @@ mod tests {
         );
 
         let auxiliary =
-            proof_query_from_sampled_index(&layout, 11, 0, layout.parity_len()).unwrap();
+            proof_query_from_sampled_index(&layout, 11, 0, 0, layout.parity_len()).unwrap();
         assert_eq!(auxiliary.domain, BackendProofQueryDomain::RelationAuxiliary);
         assert_eq!(auxiliary.index, 0);
         assert_eq!(auxiliary.physical_index, None);
@@ -6426,8 +6894,26 @@ mod tests {
         let helper = proof_query_from_sampled_index(
             &layout,
             11,
+            layout.systematic_len() * RAA_SECTION5_RELATION_RESIDUAL_ROW_COUNT,
             layout.systematic_len() * RAA_SECTION5_PERMUTATION_HELPER_ROW_COUNT,
             layout.parity_len() + 11,
+        )
+        .unwrap();
+        assert_eq!(
+            helper.domain,
+            BackendProofQueryDomain::Section5RelationResidual
+        );
+        assert_eq!(helper.index, 0);
+        assert_eq!(helper.physical_index, None);
+
+        let helper = proof_query_from_sampled_index(
+            &layout,
+            11,
+            layout.systematic_len() * RAA_SECTION5_RELATION_RESIDUAL_ROW_COUNT,
+            layout.systematic_len() * RAA_SECTION5_PERMUTATION_HELPER_ROW_COUNT,
+            layout.parity_len()
+                + 11
+                + layout.systematic_len() * RAA_SECTION5_RELATION_RESIDUAL_ROW_COUNT,
         )
         .unwrap();
         assert_eq!(

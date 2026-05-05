@@ -171,6 +171,45 @@ Pr[ intersection_i K_i != {0} ] ~= q^-( (L-1)m - sum_i (r_i-1) ).
 The certificate should sum this over support shapes and per-copy zero patterns, preserving the
 kernel dimension rather than only recording success/failure.
 
+## Aligned Extremal Intersection Check
+
+The helper:
+
+```text
+scripts/rfc_collapse_intersection_moment.py
+```
+
+counts the simplest dangerous multi-copy event: two independent parity copies are both extremal on
+the same aligned live subcube. For a live subcube of size `m`, each copy contributes an extremal
+kernel line; two lines in `F^m` coincide with probability about:
+
+```text
+q^{-(m-1)}.
+```
+
+The depth-`11`, `c=8`, `q=2^128` table is:
+
+```text
+docs/rfc_collapse_intersection_moment_c8_depth1_to_11.csv
+```
+
+The worst aligned two-copy union bound through depth `11` occurs for `m=2` and is already:
+
+```text
+log2 bound = -108.14825096.
+```
+
+The distance-dominant collapse at depth `11` uses `m=32`; its two-copy intersection term has
+collision exponent:
+
+```text
+-(32-1) * 128 = -3968.
+```
+
+So within the aligned extremal family, simultaneous two-copy sparsity is negligible. The real proof
+still needs the arbitrary-support/kernel-dimension count, but this check supports the picture that
+one sparse copy should dominate the systematic distance.
+
 ## Current Best Proof Shape
 
 The proof should not copy the old threshold recurrence. The better structure is:

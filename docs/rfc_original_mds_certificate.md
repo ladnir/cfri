@@ -212,3 +212,9 @@ d_min = N - k + 1.
 
 The only remaining writeup work is to merge the certificate soundness theorem and this original
 orientation theorem into a polished final proof. The algebra and combinatorics are now aligned.
+
+The practical distance/query impact of this upgrade is summarized in:
+
+```text
+docs/rfc_original_distance_upgrade.md
+```

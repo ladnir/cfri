@@ -294,7 +294,6 @@ pub struct RaaSection5RelationTerminalProof<H: Hash> {
 pub struct RaaSection5RelationTerminalRowProof<H: Hash> {
     pub folded_layers: Vec<AuxiliaryOraclePublicCommitment<H>>,
     pub paths: Vec<RaaSection5RelationTerminalPath>,
-    pub base_authentication_nodes: Vec<Output<H>>,
     pub folded_layer_authentication: Vec<RaaSection5RelationTerminalLayerProof<H>>,
 }
 
@@ -1115,6 +1114,10 @@ impl Blaze2BaseFoldBackendParams {
             schedule,
             &fold_challenges,
             Some(&prequery.terminal_codeword),
+            prequery
+                .section5_relation_residual
+                .as_ref()
+                .map(|public| public.len),
             top_queries,
         )
     }
@@ -1657,6 +1660,7 @@ impl<H: Hash> Blaze2BaseFoldQueryProof<H> {
         schedule: &HolographicQuerySchedule,
         fold_challenges: &[B128],
         terminal_codeword: Option<&[B128]>,
+        section5_relation_residual_len: Option<usize>,
         top_queries: &[TopQuery<B128>],
     ) -> Result<BackendProofOracleQuerySet, Error> {
         let compiler_parity_queries = self
@@ -1696,7 +1700,7 @@ impl<H: Hash> Blaze2BaseFoldQueryProof<H> {
                 Vec::new()
             }
         };
-        let section5_relation_residual_queries = match &self.section5_relation_residual {
+        let mut section5_relation_residual_queries = match &self.section5_relation_residual {
             Some(residual) => residual.authentication_queries(schedule)?,
             None => {
                 if schedule.section5_relation_residual_proof_query_count() != 0 {
@@ -1708,6 +1712,25 @@ impl<H: Hash> Blaze2BaseFoldQueryProof<H> {
                 Vec::new()
             }
         };
+        if matches!(
+            self.auxiliary.as_ref().map(|proof| &proof.raa_relation),
+            Some(RaaRelationProof::Section5(_))
+        ) && self
+            .section5_relation_residual
+            .as_ref()
+            .is_some_and(|proof| proof.terminal_proof.is_none())
+        {
+            return Err(Error::InvalidPcsOpen(
+                "RAA Section 5 terminal binding proof is missing".to_string(),
+            ));
+        }
+        if let (Some(residual), Some(residual_len)) = (
+            self.section5_relation_residual.as_ref(),
+            section5_relation_residual_len,
+        ) {
+            section5_relation_residual_queries
+                .extend(residual.terminal_residual_authentication_queries(residual_len)?);
+        }
 
         Ok(BackendProofOracleQuerySet {
             compiler_parity_queries,
@@ -2273,6 +2296,16 @@ impl<H: Hash> RaaSection5RelationResidualQueryProof<H> {
             .as_ref()
             .map(RaaSection5RelationTerminalProof::hash_node_count)
             .unwrap_or(0)
+    }
+
+    fn terminal_residual_authentication_queries(
+        &self,
+        residual_len: usize,
+    ) -> Result<Vec<(usize, B128)>, Error> {
+        match self.terminal_proof.as_ref() {
+            Some(proof) => proof.residual_authentication_queries(residual_len),
+            None => Ok(Vec::new()),
+        }
     }
 
     fn verify_schedule(
@@ -4475,7 +4508,6 @@ fn prove_section5_relation_terminal_proof<H: Hash>(
             prove_section5_relation_terminal_row_proof::<H>(
                 RAA_SECTION5_PERMUTATION_RESIDUAL_ROW,
                 &checks.permutation,
-                residual,
                 &public,
                 permutation_row,
                 domain_len,
@@ -4484,7 +4516,6 @@ fn prove_section5_relation_terminal_proof<H: Hash>(
             prove_section5_relation_terminal_row_proof::<H>(
                 RAA_SECTION5_FIRST_ACCUMULATOR_RESIDUAL_ROW,
                 &checks.first_accumulator,
-                residual,
                 &public,
                 first_accumulator_row,
                 domain_len,
@@ -4493,7 +4524,6 @@ fn prove_section5_relation_terminal_proof<H: Hash>(
             prove_section5_relation_terminal_row_proof::<H>(
                 RAA_SECTION5_SECOND_ACCUMULATOR_RESIDUAL_ROW,
                 &checks.second_accumulator,
-                residual,
                 &public,
                 second_accumulator_row,
                 domain_len,
@@ -4506,7 +4536,6 @@ fn prove_section5_relation_terminal_proof<H: Hash>(
 fn prove_section5_relation_terminal_row_proof<H: Hash>(
     row_index: usize,
     check: &RaaRelationSumcheckCheck,
-    residual: &RaaSection5RelationResidualCommitment<H>,
     residual_public: &RaaSection5RelationResidualPublicCommitment<H>,
     row: &[B128],
     domain_len: usize,
@@ -4565,11 +4594,6 @@ fn prove_section5_relation_terminal_row_proof<H: Hash>(
         )?);
     }
 
-    let base_queries =
-        section5_relation_terminal_base_authentication_queries(row_index, domain_len, &paths)?;
-    let base_authentication_nodes =
-        merkle_b128_multiproof_nodes::<H, _>(&residual.inner.merkle_tree, base_queries)?;
-
     let mut folded_layer_authentication = Vec::with_capacity(folded_commitments.len());
     for (round_offset, commitment) in folded_commitments.iter().enumerate() {
         let round = round_offset + 1;
@@ -4587,7 +4611,6 @@ fn prove_section5_relation_terminal_row_proof<H: Hash>(
     Ok(RaaSection5RelationTerminalRowProof {
         folded_layers,
         paths,
-        base_authentication_nodes,
         folded_layer_authentication,
     })
 }
@@ -4647,6 +4670,25 @@ impl<H: Hash> RaaSection5RelationTerminalProof<H> {
             .sum()
     }
 
+    fn residual_authentication_queries(
+        &self,
+        residual_len: usize,
+    ) -> Result<Vec<(usize, B128)>, Error> {
+        let domain_len = section5_relation_terminal_domain_len(residual_len)?;
+        if self.rows.len() != RAA_SECTION5_RELATION_RESIDUAL_ROW_COUNT {
+            return Err(Error::InvalidPcsOpen(
+                "RAA Section 5 terminal proof row count is invalid".to_string(),
+            ));
+        }
+        let mut queries = Vec::new();
+        for (row_index, row) in self.rows.iter().enumerate() {
+            queries.extend(section5_relation_terminal_base_authentication_queries(
+                row_index, domain_len, &row.paths,
+            )?);
+        }
+        Ok(queries)
+    }
+
     fn verify(
         &self,
         checks: &RaaSection5RelationChecks,
@@ -4694,7 +4736,6 @@ impl<H: Hash> RaaSection5RelationTerminalRowProof<H> {
 
     fn hash_node_count(&self) -> usize {
         self.folded_layers.len()
-            + self.base_authentication_nodes.len()
             + self
                 .folded_layer_authentication
                 .iter()
@@ -4750,18 +4791,6 @@ impl<H: Hash> RaaSection5RelationTerminalRowProof<H> {
             }
             verify_section5_relation_terminal_path(path, check, domain_len)?;
         }
-
-        let base_queries = section5_relation_terminal_base_authentication_queries(
-            row_index,
-            domain_len,
-            &self.paths,
-        )?;
-        verify_merkle_b128_multiproof::<H, _>(
-            &public.root,
-            public.len,
-            base_queries,
-            &self.base_authentication_nodes,
-        )?;
 
         if self.folded_layer_authentication.len() != self.folded_layers.len() {
             return Err(Error::InvalidPcsOpen(
@@ -5150,7 +5179,7 @@ fn collect_backend_query_set_from_prover_state<H: Hash>(
             ));
         }
     };
-    let section5_relation_residual_queries = match (
+    let mut section5_relation_residual_queries = match (
         &state.section5_relation_residual,
         section5_relation_residual,
     ) {
@@ -5180,6 +5209,13 @@ fn collect_backend_query_set_from_prover_state<H: Hash>(
             ));
         }
     };
+    if let (Some(oracle), Some(proof)) = (
+        state.section5_relation_residual.as_ref(),
+        section5_relation_residual,
+    ) {
+        section5_relation_residual_queries
+            .extend(proof.terminal_residual_authentication_queries(oracle.len())?);
+    }
     let section5_permutation_helper_queries = match (
         &state.section5_permutation_helper,
         section5_permutation_helper,
@@ -7504,7 +7540,7 @@ mod tests {
                 &top_queries,
             )
             .unwrap_err();
-        assert!(format!("{err:?}").contains("RAA Section 5 terminal proof"));
+        assert!(format!("{err:?}").contains("Merkle"));
 
         let mut unbound_terminal_prequery = prequery.clone();
         unbound_terminal_prequery
@@ -7542,6 +7578,10 @@ mod tests {
                 &helper_schedule,
                 &fold_challenges_from_prequery(params.spec(), &prequery, &request).unwrap(),
                 Some(&prequery.terminal_codeword),
+                prequery
+                    .section5_relation_residual
+                    .as_ref()
+                    .map(|public| public.len),
                 &helper_top_queries,
             )
             .unwrap();
@@ -7549,9 +7589,19 @@ mod tests {
             query_set.section5_permutation_helper_queries.len(),
             helper_schedule.section5_permutation_helper_proof_query_count()
         );
+        let terminal_residual_query_count = helper_proof
+            .section5_relation_residual
+            .as_ref()
+            .unwrap()
+            .terminal_residual_authentication_queries(
+                prequery.section5_relation_residual.as_ref().unwrap().len,
+            )
+            .unwrap()
+            .len();
         assert_eq!(
             query_set.section5_relation_residual_queries.len(),
             helper_schedule.section5_relation_residual_proof_query_count()
+                + terminal_residual_query_count
         );
         assert!(query_set
             .section5_permutation_helper_queries
@@ -7585,6 +7635,10 @@ mod tests {
                 &helper_schedule,
                 &fold_challenges_from_prequery(params.spec(), &prequery, &request).unwrap(),
                 Some(&prequery.terminal_codeword),
+                prequery
+                    .section5_relation_residual
+                    .as_ref()
+                    .map(|public| public.len),
                 &helper_top_queries,
             )
             .unwrap();
@@ -7615,6 +7669,10 @@ mod tests {
                 &helper_schedule,
                 &fold_challenges_from_prequery(params.spec(), &prequery, &request).unwrap(),
                 Some(&prequery.terminal_codeword),
+                prequery
+                    .section5_relation_residual
+                    .as_ref()
+                    .map(|public| public.len),
                 &helper_top_queries,
             )
             .unwrap();

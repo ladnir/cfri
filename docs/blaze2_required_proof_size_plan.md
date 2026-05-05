@@ -196,11 +196,12 @@ row at its terminal point and rejects if the value does not equal the correspond
 claim. This helper is unit-tested for honest nonzero claims, tampered claims, tampered rows, and bad
 shapes, and the Section 5 verifier now consumes a residual-terminal fold proof tied to the committed
 residual oracle: the prover commits folded residual layers, derives path query indices from those
-roots, authenticates the base residual leaves and folded-layer siblings, and rejects missing or
-tampered terminal paths. This closes the old trusted/in-memory terminal binding gap. The remaining
-accounting work is to move the terminal fold proof authentication into the shared backend
-proof-oracle collector and budget it as part of the final holographic BaseFold core rather than as
-Section 5-local scaffolding. The permutation residual row is no longer a placeholder:
+roots, authenticates the base residual leaves through the shared backend residual multiproof lane,
+authenticates folded-layer siblings, and rejects missing or tampered terminal paths. This closes the
+old trusted/in-memory terminal binding gap. The remaining accounting work is to move the
+folded-layer authentication into the shared backend proof-oracle budget/final holographic BaseFold
+core rather than leaving it as Section 5-local scaffolding. The permutation residual row is no
+longer a placeholder:
 alpha/beta/gamma are squeezed before helper construction, the helper product-tree witnesses are
 committed after alpha/beta, and the residual commitment now contains a gamma-batched product-tree
 relation/root equality residual derived from those helper witnesses plus the two accumulator
@@ -237,8 +238,10 @@ B/C below, with a concrete Section 5 proof-oracle layout:
    and validates the three Section 5 sumcheck transcript shapes and round consistency, now deriving
    named terminal challenge/claim objects; residual proof-oracle rows are committed and
    query-authenticated, and a tested residual-terminal fold proof now feeds the terminal binding
-   from committed residual rows instead of full in-memory residual vectors; its folded-layer
-   authentication still has to be folded into the shared backend proof-oracle collector/accounting]
+   from committed residual rows instead of full in-memory residual vectors; base residual leaves for
+   those terminal paths are now authenticated by the shared backend residual multiproof collector,
+   while folded-layer authentication still has to be folded into the final shared
+   proof-oracle/accounting model]
 5. switch the normal Blaze2 backend from `LocalQueries` to `Section5`.
 ```
 

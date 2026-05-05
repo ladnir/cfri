@@ -194,11 +194,17 @@ committed residual rows. The core terminal-binding check now exists as a focused
 three residual rows and the three sumcheck terminal challenge vectors, it evaluates each residual
 row at its terminal point and rejects if the value does not equal the corresponding sumcheck terminal
 claim. This helper is unit-tested for honest nonzero claims, tampered claims, tampered rows, and bad
-shapes, but it is not yet wired to a backend evaluation proof. The permutation residual row is no
-longer a placeholder: alpha/beta/gamma are squeezed before helper construction, the helper
-product-tree witnesses are committed after alpha/beta, and the residual commitment now contains a
-gamma-batched product-tree relation/root equality residual derived from those helper witnesses plus
-the two accumulator residual rows.
+shapes, and the Section 5 verifier now consumes a residual-terminal fold proof tied to the committed
+residual oracle: the prover commits folded residual layers, derives path query indices from those
+roots, authenticates the base residual leaves and folded-layer siblings, and rejects missing or
+tampered terminal paths. This closes the old trusted/in-memory terminal binding gap. The remaining
+accounting work is to move the terminal fold proof authentication into the shared backend
+proof-oracle collector and budget it as part of the final holographic BaseFold core rather than as
+Section 5-local scaffolding. The permutation residual row is no longer a placeholder:
+alpha/beta/gamma are squeezed before helper construction, the helper product-tree witnesses are
+committed after alpha/beta, and the residual commitment now contains a gamma-batched product-tree
+relation/root equality residual derived from those helper witnesses plus the two accumulator
+residual rows.
 
 After re-reading Blaze Section 5, the honest implementation cannot be just "the same three rows
 with fewer openings." The paper relation uses MLIOP proof oracles for the RAA computation: the
@@ -230,9 +236,9 @@ B/C below, with a concrete Section 5 proof-oracle layout:
    serialized terminal values; [In progress: verifier rejects unbound serialized terminal values
    and validates the three Section 5 sumcheck transcript shapes and round consistency, now deriving
    named terminal challenge/claim objects; residual proof-oracle rows are committed and
-   query-authenticated, and a tested core helper checks residual-row multilinear terminal
-   evaluations against those claims when supplied the residual rows; the helper still has to be fed
-   by the backend proof rather than by full in-memory residual vectors]
+   query-authenticated, and a tested residual-terminal fold proof now feeds the terminal binding
+   from committed residual rows instead of full in-memory residual vectors; its folded-layer
+   authentication still has to be folded into the shared backend proof-oracle collector/accounting]
 5. switch the normal Blaze2 backend from `LocalQueries` to `Section5`.
 ```
 

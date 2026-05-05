@@ -344,6 +344,7 @@ pub struct RaaEvalSumcheckProof {
 pub struct RaaSection5RelationChallenges {
     pub alpha: B128,
     pub beta: B128,
+    pub gamma: B128,
 }
 
 #[derive(Clone, Copy, Debug)]
@@ -694,44 +695,59 @@ impl Blaze2BaseFoldBackendParams {
             )?)
         };
         let auxiliary_public = auxiliary.as_ref().map(AuxiliaryOracleCommitment::public);
-        let section5_relation_residual =
-            if self.spec.raa_relation_strategy == RaaRelationProofStrategy::Section5 {
-                Some(RaaSection5RelationResidualCommitment::commit_values(
-                    build_raa_section5_relation_residual_oracle(
-                        self.praa.packed(),
-                        auxiliary_oracle,
-                        folded_codeword,
-                    )?,
-                )?)
-            } else {
-                None
-            };
-        let section5_relation_residual_public = section5_relation_residual
-            .as_ref()
-            .map(RaaSection5RelationResidualCommitment::public);
         let (section5_permutation_helper, section5_relation_challenges) = self
             .commit_section5_permutation_helper::<H>(
                 auxiliary_oracle,
                 &compiler_parity_public,
                 auxiliary_public.as_ref(),
-                section5_relation_residual_public.as_ref(),
                 request,
             )?;
         let section5_permutation_helper_public = section5_permutation_helper
             .as_ref()
             .map(RaaSection5PermutationHelperCommitment::public);
-        let section5_relation = match (&section5_permutation_helper, section5_relation_challenges) {
-            (Some(helper), Some(challenges)) => Some(prove_raa_section5_relation_proof(
-                self.praa.packed(),
-                auxiliary_oracle,
-                helper.values(),
-                folded_codeword,
-                challenges,
-            )?),
-            (None, None) => None,
+        let section5_relation_residual =
+            match (&section5_permutation_helper, section5_relation_challenges) {
+                (Some(helper), Some(challenges)) => {
+                    Some(RaaSection5RelationResidualCommitment::commit_values(
+                        build_raa_section5_relation_residual_oracle(
+                            self.praa.packed(),
+                            auxiliary_oracle,
+                            folded_codeword,
+                            helper.values(),
+                            challenges,
+                        )?,
+                    )?)
+                }
+                (None, None) => None,
+                _ => {
+                    return Err(Error::InvalidPcsOpen(
+                        "RAA Section 5 helper and relation challenges are inconsistent".to_string(),
+                    ));
+                }
+            };
+        let section5_relation_residual_public = section5_relation_residual
+            .as_ref()
+            .map(RaaSection5RelationResidualCommitment::public);
+        let section5_relation = match (
+            &section5_permutation_helper,
+            &section5_relation_residual,
+            section5_relation_challenges,
+        ) {
+            (Some(helper), Some(residual), Some(challenges)) => {
+                Some(prove_raa_section5_relation_proof(
+                    self.praa.packed(),
+                    auxiliary_oracle,
+                    helper.values(),
+                    residual.values(),
+                    folded_codeword,
+                    challenges,
+                )?)
+            }
+            (None, None, None) => None,
             _ => {
                 return Err(Error::InvalidPcsOpen(
-                    "RAA Section 5 helper and relation challenges are inconsistent".to_string(),
+                    "RAA Section 5 residual, helper, and relation challenges are inconsistent"
+                        .to_string(),
                 ));
             }
         };
@@ -1271,7 +1287,6 @@ impl Blaze2BaseFoldBackendParams {
         auxiliary_oracle: &[B128],
         compiler_parity: &CompilerParityPublicCommitment<H>,
         auxiliary: Option<&AuxiliaryOraclePublicCommitment<H>>,
-        residual: Option<&RaaSection5RelationResidualPublicCommitment<H>>,
         request: &Blaze2BaseFoldOpenRequest<'_>,
     ) -> Result<
         (
@@ -1287,7 +1302,6 @@ impl Blaze2BaseFoldBackendParams {
             self.spec(),
             compiler_parity,
             auxiliary,
-            residual,
             request,
         );
         let values = build_raa_section5_permutation_helper_oracle(
@@ -3214,7 +3228,6 @@ fn squeeze_raa_section5_relation_challenges<H: Hash>(
     spec: &Blaze2BaseFoldBackendSpec,
     compiler_parity: &CompilerParityPublicCommitment<H>,
     auxiliary: Option<&AuxiliaryOraclePublicCommitment<H>>,
-    residual: Option<&RaaSection5RelationResidualPublicCommitment<H>>,
     request: &Blaze2BaseFoldOpenRequest<'_>,
 ) -> RaaSection5RelationChallenges {
     let mut transcript = CfriTranscript::<H>::new();
@@ -3225,17 +3238,11 @@ fn squeeze_raa_section5_relation_challenges<H: Hash>(
         auxiliary,
         request,
     );
-    match residual {
-        Some(residual) => {
-            transcript.absorb("raa-section5-relation-residual-present");
-            absorb_section5_relation_residual_public_commitment(&mut transcript, residual);
-        }
-        None => transcript.absorb("raa-section5-relation-residual-absent"),
-    }
     transcript.absorb("raa-section5-relation-challenges-v1");
     RaaSection5RelationChallenges {
         alpha: transcript.squeeze(),
         beta: transcript.squeeze(),
+        gamma: transcript.squeeze(),
     }
 }
 
@@ -3825,6 +3832,7 @@ fn prove_raa_section5_relation_proof(
     code: &PackedRaaCode,
     auxiliary_oracle: &[B128],
     helper_values: &[B128],
+    residual_values: &[B128],
     folded_codeword: &[B128],
     challenges: RaaSection5RelationChallenges,
 ) -> Result<RaaSection5RelationProof, Error> {
@@ -3847,8 +3855,18 @@ fn prove_raa_section5_relation_proof(
             "RAA Section 5 helper oracle is not consistent with relation challenges".to_string(),
         ));
     }
-    let residuals =
-        build_raa_section5_relation_residual_oracle(code, auxiliary_oracle, folded_codeword)?;
+    let residuals = build_raa_section5_relation_residual_oracle(
+        code,
+        auxiliary_oracle,
+        folded_codeword,
+        helper_values,
+        challenges,
+    )?;
+    if residual_values != residuals {
+        return Err(Error::InvalidPcsOpen(
+            "RAA Section 5 residual oracle is not consistent with relation challenges".to_string(),
+        ));
+    }
     let len = code.codeword_len();
 
     Ok(RaaSection5RelationProof {
@@ -3875,6 +3893,8 @@ fn build_raa_section5_relation_residual_oracle(
     code: &PackedRaaCode,
     auxiliary_oracle: &[B128],
     folded_codeword: &[B128],
+    helper_values: &[B128],
+    challenges: RaaSection5RelationChallenges,
 ) -> Result<Vec<B128>, Error> {
     let len = code.codeword_len();
     if folded_codeword.len() != len {
@@ -3885,7 +3905,8 @@ fn build_raa_section5_relation_residual_oracle(
     }
     let (u2, u3, u4) = raa_auxiliary_rows(auxiliary_oracle, len)?;
 
-    let permutation_residuals = vec![B128::ZERO; len];
+    let permutation_residuals =
+        build_raa_section5_permutation_residuals(len, helper_values, challenges.gamma)?;
     let mut first_accumulator_residuals = Vec::with_capacity(len);
     for index in 0..len {
         let previous = if index == 0 {
@@ -3908,6 +3929,110 @@ fn build_raa_section5_relation_residual_oracle(
     residuals.extend(first_accumulator_residuals);
     residuals.extend(second_accumulator_residuals);
     Ok(residuals)
+}
+
+fn build_raa_section5_permutation_residuals(
+    len: usize,
+    helper_values: &[B128],
+    gamma: B128,
+) -> Result<Vec<B128>, Error> {
+    if len == 0 || !len.is_power_of_two() {
+        return Err(Error::InvalidPcsOpen(
+            "RAA Section 5 permutation residual domain must be a non-empty power of two"
+                .to_string(),
+        ));
+    }
+    let tree_chunk_len = len << 1;
+    if helper_values.len() != tree_chunk_len * 4 {
+        return Err(Error::InvalidPcsOpen(
+            "RAA Section 5 helper oracle length does not match four packed product trees"
+                .to_string(),
+        ));
+    }
+
+    let f1 = &helper_values[0..tree_chunk_len];
+    let g1 = &helper_values[tree_chunk_len..2 * tree_chunk_len];
+    let f2 = &helper_values[2 * tree_chunk_len..3 * tree_chunk_len];
+    let g2 = &helper_values[3 * tree_chunk_len..4 * tree_chunk_len];
+    let mut f1_residuals = product_tree_packed_relation_residuals(f1)?;
+    let g1_residuals = product_tree_packed_relation_residuals(g1)?;
+    let mut f2_residuals = product_tree_packed_relation_residuals(f2)?;
+    let g2_residuals = product_tree_packed_relation_residuals(g2)?;
+
+    f1_residuals[len - 1] = product_tree_packed_root(f1)? - product_tree_packed_root(g1)?;
+    f2_residuals[len - 1] = product_tree_packed_root(f2)? - product_tree_packed_root(g2)?;
+
+    let mut residuals = vec![B128::ZERO; len];
+    let mut coefficient = B128::ONE;
+    for relation in [&f1_residuals, &g1_residuals, &f2_residuals, &g2_residuals] {
+        for (out, value) in residuals.iter_mut().zip(relation.iter()) {
+            *out += coefficient * *value;
+        }
+        coefficient *= gamma;
+    }
+    Ok(residuals)
+}
+
+fn product_tree_packed_relation_residuals(packed: &[B128]) -> Result<Vec<B128>, Error> {
+    if packed.len() < 2 || packed.len() & 1 != 0 {
+        return Err(Error::InvalidPcsOpen(
+            "RAA Section 5 packed product-tree witness has invalid length".to_string(),
+        ));
+    }
+    let leaf_len = packed.len() >> 1;
+    if !leaf_len.is_power_of_two() {
+        return Err(Error::InvalidPcsOpen(
+            "RAA Section 5 packed product-tree leaf domain is not a power of two".to_string(),
+        ));
+    }
+
+    let mut residuals = Vec::with_capacity(leaf_len);
+    let mut level_offset = 0;
+    let mut level_len = leaf_len;
+    let mut parent_offset = leaf_len;
+    while level_len > 1 {
+        let parent_len = level_len >> 1;
+        if parent_offset + parent_len > packed.len() {
+            return Err(Error::InvalidPcsOpen(
+                "RAA Section 5 packed product-tree witness is truncated".to_string(),
+            ));
+        }
+        for index in 0..parent_len {
+            residuals.push(
+                packed[parent_offset + index]
+                    - packed[level_offset + 2 * index] * packed[level_offset + 2 * index + 1],
+            );
+        }
+        level_offset = parent_offset;
+        parent_offset += parent_len;
+        level_len = parent_len;
+    }
+    residuals.push(*packed.last().expect("packed length checked"));
+    if residuals.len() != leaf_len {
+        return Err(Error::InvalidPcsOpen(
+            "RAA Section 5 product-tree residual length does not match leaf domain".to_string(),
+        ));
+    }
+    Ok(residuals)
+}
+
+fn product_tree_packed_root(packed: &[B128]) -> Result<B128, Error> {
+    if packed.len() < 2 || packed.len() & 1 != 0 {
+        return Err(Error::InvalidPcsOpen(
+            "RAA Section 5 packed product-tree witness has invalid length".to_string(),
+        ));
+    }
+    let leaf_len = packed.len() >> 1;
+    if !leaf_len.is_power_of_two() {
+        return Err(Error::InvalidPcsOpen(
+            "RAA Section 5 packed product-tree leaf domain is not a power of two".to_string(),
+        ));
+    }
+    if leaf_len == 1 {
+        Ok(packed[0])
+    } else {
+        Ok(packed[packed.len() - 2])
+    }
 }
 
 fn prove_raa_relation_zero_sumcheck(
@@ -4892,18 +5017,18 @@ fn build_raa_section5_permutation_helper_oracle(
     let mut values = Vec::with_capacity(len * RAA_SECTION5_PERMUTATION_HELPER_ROW_COUNT);
     append_raa_section5_permutation_helper_witness(
         &mut values,
-        &u1,
+        u2,
         Some(&permutation.permutation1),
         challenges,
     )?;
-    append_raa_section5_permutation_helper_witness(&mut values, u2, None, challenges)?;
+    append_raa_section5_permutation_helper_witness(&mut values, &u1, None, challenges)?;
     append_raa_section5_permutation_helper_witness(
         &mut values,
-        u3,
+        u4,
         Some(&permutation.permutation2),
         challenges,
     )?;
-    append_raa_section5_permutation_helper_witness(&mut values, u4, None, challenges)?;
+    append_raa_section5_permutation_helper_witness(&mut values, u3, None, challenges)?;
     let expected_len = len * RAA_SECTION5_PERMUTATION_HELPER_ROW_COUNT;
     if values.len() != expected_len {
         return Err(Error::InvalidPcsOpen(
@@ -5786,7 +5911,6 @@ mod tests {
             params.spec(),
             &prequery.compiler_parity,
             prequery.auxiliary.as_ref(),
-            prequery.section5_relation_residual.as_ref(),
             &request,
         );
         let expected_helper = build_raa_section5_permutation_helper_oracle(

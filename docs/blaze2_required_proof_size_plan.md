@@ -190,7 +190,10 @@ backend multiproof collector. The honest Section 5 verifier path now accepts onc
 terminal claims are zero and all scheduled residual proof-oracle openings authenticate to zero.
 This removes the artificial fail-closed branch, but the verifier still has to replace that
 sampled-zero placeholder with paper-style multilinear terminal evaluation binding against the
-committed residual rows.
+committed residual rows. The permutation residual row is no longer a placeholder: alpha/beta/gamma
+are squeezed before helper construction, the helper product-tree witnesses are committed after
+alpha/beta, and the residual commitment now contains a gamma-batched product-tree relation/root
+equality residual derived from those helper witnesses plus the two accumulator residual rows.
 
 After re-reading Blaze Section 5, the honest implementation cannot be just "the same three rows
 with fewer openings." The paper relation uses MLIOP proof oracles for the RAA computation: the
@@ -203,7 +206,8 @@ B/C below, with a concrete Section 5 proof-oracle layout:
 1. define the packed Section 5 proof-oracle rows; [In progress: pre-challenge `u2/u3/u4` rows are
    explicit; post-challenge `f/g` helper-row constants, byte budget, commitment slot, and honest
    challenge-derived product-tree witness values are explicit; relation residual rows have a
-   named commitment/query/authentication lane]
+   named commitment/query/authentication lane and the permutation residual is now tied to the
+   helper product-tree witnesses]
 2. commit/authenticate those rows through the shared backend query-set collector; [Done:
    scheduled pre-challenge Section 5 rows are in the auxiliary query domain; helper commitment is
    transcript-bound before query sampling; helper leaves are opened through the shared backend
@@ -214,8 +218,9 @@ B/C below, with a concrete Section 5 proof-oracle layout:
    - u3 = A * u2,
    - u4 = M_pi2 * u3,
    - c_star = A * u4; [In progress: the prover emits honest zero-check transcripts derived from
-     the committed auxiliary/helper state, and the verifier rejects malformed transcript rounds or
-     nonzero initial claims; those transcripts are now bound before query sampling]
+     the committed auxiliary/helper/residual state, and the verifier rejects malformed transcript
+     rounds, nonzero initial claims, nonzero terminal claims, or nonzero scheduled residual
+     openings; those transcripts are now bound before query sampling]
 4. bind sumcheck terminal oracle evaluations to backend proof-oracle openings, not unbound
    serialized terminal values; [In progress: verifier rejects unbound serialized terminal values
    and validates the three Section 5 sumcheck transcript shapes and round consistency, now deriving

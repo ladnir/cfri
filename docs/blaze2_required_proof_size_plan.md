@@ -33,7 +33,7 @@ terminal folded-layer commitments/authentication across the three residual rows:
 | Backend compiler-parity fold values and multiproof nodes | 720 | 680 | Uses one shared multiproof per compiler commitment layer. |
 | Backend auxiliary relation values and multiproof nodes | 1,200 | 712 | Only sampled Section 5 relation-auxiliary leaves remain in this bucket. |
 | Section 5 residual values and shared residual multiproof nodes | 1,168 | 1,016 | Terminal base leaves now use the shared residual lane and terminal query count is tied to the residual query budget. |
-| Section 5 terminal folded-layer roots and authentication | 1,408 | 1,408 | Folded-layer roots and authentication nodes now live in the shared backend authentication object, but the terminal folded-layer lane is still Section 5-specific until terminal folding is part of the shared BaseFold core. |
+| Section 5 terminal folded-layer roots and authentication | 1,408 | 1,408 | Blocked as a local deletion: these roots/nodes bind the residual terminal paths under the current residual-Merkle scaffold. Removing this bucket soundly requires replacing that scaffold with the final shared BaseFold terminal-clear core. |
 | Section 5 helper values and multiproof nodes | 1,056 | 1,008 | Remaining helper-oracle bucket. |
 | Total | 6,928 | 5,976 | Current pinned honest Section 5 implementation total. |
 
@@ -211,8 +211,13 @@ canonicalized: the proof now serializes the unique set of non-derived terminal v
 by `(round, row, index)`, rejects duplicate or missing openings, and derives folded current values
 from earlier openings instead of serializing them. This keeps the wire shape honest, but it does not
 remove the terminal folded-layer bucket because that bucket is the separate commitment/authentication
-chain itself. The remaining accounting work is to move the terminal folded-layer lane into the final
-holographic BaseFold core rather than leaving it as Section 5-specific scaffolding. The permutation
+chain itself. After the shared-lane refactor, the remaining terminal blocker is no longer code
+plumbing: deleting the folded-layer roots/authentication while the residual rows are only Merkle
+committed would make the terminal fold siblings unbound. The existing tamper tests for folded-layer
+roots and authentication nodes are the regression guard for that fact. The sound proof-size move is
+to replace the residual-Merkle terminal scaffold with the final holographic BaseFold terminal-clear
+core, where the terminal word and fold queries are part of the shared backend proof rather than a
+Section 5 side chain. The permutation
 residual row is no longer a placeholder:
 alpha/beta/gamma are squeezed before helper construction, the helper product-tree witnesses are
 committed after alpha/beta, and the residual commitment now contains a gamma-batched product-tree
@@ -393,7 +398,7 @@ Acceptance:
 | 3. Build the shared backend query-set collector. | Complete. |
 | 4. Generate per-layer multiproofs from the collector. | Complete. |
 | 5. Move auxiliary local relation checks into scheduled or algebraic backend checks. | In progress: arbitrary auxiliary traces now reject at prequery construction; the relation proof strategy is explicit; the normal Blaze2/BaseFold fixture uses Section 5; Section 5 builds scheduled pre-challenge relation openings/authentication, has a transcript-bound/authenticated post-challenge helper domain, emits prequery-bound honest relation sumcheck transcripts, and binds terminal residual evaluations through authenticated residual-terminal fold paths. |
-| 6. Replace the Blaze2-specific backend proof structs with the shared BaseFold-core proof. | Pending. |
+| 6. Replace the Blaze2-specific backend proof structs with the shared BaseFold-core proof. | Pending. This is the step that must absorb the current 1,408-byte terminal folded-layer side chain; the side chain is soundly necessary until then. |
 | 7. Add the 8-byte/16-byte field-width template and lock both acceptance numbers. | In progress: the current budget and byte-template test are parameterized by field byte width; a concrete 8-byte backend is still future work. |
 
 This order keeps the current hard structural wins intact while making each remaining byte movement

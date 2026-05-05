@@ -100,6 +100,12 @@ dim ker(A[R, [k]\W]) =
   0 otherwise.
 ```
 
+The constructive matched half is:
+
+```text
+docs/rfc_matched_kernel_induction.md
+```
+
 The small-depth scans support this:
 
 ```text

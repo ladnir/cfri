@@ -232,3 +232,9 @@ when:
 ```text
 |R| * |W| = k.
 ```
+
+The constructive matched-pair half of this rank statement is expanded in:
+
+```text
+docs/rfc_matched_kernel_induction.md
+```

@@ -4325,6 +4325,68 @@ fn fold_eval_sumcheck_vector(mut values: Vec<B128>, challenges: &[B128]) -> Resu
     Ok(values[0])
 }
 
+#[allow(dead_code)]
+fn verify_section5_relation_terminal_evaluations_from_residual_values(
+    checks: &RaaSection5RelationChecks,
+    residual_values: &[B128],
+    domain_len: usize,
+) -> Result<(), Error> {
+    if domain_len == 0 || !domain_len.is_power_of_two() {
+        return Err(Error::InvalidPcsOpen(
+            "RAA Section 5 residual terminal domain length must be a nonzero power of two"
+                .to_string(),
+        ));
+    }
+    let expected_len = domain_len * RAA_SECTION5_RELATION_RESIDUAL_ROW_COUNT;
+    if residual_values.len() != expected_len {
+        return Err(Error::InvalidPcsOpen(
+            "RAA Section 5 residual terminal values are not row-aligned".to_string(),
+        ));
+    }
+    let num_vars = log2_strict(domain_len);
+    let (permutation_row, rest) = residual_values.split_at(domain_len);
+    let (first_accumulator_row, second_accumulator_row) = rest.split_at(domain_len);
+    verify_section5_relation_terminal_row_evaluation(
+        "permutation",
+        permutation_row,
+        &checks.permutation,
+        num_vars,
+    )?;
+    verify_section5_relation_terminal_row_evaluation(
+        "first accumulator",
+        first_accumulator_row,
+        &checks.first_accumulator,
+        num_vars,
+    )?;
+    verify_section5_relation_terminal_row_evaluation(
+        "second accumulator",
+        second_accumulator_row,
+        &checks.second_accumulator,
+        num_vars,
+    )
+}
+
+#[allow(dead_code)]
+fn verify_section5_relation_terminal_row_evaluation(
+    label: &str,
+    row: &[B128],
+    check: &RaaRelationSumcheckCheck,
+    num_vars: usize,
+) -> Result<(), Error> {
+    if check.challenges.len() != num_vars {
+        return Err(Error::InvalidPcsOpen(format!(
+            "RAA Section 5 {label} terminal challenge length is invalid"
+        )));
+    }
+    let terminal_eval = fold_eval_sumcheck_vector(row.to_vec(), &check.challenges)?;
+    if terminal_eval != check.terminal_claim {
+        return Err(Error::InvalidPcsOpen(format!(
+            "RAA Section 5 {label} terminal residual evaluation does not match sumcheck claim"
+        )));
+    }
+    Ok(())
+}
+
 fn raa_eval_sumcheck_evaluate(coeffs: &[B128; 3], point: B128) -> B128 {
     coeffs[0] + point * (coeffs[1] + point * coeffs[2])
 }
@@ -5697,6 +5759,47 @@ mod tests {
             .collect()
     }
 
+    fn section5_relation_check_for_row(
+        row: &[B128],
+        challenges: &[B128],
+    ) -> RaaRelationSumcheckCheck {
+        RaaRelationSumcheckCheck {
+            challenges: challenges.to_vec(),
+            initial_sum: B128::ZERO,
+            terminal_claim: fold_eval_sumcheck_vector(row.to_vec(), challenges).unwrap(),
+        }
+    }
+
+    fn section5_terminal_binding_fixture() -> (RaaSection5RelationChecks, Vec<B128>, usize) {
+        let domain_len = 8;
+        let permutation_row = message(domain_len, 31);
+        let first_accumulator_row = message(domain_len, 211);
+        let second_accumulator_row = message(domain_len, 409);
+        let permutation_challenges = [B128::from(3), B128::from(5), B128::from(7)];
+        let first_accumulator_challenges = [B128::from(11), B128::from(13), B128::from(17)];
+        let second_accumulator_challenges = [B128::from(19), B128::from(23), B128::from(29)];
+        let checks = RaaSection5RelationChecks {
+            permutation: section5_relation_check_for_row(&permutation_row, &permutation_challenges),
+            first_accumulator: section5_relation_check_for_row(
+                &first_accumulator_row,
+                &first_accumulator_challenges,
+            ),
+            second_accumulator: section5_relation_check_for_row(
+                &second_accumulator_row,
+                &second_accumulator_challenges,
+            ),
+        };
+        assert_ne!(checks.permutation.terminal_claim, B128::ZERO);
+        assert_ne!(checks.first_accumulator.terminal_claim, B128::ZERO);
+        assert_ne!(checks.second_accumulator.terminal_claim, B128::ZERO);
+        let mut residual_values =
+            Vec::with_capacity(domain_len * RAA_SECTION5_RELATION_RESIDUAL_ROW_COUNT);
+        residual_values.extend_from_slice(&permutation_row);
+        residual_values.extend_from_slice(&first_accumulator_row);
+        residual_values.extend_from_slice(&second_accumulator_row);
+        (checks, residual_values, domain_len)
+    }
+
     fn blaze2_backend_spec() -> Blaze2BaseFoldBackendSpec {
         let praa = Blaze2CodeSpec {
             version: 1,
@@ -5862,6 +5965,71 @@ mod tests {
                 raa_relation_strategy: spec.raa_relation_strategy,
             }
         );
+    }
+
+    #[test]
+    fn section5_terminal_binding_accepts_residual_row_evaluations() {
+        let (checks, residual_values, domain_len) = section5_terminal_binding_fixture();
+
+        verify_section5_relation_terminal_evaluations_from_residual_values(
+            &checks,
+            &residual_values,
+            domain_len,
+        )
+        .unwrap();
+    }
+
+    #[test]
+    fn section5_terminal_binding_rejects_tampered_terminal_claim() {
+        let (mut checks, residual_values, domain_len) = section5_terminal_binding_fixture();
+        checks.first_accumulator.terminal_claim += B128::ONE;
+
+        let err = verify_section5_relation_terminal_evaluations_from_residual_values(
+            &checks,
+            &residual_values,
+            domain_len,
+        )
+        .unwrap_err();
+        assert!(format!("{err:?}")
+            .contains("first accumulator terminal residual evaluation does not match"));
+    }
+
+    #[test]
+    fn section5_terminal_binding_rejects_tampered_residual_row() {
+        let (checks, mut residual_values, domain_len) = section5_terminal_binding_fixture();
+        residual_values[domain_len * 2 + 3] += B128::ONE;
+
+        let err = verify_section5_relation_terminal_evaluations_from_residual_values(
+            &checks,
+            &residual_values,
+            domain_len,
+        )
+        .unwrap_err();
+        assert!(format!("{err:?}")
+            .contains("second accumulator terminal residual evaluation does not match"));
+    }
+
+    #[test]
+    fn section5_terminal_binding_rejects_bad_shapes() {
+        let (mut checks, mut residual_values, domain_len) = section5_terminal_binding_fixture();
+        residual_values.pop();
+        let err = verify_section5_relation_terminal_evaluations_from_residual_values(
+            &checks,
+            &residual_values,
+            domain_len,
+        )
+        .unwrap_err();
+        assert!(format!("{err:?}").contains("residual terminal values are not row-aligned"));
+
+        let (_, residual_values, domain_len) = section5_terminal_binding_fixture();
+        checks.permutation.challenges.pop();
+        let err = verify_section5_relation_terminal_evaluations_from_residual_values(
+            &checks,
+            &residual_values,
+            domain_len,
+        )
+        .unwrap_err();
+        assert!(format!("{err:?}").contains("permutation terminal challenge length is invalid"));
     }
 
     #[test]

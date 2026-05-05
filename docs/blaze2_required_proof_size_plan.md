@@ -190,10 +190,15 @@ backend multiproof collector. The honest Section 5 verifier path now accepts onc
 terminal claims are zero and all scheduled residual proof-oracle openings authenticate to zero.
 This removes the artificial fail-closed branch, but the verifier still has to replace that
 sampled-zero placeholder with paper-style multilinear terminal evaluation binding against the
-committed residual rows. The permutation residual row is no longer a placeholder: alpha/beta/gamma
-are squeezed before helper construction, the helper product-tree witnesses are committed after
-alpha/beta, and the residual commitment now contains a gamma-batched product-tree relation/root
-equality residual derived from those helper witnesses plus the two accumulator residual rows.
+committed residual rows. The core terminal-binding check now exists as a focused helper: given the
+three residual rows and the three sumcheck terminal challenge vectors, it evaluates each residual
+row at its terminal point and rejects if the value does not equal the corresponding sumcheck terminal
+claim. This helper is unit-tested for honest nonzero claims, tampered claims, tampered rows, and bad
+shapes, but it is not yet wired to a backend evaluation proof. The permutation residual row is no
+longer a placeholder: alpha/beta/gamma are squeezed before helper construction, the helper
+product-tree witnesses are committed after alpha/beta, and the residual commitment now contains a
+gamma-batched product-tree relation/root equality residual derived from those helper witnesses plus
+the two accumulator residual rows.
 
 After re-reading Blaze Section 5, the honest implementation cannot be just "the same three rows
 with fewer openings." The paper relation uses MLIOP proof oracles for the RAA computation: the
@@ -225,8 +230,9 @@ B/C below, with a concrete Section 5 proof-oracle layout:
    serialized terminal values; [In progress: verifier rejects unbound serialized terminal values
    and validates the three Section 5 sumcheck transcript shapes and round consistency, now deriving
    named terminal challenge/claim objects; residual proof-oracle rows are committed and
-   query-authenticated, and the honest verifier accepts only zero terminal claims plus zero
-   authenticated residual openings; their multilinear terminal evaluations are not yet verified]
+   query-authenticated, and a tested core helper checks residual-row multilinear terminal
+   evaluations against those claims when supplied the residual rows; the helper still has to be fed
+   by the backend proof rather than by full in-memory residual vectors]
 5. switch the normal Blaze2 backend from `LocalQueries` to `Section5`.
 ```
 

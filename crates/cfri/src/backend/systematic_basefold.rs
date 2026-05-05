@@ -462,6 +462,7 @@ enum BackendProofOracleLaneKind {
     Auxiliary,
     Section5RelationResidual,
     Section5PermutationHelper,
+    Section5RelationTerminalFoldedRound(usize),
 }
 
 impl BackendProofOracleLaneKind {
@@ -471,6 +472,7 @@ impl BackendProofOracleLaneKind {
             Self::Auxiliary => "auxiliary",
             Self::Section5RelationResidual => "Section 5 residual",
             Self::Section5PermutationHelper => "Section 5 helper",
+            Self::Section5RelationTerminalFoldedRound(_) => "Section 5 terminal folded layer",
         }
     }
 }
@@ -5068,10 +5070,11 @@ fn prove_section5_relation_terminal_proof<H: Hash>(
             &opening_map,
         )?;
         folded_layer_authentication.push(RaaSection5RelationTerminalLayerProof {
-            authentication_nodes: merkle_b128_multiproof_nodes::<H, _>(
-                &commitment.merkle_tree,
+            authentication_nodes: prove_backend_oracle_lane::<H>(BackendProofOracleProverLane {
+                kind: BackendProofOracleLaneKind::Section5RelationTerminalFoldedRound(round),
+                merkle_tree: Some(&commitment.merkle_tree),
                 queries,
-            )?,
+            })?,
         });
     }
     let openings = section5_relation_terminal_openings_from_map(opening_map);
@@ -5444,12 +5447,13 @@ impl<H: Hash> RaaSection5RelationTerminalProof<H> {
                 query_count,
                 &openings,
             )?;
-            verify_merkle_b128_multiproof::<H, _>(
-                &folded_public.root,
-                folded_public.len,
+            verify_backend_oracle_lane::<H>(BackendProofOracleVerifierLane {
+                kind: BackendProofOracleLaneKind::Section5RelationTerminalFoldedRound(round),
+                root: Some(&folded_public.root),
+                len: folded_public.len,
                 queries,
-                &proof.authentication_nodes,
-            )?;
+                authentication_nodes: &proof.authentication_nodes,
+            })?;
         }
         Ok(())
     }

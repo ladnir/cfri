@@ -128,7 +128,14 @@ at `m=2`, and the distance-dominant `m=32` term is:
 ### Lemma 4: Non-Extremal Copy Density
 
 Conditioned on a message coming from one extremal copy, every other independent copy has full
-generic support except with a root/determinant event. Informally:
+generic support except with a root/determinant event. For a fixed nonzero vector `x` independent of
+copy `j`, a crude union tail is:
+
+```text
+Pr[wt(A_j x) <= b] <= binom(k,b) q^{-(k-b)}.
+```
+
+Informally:
 
 ```text
 wt(A_j x) = k
@@ -139,6 +146,29 @@ for all `j` not responsible for the extremal collapse, outside negligible finite
 This lemma is the part that still needs the cleanest algebraic statement. It should be easier than
 the first copy: after conditioning on `x`, the challenges of another copy are independent, and no
 matched block/stride zero pattern has been imposed on that copy.
+
+The depth-`11`, `q=2^128` conditioned-copy tail is:
+
+```text
+docs/rfc_conditioned_copy_tail_depth11_q128.csv
+```
+
+Some entries:
+
+```text
+output weight <= 1984: log2 tail <= -7785.43020642
+output weight <= 2047: log2 tail <=  -117.00000000
+```
+
+So even a single zero in an independent second copy is already below an 80-bit target for one fixed
+message vector. At the distance-dominant depth-`11`, `m=32` point, multiplying by the rough matched
+candidate count:
+
+```text
+c_p * k * m
+```
+
+costs only about `18.8` bits, still leaving roughly `98` bits of slack for the one-zero event.
 
 The first sanity checks are:
 

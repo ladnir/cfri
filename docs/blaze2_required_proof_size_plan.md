@@ -33,7 +33,7 @@ terminal folded-layer commitments/authentication across the three residual rows:
 | Backend compiler-parity fold values and multiproof nodes | 720 | 680 | Uses one shared multiproof per compiler commitment layer. |
 | Backend auxiliary relation values and multiproof nodes | 1,200 | 712 | Only sampled Section 5 relation-auxiliary leaves remain in this bucket. |
 | Section 5 residual values and shared residual multiproof nodes | 1,168 | 1,016 | Terminal base leaves now use the shared residual lane and terminal query count is tied to the residual query budget. |
-| Section 5 terminal folded-layer roots and authentication | 1,408 | 1,408 | Commitments are shared across residual rows and authentication nodes now live in the shared backend authentication object, but terminal folded-layer roots still remain local scaffolding until terminal folding is part of the shared BaseFold core. |
+| Section 5 terminal folded-layer roots and authentication | 1,408 | 1,408 | Folded-layer roots and authentication nodes now live in the shared backend authentication object, but the terminal folded-layer lane is still Section 5-specific until terminal folding is part of the shared BaseFold core. |
 | Section 5 helper values and multiproof nodes | 1,056 | 1,008 | Remaining helper-oracle bucket. |
 | Total | 6,928 | 5,976 | Current pinned honest Section 5 implementation total. |
 
@@ -204,11 +204,11 @@ residual oracle: the prover commits folded residual layers, derives path query i
 roots, authenticates the base residual leaves through the shared backend residual multiproof lane,
 authenticates folded-layer siblings, and rejects missing or tampered terminal paths. Those
 folded-layer commitments and multiproofs are now shared across the three residual rows instead of
-being emitted independently per row, and the folded-layer authentication nodes now live in the
-shared backend authentication object rather than inside the terminal proof object. This closes the
-old trusted/in-memory terminal binding gap. The remaining accounting work is to move the
-folded-layer commitments/query lane themselves into the final holographic BaseFold core rather than
-leaving them as Section 5-local scaffolding. The permutation residual row is no longer a placeholder:
+being emitted independently per row, and both folded-layer roots and authentication nodes now live in
+the shared backend authentication object rather than inside the terminal proof object. This closes
+the old trusted/in-memory terminal binding gap. The remaining accounting work is to move the
+terminal folded-layer lane itself into the final holographic BaseFold core rather than leaving it as
+Section 5-specific scaffolding. The permutation residual row is no longer a placeholder:
 alpha/beta/gamma are squeezed before helper construction, the helper product-tree witnesses are
 committed after alpha/beta, and the residual commitment now contains a gamma-batched product-tree
 relation/root equality residual derived from those helper witnesses plus the two accumulator
@@ -248,8 +248,8 @@ B/C below, with a concrete Section 5 proof-oracle layout:
    from committed residual rows instead of full in-memory residual vectors; terminal folding queries
    are budgeted by the residual query domain rather than all backend query domains; base residual
    leaves for those terminal paths are now authenticated by the shared backend residual multiproof
-   collector, while folded-layer authentication nodes are carried by the shared backend
-   authentication object and the folded-layer commitment lane still has to be folded into the final
+   collector, while folded-layer roots and authentication nodes are carried by the shared backend
+   authentication object and the terminal folded-layer lane still has to be folded into the final
    shared proof-oracle/accounting model]
 5. switch the normal Blaze2 backend from `LocalQueries` to `Section5`; [Done for the normal
    Blaze2/BaseFold fixture]

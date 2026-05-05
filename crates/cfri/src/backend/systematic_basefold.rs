@@ -287,31 +287,39 @@ pub struct RaaSection5RelationResidualQueryProof<H: Hash> {
 }
 
 #[derive(Clone, Debug, Default, Eq, PartialEq)]
-pub struct RaaSection5RelationTerminalProof<H: Hash> {
-    pub rows: Vec<RaaSection5RelationTerminalRowProof<H>>,
-    pub openings: Vec<RaaSection5RelationTerminalValueOpening>,
+pub struct BaseFoldTerminalCoreProof<H: Hash> {
+    pub rows: Vec<BaseFoldTerminalCoreRowProof<H>>,
+    pub openings: Vec<BaseFoldTerminalCoreOpening>,
 }
 
 #[derive(Clone, Debug, Default, Eq, PartialEq)]
-pub struct RaaSection5RelationTerminalRowProof<H: Hash> {
-    pub paths: Vec<RaaSection5RelationTerminalPath>,
+pub struct BaseFoldTerminalCoreRowProof<H: Hash> {
+    pub paths: Vec<BaseFoldTerminalCorePath>,
     _hash_marker: PhantomData<H>,
 }
 
 #[derive(Clone, Debug, Eq, PartialEq)]
-pub struct RaaSection5RelationTerminalLayerProof<H: Hash> {
-    pub authentication_nodes: Vec<Output<H>>,
-}
+pub struct BaseFoldTerminalCorePath;
 
 #[derive(Clone, Debug, Eq, PartialEq)]
-pub struct RaaSection5RelationTerminalPath;
-
-#[derive(Clone, Debug, Eq, PartialEq)]
-pub struct RaaSection5RelationTerminalValueOpening {
+pub struct BaseFoldTerminalCoreOpening {
     pub round: usize,
     pub row_index: usize,
     pub index: usize,
     pub value: B128,
+}
+
+pub type RaaSection5RelationTerminalProof<H> = BaseFoldTerminalCoreProof<H>;
+
+pub type RaaSection5RelationTerminalRowProof<H> = BaseFoldTerminalCoreRowProof<H>;
+
+pub type RaaSection5RelationTerminalPath = BaseFoldTerminalCorePath;
+
+pub type RaaSection5RelationTerminalValueOpening = BaseFoldTerminalCoreOpening;
+
+#[derive(Clone, Debug, Eq, PartialEq)]
+pub struct RaaSection5RelationTerminalLayerProof<H: Hash> {
+    pub authentication_nodes: Vec<Output<H>>,
 }
 
 #[derive(Clone, Debug, Eq, PartialEq)]
@@ -5290,10 +5298,10 @@ fn section5_relation_terminal_path(
         )?;
         current_index &= half - 1;
     }
-    Ok(RaaSection5RelationTerminalPath)
+    Ok(BaseFoldTerminalCorePath)
 }
 
-impl<H: Hash> RaaSection5RelationTerminalProof<H> {
+impl<H: Hash> BaseFoldTerminalCoreProof<H> {
     fn serialized_value_count(&self) -> usize {
         self.openings.len()
     }
@@ -5480,7 +5488,7 @@ impl<H: Hash> RaaSection5RelationTerminalProof<H> {
     }
 }
 
-impl<H: Hash> RaaSection5RelationTerminalRowProof<H> {
+impl<H: Hash> BaseFoldTerminalCoreRowProof<H> {
     fn verify(
         &self,
         row_index: usize,

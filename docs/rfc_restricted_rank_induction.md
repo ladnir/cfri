@@ -253,3 +253,123 @@ docs/rfc_certified_defect_row_s5_zp3_depth3_c8.csv
 This is the strongest evidence so far that the structural family is exactly the failure set of the
 recursive leading-monomial certificate, while the remaining sampled rank defects are ordinary
 finite-field determinant zeros.
+
+## Soundness Theorem
+
+The certificate rank should now be formalized as a theorem.
+
+**Theorem.** If `certified_rank(S,Q) = r = 2^d - |S|`, then the restricted parity matrix
+`M_d(S,Q)` has generic row rank `r`.
+
+**Proof sketch.** Induct on `d`.
+
+At the root, group selected parity columns by `(copy, lower_path)`. A group with both siblings
+selected can be replaced, by the determinant-`1` local transform, with independent obligations
+`[g_0;0]` and `[0;g_1]`. This operation preserves column span over the rational function field in
+the root challenge.
+
+A singleton column has the form:
+
+```text
+[ alpha(T) g_0 ]
+[ beta(T)  g_1 ]
+```
+
+where `alpha` and `beta` are nonzero linear polynomials. The certificate orients that singleton to
+one child. In determinant language, this chooses the leading root-term contribution from that child.
+For the chosen orientation, the other child contribution is lower priority under a term order that
+first compares root variables and then recurses into child variables.
+
+If the certificate finds child ranks `r_0` and `r_1` with `r_0+r_1=r`, the induction hypothesis gives
+nonzero child minors with unique leading monomials. Place those minors in the block rows selected
+by the split obligations. Multiplying the child leading monomials with the oriented singleton root
+coefficients gives one parent determinant monomial. No other determinant term can produce the same
+monomial: sibling-pair columns have already been diagonalized into separate child blocks, and
+singleton orientation fixes which child supplies that column's leading root factor. Therefore the
+parent minor is a nonzero polynomial, so `M_d(S,Q)` has generic rank `r`. QED outline.
+
+The remaining rigor work is to write the term order and orientation map explicitly, but there is no
+longer an algebraic mystery: the script is computing the recursive minor construction.
+
+## Extension Checks And Distance Threshold
+
+For a fixed systematic set `S`, `certified_rank(S,Q)` is monotone in `Q`: adding more parity columns
+cannot lower the best recursive certificate rank. The converse is not automatic: a defective
+minimal core can be repaired by adding another parity column. Therefore the distance threshold must
+track extension survival, not only minimal cores.
+
+The helper:
+
+```text
+scripts/rfc_certified_extension_check.py
+```
+
+checks exactly that question for a list of defective cores. At depth `3`, total expansion `8`, the
+first extension results revise the earlier `e=2` hope:
+
+```text
+s=6:
+  defective zp=2 cores:               560
+  unique defective extensions to zp=4: 56
+  defective extensions from zp=4 to 5: 0
+
+s=5:
+  defective zp=3 cores:                12992
+  unique defective extensions to zp=4:  3248
+  defective extensions from zp=4 to 5:  0
+
+s=7:
+  exact zp=1 row defects: 0
+```
+
+The `s=6,zp=4` extension has total zero-set size:
+
+```text
+|S| + |Q| = 6 + 4 = 10 = k + 2.
+```
+
+One example is:
+
+```text
+0:1:2:3:4:5:8:22:36:50
+```
+
+and it resamples as rank `7` over ten independent large-prime challenge assignments, so this is a
+real structural obstruction. Thus the all-level systematic construction does not appear to satisfy
+the `k+2` zero-set threshold at depth `3`.
+
+The current evidence supports the weaker threshold:
+
+```text
+structural defects at z = k+2,
+no observed structural defects at z = k+3.
+```
+
+A target sample at depth `3`, zero-count `10`, found an additional structural example at
+`s=4,zp=6`, while a matching zero-count `11` sample found no certificate defects:
+
+```text
+z=10 sample, 20k per split:
+  one s=4,zp=6 certificate defect
+
+z=11 sample, 20k per split:
+  zero certificate defects across all splits
+```
+
+The checked artifacts for this pass are:
+
+```text
+docs/rfc_certified_extension_s6_zp2_to_zp4_depth3_c8.csv
+docs/rfc_certified_extension_s6_zp4_to_zp5_depth3_c8.csv
+docs/rfc_certified_extension_s5_zp3_to_zp4_depth3_c8.csv
+docs/rfc_certified_extension_s5_zp4_to_zp5_depth3_c8.csv
+docs/rfc_certified_target_sample_z10_depth3_c8.csv
+docs/rfc_certified_target_sample_z11_depth3_c8.csv
+docs/rfc_extension_rank_resample_s6_zp4_depth3_c8.csv
+docs/rfc_extension_rank_resample_s4_zp6_depth3_c8.csv
+```
+
+So the working systematic distance target should be updated from `e=2` to `e=3` unless a stronger
+minor construction can certify the `z=k+2` shapes that the current leading-monomial certificate
+misses. Since the `z=k+2` examples are actual rank-deficient samples, that stronger construction
+would need a different code variant, not merely a better proof for this all-level systematic code.

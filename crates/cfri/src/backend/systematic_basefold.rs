@@ -2140,10 +2140,10 @@ impl<H: Hash> RaaSection5PermutationHelperCommitment<H> {
         schedule: &HolographicQuerySchedule,
         _residual_proof: Option<&RaaSection5RelationResidualQueryProof<H>>,
     ) -> Result<RaaSection5PermutationHelperQueryProof<H>, Error> {
-        let mut queries = Vec::new();
+        let mut queries = BTreeMap::new();
         for query in schedule.proof_queries() {
             if query.domain == BackendProofQueryDomain::Section5PermutationHelper {
-                queries.push(self.query(query.index)?);
+                queries.insert(query.index, self.query(query.index)?);
             }
         }
         for query in schedule.section5_permutation_helper_authentication_queries() {
@@ -2152,10 +2152,10 @@ impl<H: Hash> RaaSection5PermutationHelperCommitment<H> {
                     "Section 5 helper authentication query has wrong domain".to_string(),
                 ));
             }
-            queries.push(self.query(query.index)?);
+            queries.insert(query.index, self.query(query.index)?);
         }
         Ok(RaaSection5PermutationHelperQueryProof {
-            queries,
+            queries: queries.into_values().collect(),
             authentication_nodes: Vec::new(),
         })
     }
@@ -2227,6 +2227,7 @@ impl<H: Hash> RaaSection5PermutationHelperQueryProof<H> {
                     .to_string(),
             ));
         }
+        let query_map = self.unique_query_map(public.len)?;
         let expected_count = section5_permutation_helper_expected_query_count(
             public,
             residual_public,
@@ -2238,43 +2239,27 @@ impl<H: Hash> RaaSection5PermutationHelperQueryProof<H> {
                 "Section 5 helper query proof count does not match schedule".to_string(),
             ));
         }
-        let mut queries = self.queries.iter();
         for expected in schedule.proof_queries() {
             if expected.domain != BackendProofQueryDomain::Section5PermutationHelper {
                 continue;
             }
-            let query = queries.next().ok_or_else(|| {
-                Error::InvalidPcsOpen("Section 5 helper query opening is missing".to_string())
-            })?;
-            if query.logical_index != expected.index || query.logical_index >= public.len {
+            if !query_map.contains_key(&expected.index) {
                 return Err(Error::InvalidPcsOpen(
                     "Section 5 helper query index does not match schedule".to_string(),
                 ));
             }
         }
-        let _ = residual_proof;
-        let _ = residual_public;
         for expected in schedule.section5_permutation_helper_authentication_queries() {
             if expected.domain != BackendProofQueryDomain::Section5PermutationHelper {
                 return Err(Error::InvalidPcsOpen(
                     "Section 5 helper authentication query has wrong domain".to_string(),
                 ));
             }
-            let query = queries.next().ok_or_else(|| {
-                Error::InvalidPcsOpen(
-                    "Section 5 helper residual-local opening is missing".to_string(),
-                )
-            })?;
-            if query.logical_index != expected.index || query.logical_index >= public.len {
+            if !query_map.contains_key(&expected.index) {
                 return Err(Error::InvalidPcsOpen(
                     "Section 5 helper residual-local opening index does not match".to_string(),
                 ));
             }
-        }
-        if queries.next().is_some() {
-            return Err(Error::InvalidPcsOpen(
-                "too many Section 5 helper query openings".to_string(),
-            ));
         }
         Ok(())
     }
@@ -2286,50 +2271,72 @@ impl<H: Hash> RaaSection5PermutationHelperQueryProof<H> {
         residual_proof: Option<&RaaSection5RelationResidualQueryProof<H>>,
         helper_public: Option<&RaaSection5PermutationHelperPublicCommitment<H>>,
     ) -> Result<Vec<(usize, B128)>, Error> {
-        let mut queries = Vec::with_capacity(self.queries.len());
-        let mut supplied = self.queries.iter();
-        for expected in schedule.proof_queries() {
-            if expected.domain != BackendProofQueryDomain::Section5PermutationHelper {
-                continue;
+        let public_len = match helper_public {
+            Some(public) => public.len,
+            None => {
+                section5_permutation_residual_len_from_residual_public(residual_public)?
+                    * RAA_SECTION5_PERMUTATION_HELPER_ROW_COUNT
             }
-            let query = supplied.next().ok_or_else(|| {
-                Error::InvalidPcsOpen("Section 5 helper query opening is missing".to_string())
-            })?;
-            if query.logical_index != expected.index {
+        };
+        let query_map = self.unique_query_map(public_len)?;
+        let expected_indices = section5_permutation_helper_required_indices(schedule)?;
+        for index in &expected_indices {
+            if !query_map.contains_key(index) {
                 return Err(Error::InvalidPcsOpen(
-                    "Section 5 helper query index does not match schedule".to_string(),
+                    "Section 5 helper query opening is missing".to_string(),
                 ));
             }
-            queries.push((query.logical_index, query.value));
         }
-        let _ = residual_public;
-        let _ = residual_proof;
-        let _ = helper_public;
-        for expected in schedule.section5_permutation_helper_authentication_queries() {
-            if expected.domain != BackendProofQueryDomain::Section5PermutationHelper {
-                return Err(Error::InvalidPcsOpen(
-                    "Section 5 helper authentication query has wrong domain".to_string(),
-                ));
-            }
-            let query = supplied.next().ok_or_else(|| {
-                Error::InvalidPcsOpen(
-                    "Section 5 helper residual-local opening is missing".to_string(),
-                )
-            })?;
-            if query.logical_index != expected.index {
-                return Err(Error::InvalidPcsOpen(
-                    "Section 5 helper residual-local opening index does not match".to_string(),
-                ));
-            }
-            queries.push((query.logical_index, query.value));
-        }
-        if supplied.next().is_some() {
+        if query_map.len() != expected_indices.len() {
             return Err(Error::InvalidPcsOpen(
                 "too many Section 5 helper query openings".to_string(),
             ));
         }
+        let _ = residual_proof;
+        Ok(query_map.into_iter().collect())
+    }
+
+    fn unique_query_map(&self, public_len: usize) -> Result<BTreeMap<usize, B128>, Error> {
+        let mut queries = BTreeMap::new();
+        for query in &self.queries {
+            if query.logical_index >= public_len {
+                return Err(Error::InvalidPcsOpen(
+                    "Section 5 helper query index is outside the helper oracle".to_string(),
+                ));
+            }
+            if let Some(existing) = queries.insert(query.logical_index, query.value) {
+                if existing != query.value {
+                    return Err(Error::InvalidPcsOpen(
+                        "duplicate Section 5 helper query index has conflicting values".to_string(),
+                    ));
+                }
+                return Err(Error::InvalidPcsOpen(
+                    "duplicate Section 5 helper query opening is not canonical".to_string(),
+                ));
+            }
+        }
         Ok(queries)
     }
+}
+
+fn section5_permutation_helper_required_indices(
+    schedule: &HolographicQuerySchedule,
+) -> Result<Vec<usize>, Error> {
+    let mut indices = BTreeMap::new();
+    for query in schedule.proof_queries() {
+        if query.domain == BackendProofQueryDomain::Section5PermutationHelper {
+            indices.insert(query.index, ());
+        }
+    }
+    for query in schedule.section5_permutation_helper_authentication_queries() {
+        if query.domain != BackendProofQueryDomain::Section5PermutationHelper {
+            return Err(Error::InvalidPcsOpen(
+                "Section 5 helper authentication query has wrong domain".to_string(),
+            ));
+        }
+        indices.insert(query.index, ());
+    }
+    Ok(indices.into_keys().collect())
 }
 
 fn section5_permutation_helper_expected_query_count<H: Hash>(
@@ -2361,7 +2368,7 @@ fn section5_permutation_helper_expected_query_count<H: Hash>(
             }
         }
     }
-    Ok(schedule.section5_permutation_helper_query_proof_count())
+    Ok(section5_permutation_helper_required_indices(schedule)?.len())
 }
 
 fn section5_permutation_residual_len_from_helper_len(helper_len: usize) -> Result<usize, Error> {
@@ -2422,7 +2429,9 @@ fn section5_permutation_helper_absent_expected_count<H: Hash>(
     residual_proof: Option<&RaaSection5RelationResidualQueryProof<H>>,
 ) -> usize {
     let _ = residual_proof;
-    schedule.section5_permutation_helper_query_proof_count()
+    section5_permutation_helper_required_indices(schedule)
+        .map(|indices| indices.len())
+        .unwrap_or_else(|_| schedule.section5_permutation_helper_query_proof_count())
 }
 
 impl<H: Hash> RaaSection5RelationResidualQueryProof<H> {
@@ -6576,15 +6585,7 @@ fn verify_section5_permutation_helper_residual_bindings<H: Hash>(
         )
     })?;
     let len = section5_permutation_residual_len_from_publics(public, residual_public)?;
-    let mut supplied = proof.queries.iter();
-    for expected in schedule.proof_queries() {
-        if expected.domain != BackendProofQueryDomain::Section5PermutationHelper {
-            continue;
-        }
-        supplied.next().ok_or_else(|| {
-            Error::InvalidPcsOpen("Section 5 helper query opening is missing".to_string())
-        })?;
-    }
+    let supplied = proof.unique_query_map(public.len)?;
     let mut scheduled_helper_authentication = schedule
         .section5_permutation_helper_authentication_queries()
         .iter();
@@ -6611,17 +6612,12 @@ fn verify_section5_permutation_helper_residual_bindings<H: Hash>(
                         .to_string(),
                 ));
             }
-            let query = supplied.next().ok_or_else(|| {
+            let value = supplied.get(&expected_index).ok_or_else(|| {
                 Error::InvalidPcsOpen(
                     "Section 5 helper residual-local opening is missing".to_string(),
                 )
             })?;
-            if query.logical_index != expected_index {
-                return Err(Error::InvalidPcsOpen(
-                    "Section 5 helper residual-local opening index does not match".to_string(),
-                ));
-            }
-            helper_openings.push((expected_index, query.value));
+            helper_openings.push((expected_index, *value));
         }
         let derived_residual = raa_section5_permutation_residual_from_helper_openings(
             len,
@@ -8473,7 +8469,19 @@ mod tests {
             .unwrap();
 
         let mut tampered_helper_relation = helper_proof.clone();
-        let derived_helper_offset = helper_schedule.section5_permutation_helper_proof_query_count();
+        let derived_helper_index = helper_schedule
+            .section5_permutation_helper_authentication_queries()
+            .first()
+            .expect("helper authentication query is scheduled")
+            .index;
+        let derived_helper_offset = tampered_helper_relation
+            .section5_permutation_helper
+            .as_ref()
+            .unwrap()
+            .queries
+            .iter()
+            .position(|query| query.logical_index == derived_helper_index)
+            .expect("helper authentication query is opened");
         tampered_helper_relation
             .section5_permutation_helper
             .as_mut()

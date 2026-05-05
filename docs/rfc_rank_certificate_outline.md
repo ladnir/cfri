@@ -253,3 +253,12 @@ s=5,z_p=3 bad shapes: 13027 all have restricted rank 2 on 3 remaining rows
 
 Projective collapse explains the simplest structural defects; the remaining structural defects are
 nontrivial determinant identities of the restricted tensor columns.
+
+The original, non-systematic MDS direction is tracked separately in:
+
+```text
+docs/rfc_original_mds_certificate.md
+```
+
+It uses the same recursive leading-monomial certificate with `S=empty`; current exact/sampled
+certificate checks find no defects through depth `5` for expansion `8`.

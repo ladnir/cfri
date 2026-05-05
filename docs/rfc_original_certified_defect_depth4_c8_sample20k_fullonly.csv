@@ -1,0 +1,2 @@
+depth,expansion,k,n,subset_size,mode,checked_subsets,cert_defect,subset_count,first_defective
+4,8,16,128,16,sample:20000:full_only,20000,0,20000,

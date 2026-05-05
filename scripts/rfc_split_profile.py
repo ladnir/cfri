@@ -120,6 +120,14 @@ def certified_rank(systematic: set[int], parity: list[tuple[int, int]], depth: i
     return _certified_rank_cached(depth, systematic_key, parity_key)
 
 
+def certificate_full(systematic: set[int], parity: list[tuple[int, int]], depth: int) -> bool:
+    """Return whether the recursive certificate spans every undeleted row."""
+
+    systematic_key = tuple(sorted(systematic))
+    parity_key = tuple(sorted(set(parity)))
+    return _certificate_full_cached(depth, systematic_key, parity_key)
+
+
 @lru_cache(maxsize=None)
 def _certified_rank_cached(depth: int, systematic_key: tuple[int, ...], parity_key: tuple[tuple[int, int], ...]) -> int:
     systematic = set(systematic_key)
@@ -178,6 +186,80 @@ def _certified_rank_cached(depth: int, systematic_key: tuple[int, ...], parity_k
             if best == (1 << depth) - len(systematic):
                 break
     return best
+
+
+@lru_cache(maxsize=None)
+def _certificate_full_cached(depth: int, systematic_key: tuple[int, ...], parity_key: tuple[tuple[int, int], ...]) -> bool:
+    systematic = set(systematic_key)
+    parity = list(parity_key)
+    live = (1 << depth) - len(systematic)
+    if live == 0:
+        return True
+    if len(parity) < live:
+        return False
+    if depth == 0:
+        return bool(parity)
+
+    child_size = 1 << (depth - 1)
+    child_bit = child_size
+    low_mask = child_size - 1
+
+    systematic_left = {path & low_mask for path in systematic if (path & child_bit) == 0}
+    systematic_right = {path & low_mask for path in systematic if (path & child_bit) != 0}
+    left_live_rows = child_size - len(systematic_left)
+    right_live_rows = child_size - len(systematic_right)
+
+    groups: dict[tuple[int, int], set[int]] = defaultdict(set)
+    for copy, path in parity:
+        groups[(copy, path & low_mask)].add(1 if (path & child_bit) else 0)
+
+    left_forced: list[tuple[int, int]] = []
+    right_forced: list[tuple[int, int]] = []
+    choices: list[tuple[int, int]] = []
+    for copy_lower, sides in groups.items():
+        if len(sides) == 2:
+            if left_live_rows:
+                left_forced.append(copy_lower)
+            if right_live_rows:
+                right_forced.append(copy_lower)
+        elif left_live_rows and right_live_rows:
+            choices.append(copy_lower)
+        elif left_live_rows:
+            left_forced.append(copy_lower)
+        elif right_live_rows:
+            right_forced.append(copy_lower)
+
+    if len(left_forced) + len(choices) < left_live_rows:
+        return False
+    if len(right_forced) + len(choices) < right_live_rows:
+        return False
+
+    choices = sorted(set(choices))
+
+    def search(index: int, left_extra: list[tuple[int, int]], right_extra: list[tuple[int, int]]) -> bool:
+        left_available = len(left_forced) + len(left_extra) + (len(choices) - index)
+        right_available = len(right_forced) + len(right_extra) + (len(choices) - index)
+        if left_available < left_live_rows or right_available < right_live_rows:
+            return False
+        if index == len(choices):
+            left_key = tuple(sorted(set(left_forced + left_extra)))
+            right_key = tuple(sorted(set(right_forced + right_extra)))
+            return _certificate_full_cached(depth - 1, tuple(sorted(systematic_left)), left_key) and (
+                _certificate_full_cached(depth - 1, tuple(sorted(systematic_right)), right_key)
+            )
+
+        column = choices[index]
+        left_need = left_live_rows - len(set(left_forced + left_extra))
+        right_need = right_live_rows - len(set(right_forced + right_extra))
+        if left_need >= right_need:
+            if search(index + 1, left_extra + [column], right_extra):
+                return True
+            return search(index + 1, left_extra, right_extra + [column])
+        if search(index + 1, left_extra, right_extra + [column]):
+            return True
+        return search(index + 1, left_extra + [column], right_extra)
+
+    return search(0, [], [])
 
 
 def stats_key(stats: SplitStats, depth: int) -> tuple[int, ...]:

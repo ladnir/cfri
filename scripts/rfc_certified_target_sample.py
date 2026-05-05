@@ -8,7 +8,7 @@ import csv
 import random
 from pathlib import Path
 
-from rfc_split_profile import certified_rank, decode_shape, live_rows
+from rfc_split_profile import certificate_full, certified_rank, decode_shape, live_rows
 
 
 def main() -> None:
@@ -18,6 +18,7 @@ def main() -> None:
     parser.add_argument("--zero-count", type=int, required=True)
     parser.add_argument("--samples", type=int, default=20000)
     parser.add_argument("--seed", type=int, default=17)
+    parser.add_argument("--full-only", action="store_true")
     parser.add_argument("--out", required=True)
     args = parser.parse_args()
 
@@ -51,7 +52,10 @@ def main() -> None:
                 parities = sorted(rng.sample(range(parity_n), z_parity))
                 columns = identities + [k + column for column in parities]
                 systematic, parity = decode_shape(columns, args.depth, parity_expansion)
-                defect = live_rows(systematic, args.depth) - certified_rank(systematic, parity, args.depth)
+                if args.full_only:
+                    defect = 0 if certificate_full(systematic, parity, args.depth) else 1
+                else:
+                    defect = live_rows(systematic, args.depth) - certified_rank(systematic, parity, args.depth)
                 if defect > 0:
                     bad += 1
                     if first_defective == "":

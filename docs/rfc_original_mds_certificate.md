@@ -64,14 +64,6 @@ depth 2 exact:
 depth 3 sample:
   checked k-subsets: 100000
   certificate defects: 0
-
-depth 4 sample:
-  checked k-subsets: 20000
-  certificate defects: 0
-
-depth 5 sample:
-  checked k-subsets: 20000
-  certificate defects: 0
 ```
 
 The checked artifacts are:
@@ -79,8 +71,6 @@ The checked artifacts are:
 ```text
 docs/rfc_original_certified_defect_depth2_c8_exact.csv
 docs/rfc_original_certified_defect_depth3_c8_sample100k.csv
-docs/rfc_original_certified_defect_depth4_c8_sample20k_fullonly.csv
-docs/rfc_original_certified_defect_depth5_c8_sample20k_fullonly.csv
 ```
 
 The orientation theorem also has a small executable trace:

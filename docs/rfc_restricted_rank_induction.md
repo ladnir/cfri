@@ -373,3 +373,47 @@ So the working systematic distance target should be updated from `e=2` to `e=3` 
 minor construction can certify the `z=k+2` shapes that the current leading-monomial certificate
 misses. Since the `z=k+2` examples are actual rank-deficient samples, that stronger construction
 would need a different code variant, not merely a better proof for this all-level systematic code.
+
+## Depth 4 Safe Certificate Samples
+
+The target sampler was rerun at depth `4` using the exact recursive `certified_rank` predicate.
+This is slower than the optimistic full-check shortcut, but it agrees with the known depth-3
+defect and is the safe diagnostic.
+
+For depth `4`, total expansion `8`, `k=16`:
+
+```text
+z = k+1 = 17:
+  1000 samples per split
+  certificate defects found at s=9,zp=8; s=10,zp=7; s=14,zp=3
+
+z = k+2 = 18:
+  1000 samples per split
+  certificate defects found: 0
+
+z = k+3 = 19:
+  1000 samples per split
+  certificate defects found: 0
+```
+
+One `z=17` example:
+
+```text
+7:8:9:10:11:12:13:14:15:24:40:64:80:91:96:102:122
+```
+
+resamples as rank `15` over ten independent large-prime challenge assignments, so the certificate
+is again detecting a real structural rank defect.
+
+The checked artifacts are:
+
+```text
+docs/rfc_certified_target_sample_z17_depth4_c8_safe1k.csv
+docs/rfc_certified_target_sample_z18_depth4_c8_safe1k.csv
+docs/rfc_certified_target_sample_z19_depth4_c8_safe1k.csv
+docs/rfc_certificate_rank_resample_depth4_z17_c8.csv
+```
+
+This depth-4 evidence is compatible with the `e=3` systematic target and, in fact, does not find
+`k+2` defects at this sample size. The depth-3 `k+2` counterexamples still force the uniform
+all-depth statement to use at least `e=3`.

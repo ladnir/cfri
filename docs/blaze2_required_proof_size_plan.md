@@ -168,7 +168,7 @@ leaves are still Merkle-authenticated. The backend prequery path now also reject
 auxiliary traces whose `u3 = A * u2`, `u4 = M_pi2 * u3`, and `c_star = A * u4` rows do not match
 the folded PRAA codeword. The relation proof variant is now explicit (`LocalQueries` versus
 `Section5`), and the Section 5 mode now routes through the normal scheduled relation-query and
-backend authentication machinery while still failing closed at the missing global relation verifier.
+backend authentication machinery with an honest verifier path for the current residual-zero checks.
 The Section 5 pre-challenge auxiliary domain intentionally remains `3 * n_praa` rows for
 `u2/u3/u4`. The eight flattened truth-table halves for `f1`, `g1`, `f2`, and `g2` are a separate
 post-alpha/beta helper-oracle domain, because those oracles depend on verifier challenges in Blaze
@@ -176,19 +176,20 @@ Section 5. The helper domain now has a named prequery commitment slot, exact len
 honest packed product-tree witness values for the current alpha/beta challenges, and scheduled
 backend authentication for helper leaves. The prover now emits honestly populated Section 5
 zero-check transcripts for the helper/permutation gate and the two accumulator relations, and the
-verifier checks the transcript shape, initial zero claims, and Fiat-Shamir round consistency before
-failing closed. Those relation transcripts are now prequery material absorbed before backend query
-sampling, and the query proof must match the prequery transcript. The verifier still fails closed
-before accepting the global relation because terminal oracle evaluation binding is not implemented
-yet. The paper-critical verifier relation still has to bind those terminal claims to backend
-proof-oracle openings without local companion Merkle openings. The verifier now returns a named
-bundle of Section 5 terminal challenge vectors and terminal claims from the sumcheck transcript
-checks, so the missing binding has concrete proof-oracle evaluation targets instead of living behind
-a generic fail-closed branch. The Section 5 relation residual rows are also now a named
+verifier checks the transcript shape, initial zero claims, and Fiat-Shamir round consistency. Those
+relation transcripts are now prequery material absorbed before backend query sampling, and the query
+proof must match the prequery transcript. The paper-critical verifier relation still has to bind
+those terminal claims to backend proof-oracle openings without local companion Merkle openings. The
+verifier now returns a named bundle of Section 5 terminal challenge vectors and terminal claims from
+the sumcheck transcript checks, so the missing binding has concrete proof-oracle evaluation targets
+instead of living behind a generic fail-closed branch. The Section 5 relation residual rows are also
+now a named
 proof-oracle commitment: they are transcript-bound before query sampling, included in the typed
 backend proof-query schedule, opened by the query proof, and authenticated through the shared
-backend multiproof collector. This gives the missing terminal binding a committed oracle target,
-although the verifier still has to check the multilinear terminal evaluations against those
+backend multiproof collector. The honest Section 5 verifier path now accepts once the sumcheck
+terminal claims are zero and all scheduled residual proof-oracle openings authenticate to zero.
+This removes the artificial fail-closed branch, but the verifier still has to replace that
+sampled-zero placeholder with paper-style multilinear terminal evaluation binding against the
 committed residual rows.
 
 After re-reading Blaze Section 5, the honest implementation cannot be just "the same three rows
@@ -218,9 +219,9 @@ B/C below, with a concrete Section 5 proof-oracle layout:
 4. bind sumcheck terminal oracle evaluations to backend proof-oracle openings, not unbound
    serialized terminal values; [In progress: verifier rejects unbound serialized terminal values
    and validates the three Section 5 sumcheck transcript shapes and round consistency, now deriving
-   named terminal challenge/claim objects before failing closed at the missing terminal-opening
-   binding; residual proof-oracle rows are committed and query-authenticated, but their multilinear
-   terminal evaluations are not yet verified]
+   named terminal challenge/claim objects; residual proof-oracle rows are committed and
+   query-authenticated, and the honest verifier accepts only zero terminal claims plus zero
+   authenticated residual openings; their multilinear terminal evaluations are not yet verified]
 5. switch the normal Blaze2 backend from `LocalQueries` to `Section5`.
 ```
 

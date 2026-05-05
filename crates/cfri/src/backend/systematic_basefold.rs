@@ -940,6 +940,7 @@ impl Blaze2BaseFoldBackendParams {
         proof.authentication.verify(prequery, &query_set)?;
         verify_raa_relation_openings(
             proof.auxiliary.as_ref(),
+            proof.section5_relation_residual.as_ref(),
             self.spec.auxiliary_oracle_len,
             schedule,
             top_queries,
@@ -2459,6 +2460,7 @@ impl RaaRelationProof {
     fn verify_openings<H: Hash>(
         &self,
         relation_queries: &[AuxiliaryOracleQuery],
+        section5_relation_residual: Option<&RaaSection5RelationResidualQueryProof<H>>,
         auxiliary_oracle_len: usize,
         schedule: &HolographicQuerySchedule,
         top_queries: &[TopQuery<B128>],
@@ -2469,6 +2471,7 @@ impl RaaRelationProof {
             }
             Self::Section5(proof) => proof.verify_openings::<H>(
                 relation_queries,
+                section5_relation_residual,
                 auxiliary_oracle_len,
                 schedule,
                 top_queries,
@@ -2823,15 +2826,22 @@ impl RaaSection5RelationProof {
     fn verify_openings<H: Hash>(
         &self,
         _relation_queries: &[AuxiliaryOracleQuery],
+        section5_relation_residual: Option<&RaaSection5RelationResidualQueryProof<H>>,
         auxiliary_oracle_len: usize,
         schedule: &HolographicQuerySchedule,
         _top_queries: &[TopQuery<B128>],
     ) -> Result<(), Error> {
         self.verify_schedule_shape(schedule)?;
-        let _checks = self.verify_prequery::<H>(auxiliary_oracle_len)?;
-        Err(Error::InvalidPcsOpen(
-            "RAA Section 5 terminal opening binding is not implemented yet".to_string(),
-        ))
+        let checks = self.verify_prequery::<H>(auxiliary_oracle_len)?;
+        if checks.permutation.terminal_claim != B128::ZERO
+            || checks.first_accumulator.terminal_claim != B128::ZERO
+            || checks.second_accumulator.terminal_claim != B128::ZERO
+        {
+            return Err(Error::InvalidPcsOpen(
+                "RAA Section 5 terminal claims are not zero".to_string(),
+            ));
+        }
+        verify_section5_relation_residual_openings(section5_relation_residual, schedule)
     }
 
     fn verify_sumcheck_transcripts<H: Hash>(
@@ -5165,6 +5175,7 @@ fn verify_section5_relation_query_proof_matches_prequery<H: Hash>(
 
 fn verify_raa_relation_openings<H: Hash>(
     proof: Option<&AuxiliaryOracleQueryProof<H>>,
+    section5_relation_residual: Option<&RaaSection5RelationResidualQueryProof<H>>,
     auxiliary_oracle_len: usize,
     schedule: &HolographicQuerySchedule,
     top_queries: &[TopQuery<B128>],
@@ -5185,10 +5196,54 @@ fn verify_raa_relation_openings<H: Hash>(
     })?;
     proof.raa_relation.verify_openings::<H>(
         &proof.relation_queries,
+        section5_relation_residual,
         auxiliary_oracle_len,
         schedule,
         top_queries,
     )
+}
+
+fn verify_section5_relation_residual_openings<H: Hash>(
+    proof: Option<&RaaSection5RelationResidualQueryProof<H>>,
+    schedule: &HolographicQuerySchedule,
+) -> Result<(), Error> {
+    if schedule.raa_relation_strategy() != RaaRelationProofStrategy::Section5 {
+        if proof.is_some() {
+            return Err(Error::InvalidPcsOpen(
+                "Section 5 residual openings were supplied for a non-Section 5 schedule"
+                    .to_string(),
+            ));
+        }
+        return Ok(());
+    }
+    let expected_count = schedule.section5_relation_residual_proof_query_count();
+    if expected_count == 0 {
+        if proof.map(|proof| proof.query_count() != 0).unwrap_or(false) {
+            return Err(Error::InvalidPcsOpen(
+                "Section 5 residual openings were supplied even though none were scheduled"
+                    .to_string(),
+            ));
+        }
+        return Ok(());
+    }
+    let proof = proof.ok_or_else(|| {
+        Error::InvalidPcsOpen(
+            "Section 5 residual openings are missing for scheduled residual queries".to_string(),
+        )
+    })?;
+    if proof.query_count() != expected_count {
+        return Err(Error::InvalidPcsOpen(
+            "Section 5 residual opening count does not match the schedule".to_string(),
+        ));
+    }
+    for query in &proof.queries {
+        if query.value != B128::ZERO {
+            return Err(Error::InvalidPcsOpen(
+                "Section 5 residual opening is nonzero".to_string(),
+            ));
+        }
+    }
+    Ok(())
 }
 
 fn merkelize_b128_padded<H: Hash>(values: &[B128]) -> Vec<Vec<Output<H>>> {
@@ -6336,7 +6391,7 @@ mod tests {
     }
 
     #[test]
-    fn backend_section5_relation_strategy_fails_closed_until_implemented() {
+    fn backend_section5_relation_strategy_checks_residual_oracles() {
         let mut spec = blaze2_backend_spec();
         spec.raa_relation_strategy = RaaRelationProofStrategy::Section5;
         spec.q_raa_input = 5;
@@ -6474,10 +6529,9 @@ mod tests {
                 value: folded_codeword[query.logical_index],
             })
             .collect::<Vec<_>>();
-        let err = params
+        params
             .verify_query_proof(&prequery, &request, &schedule, &proof, &top_queries)
-            .unwrap_err();
-        assert!(format!("{err:?}").contains("terminal opening binding"));
+            .unwrap();
 
         let mut tampered_sumcheck = proof.clone();
         if let RaaRelationProof::Section5(section5) =
@@ -6519,6 +6573,15 @@ mod tests {
                 value: folded_codeword[query.logical_index],
             })
             .collect::<Vec<_>>();
+        params
+            .verify_query_proof(
+                &prequery,
+                &request,
+                &helper_schedule,
+                &helper_proof,
+                &helper_top_queries,
+            )
+            .unwrap();
         let query_set = helper_proof
             .collect_backend_query_set(
                 params.compiler_code.layout(),
@@ -6556,6 +6619,12 @@ mod tests {
             .unwrap()
             .queries[0]
             .value += B128::ONE;
+        let err = verify_section5_relation_residual_openings::<Blake2s>(
+            tampered_residual_value.section5_relation_residual.as_ref(),
+            &helper_schedule,
+        )
+        .unwrap_err();
+        assert!(format!("{err:?}").contains("residual opening is nonzero"));
         let tampered_query_set = tampered_residual_value
             .collect_backend_query_set(
                 params.compiler_code.layout(),

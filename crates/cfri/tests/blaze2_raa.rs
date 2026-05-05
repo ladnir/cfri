@@ -1019,13 +1019,8 @@ fn blaze2_basefold_wire_payload_bytes_with_field_bytes(
         }
         push_wire_hashes(&mut bytes, residual.authentication_nodes.iter());
         if let Some(terminal) = &residual.terminal_proof {
-            for row in &terminal.rows {
-                for path in &row.paths {
-                    push_wire_field(&mut bytes, &path.top_value, field_bytes);
-                    for step in &path.steps {
-                        push_wire_field(&mut bytes, &step.sibling_value, field_bytes);
-                    }
-                }
+            for opening in &terminal.openings {
+                push_wire_field(&mut bytes, &opening.value, field_bytes);
             }
         }
     }

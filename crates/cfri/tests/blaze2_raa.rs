@@ -27,7 +27,8 @@ use cfri::backend::{
         required_blaze2_basefold_auxiliary_oracle_len, required_blaze2_basefold_eval_binding_len,
         required_blaze2_basefold_relation_auxiliary_len, BackendProofQueryDomain,
         Blaze2BaseFoldBackendParams, Blaze2BaseFoldBackendSpec, Blaze2BaseFoldOpenRequest,
-        HolographicQuerySchedule, RaaRelationProofStrategy, SystematicFoldableCodeSpec,
+        HolographicQuerySchedule, RaaRelationProof, RaaRelationProofStrategy,
+        SystematicFoldableCodeSpec,
     },
     transcript::InMemoryTranscript as _,
     Error,
@@ -300,7 +301,7 @@ fn blaze2_basefold_backend_params_with_auxiliary_len(
         q_raa_input,
         q_backend_proof,
         auxiliary_oracle_len,
-        raa_relation_strategy: RaaRelationProofStrategy::LocalQueries,
+        raa_relation_strategy: RaaRelationProofStrategy::Section5,
     })
     .unwrap()
 }
@@ -434,6 +435,11 @@ struct Blaze2BaseFoldProofSizeBreakdown {
     compiler_parity_fold_path_bytes: usize,
     auxiliary_query_value_bytes: usize,
     auxiliary_query_path_bytes: usize,
+    section5_relation_residual_value_bytes: usize,
+    section5_relation_residual_path_bytes: usize,
+    section5_relation_terminal_path_bytes: usize,
+    section5_permutation_helper_value_bytes: usize,
+    section5_permutation_helper_path_bytes: usize,
 }
 
 impl Blaze2BaseFoldProofSizeBreakdown {
@@ -459,6 +465,11 @@ impl Blaze2BaseFoldProofSizeBreakdown {
             + self.compiler_parity_fold_path_bytes
             + self.auxiliary_query_value_bytes
             + self.auxiliary_query_path_bytes
+            + self.section5_relation_residual_value_bytes
+            + self.section5_relation_residual_path_bytes
+            + self.section5_relation_terminal_path_bytes
+            + self.section5_permutation_helper_value_bytes
+            + self.section5_permutation_helper_path_bytes
     }
 
     fn total_bytes(&self) -> usize {
@@ -480,6 +491,11 @@ struct Blaze2BaseFoldProofSizeBudget {
     compiler_parity_fold_path_bytes: usize,
     auxiliary_serialized_value_count: usize,
     auxiliary_query_path_bytes: usize,
+    section5_relation_residual_serialized_value_count: usize,
+    section5_relation_residual_path_bytes: usize,
+    section5_relation_terminal_path_bytes: usize,
+    section5_permutation_helper_serialized_value_count: usize,
+    section5_permutation_helper_path_bytes: usize,
     eval_sumcheck_rounds: usize,
 }
 
@@ -519,6 +535,38 @@ impl Blaze2BaseFoldProofSizeBudget {
             .iter()
             .map(|digest| digest.len())
             .sum();
+        let section5_relation_residual_serialized_value_count = proof
+            .backend_proof
+            .section5_relation_residual
+            .as_ref()
+            .map(|residual| residual.serialized_value_count())
+            .unwrap_or(0);
+        let section5_relation_residual_path_bytes = proof
+            .backend_proof
+            .authentication
+            .section5_relation_residual_nodes
+            .iter()
+            .map(|digest| digest.len())
+            .sum();
+        let section5_relation_terminal_path_bytes = proof
+            .backend_proof
+            .section5_relation_residual
+            .as_ref()
+            .map(|residual| residual.terminal_hash_node_count() * hash_bytes)
+            .unwrap_or(0);
+        let section5_permutation_helper_serialized_value_count = proof
+            .backend_proof
+            .section5_permutation_helper
+            .as_ref()
+            .map(|helper| helper.serialized_value_count())
+            .unwrap_or(0);
+        let section5_permutation_helper_path_bytes = proof
+            .backend_proof
+            .authentication
+            .section5_permutation_helper_nodes
+            .iter()
+            .map(|digest| digest.len())
+            .sum();
 
         Self {
             field_bytes,
@@ -533,6 +581,11 @@ impl Blaze2BaseFoldProofSizeBudget {
             compiler_parity_fold_path_bytes,
             auxiliary_serialized_value_count,
             auxiliary_query_path_bytes,
+            section5_relation_residual_serialized_value_count,
+            section5_relation_residual_path_bytes,
+            section5_relation_terminal_path_bytes,
+            section5_permutation_helper_serialized_value_count,
+            section5_permutation_helper_path_bytes,
             eval_sumcheck_rounds: params.praa().packed().codeword_len().trailing_zeros() as usize,
         }
     }
@@ -555,6 +608,15 @@ impl Blaze2BaseFoldProofSizeBudget {
             compiler_parity_fold_path_bytes: self.compiler_parity_fold_path_bytes,
             auxiliary_query_value_bytes: self.auxiliary_serialized_value_count * self.field_bytes,
             auxiliary_query_path_bytes: self.auxiliary_query_path_bytes,
+            section5_relation_residual_value_bytes: self
+                .section5_relation_residual_serialized_value_count
+                * self.field_bytes,
+            section5_relation_residual_path_bytes: self.section5_relation_residual_path_bytes,
+            section5_relation_terminal_path_bytes: self.section5_relation_terminal_path_bytes,
+            section5_permutation_helper_value_bytes: self
+                .section5_permutation_helper_serialized_value_count
+                * self.field_bytes,
+            section5_permutation_helper_path_bytes: self.section5_permutation_helper_path_bytes,
         }
     }
 
@@ -570,6 +632,7 @@ fn blaze2_basefold_proof_size_breakdown(
     proof: &Blaze2BaseFoldOpeningProof<Blake2s256>,
     field_bytes: usize,
 ) -> Blaze2BaseFoldProofSizeBreakdown {
+    let hash_bytes = proof.backend_prequery.compiler_parity.root.len();
     let row_eval_bytes = proof.row_evals.len() * field_bytes;
     let compiler_parity_root_bytes = proof.backend_prequery.compiler_parity.root.len();
     let eval_sumcheck_bytes = proof
@@ -644,6 +707,38 @@ fn blaze2_basefold_proof_size_breakdown(
         .iter()
         .map(|digest| digest.len())
         .sum();
+    let section5_relation_residual_value_bytes = proof
+        .backend_proof
+        .section5_relation_residual
+        .as_ref()
+        .map(|residual| residual.serialized_value_count() * field_bytes)
+        .unwrap_or(0);
+    let section5_relation_residual_path_bytes = proof
+        .backend_proof
+        .authentication
+        .section5_relation_residual_nodes
+        .iter()
+        .map(|digest| digest.len())
+        .sum();
+    let section5_relation_terminal_path_bytes = proof
+        .backend_proof
+        .section5_relation_residual
+        .as_ref()
+        .map(|residual| residual.terminal_hash_node_count() * hash_bytes)
+        .unwrap_or(0);
+    let section5_permutation_helper_value_bytes = proof
+        .backend_proof
+        .section5_permutation_helper
+        .as_ref()
+        .map(|helper| helper.serialized_value_count() * field_bytes)
+        .unwrap_or(0);
+    let section5_permutation_helper_path_bytes = proof
+        .backend_proof
+        .authentication
+        .section5_permutation_helper_nodes
+        .iter()
+        .map(|digest| digest.len())
+        .sum();
 
     Blaze2BaseFoldProofSizeBreakdown {
         row_eval_bytes,
@@ -660,6 +755,11 @@ fn blaze2_basefold_proof_size_breakdown(
         compiler_parity_fold_path_bytes,
         auxiliary_query_value_bytes,
         auxiliary_query_path_bytes,
+        section5_relation_residual_value_bytes,
+        section5_relation_residual_path_bytes,
+        section5_relation_terminal_path_bytes,
+        section5_permutation_helper_value_bytes,
+        section5_permutation_helper_path_bytes,
     }
 }
 
@@ -1563,23 +1663,27 @@ fn blaze2_basefold_b128_proof_size_accounting_is_exact() {
         .filter(|query| query.domain == BackendProofQueryDomain::CompilerParity)
         .count();
     let relation_auxiliary_query_count = schedule.relation_auxiliary_proof_query_count();
+    let section5_relation_residual_query_count =
+        schedule.section5_relation_residual_proof_query_count();
+    let section5_permutation_helper_query_count =
+        schedule.section5_permutation_helper_proof_query_count();
     let auxiliary_authentication_query_count = schedule.raa_auxiliary_authentication_query_count();
     let auxiliary_query_count = schedule.expected_auxiliary_query_proof_count();
     assert_eq!(
-        compiler_parity_query_count + relation_auxiliary_query_count,
+        compiler_parity_query_count
+            + relation_auxiliary_query_count
+            + section5_relation_residual_query_count
+            + section5_permutation_helper_query_count,
         q_backend_proof,
         "typed backend proof schedule has exactly Q_backend entries"
     );
     assert_eq!(
-        auxiliary_query_count,
-        relation_auxiliary_query_count
-            + schedule.raa_final_queries().len()
-            + auxiliary_authentication_query_count,
-        "every auxiliary authenticated leaf is either sampled, final-derived, or an explicit local-relation companion"
+        auxiliary_query_count, relation_auxiliary_query_count,
+        "Section 5 backend carries only sampled relation auxiliary openings in the auxiliary proof"
     );
-    assert!(
-        auxiliary_authentication_query_count > 0,
-        "RAA local-relation companion leaves must be explicit schedule entries while they are still Merkle-authenticated"
+    assert_eq!(
+        auxiliary_authentication_query_count, 0,
+        "Section 5 backend must not schedule local-relation companion leaves"
     );
     assert_eq!(
         proof.backend_proof.compiler_parity.queries.len(),
@@ -1595,6 +1699,26 @@ fn blaze2_basefold_b128_proof_size_accounting_is_exact() {
             .query_count(),
         auxiliary_query_count,
         "auxiliary proof carries exactly the schedule-required relation openings"
+    );
+    assert_eq!(
+        proof
+            .backend_proof
+            .section5_relation_residual
+            .as_ref()
+            .unwrap()
+            .query_count(),
+        section5_relation_residual_query_count,
+        "Section 5 residual proof carries exactly the scheduled residual openings"
+    );
+    assert_eq!(
+        proof
+            .backend_proof
+            .section5_permutation_helper
+            .as_ref()
+            .unwrap()
+            .query_count(),
+        section5_permutation_helper_query_count,
+        "Section 5 helper proof carries exactly the scheduled helper openings"
     );
     assert_eq!(
         proof.backend_prequery.folded_parity_layers.len(),
@@ -1701,12 +1825,24 @@ fn blaze2_basefold_b128_proof_size_accounting_is_exact() {
         "compiler-parity top authentication is merged into the shared backend layer proof"
     );
     assert_eq!(
-        b128_budget.compiler_parity_fold_path_bytes, 576,
+        b128_budget.compiler_parity_fold_path_bytes, 640,
         "compiler-parity authentication is now one multiproof per commitment layer, including the top parity leaves in round 0"
     );
     assert_eq!(
-        b128_budget.auxiliary_query_path_bytes, 960,
-        "current auxiliary authentication budget is pinned until auxiliary openings move into the final BaseFold core"
+        b128_budget.auxiliary_query_path_bytes, 224,
+        "Section 5 auxiliary authentication is only the sampled relation-auxiliary leaves"
+    );
+    assert_eq!(
+        b128_budget.section5_relation_residual_path_bytes, 1152,
+        "Section 5 terminal base leaves are authenticated through the shared residual multiproof lane"
+    );
+    assert_eq!(
+        b128_budget.section5_relation_terminal_path_bytes, 896,
+        "current Section 5 terminal folded-layer authentication is pinned until it moves into the shared BaseFold core"
+    );
+    assert_eq!(
+        b128_budget.section5_permutation_helper_path_bytes, 960,
+        "current Section 5 helper authentication is pinned as a named remaining proof-size bucket"
     );
     assert_eq!(
         backend_query_set.compiler_parity_queries.len(),
@@ -1739,13 +1875,13 @@ fn blaze2_basefold_b128_proof_size_accounting_is_exact() {
     );
     assert_eq!(
         b128_breakdown.total_bytes(),
-        3_360,
-        "current small fixture B128 total is the primary acceptance number for the implemented proof"
+        8_944,
+        "current small fixture B128 total pins the honest Section 5 terminal-binding proof shape"
     );
     assert_eq!(
         paper_breakdown.total_bytes(),
-        2_880,
-        "current small fixture 8-byte projection is reported only for Blaze-paper comparison"
+        6_840,
+        "current small fixture 8-byte projection keeps the field-width correction explicit"
     );
 }
 
@@ -1915,22 +2051,23 @@ fn blaze2_basefold_opening_derives_configured_auxiliary_trace() {
     )
     .is_err());
 
-    let mut bad_final_accumulator = proof.clone();
-    bad_final_accumulator
+    let mut bad_section5_relation = proof.clone();
+    if let RaaRelationProof::Section5(section5) = &mut bad_section5_relation
         .backend_proof
         .auxiliary
         .as_mut()
         .unwrap()
         .raa_relation
-        .local_queries_mut()
-        .unwrap()
-        .final_accumulator_queries
-        .pop();
+    {
+        section5.permutation_sumcheck.round_polynomials[0][0] += B128::ONE;
+    } else {
+        panic!("basefold test backend should use Section 5 relation proof");
+    }
     assert!(verify_blaze2_basefold_opening(
         &params,
         &commitment.public(),
         &claim,
-        &bad_final_accumulator
+        &bad_section5_relation
     )
     .is_err());
 

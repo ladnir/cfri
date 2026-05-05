@@ -267,3 +267,19 @@ e   |W|   log2 count
 
 This grows, but it grows as a boundary-extra count around the matched family rather than as
 arbitrary `binom(k,m)` support counting. That is the near-extremizer stability shape we need.
+
+The slack calculation that combines this count with independent-copy zero tails is:
+
+```text
+docs/rfc_near_extremizer_slack_depth11_m32_c8.csv
+```
+
+At depth `11`, `m=32`, `c=8`, and `q=2^128`, the worst union term over `0 <= e <= 128` is the exact
+case `e=0`:
+
+```text
+log2 union bound = -100.60768258.
+```
+
+For positive `e`, the first copy has extra output weight, so another copy must create at least
+`e+1` zeros to beat the collapse baseline; those terms decay quickly.

@@ -246,3 +246,28 @@ For the depth-`11`, `m=32` distance-dominant point, this model is tabulated in:
 ```text
 docs/rfc_near_extremizer_count_depth11_m32.csv
 ```
+
+Combining this count with the conditioned-copy zero tail gives:
+
+```text
+docs/rfc_near_extremizer_slack_depth11_m32_c8.csv
+```
+
+Here `e` extra outputs in the first sparse copy require at least `e+1` zeros in some independent
+copy to beat the collapse baseline. The resulting union terms are:
+
+```text
+e    log2 union bound
+0     -100.60768258
+1     -207.65419088
+2     -316.28709399
+4     -536.29416556
+8     -982.78823448
+16   -1890.11183560
+32   -3735.18084799
+64   -7488.51449998
+128 -15125.78793032
+```
+
+So, under the near-extremizer counting model, the dangerous term is still the exact extremizer case,
+and even that has about `100` bits of slack in this depth-`11`, `c=8`, `q=2^128` calculation.

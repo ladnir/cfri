@@ -212,7 +212,10 @@ Section 5-specific scaffolding. The permutation residual row is no longer a plac
 alpha/beta/gamma are squeezed before helper construction, the helper product-tree witnesses are
 committed after alpha/beta, and the residual commitment now contains a gamma-batched product-tree
 relation/root equality residual derived from those helper witnesses plus the two accumulator
-residual rows.
+residual rows. The helper-product-tree local relation has a tested query primitive now: given a
+permutation residual index, it derives the exact helper-oracle leaves that determine that residual
+value, including the root-equality terminal row case. That is the core logic needed to bind helper
+openings to residual openings without treating the helper bucket as opaque authenticated data.
 
 After re-reading Blaze Section 5, the honest implementation cannot be just "the same three rows
 with fewer openings." The paper relation uses MLIOP proof oracles for the RAA computation: the
@@ -250,7 +253,8 @@ B/C below, with a concrete Section 5 proof-oracle layout:
    leaves for those terminal paths are now authenticated by the shared backend residual multiproof
    collector, while folded-layer roots and authentication nodes are carried by the shared backend
    authentication object and the terminal folded-layer lane still has to be folded into the final
-   shared proof-oracle/accounting model]
+   shared proof-oracle/accounting model; helper product-tree local query derivation is tested and
+   ready to be wired into the residual/helper verifier relation]
 5. switch the normal Blaze2 backend from `LocalQueries` to `Section5`; [Done for the normal
    Blaze2/BaseFold fixture]
 ```

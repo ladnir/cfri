@@ -4048,6 +4048,158 @@ fn build_raa_section5_permutation_residuals(
     Ok(residuals)
 }
 
+#[derive(Clone, Debug, Eq, PartialEq)]
+struct RaaSection5PermutationResidualLocalQuery {
+    residual: B128,
+    helper_openings: Vec<(usize, B128)>,
+}
+
+fn raa_section5_permutation_residual_local_query(
+    len: usize,
+    helper_values: &[B128],
+    gamma: B128,
+    residual_index: usize,
+) -> Result<RaaSection5PermutationResidualLocalQuery, Error> {
+    if len == 0 || !len.is_power_of_two() || residual_index >= len {
+        return Err(Error::InvalidPcsOpen(
+            "RAA Section 5 permutation residual local query index is invalid".to_string(),
+        ));
+    }
+    let tree_chunk_len = len << 1;
+    if helper_values.len() != tree_chunk_len * 4 {
+        return Err(Error::InvalidPcsOpen(
+            "RAA Section 5 helper oracle length does not match four packed product trees"
+                .to_string(),
+        ));
+    }
+    let f1_offset = 0;
+    let g1_offset = tree_chunk_len;
+    let f2_offset = tree_chunk_len * 2;
+    let g2_offset = tree_chunk_len * 3;
+    let chunks = [
+        (&helper_values[f1_offset..g1_offset], f1_offset),
+        (&helper_values[g1_offset..f2_offset], g1_offset),
+        (&helper_values[f2_offset..g2_offset], f2_offset),
+        (&helper_values[g2_offset..], g2_offset),
+    ];
+
+    if residual_index + 1 == len {
+        let root_index = product_tree_packed_root_index(len);
+        let padding_index = tree_chunk_len - 1;
+        let f1_root = chunks[0].0[root_index];
+        let g1_root = chunks[1].0[root_index];
+        let g1_padding = chunks[1].0[padding_index];
+        let f2_root = chunks[2].0[root_index];
+        let g2_root = chunks[3].0[root_index];
+        let g2_padding = chunks[3].0[padding_index];
+        let gamma2 = gamma * gamma;
+        let gamma3 = gamma2 * gamma;
+        let residual = f1_root - g1_root
+            + gamma * g1_padding
+            + gamma2 * (f2_root - g2_root)
+            + gamma3 * g2_padding;
+        let helper_openings = vec![
+            (chunks[0].1 + root_index, f1_root),
+            (chunks[1].1 + root_index, g1_root),
+            (chunks[1].1 + padding_index, g1_padding),
+            (chunks[2].1 + root_index, f2_root),
+            (chunks[3].1 + root_index, g2_root),
+            (chunks[3].1 + padding_index, g2_padding),
+        ];
+        return Ok(RaaSection5PermutationResidualLocalQuery {
+            residual,
+            helper_openings,
+        });
+    }
+
+    let mut residual = B128::ZERO;
+    let mut coefficient = B128::ONE;
+    let mut helper_openings = Vec::with_capacity(12);
+    for (chunk, offset) in chunks {
+        let query = product_tree_packed_relation_local_query(chunk, residual_index)?;
+        residual += coefficient * query.residual;
+        helper_openings.extend(
+            query
+                .openings
+                .into_iter()
+                .map(|(index, value)| (offset + index, value)),
+        );
+        coefficient *= gamma;
+    }
+    Ok(RaaSection5PermutationResidualLocalQuery {
+        residual,
+        helper_openings,
+    })
+}
+
+#[derive(Clone, Debug, Eq, PartialEq)]
+struct ProductTreePackedRelationLocalQuery {
+    residual: B128,
+    openings: Vec<(usize, B128)>,
+}
+
+fn product_tree_packed_relation_local_query(
+    packed: &[B128],
+    relation_index: usize,
+) -> Result<ProductTreePackedRelationLocalQuery, Error> {
+    if packed.len() < 2 || packed.len() & 1 != 0 {
+        return Err(Error::InvalidPcsOpen(
+            "RAA Section 5 packed product-tree witness has invalid length".to_string(),
+        ));
+    }
+    let leaf_len = packed.len() >> 1;
+    if !leaf_len.is_power_of_two() || relation_index >= leaf_len {
+        return Err(Error::InvalidPcsOpen(
+            "RAA Section 5 product-tree relation query index is invalid".to_string(),
+        ));
+    }
+    if relation_index + 1 == leaf_len {
+        let padding_index = packed.len() - 1;
+        return Ok(ProductTreePackedRelationLocalQuery {
+            residual: packed[padding_index],
+            openings: vec![(padding_index, packed[padding_index])],
+        });
+    }
+
+    let mut relation_offset = 0;
+    let mut level_offset = 0;
+    let mut level_len = leaf_len;
+    let mut parent_offset = leaf_len;
+    while level_len > 1 {
+        let parent_len = level_len >> 1;
+        if relation_index < relation_offset + parent_len {
+            let local_index = relation_index - relation_offset;
+            let left_index = level_offset + (local_index << 1);
+            let right_index = left_index + 1;
+            let parent_index = parent_offset + local_index;
+            let residual = packed[parent_index] - packed[left_index] * packed[right_index];
+            return Ok(ProductTreePackedRelationLocalQuery {
+                residual,
+                openings: vec![
+                    (left_index, packed[left_index]),
+                    (right_index, packed[right_index]),
+                    (parent_index, packed[parent_index]),
+                ],
+            });
+        }
+        relation_offset += parent_len;
+        level_offset = parent_offset;
+        parent_offset += parent_len;
+        level_len = parent_len;
+    }
+    Err(Error::InvalidPcsOpen(
+        "RAA Section 5 product-tree relation query index is invalid".to_string(),
+    ))
+}
+
+fn product_tree_packed_root_index(leaf_len: usize) -> usize {
+    if leaf_len == 1 {
+        0
+    } else {
+        (leaf_len << 1) - 2
+    }
+}
+
 fn product_tree_packed_relation_residuals(packed: &[B128]) -> Result<Vec<B128>, Error> {
     if packed.len() < 2 || packed.len() & 1 != 0 {
         return Err(Error::InvalidPcsOpen(
@@ -6498,6 +6650,87 @@ mod tests {
         residual_values.extend_from_slice(&first_accumulator_row);
         residual_values.extend_from_slice(&second_accumulator_row);
         (checks, residual_values, domain_len)
+    }
+
+    #[test]
+    fn product_tree_local_queries_match_packed_relation_residuals() {
+        let leaves = vec![
+            B128::from(3),
+            B128::from(5),
+            B128::from(7),
+            B128::from(11),
+            B128::from(13),
+            B128::from(17),
+            B128::from(19),
+            B128::from(23),
+        ];
+        let tree = ProductTree::new(leaves).unwrap();
+        let packed = tree.packed_witness_evals();
+        let residuals = product_tree_packed_relation_residuals(&packed).unwrap();
+        for (index, expected) in residuals.iter().copied().enumerate() {
+            let query = product_tree_packed_relation_local_query(&packed, index).unwrap();
+            assert_eq!(query.residual, expected);
+            for (opening_index, value) in query.openings {
+                assert_eq!(packed[opening_index], value);
+            }
+        }
+    }
+
+    #[test]
+    fn section5_permutation_residual_local_queries_match_helper_oracle() {
+        let mut spec = blaze2_backend_spec();
+        spec.raa_relation_strategy = RaaRelationProofStrategy::Section5;
+        spec.auxiliary_oracle_len =
+            required_blaze2_basefold_section5_auxiliary_oracle_len(&spec.praa);
+        let params = Blaze2BaseFoldBackendParams::new(spec).unwrap();
+        let request_point = make_request_point(&params, 37);
+        let (folded_codeword, auxiliary, folded_eval) =
+            folded_codeword_and_auxiliary(&params, 89, &request_point);
+        let request = open_request_with_eval(&request_point, folded_eval);
+        let (prequery, state) = params
+            .prove_prequery::<Blake2s>(&folded_codeword, &auxiliary, &request)
+            .unwrap();
+        let challenges = squeeze_raa_section5_relation_challenges(
+            params.spec(),
+            &prequery.compiler_parity,
+            prequery.auxiliary.as_ref(),
+            &request,
+        );
+        let helper_values = state.section5_permutation_helper.as_ref().unwrap().values();
+        let residuals = build_raa_section5_relation_residual_oracle(
+            params.praa().packed(),
+            &auxiliary,
+            &folded_codeword,
+            helper_values,
+            challenges,
+        )
+        .unwrap();
+        let len = params.praa().packed().codeword_len();
+        for (index, expected) in residuals[..len].iter().copied().enumerate() {
+            let query = raa_section5_permutation_residual_local_query(
+                len,
+                helper_values,
+                challenges.gamma,
+                index,
+            )
+            .unwrap();
+            assert_eq!(query.residual, expected);
+            assert!(!query.helper_openings.is_empty());
+            for (opening_index, value) in query.helper_openings {
+                assert_eq!(helper_values[opening_index], value);
+            }
+        }
+
+        let mut tampered_helper = helper_values.to_vec();
+        tampered_helper[0] += B128::ONE;
+        let tampered_query = raa_section5_permutation_residual_local_query(
+            len,
+            &tampered_helper,
+            challenges.gamma,
+            0,
+        )
+        .unwrap();
+        assert_ne!(tampered_query.residual, residuals[0]);
     }
 
     fn blaze2_backend_spec() -> Blaze2BaseFoldBackendSpec {

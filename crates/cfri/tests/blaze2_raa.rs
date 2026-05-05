@@ -2058,15 +2058,15 @@ fn blaze2_basefold_b128_proof_size_accounting_is_exact() {
         "compiler-parity top authentication is merged into the shared backend layer proof"
     );
     assert_eq!(
-        b128_budget.compiler_parity_fold_path_bytes, 640,
+        b128_budget.compiler_parity_fold_path_bytes, 384,
         "compiler-parity authentication is now one multiproof per commitment layer, including the top parity leaves in round 0"
     );
     assert_eq!(
-        b128_budget.auxiliary_query_path_bytes, 224,
+        b128_budget.auxiliary_query_path_bytes, 0,
         "Section 5 auxiliary authentication is only the sampled relation-auxiliary leaves"
     );
     assert_eq!(
-        b128_budget.section5_relation_residual_path_bytes, 864,
+        b128_budget.section5_relation_residual_path_bytes, 832,
         "Section 5 terminal base leaves are authenticated through the shared residual multiproof lane"
     );
     assert_eq!(
@@ -2074,8 +2074,8 @@ fn blaze2_basefold_b128_proof_size_accounting_is_exact() {
         "Section 5 terminal folded-layer authentication is shared across residual rows until it moves into the shared BaseFold core"
     );
     assert_eq!(
-        b128_budget.section5_permutation_helper_path_bytes, 960,
-        "current Section 5 helper authentication is pinned as a named remaining proof-size bucket"
+        b128_budget.section5_permutation_helper_path_bytes, 832,
+        "Section 5 helper authentication uses the product-tree-aware physical layout"
     );
     assert_eq!(
         backend_query_set.compiler_parity_queries.len(),
@@ -2118,12 +2118,12 @@ fn blaze2_basefold_b128_proof_size_accounting_is_exact() {
     );
     assert_eq!(
         b128_breakdown.total_bytes(),
-        6_928,
-        "current small fixture B128 total pins the shared residual-terminal folded-layer proof shape and all prequery roots"
+        6_368,
+        "current small fixture B128 total pins the shared residual-terminal folded-layer proof shape, helper physical layout, and all prequery roots"
     );
     assert_eq!(
         paper_breakdown.total_bytes(),
-        5_976,
+        5_376,
         "current small fixture 8-byte projection keeps the field-width correction explicit"
     );
 }

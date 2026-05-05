@@ -234,6 +234,7 @@ pub struct AuxiliaryOracleCommitment<H: Hash> {
 #[derive(Clone, Debug)]
 pub struct RaaSection5PermutationHelperCommitment<H: Hash> {
     inner: AuxiliaryOracleCommitment<H>,
+    logical_values: Vec<B128>,
 }
 
 #[derive(Clone, Debug)]
@@ -1118,6 +1119,13 @@ impl Blaze2BaseFoldBackendParams {
                     .map(|residual| residual.inner.merkle_tree.as_slice()),
                 queries: query_set.section5_relation_residual_queries.clone(),
             })?;
+        let section5_permutation_helper_queries = match &state.section5_permutation_helper {
+            Some(helper) => section5_permutation_helper_physical_queries(
+                helper.len(),
+                &query_set.section5_permutation_helper_queries,
+            )?,
+            None => query_set.section5_permutation_helper_queries.clone(),
+        };
         let section5_permutation_helper_nodes =
             prove_backend_oracle_lane::<H>(BackendProofOracleProverLane {
                 kind: BackendProofOracleLaneKind::Section5PermutationHelper,
@@ -1125,7 +1133,7 @@ impl Blaze2BaseFoldBackendParams {
                     .section5_permutation_helper
                     .as_ref()
                     .map(|helper| helper.inner.merkle_tree.as_slice()),
-                queries: query_set.section5_permutation_helper_queries.clone(),
+                queries: section5_permutation_helper_queries,
             })?;
 
         Ok(BackendProofOracleAuthentication {
@@ -1887,6 +1895,13 @@ impl<H: Hash> BackendProofOracleAuthentication<H> {
             queries: query_set.section5_relation_residual_queries.clone(),
             authentication_nodes: &self.section5_relation_residual_nodes,
         })?;
+        let section5_permutation_helper_queries = match &prequery.section5_permutation_helper {
+            Some(public) => section5_permutation_helper_physical_queries(
+                public.len,
+                &query_set.section5_permutation_helper_queries,
+            )?,
+            None => query_set.section5_permutation_helper_queries.clone(),
+        };
         verify_backend_oracle_lane::<H>(BackendProofOracleVerifierLane {
             kind: BackendProofOracleLaneKind::Section5PermutationHelper,
             root: prequery
@@ -1898,7 +1913,7 @@ impl<H: Hash> BackendProofOracleAuthentication<H> {
                 .as_ref()
                 .map(|public| public.len)
                 .unwrap_or(0),
-            queries: query_set.section5_permutation_helper_queries.clone(),
+            queries: section5_permutation_helper_queries,
             authentication_nodes: &self.section5_permutation_helper_nodes,
         })?;
         Ok(())
@@ -2141,8 +2156,10 @@ impl<H: Hash> AuxiliaryOracleCommitment<H> {
 
 impl<H: Hash> RaaSection5PermutationHelperCommitment<H> {
     pub fn commit_values(values: Vec<B128>) -> Result<Self, Error> {
+        let physical_values = section5_permutation_helper_physical_values(&values)?;
         Ok(Self {
-            inner: AuxiliaryOracleCommitment::commit_values(values)?,
+            inner: AuxiliaryOracleCommitment::commit_values(physical_values)?,
+            logical_values: values,
         })
     }
 
@@ -2162,11 +2179,15 @@ impl<H: Hash> RaaSection5PermutationHelperCommitment<H> {
     }
 
     pub fn values(&self) -> &[B128] {
-        self.inner.values()
+        &self.logical_values
     }
 
     pub fn query(&self, logical_index: usize) -> Result<AuxiliaryOracleQuery, Error> {
-        self.inner.query(logical_index)
+        validate_auxiliary_query_index(logical_index, self.len())?;
+        Ok(AuxiliaryOracleQuery {
+            logical_index,
+            value: self.logical_values[logical_index],
+        })
     }
 
     pub fn prove_schedule(
@@ -6654,6 +6675,51 @@ fn section5_permutation_helper_len_for_schedule(
     } else {
         0
     }
+}
+
+fn section5_permutation_helper_logical_to_physical(
+    helper_len: usize,
+    logical_index: usize,
+) -> Result<usize, Error> {
+    if helper_len == 0 || helper_len % 4 != 0 || logical_index >= helper_len {
+        return Err(Error::InvalidPcsOpen(
+            "Section 5 helper physical index mapping is invalid".to_string(),
+        ));
+    }
+    let tree_chunk_len = helper_len >> 2;
+    let chunk = logical_index / tree_chunk_len;
+    let packed_index = logical_index % tree_chunk_len;
+    Ok(packed_index * 4 + chunk)
+}
+
+fn section5_permutation_helper_physical_values(values: &[B128]) -> Result<Vec<B128>, Error> {
+    if values.is_empty() || values.len() % 4 != 0 {
+        return Err(Error::InvalidPcsParam(
+            "Section 5 helper oracle length does not match four product-tree chunks".to_string(),
+        ));
+    }
+    let mut physical_values = vec![B128::ZERO; values.len()];
+    for (logical_index, value) in values.iter().copied().enumerate() {
+        let physical_index =
+            section5_permutation_helper_logical_to_physical(values.len(), logical_index)?;
+        physical_values[physical_index] = value;
+    }
+    Ok(physical_values)
+}
+
+fn section5_permutation_helper_physical_queries(
+    helper_len: usize,
+    queries: &[(usize, B128)],
+) -> Result<Vec<(usize, B128)>, Error> {
+    queries
+        .iter()
+        .map(|(logical_index, value)| {
+            Ok((
+                section5_permutation_helper_logical_to_physical(helper_len, *logical_index)?,
+                *value,
+            ))
+        })
+        .collect()
 }
 
 fn b128_to_u128(value: B128) -> u128 {

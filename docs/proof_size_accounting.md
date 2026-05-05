@@ -126,13 +126,16 @@ Blaze2/BaseFold fixture (`t = 2` packed rows, `n_praa = 32`, `Q_RAA = 4`,
 | Component | Bytes |
 |---|---:|
 | Row evaluations | 32 |
-| Backend prequery roots, eval sumcheck, terminal word | 496 |
+| Backend prequery roots, eval sumcheck, terminal word | 560 |
 | Blaze-authenticated column values | 128 |
 | Blaze-authenticated column Merkle paths | 640 |
-| Backend compiler-parity query values and multiproof nodes | 384 |
-| Backend compiler-parity fold values and multiproof nodes | 832 |
-| Backend auxiliary query values and multiproof nodes | 1,104 |
-| Total | 3,616 |
+| Backend compiler-parity query values and multiproof nodes | 32 |
+| Backend compiler-parity fold values and multiproof nodes | 544 |
+| Backend auxiliary relation values and multiproof nodes | 960 |
+| Section 5 residual values and shared residual multiproof nodes | 1,136 |
+| Section 5 terminal folded-layer roots and authentication | 1,408 |
+| Section 5 helper values and multiproof nodes | 928 |
+| Total | 6,368 |
 
 For comparison to the Blaze paper's 64-bit field-byte convention, the same proof structure with
 `field_bytes = 8` projects to:
@@ -140,18 +143,21 @@ For comparison to the Blaze paper's 64-bit field-byte convention, the same proof
 | Component | Bytes |
 |---|---:|
 | Row evaluations | 16 |
-| Backend prequery roots, eval sumcheck, terminal word | 360 |
+| Backend prequery roots, eval sumcheck, terminal word | 424 |
 | Blaze-authenticated column values | 64 |
 | Blaze-authenticated column Merkle paths | 640 |
-| Backend compiler-parity query values and multiproof nodes | 352 |
-| Backend compiler-parity fold values and multiproof nodes | 672 |
-| Backend auxiliary query values and multiproof nodes | 1,032 |
-| Total | 3,136 |
+| Backend compiler-parity query values and multiproof nodes | 16 |
+| Backend compiler-parity fold values and multiproof nodes | 464 |
+| Backend auxiliary relation values and multiproof nodes | 480 |
+| Section 5 residual values and shared residual multiproof nodes | 984 |
+| Section 5 terminal folded-layer roots and authentication | 1,408 |
+| Section 5 helper values and multiproof nodes | 880 |
+| Total | 5,376 |
 
 This confirms the structural acceptance point: the Blaze outer term is exactly row evaluations plus
 backend prequery material plus `Q_RAA` opened columns and paths. The remaining large term is inside
-the backend proof, especially auxiliary openings, compiler-parity query paths, and duplicated
-authentication that is still outside the shared multiproofs; these are the next targets for
+the backend proof, especially the residual-terminal side chain and Section 5 helper/residual
+authentication that is still outside the final shared BaseFold-core proof; these are the next targets for
 serialization tightening.
 
 The BaseFold paper gives the protocol and asymptotics, while its exact figure data for standalone

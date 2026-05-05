@@ -238,6 +238,90 @@ relation-layer rejection. This is intentionally still a scaffolding step: those 
 helper-authentication leaves must ultimately be internal to the shared holographic BaseFold relation,
 not an extra local-opening multiplier outside the paper accounting.
 
+### Terminal-Core Replacement Target
+
+The next implementation target is a shared `BaseFoldTerminalCore` owned by the backend proof, not by
+the Section 5 residual proof. It must express the current residual-terminal check as a normal
+BaseFold terminal-clear relation:
+
+```text
+for each terminal row j in {permutation, first_accumulator, second_accumulator}:
+    R_j is a committed backend proof-oracle row of length L
+    r_j = Section 5 sumcheck terminal challenge vector
+    claim_j = Section 5 sumcheck terminal claim
+    terminal_core proves R_j(r_j) = claim_j
+```
+
+The fold equation is the existing systematic fold equation:
+
+```text
+fold_round(v, alpha)[i] = v[i] + alpha * v[i + active_len / 2]
+```
+
+with `i` in the lower half of the current layer. For an opened path at top index `q`, the verifier
+reconstructs the folded value by repeatedly applying that equation until the final scalar equals
+`claim_j`. The difference from the current scaffold is ownership and authentication:
+
+```text
+current:
+    Section 5 residual proof owns terminal path witnesses
+    shared residual lane authenticates round-0 residual leaves
+    Section 5-specific folded-layer roots/authentication bind later siblings
+
+target:
+    shared BaseFold terminal core owns the terminal path descriptors
+    backend proof-oracle query set owns every terminal fold query
+    folded terminal layers are either already part of the shared BaseFold fold layers or are
+    represented by the terminal clear word
+    no Section 5-specific folded-layer root/authentication bucket remains
+```
+
+The first code hop should therefore add shared types without changing bytes:
+
+```text
+BaseFoldTerminalCoreProof {
+    rows: Vec<BaseFoldTerminalRowProof>,
+    openings: Vec<BaseFoldTerminalOpening>,
+}
+
+BaseFoldTerminalRowProof {
+    source: BackendTerminalSource,
+    challenges: Vec<B128>,
+    claim: B128,
+    paths: Vec<BaseFoldTerminalPath>,
+}
+```
+
+`BackendTerminalSource` must identify the residual row and domain length, but it must not own a new
+Merkle commitment. The existing `RaaSection5RelationTerminalProof` can then become a Section 5
+adapter that builds this shared proof. That first hop should keep the `1,408` bytes unchanged and
+prove only that the ownership boundary has moved.
+
+The reduction hop is allowed only after these tests exist:
+
+- Tampering a residual base leaf still fails through the shared residual lane.
+- Tampering a folded sibling still fails before the side-chain roots are removed.
+- After side-chain removal, tampering an equivalent terminal-core query fails through the shared
+  BaseFold fold/query verifier.
+- Removing or duplicating terminal openings still fails canonicality checks.
+- The byte test names the exact moved bucket and pins the new B128 and 8-byte totals.
+
+The expected byte movement for the reduction hop is:
+
+```text
+remove:
+    Section 5 terminal folded-layer roots/authentication = 1,408 bytes
+
+keep or reclassify:
+    residual base leaves already counted in Section 5 residual shared multiproof nodes
+    terminal value openings already counted as residual serialized values
+    terminal path descriptors remain transcript-derived and serialize as zero bytes
+```
+
+If the implementation cannot make folded sibling authentication part of the shared BaseFold fold
+query verifier, then the `1,408` bytes must remain. Deleting those bytes without that binding is
+unsound.
+
 After re-reading Blaze Section 5, the honest implementation cannot be just "the same three rows
 with fewer openings." The paper relation uses MLIOP proof oracles for the RAA computation: the
 `u2/u3/u4` computation rows plus the permutation/grand-product helper oracles, packed as the
@@ -398,7 +482,7 @@ Acceptance:
 | 3. Build the shared backend query-set collector. | Complete. |
 | 4. Generate per-layer multiproofs from the collector. | Complete. |
 | 5. Move auxiliary local relation checks into scheduled or algebraic backend checks. | In progress: arbitrary auxiliary traces now reject at prequery construction; the relation proof strategy is explicit; the normal Blaze2/BaseFold fixture uses Section 5; Section 5 builds scheduled pre-challenge relation openings/authentication, has a transcript-bound/authenticated post-challenge helper domain, emits prequery-bound honest relation sumcheck transcripts, and binds terminal residual evaluations through authenticated residual-terminal fold paths. |
-| 6. Replace the Blaze2-specific backend proof structs with the shared BaseFold-core proof. | Pending. This is the step that must absorb the current 1,408-byte terminal folded-layer side chain; the side chain is soundly necessary until then. |
+| 6. Replace the Blaze2-specific backend proof structs with the shared BaseFold-core proof. | In progress: the terminal-core replacement target is now specified, including the verifier equation, ownership move, tests, and exact 1,408-byte side-chain reduction condition. |
 | 7. Add the 8-byte/16-byte field-width template and lock both acceptance numbers. | In progress: the current budget and byte-template test are parameterized by field byte width; a concrete 8-byte backend is still future work. |
 
 This order keeps the current hard structural wins intact while making each remaining byte movement

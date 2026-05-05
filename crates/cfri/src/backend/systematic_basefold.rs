@@ -300,7 +300,6 @@ pub struct RaaSection5RelationTerminalRowProof<H: Hash> {
 
 #[derive(Clone, Debug, Eq, PartialEq)]
 pub struct RaaSection5RelationTerminalLayerProof<H: Hash> {
-    pub round: usize,
     pub authentication_nodes: Vec<Output<H>>,
 }
 
@@ -313,8 +312,6 @@ pub struct RaaSection5RelationTerminalPath {
 
 #[derive(Clone, Debug, Eq, PartialEq)]
 pub struct RaaSection5RelationTerminalStep {
-    pub round: usize,
-    pub sibling_index: usize,
     pub sibling_value: B128,
 }
 
@@ -4563,7 +4560,6 @@ fn prove_section5_relation_terminal_proof<H: Hash>(
             round, &rows, checks, domain_len,
         )?;
         folded_layer_authentication.push(RaaSection5RelationTerminalLayerProof {
-            round,
             authentication_nodes: merkle_b128_multiproof_nodes::<H, _>(
                 &commitment.merkle_tree,
                 queries,
@@ -4689,8 +4685,6 @@ fn section5_relation_terminal_path(
             current_index - half
         };
         steps.push(RaaSection5RelationTerminalStep {
-            round,
-            sibling_index,
             sibling_value: layer[sibling_index],
         });
         current_index &= half - 1;
@@ -4802,12 +4796,6 @@ impl<H: Hash> RaaSection5RelationTerminalProof<H> {
             .enumerate()
         {
             let round = offset + 1;
-            if proof.round != round {
-                return Err(Error::InvalidPcsOpen(
-                    "RAA Section 5 terminal proof folded authentication round is invalid"
-                        .to_string(),
-                ));
-            }
             let queries = section5_relation_terminal_combined_folded_layer_queries(
                 round, &self.rows, checks, domain_len,
             )?;
@@ -4888,23 +4876,8 @@ fn verify_section5_relation_terminal_path(
     let mut current_value = path.top_value;
     let mut current_index = path.top_index;
     for (round, (&challenge, step)) in check.challenges.iter().zip(path.steps.iter()).enumerate() {
-        if step.round != round {
-            return Err(Error::InvalidPcsOpen(
-                "RAA Section 5 terminal proof path round is invalid".to_string(),
-            ));
-        }
         let active_len = domain_len >> round;
         let half = active_len >> 1;
-        let expected_sibling_index = if current_index < half {
-            current_index + half
-        } else {
-            current_index - half
-        };
-        if step.sibling_index != expected_sibling_index {
-            return Err(Error::InvalidPcsOpen(
-                "RAA Section 5 terminal proof path sibling index is invalid".to_string(),
-            ));
-        }
         let (left, right) = if current_index < half {
             (current_value, step.sibling_value)
         } else {
@@ -4942,16 +4915,6 @@ fn section5_relation_terminal_value_after_round(
         })?;
         let active_len = domain_len >> round;
         let half = active_len >> 1;
-        let expected_sibling_index = if current_index < half {
-            current_index + half
-        } else {
-            current_index - half
-        };
-        if step.round != round || step.sibling_index != expected_sibling_index {
-            return Err(Error::InvalidPcsOpen(
-                "RAA Section 5 terminal folded layer path step is invalid".to_string(),
-            ));
-        }
         let (left, right) = if current_index < half {
             (current_value, step.sibling_value)
         } else {
@@ -5030,7 +4993,13 @@ fn section5_relation_terminal_base_authentication_queries(
         }
         queries.push((row_offset + path.top_index, path.top_value));
         if let Some(step) = path.steps.first() {
-            queries.push((row_offset + step.sibling_index, step.sibling_value));
+            let half = domain_len >> 1;
+            let sibling_index = if path.top_index < half {
+                path.top_index + half
+            } else {
+                path.top_index - half
+            };
+            queries.push((row_offset + sibling_index, step.sibling_value));
         }
     }
     Ok(queries)
@@ -5063,13 +5032,8 @@ fn section5_relation_terminal_folded_layer_queries(
         } else {
             current_index - half
         };
-        if step.round != round || step.sibling_index != expected_sibling_index {
-            return Err(Error::InvalidPcsOpen(
-                "RAA Section 5 terminal folded layer sibling is invalid".to_string(),
-            ));
-        }
         queries.push((current_index, current_value));
-        queries.push((step.sibling_index, step.sibling_value));
+        queries.push((expected_sibling_index, step.sibling_value));
     }
     Ok(queries)
 }

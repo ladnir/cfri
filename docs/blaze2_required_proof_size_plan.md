@@ -206,9 +206,14 @@ authenticates folded-layer siblings, and rejects missing or tampered terminal pa
 folded-layer commitments and multiproofs are now shared across the three residual rows instead of
 being emitted independently per row, and both folded-layer roots and authentication nodes now live in
 the shared backend authentication object rather than inside the terminal proof object. This closes
-the old trusted/in-memory terminal binding gap. The remaining accounting work is to move the
-terminal folded-layer lane itself into the final holographic BaseFold core rather than leaving it as
-Section 5-specific scaffolding. The permutation residual row is no longer a placeholder:
+the old trusted/in-memory terminal binding gap. The terminal path witness has also been
+canonicalized: the proof now serializes the unique set of non-derived terminal value openings keyed
+by `(round, row, index)`, rejects duplicate or missing openings, and derives folded current values
+from earlier openings instead of serializing them. This keeps the wire shape honest, but it does not
+remove the terminal folded-layer bucket because that bucket is the separate commitment/authentication
+chain itself. The remaining accounting work is to move the terminal folded-layer lane into the final
+holographic BaseFold core rather than leaving it as Section 5-specific scaffolding. The permutation
+residual row is no longer a placeholder:
 alpha/beta/gamma are squeezed before helper construction, the helper product-tree witnesses are
 committed after alpha/beta, and the residual commitment now contains a gamma-batched product-tree
 relation/root equality residual derived from those helper witnesses plus the two accumulator
@@ -261,15 +266,16 @@ B/C below, with a concrete Section 5 proof-oracle layout:
    query-authenticated, and a tested residual-terminal fold proof now feeds the terminal binding
    from committed residual rows instead of full in-memory residual vectors; terminal folding queries
    are budgeted by the residual query domain rather than all backend query domains; base residual
-   leaves for those terminal paths are now authenticated by the shared backend residual multiproof
-   collector, while folded-layer roots and authentication nodes are carried by the shared backend
-   authentication object and the terminal folded-layer lane still has to be folded into the final
-   shared proof-oracle/accounting model; helper product-tree local query derivation is tested and
-   wired into the residual/helper verifier relation for sampled permutation residual rows; those
-   helper leaves are now transcript-schedule-derived authentication queries rather than inferred
-   from proof contents, and the helper query proof serializes the canonical unique set of needed
-   leaves; the remaining target is to move that scheduled helper-authentication lane into the shared
-   BaseFold relation rather than serializing it as explicit helper openings]
+  leaves for those terminal paths are now authenticated by the shared backend residual multiproof
+  collector, while folded-layer roots and authentication nodes are carried by the shared backend
+  authentication object; terminal path values are canonical unique openings rather than per-path
+  duplicates, but the terminal folded-layer lane still has to be folded into the final shared
+  proof-oracle/accounting model; helper product-tree local query derivation is tested and wired
+  into the residual/helper verifier relation for sampled permutation residual rows; those helper
+  leaves are now transcript-schedule-derived authentication queries rather than inferred from proof
+  contents, and the helper query proof serializes the canonical unique set of needed leaves; the
+  remaining target is to move that scheduled helper-authentication lane into the shared BaseFold
+  relation rather than serializing it as explicit helper openings]
 5. switch the normal Blaze2 backend from `LocalQueries` to `Section5`; [Done for the normal
    Blaze2/BaseFold fixture]
 ```

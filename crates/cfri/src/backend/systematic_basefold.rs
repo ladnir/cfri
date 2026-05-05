@@ -456,6 +456,39 @@ pub struct BackendProofOracleAuthentication<H: Hash> {
     pub section5_permutation_helper_nodes: Vec<Output<H>>,
 }
 
+#[derive(Clone, Copy, Debug, Eq, PartialEq)]
+enum BackendProofOracleLaneKind {
+    CompilerParityRound(usize),
+    Auxiliary,
+    Section5RelationResidual,
+    Section5PermutationHelper,
+}
+
+impl BackendProofOracleLaneKind {
+    fn name(self) -> &'static str {
+        match self {
+            Self::CompilerParityRound(_) => "compiler parity",
+            Self::Auxiliary => "auxiliary",
+            Self::Section5RelationResidual => "Section 5 residual",
+            Self::Section5PermutationHelper => "Section 5 helper",
+        }
+    }
+}
+
+struct BackendProofOracleProverLane<'a, H: Hash> {
+    kind: BackendProofOracleLaneKind,
+    merkle_tree: Option<&'a [Vec<Output<H>>]>,
+    queries: Vec<(usize, B128)>,
+}
+
+struct BackendProofOracleVerifierLane<'a, H: Hash> {
+    kind: BackendProofOracleLaneKind,
+    root: Option<&'a Output<H>>,
+    len: usize,
+    queries: Vec<(usize, B128)>,
+    authentication_nodes: &'a [Output<H>],
+}
+
 #[derive(Clone, Debug, Eq, PartialEq)]
 pub struct CompilerParityFoldQueryProof<H: Hash> {
     pub paths: Vec<CompilerParityFoldPath>,
@@ -1056,61 +1089,42 @@ impl Blaze2BaseFoldBackendParams {
                 queries.extend(query_set.compiler_parity_queries.iter().copied());
             }
             compiler_parity_layers.push(CompilerParityFoldLayerProof {
-                authentication_nodes: merkle_b128_multiproof_nodes::<H, _>(
-                    &commitment.merkle_tree,
-                    queries,
+                authentication_nodes: prove_backend_oracle_lane::<H>(
+                    BackendProofOracleProverLane {
+                        kind: BackendProofOracleLaneKind::CompilerParityRound(round),
+                        merkle_tree: Some(&commitment.merkle_tree),
+                        queries,
+                    },
                 )?,
             });
         }
 
-        let auxiliary_nodes = match (&state.auxiliary, query_set.auxiliary_queries.is_empty()) {
-            (Some(auxiliary), _) => merkle_b128_multiproof_nodes::<H, _>(
-                &auxiliary.merkle_tree,
-                query_set.auxiliary_queries.iter().copied(),
-            )?,
-            (None, true) => Vec::new(),
-            (None, false) => {
-                return Err(Error::InvalidPcsOpen(
-                    "backend query set contains auxiliary leaves but no auxiliary oracle is committed"
-                        .to_string(),
-                ));
-            }
-        };
-        let section5_relation_residual_nodes = match (
-            &state.section5_relation_residual,
-            query_set.section5_relation_residual_queries.is_empty(),
-        ) {
-            (Some(residual), _) => merkle_b128_multiproof_nodes::<H, _>(
-                &residual.inner.merkle_tree,
-                query_set.section5_relation_residual_queries.iter().copied(),
-            )?,
-            (None, true) => Vec::new(),
-            (None, false) => {
-                return Err(Error::InvalidPcsOpen(
-                    "backend query set contains Section 5 residual leaves but no residual oracle is committed"
-                        .to_string(),
-                ));
-            }
-        };
-        let section5_permutation_helper_nodes = match (
-            &state.section5_permutation_helper,
-            query_set.section5_permutation_helper_queries.is_empty(),
-        ) {
-            (Some(helper), _) => merkle_b128_multiproof_nodes::<H, _>(
-                &helper.inner.merkle_tree,
-                query_set
-                    .section5_permutation_helper_queries
-                    .iter()
-                    .copied(),
-            )?,
-            (None, true) => Vec::new(),
-            (None, false) => {
-                return Err(Error::InvalidPcsOpen(
-                    "backend query set contains Section 5 helper leaves but no helper oracle is committed"
-                        .to_string(),
-                ));
-            }
-        };
+        let auxiliary_nodes = prove_backend_oracle_lane::<H>(BackendProofOracleProverLane {
+            kind: BackendProofOracleLaneKind::Auxiliary,
+            merkle_tree: state
+                .auxiliary
+                .as_ref()
+                .map(|auxiliary| auxiliary.merkle_tree.as_slice()),
+            queries: query_set.auxiliary_queries.clone(),
+        })?;
+        let section5_relation_residual_nodes =
+            prove_backend_oracle_lane::<H>(BackendProofOracleProverLane {
+                kind: BackendProofOracleLaneKind::Section5RelationResidual,
+                merkle_tree: state
+                    .section5_relation_residual
+                    .as_ref()
+                    .map(|residual| residual.inner.merkle_tree.as_slice()),
+                queries: query_set.section5_relation_residual_queries.clone(),
+            })?;
+        let section5_permutation_helper_nodes =
+            prove_backend_oracle_lane::<H>(BackendProofOracleProverLane {
+                kind: BackendProofOracleLaneKind::Section5PermutationHelper,
+                merkle_tree: state
+                    .section5_permutation_helper
+                    .as_ref()
+                    .map(|helper| helper.inner.merkle_tree.as_slice()),
+                queries: query_set.section5_permutation_helper_queries.clone(),
+            })?;
 
         Ok(BackendProofOracleAuthentication {
             compiler_parity_layers,
@@ -1767,6 +1781,37 @@ impl<H: Hash> Blaze2BaseFoldQueryProof<H> {
     }
 }
 
+fn prove_backend_oracle_lane<H: Hash>(
+    lane: BackendProofOracleProverLane<'_, H>,
+) -> Result<Vec<Output<H>>, Error> {
+    match lane.merkle_tree {
+        Some(merkle_tree) => merkle_b128_multiproof_nodes::<H, _>(merkle_tree, lane.queries),
+        None if lane.queries.is_empty() => Ok(Vec::new()),
+        None => Err(Error::InvalidPcsOpen(format!(
+            "backend query set contains {} leaves but no committed oracle",
+            lane.kind.name()
+        ))),
+    }
+}
+
+fn verify_backend_oracle_lane<H: Hash>(
+    lane: BackendProofOracleVerifierLane<'_, H>,
+) -> Result<(), Error> {
+    match lane.root {
+        Some(root) => verify_merkle_b128_multiproof::<H, _>(
+            root,
+            lane.len,
+            lane.queries,
+            lane.authentication_nodes,
+        ),
+        None if lane.queries.is_empty() && lane.authentication_nodes.is_empty() => Ok(()),
+        None => Err(Error::InvalidPcsOpen(format!(
+            "backend proof oracle contains {} authentication without a committed oracle",
+            lane.kind.name()
+        ))),
+    }
+}
+
 impl<H: Hash> BackendProofOracleAuthentication<H> {
     pub fn hash_node_count(&self) -> usize {
         self.compiler_parity_layers
@@ -1806,68 +1851,54 @@ impl<H: Hash> BackendProofOracleAuthentication<H> {
             if round == 0 {
                 queries.extend(query_set.compiler_parity_queries.iter().copied());
             }
-            verify_merkle_b128_multiproof::<H, _>(
-                &public.root,
-                public.len,
+            verify_backend_oracle_lane::<H>(BackendProofOracleVerifierLane {
+                kind: BackendProofOracleLaneKind::CompilerParityRound(round),
+                root: Some(&public.root),
+                len: public.len,
                 queries,
-                &proof.authentication_nodes,
-            )?;
+                authentication_nodes: &proof.authentication_nodes,
+            })?;
         }
 
-        match (&prequery.auxiliary, query_set.auxiliary_queries.is_empty()) {
-            (Some(public), _) => verify_merkle_b128_multiproof::<H, _>(
-                &public.root,
-                public.len,
-                query_set.auxiliary_queries.iter().copied(),
-                &self.auxiliary_nodes,
-            )?,
-            (None, true) if self.auxiliary_nodes.is_empty() => {}
-            (None, _) => {
-                return Err(Error::InvalidPcsOpen(
-                    "backend proof oracle contains auxiliary authentication without an auxiliary commitment"
-                        .to_string(),
-                ));
-            }
-        }
-        match (
-            &prequery.section5_relation_residual,
-            query_set.section5_relation_residual_queries.is_empty(),
-        ) {
-            (Some(public), _) => verify_merkle_b128_multiproof::<H, _>(
-                &public.root,
-                public.len,
-                query_set.section5_relation_residual_queries.iter().copied(),
-                &self.section5_relation_residual_nodes,
-            )?,
-            (None, true) if self.section5_relation_residual_nodes.is_empty() => {}
-            (None, _) => {
-                return Err(Error::InvalidPcsOpen(
-                    "backend proof oracle contains Section 5 residual authentication without a residual commitment"
-                        .to_string(),
-                ));
-            }
-        }
-        match (
-            &prequery.section5_permutation_helper,
-            query_set.section5_permutation_helper_queries.is_empty(),
-        ) {
-            (Some(public), _) => verify_merkle_b128_multiproof::<H, _>(
-                &public.root,
-                public.len,
-                query_set
-                    .section5_permutation_helper_queries
-                    .iter()
-                    .copied(),
-                &self.section5_permutation_helper_nodes,
-            )?,
-            (None, true) if self.section5_permutation_helper_nodes.is_empty() => {}
-            (None, _) => {
-                return Err(Error::InvalidPcsOpen(
-                    "backend proof oracle contains Section 5 helper authentication without a helper commitment"
-                        .to_string(),
-                ));
-            }
-        }
+        verify_backend_oracle_lane::<H>(BackendProofOracleVerifierLane {
+            kind: BackendProofOracleLaneKind::Auxiliary,
+            root: prequery.auxiliary.as_ref().map(|public| &public.root),
+            len: prequery
+                .auxiliary
+                .as_ref()
+                .map(|public| public.len)
+                .unwrap_or(0),
+            queries: query_set.auxiliary_queries.clone(),
+            authentication_nodes: &self.auxiliary_nodes,
+        })?;
+        verify_backend_oracle_lane::<H>(BackendProofOracleVerifierLane {
+            kind: BackendProofOracleLaneKind::Section5RelationResidual,
+            root: prequery
+                .section5_relation_residual
+                .as_ref()
+                .map(|public| &public.root),
+            len: prequery
+                .section5_relation_residual
+                .as_ref()
+                .map(|public| public.len)
+                .unwrap_or(0),
+            queries: query_set.section5_relation_residual_queries.clone(),
+            authentication_nodes: &self.section5_relation_residual_nodes,
+        })?;
+        verify_backend_oracle_lane::<H>(BackendProofOracleVerifierLane {
+            kind: BackendProofOracleLaneKind::Section5PermutationHelper,
+            root: prequery
+                .section5_permutation_helper
+                .as_ref()
+                .map(|public| &public.root),
+            len: prequery
+                .section5_permutation_helper
+                .as_ref()
+                .map(|public| public.len)
+                .unwrap_or(0),
+            queries: query_set.section5_permutation_helper_queries.clone(),
+            authentication_nodes: &self.section5_permutation_helper_nodes,
+        })?;
         Ok(())
     }
 }

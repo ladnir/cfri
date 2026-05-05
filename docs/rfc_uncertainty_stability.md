@@ -67,7 +67,9 @@ wt(A_d x) >= 2 max(p,q) - min(p,q)
            >= 2^d/(a+b).
 ```
 
-Equality at depth `d` forces equality at every step:
+Equality at depth `d` has two branches. If exactly one child is nonzero, equality forces that child
+to be exact recursively and the parent output is the two sibling lifts of the child output. If both
+children are nonzero, equality forces:
 
 ```text
 1. a = b = m/2;
@@ -77,9 +79,9 @@ Equality at depth `d` forces equality at every step:
 5. the child messages are equality cases recursively.
 ```
 
-Thus exact equality can only persist when the support splits evenly at every active node and the
-two child output supports coincide recursively. This is the recursive fingerprint of an affine
-subcube support.
+Thus exact equality can persist either by descending through one child, or by splitting evenly and
+gluing two sibling child extremizers. This is the recursive fingerprint of a matched block/stride
+support pair.
 
 ## Candidate Stability Theorem
 

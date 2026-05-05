@@ -87,6 +87,14 @@ This is minimized when the overlap is as large as possible, giving:
 wt(A_d x) >= 2 max(p,q) - min(p,q).
 ```
 
+If one child message is zero, this specializes to:
+
+```text
+wt(A_d x) = 2p
+```
+
+for the nonzero child output weight `p`.
+
 In particular:
 
 ```text
@@ -100,7 +108,7 @@ p >= 2^(d-1)/a
 q >= 2^(d-1)/b
 ```
 
-with the convention that an absent child contributes no constraint. Therefore:
+If both children are nonzero, then:
 
 ```text
 wt(A_d x) >= max(p,q)
@@ -108,6 +116,14 @@ wt(A_d x) >= max(p,q)
            = 2^(d-1) / min(a,b)
            >= 2^d/(a+b)
            = k/wt(x).
+```
+
+If exactly one child is nonzero, say `b=0`, then:
+
+```text
+wt(A_d x) = 2p
+           >= 2 * 2^(d-1)/a
+           = 2^d/wt(x).
 ```
 
 This is exactly tight for recursive live-subcube vectors: if `x` is supported on an `m`-row subcube

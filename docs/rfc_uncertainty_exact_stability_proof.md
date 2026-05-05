@@ -42,20 +42,31 @@ wt(A_d x) >= 2(p-r) + 2(q-r) + r
            >= max(p,q).
 ```
 
+If exactly one child is nonzero, the parent output has weight exactly twice the nonzero child
+output weight, because every active local input has one nonzero coordinate.
+
 By induction:
 
 ```text
-p >= 2^(d-1)/a
-q >= 2^(d-1)/b.
+p >= 2^(d-1)/a      when a > 0
+q >= 2^(d-1)/b      when b > 0.
 ```
 
-So:
+If both children are nonzero:
 
 ```text
 wt(A_d x) >= max(p,q)
            >= max(2^(d-1)/a, 2^(d-1)/b)
            = 2^(d-1)/min(a,b)
            >= 2^d/(a+b).
+```
+
+If exactly one child is nonzero, say `b=0`, then:
+
+```text
+wt(A_d x) = 2p
+           >= 2 * 2^(d-1)/a
+           = 2^d/(a+b).
 ```
 
 This proves:
@@ -73,9 +84,19 @@ wt(x) = m
 wt(A_d x) = 2^d/m.
 ```
 
-Then every inequality above must be tight.
+Then the induction is tight at every active step. There are two equality branches.
 
-Thus:
+**One-child branch.** If exactly one child is nonzero, then:
+
+```text
+1. the nonzero child is an exact extremizer recursively;
+2. the parent output is both sibling lifts of the child output support.
+```
+
+This is the branch that lets a small live block remain inside one half of the tree while the output
+stride doubles.
+
+**Two-child branch.** If both children are nonzero, then:
 
 ```text
 1. a = b = m/2;
@@ -85,8 +106,11 @@ Thus:
 5. x_0 and x_1 are exact extremizers recursively.
 ```
 
-In particular, `m` is a power of two. Equality cannot appear for an odd split or for a child that
-is not itself extremal.
+This is the branch where two sibling live blocks glue together and one parent side cancels at every
+active child output coordinate.
+
+In particular, `m` is a power of two. Equality cannot appear for an odd split or for a child that is
+not itself extremal.
 
 ## Matched Block/Stride Theorem
 
@@ -107,8 +131,11 @@ There are exactly:
 
 matched support pairs for each `m`.
 
-The equality conditions above prove the recursive shape up to a cancellation-consistency lemma.
-That missing lemma should say:
+The two equality branches explain the block/stride form. The one-child branch keeps the input block
+inside one child and doubles the output stride. The two-child branch glues two sibling input blocks
+and chooses one output residue at the current bit.
+
+The remaining missing lemma is cancellation consistency:
 
 ```text
 If two child extremizers have the same output support and every active local coordinate cancels one

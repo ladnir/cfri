@@ -462,7 +462,6 @@ pub struct CompilerParityFoldQueryProof<H: Hash> {
 
 #[derive(Clone, Debug, Eq, PartialEq)]
 pub struct CompilerParityFoldLayerProof<H: Hash> {
-    pub round: usize,
     pub authentication_nodes: Vec<Output<H>>,
 }
 
@@ -1024,7 +1023,6 @@ impl Blaze2BaseFoldBackendParams {
                 queries.extend(query_set.compiler_parity_queries.iter().copied());
             }
             compiler_parity_layers.push(CompilerParityFoldLayerProof {
-                round,
                 authentication_nodes: merkle_b128_multiproof_nodes::<H, _>(
                     &commitment.merkle_tree,
                     queries,
@@ -1748,11 +1746,6 @@ impl<H: Hash> BackendProofOracleAuthentication<H> {
             .zip(query_set.compiler_parity_fold_layer_queries.iter())
             .enumerate()
         {
-            if proof.round != round {
-                return Err(Error::InvalidPcsOpen(
-                    "backend proof oracle authentication round is out of order".to_string(),
-                ));
-            }
             let public = parity_public_at_round(prequery, round)?;
             let mut queries = fold_queries.clone();
             if round == 0 {

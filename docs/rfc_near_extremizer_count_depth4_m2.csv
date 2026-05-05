@@ -1,0 +1,6 @@
+depth,k,live_rows,exact_output_support,extra_outputs,near_output_support,model_count_log2,model_count
+4,16,2,8,0,8,4.00000000,16
+4,16,2,8,1,9,7.00000000,128
+4,16,2,8,2,10,8.80735492,448
+4,16,2,8,3,11,9.80735492,896
+4,16,2,8,4,12,10.12928302,1120

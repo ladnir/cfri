@@ -196,3 +196,74 @@ There are exactly:
 such matched pairs for each power-of-two `m`. This is even better than arbitrary aligned-subcube
 counting and matches the explicit collapse family: the live rows occupy a recursive block, while
 the surviving output direction fixes the low `log2(m)` path bits.
+
+## Near-Extremizer Scan
+
+The next leakage case allows the output support to be slightly larger than the exact uncertainty
+minimum:
+
+```text
+|W| = k/m + e.
+```
+
+At depth `4`, the first exact scans show the cleanest possible behavior: every near-extremizer is
+an exact matched block/stride extremizer plus `e` arbitrary extra output positions.
+
+Artifacts:
+
+```text
+docs/rfc_uncertainty_near_extremizer_scan_depth4_m4_w5.csv
+docs/rfc_uncertainty_near_extremizer_pairs_depth4_m4_w5.csv
+docs/rfc_uncertainty_near_extremizer_class_depth4_m4_w5.csv
+docs/rfc_uncertainty_near_extremizer_scan_depth4_m2_w9.csv
+docs/rfc_uncertainty_near_extremizer_pairs_depth4_m2_w9.csv
+docs/rfc_uncertainty_near_extremizer_class_depth4_m2_w9.csv
+docs/rfc_uncertainty_near_extremizer_scan_depth4_m2_w10.csv
+docs/rfc_uncertainty_near_extremizer_pairs_depth4_m2_w10.csv
+docs/rfc_uncertainty_near_extremizer_class_depth4_m2_w10.csv
+```
+
+Results:
+
+```text
+depth 4, m=4, e=1: checked 7,949,760 pairs, near-extremizers 192
+depth 4, m=2, e=1: checked 1,372,800 pairs, near-extremizers 128
+depth 4, m=2, e=2: checked   960,960 pairs, near-extremizers 448
+```
+
+These match exactly:
+
+```text
+k * binom(k-k/m, e).
+```
+
+The classifier verifies every saved near-extremizer has:
+
+```text
+R is a matched row block;
+W contains a matched stride core of size k/m;
+the remaining e positions are extras.
+```
+
+The corresponding depth-`11`, `m=32` model counts are in:
+
+```text
+docs/rfc_near_extremizer_count_depth11_m32.csv
+```
+
+Selected values:
+
+```text
+e   |W|   log2 count
+0    64    11.00000000
+1    65    21.95419631
+2    66    31.90766527
+4    68    50.22745718
+8    72    83.31397614
+16   80   141.92951259
+32   96   243.50842042
+64  128   414.59156052
+```
+
+This grows, but it grows as a boundary-extra count around the matched family rather than as
+arbitrary `binom(k,m)` support counting. That is the near-extremizer stability shape we need.

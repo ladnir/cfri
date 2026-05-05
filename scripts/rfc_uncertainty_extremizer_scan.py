@@ -77,6 +77,7 @@ def main() -> None:
     parser = argparse.ArgumentParser()
     parser.add_argument("--depth", type=int, required=True)
     parser.add_argument("--live-rows", type=int, required=True)
+    parser.add_argument("--output-support", type=int, default=0)
     parser.add_argument("--prime", type=int, default=65537)
     parser.add_argument("--seed", type=int, default=1)
     parser.add_argument("--max-pairs", type=int, default=0)
@@ -87,7 +88,9 @@ def main() -> None:
     k = 1 << args.depth
     if k % args.live_rows != 0:
         raise SystemExit("--live-rows must divide k")
-    output_support = k // args.live_rows
+    output_support = k // args.live_rows if args.output_support == 0 else args.output_support
+    if output_support < 0 or output_support > k:
+        raise SystemExit("--output-support must be in 0..k")
     zero_count = k - output_support
     rng = random.Random(args.seed)
     generator = rfc_generator_prime(args.depth, 1, args.prime, rng)

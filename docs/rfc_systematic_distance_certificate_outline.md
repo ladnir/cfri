@@ -224,3 +224,25 @@ wt(Ax) = k/m + e
 for moderate `e`. The kernel envelope controls the dimension as `e` grows, but the final proof must
 sum those near-extremal kernel dimensions across copies. The right next object is therefore a
 near-extremizer stability/counting lemma, not another threshold recurrence.
+
+The first exact near-extremizer scans support the strongest simple counting model:
+
+```text
+near-extremizer count for |W|=k/m+e:
+  k * binom(k-k/m, e).
+```
+
+That is, choose one of the `k` matched exact block/stride cores and then choose `e` extra output
+positions outside the core. Depth-`4` checks match this count for:
+
+```text
+m=4,e=1: 192
+m=2,e=1: 128
+m=2,e=2: 448
+```
+
+For the depth-`11`, `m=32` distance-dominant point, this model is tabulated in:
+
+```text
+docs/rfc_near_extremizer_count_depth11_m32.csv
+```

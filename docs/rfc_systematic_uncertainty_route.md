@@ -39,10 +39,10 @@ k - ceil(k/m)
 
 structural zeros.
 
-This is a generic-support statement, not a statement about every finite-field evaluation. If a
-factor such as `1-T` evaluates to zero, an otherwise nonzero output polynomial can vanish. Those
-events are the accidental determinant/root events that must be charged separately by the large
-field size.
+This is a generic rank/support statement over the rational function field of the challenges. The
+message witnessing a kernel may depend on the challenges, so the proof cannot treat the message
+coordinates as constants independent of the root challenge. The right local input is the MDS
+support property of each local `2 x 2` fold matrix over that rational function field.
 
 The proof is the natural induction on the butterfly.
 
@@ -60,27 +60,45 @@ y_0 = u + T (v-u)
 y_1 = v + T (v-u).
 ```
 
-The local map from `(u_j,v_j)` to `(y_{0,j},y_{1,j})` is invertible over the rational function
-field, so if `(u_j,v_j) != (0,0)`, the parent pair is not identically zero. Therefore its generic
-support obeys:
+The local `2 x 2` matrix is MDS over the rational function field: all entries are nonzero
+polynomials and the determinant is nonzero. Therefore, for each coordinate `j`:
 
 ```text
-wt(A_d x) >= |supp(u) union supp(v)|
-           >= max(wt(u), wt(v)).
+wt(u_j,v_j) = 1  =>  wt(y_{0,j},y_{1,j}) = 2
+wt(u_j,v_j) = 2  =>  wt(y_{0,j},y_{1,j}) >= 1.
+```
+
+Let:
+
+```text
+p = wt(u)
+q = wt(v).
+```
+
+If the supports of `u` and `v` overlap in `r` positions, the parent output weight is at least:
+
+```text
+2(p+q-2r) + r.
+```
+
+This is minimized when the overlap is as large as possible, giving:
+
+```text
+wt(A_d x) >= 2 max(p,q) - min(p,q).
 ```
 
 By induction, if `a = wt(x_0)` and `b = wt(x_1)`, then:
 
 ```text
-wt(u) >= 2^(d-1)/a
-wt(v) >= 2^(d-1)/b
+p >= 2^(d-1)/a
+q >= 2^(d-1)/b
 ```
 
-with the convention that an absent child contributes no constraint. Hence:
+with the convention that an absent child contributes no constraint. The worst case is balanced, and
+one obtains:
 
 ```text
-wt(A_d x) >= max(2^(d-1)/a, 2^(d-1)/b)
-           >= 2^d/(a+b)
+wt(A_d x) >= 2^d/(a+b)
            = k/wt(x).
 ```
 
@@ -94,9 +112,9 @@ scripts/rfc_uncertainty_check.py
 ```
 
 exhausts tiny evaluated fields and records where the evaluated support product drops below `k`.
-For `GF(5)`, depth `3`, these drops do occur, as expected, because the tiny field frequently hits
-local roots. This is useful calibration for the large-field proof: the uncertainty lemma gives the
-nonzero polynomial support, while Schwartz-Zippel charges the evaluated root losses.
+For `GF(5)`, depth `3`, these drops do occur in sampled evaluations. This means the theorem must
+be phrased with the standard generic/large-field exception: the structural support certificate
+holds away from determinant/root hypersurfaces, and tiny fields hit those hypersurfaces often.
 
 ## Why This Alone Is Not Enough
 
@@ -170,6 +188,77 @@ Pr[ intersection_i K_i != {0} ] ~= q^-( (L-1)m - sum_i (r_i-1) ).
 
 The certificate should sum this over support shapes and per-copy zero patterns, preserving the
 kernel dimension rather than only recording success/failure.
+
+## One-Copy Kernel Envelope
+
+The one-copy uncertainty theorem gives a useful dimension bound, not just a yes/no bound.
+
+Fix a live support `R` with:
+
+```text
+|R| = m.
+```
+
+Let `Q` be `q` parity coordinates in one copy, and define:
+
+```text
+K(R,Q) = { x in F^R : (A x)|_Q = 0 }.
+```
+
+If `dim K(R,Q) = r`, then elementary linear algebra gives a nonzero vector in `K(R,Q)` with input
+support at most:
+
+```text
+m - r + 1.
+```
+
+That vector has output support at most `k-q`. By one-copy uncertainty:
+
+```text
+k - q >= k / (m-r+1).
+```
+
+Therefore:
+
+```text
+dim K(R,Q) <= max(0, m + 1 - ceil(k/(k-q))).
+```
+
+The helper:
+
+```text
+scripts/rfc_one_copy_kernel_envelope.py
+```
+
+emits this envelope. For depth `11`, `k=2048`, the distance-dominant live size is `m=32`. Around
+the extremal one-copy parity-zero count `q=1984`:
+
+```text
+q       output budget   dim bound
+1978    70              3
+1979    69              3
+1980    68              2
+1981    67              2
+1982    66              1
+1983    65              1
+1984    64              1
+1985    63              0
+```
+
+So the extremal copy really leaves only a line, and asking for even one more zero in that same copy
+kills the kernel structurally.
+
+The remaining combinatorial issue is classifying when the line case can happen. That stability
+target is split out in:
+
+```text
+docs/rfc_uncertainty_stability.md
+```
+
+The short version: equality in the uncertainty induction forces even support splitting and matching
+child output supports at every active recursive node, which should classify exact extremizers as
+aligned subcubes. This classification is what keeps the final union bound from paying
+`binom(k,m)` for arbitrary supports.
 
 ## Aligned Extremal Intersection Check
 

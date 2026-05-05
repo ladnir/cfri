@@ -1,0 +1,180 @@
+# RFC Uncertainty Stability Target
+
+This note isolates the classification theorem needed to turn the systematic ceiling into a
+distance certificate.
+
+## Why Stability Is Needed
+
+The one-copy uncertainty lemma gives:
+
+```text
+wt(x) * wt(Ax) >= k.
+```
+
+For a live support of size `m`, this says one copy cannot have fewer than `k/m` nonzero output
+coordinates. The systematic collapse family reaches equality by taking `x` on an `m`-point live
+subcube and making one parity copy vanish outside a complementary output subcube.
+
+For the multi-copy proof, it is not enough to know that equality is possible. We need to know that
+the equality and near-equality cases are structured. Otherwise the union bound would have to count
+arbitrary supports:
+
+```text
+binom(k,m),
+```
+
+which is too large at the target `m ~= sqrt(k)`.
+
+At depth `11`, `m=32`:
+
+```text
+log2 binom(2048,32) ~= 232.
+```
+
+The aligned live-subcube count is tiny by comparison:
+
+```text
+log2(count) = log2 binom(11,5) + 6 ~= 14.78.
+```
+
+So a sharp proof must show that the dangerous one-copy kernels are subcube-like, not arbitrary.
+
+## Equality Conditions In The Induction
+
+Write a depth-`d` message as `(x_0,x_1)` with supports:
+
+```text
+a = wt(x_0)
+b = wt(x_1)
+m = a+b.
+```
+
+Let:
+
+```text
+u = A_{d-1} x_0
+v = A_{d-1} x_1.
+```
+
+The uncertainty proof used:
+
+```text
+p = wt(u) >= 2^(d-1)/a
+q = wt(v) >= 2^(d-1)/b
+wt(A_d x) >= 2 max(p,q) - min(p,q)
+           >= 2^d/(a+b).
+```
+
+Equality at depth `d` forces equality at every step:
+
+```text
+1. a = b = m/2;
+2. p = q = 2^(d-1)/a;
+3. supp(u) = supp(v);
+4. each active local 2 x 2 fold cancels one of the two parent outputs, never both;
+5. the child messages are equality cases recursively.
+```
+
+Thus exact equality can only persist when the support splits evenly at every active node and the
+two child output supports coincide recursively. This is the recursive fingerprint of an affine
+subcube support.
+
+## Candidate Stability Theorem
+
+The desired theorem is:
+
+```text
+If wt(x)=m and wt(Ax)=k/m generically, then m is a power of two and,
+up to tree-coordinate relabeling induced by the recursion, supp(x) is an aligned live subcube.
+```
+
+The corresponding output support is the complementary quotient subcube of size `k/m`.
+
+A near-equality version should also hold. If:
+
+```text
+wt(Ax) <= k/m + e,
+```
+
+then all but `O(e)` of the recursive equality conditions above must hold. The support should be
+covered by a small number of aligned subcubes, or by a subcube with a small boundary defect. This is
+the object the final first-moment proof needs to count.
+
+## Kernel Version
+
+For a live support `R` and parity-zero set `Q`, the extremal one-copy kernel has:
+
+```text
+|R| = m
+|Q| = k - k/m
+dim K(R,Q) = 1.
+```
+
+The stability theorem should imply:
+
+```text
+dim K(R,Q) = 1 at the extremal zero count
+  => R and [k]\Q form a matched pair of recursive subcubes.
+```
+
+This turns the worst multi-copy event count from arbitrary support counting into aligned-subcube
+counting. Then the two-copy line-intersection moment in:
+
+```text
+docs/rfc_systematic_uncertainty_route.md
+```
+
+becomes a realistic component of a full certificate, not merely a sanity check for one hand-picked
+family.
+
+## Next Mechanical Check
+
+For small depths, enumerate support/output-support pairs over the recursive certificate rather than
+over finite-field evaluations. The check should answer:
+
+```text
+For each support size m, which row supports R admit an output set W of size k/m
+such that there is a nonzero generic vector supported on R and output-supported inside W?
+```
+
+The expected answer is:
+
+```text
+only recursive subcube pairs, plus finite-field accidental cases when evaluated over tiny fields.
+```
+
+This is the next concrete bridge from the current proof outline to a distance certificate near the
+`1-2/c` systematic ceiling.
+
+## Exact Small-Depth Scan
+
+The helper:
+
+```text
+scripts/rfc_uncertainty_extremizer_scan.py
+```
+
+does the first version of this check by evaluating a large-prime sample and exhaustively scanning
+support/output-support pairs at the exact uncertainty boundary. Since non-subcube extremizers would
+be structural, they should persist and show up in this scan with overwhelming probability.
+
+The checked artifacts are:
+
+```text
+docs/rfc_uncertainty_extremizer_scan_depth3_m2.csv
+docs/rfc_uncertainty_extremizer_scan_depth3_m4.csv
+docs/rfc_uncertainty_extremizer_scan_depth4_m4.csv
+```
+
+Results:
+
+```text
+depth 3, k=8,  m=2: checked 1,960 pairs,    extremizers 8,  subcube/subcube 8
+depth 3, k=8,  m=4: checked 1,960 pairs,    extremizers 8,  subcube/subcube 8
+depth 4, k=16, m=4: checked 3,312,400 pairs, extremizers 16, subcube/subcube 16
+```
+
+No non-subcube extremizer appeared. The count is even smaller than the number of arbitrary aligned
+subcube pairs; it looks like the input and output subcubes must be matched by the recursive fold
+orientation. This is exactly the kind of classification needed for the final multi-copy union
+bound.

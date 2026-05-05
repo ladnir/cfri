@@ -58,6 +58,21 @@ def is_aligned_subcube(values: tuple[int, ...], depth: int) -> bool:
     return False
 
 
+def is_matched_extremizer(rows: tuple[int, ...], outputs: tuple[int, ...], k: int) -> bool:
+    live_rows = len(rows)
+    if live_rows == 0 or live_rows & (live_rows - 1) != 0:
+        return False
+    if k % live_rows != 0 or len(outputs) != k // live_rows:
+        return False
+    first = rows[0]
+    if first % live_rows != 0:
+        return False
+    if rows != tuple(range(first, first + live_rows)):
+        return False
+    output_residue = outputs[0] % live_rows
+    return outputs == tuple(range(output_residue, k, live_rows))
+
+
 def main() -> None:
     parser = argparse.ArgumentParser()
     parser.add_argument("--depth", type=int, required=True)
@@ -66,6 +81,7 @@ def main() -> None:
     parser.add_argument("--seed", type=int, default=1)
     parser.add_argument("--max-pairs", type=int, default=0)
     parser.add_argument("--out", required=True)
+    parser.add_argument("--extremizers-out", default=None)
     args = parser.parse_args()
 
     k = 1 << args.depth
@@ -81,6 +97,7 @@ def main() -> None:
     extremal_both_subcube = 0
     first_non_subcube = ""
     by_kind: dict[tuple[int, int], int] = {}
+    extremizer_rows: list[tuple[tuple[int, ...], tuple[int, ...], bool, bool, bool]] = []
 
     row_supports = list(itertools.combinations(range(k), args.live_rows))
     output_supports = list(itertools.combinations(range(k), output_support))
@@ -107,6 +124,7 @@ def main() -> None:
                 checked += 1
                 if rank < args.live_rows:
                     outputs_subcube = is_aligned_subcube(outputs, args.depth)
+                    matched = is_matched_extremizer(rows, outputs, k)
                     extremal += 1
                     if rows_subcube and outputs_subcube:
                         extremal_both_subcube += 1
@@ -118,6 +136,8 @@ def main() -> None:
                         )
                     key = (int(rows_subcube), int(outputs_subcube))
                     by_kind[key] = by_kind.get(key, 0) + 1
+                    if args.extremizers_out is not None:
+                        extremizer_rows.append((rows, outputs, rows_subcube, outputs_subcube, matched))
                 if args.max_pairs > 0 and checked >= args.max_pairs:
                     break
             if args.max_pairs > 0 and checked >= args.max_pairs:
@@ -140,6 +160,21 @@ def main() -> None:
         writer.writerow(["rows_subcube", "outputs_subcube", "extremal_pairs"])
         for (rows_subcube, outputs_subcube), count in sorted(by_kind.items()):
             writer.writerow([rows_subcube, outputs_subcube, count])
+
+    if args.extremizers_out is not None:
+        with Path(args.extremizers_out).open("w", newline="") as handle:
+            writer = csv.writer(handle)
+            writer.writerow(["rows", "outputs", "rows_subcube", "outputs_subcube", "matched_block_stride"])
+            for rows, outputs, rows_subcube, outputs_subcube, matched in extremizer_rows:
+                writer.writerow(
+                    [
+                        ":".join(str(value) for value in rows),
+                        ":".join(str(value) for value in outputs),
+                        int(rows_subcube),
+                        int(outputs_subcube),
+                        int(matched),
+                    ]
+                )
 
     print(f"checked={checked} extremal={extremal} out={args.out}")
 

@@ -162,19 +162,37 @@ The checked artifacts are:
 
 ```text
 docs/rfc_uncertainty_extremizer_scan_depth3_m2.csv
+docs/rfc_uncertainty_extremizer_pairs_depth3_m2.csv
 docs/rfc_uncertainty_extremizer_scan_depth3_m4.csv
+docs/rfc_uncertainty_extremizer_pairs_depth3_m4.csv
+docs/rfc_uncertainty_extremizer_scan_depth4_m2.csv
+docs/rfc_uncertainty_extremizer_pairs_depth4_m2.csv
 docs/rfc_uncertainty_extremizer_scan_depth4_m4.csv
+docs/rfc_uncertainty_extremizer_pairs_depth4_m4.csv
 ```
 
 Results:
 
 ```text
-depth 3, k=8,  m=2: checked 1,960 pairs,    extremizers 8,  subcube/subcube 8
-depth 3, k=8,  m=4: checked 1,960 pairs,    extremizers 8,  subcube/subcube 8
-depth 4, k=16, m=4: checked 3,312,400 pairs, extremizers 16, subcube/subcube 16
+depth 3, k=8,  m=2: checked 1,960 pairs,     extremizers 8,  matched 8
+depth 3, k=8,  m=4: checked 1,960 pairs,     extremizers 8,  matched 8
+depth 4, k=16, m=2: checked 1,544,400 pairs, extremizers 16, matched 16
+depth 4, k=16, m=4: checked 3,312,400 pairs, extremizers 16, matched 16
 ```
 
-No non-subcube extremizer appeared. The count is even smaller than the number of arbitrary aligned
-subcube pairs; it looks like the input and output subcubes must be matched by the recursive fold
-orientation. This is exactly the kind of classification needed for the final multi-copy union
-bound.
+No non-subcube extremizer appeared. In fact, every extremizer is a stricter block/stride pair:
+
+```text
+R = { s m, s m + 1, ..., s m + m - 1 }
+W = { r, r + m, r + 2m, ..., r + (k/m - 1)m }.
+```
+
+There are exactly:
+
+```text
+(k/m) * m = k
+```
+
+such matched pairs for each power-of-two `m`. This is even better than arbitrary aligned-subcube
+counting and matches the explicit collapse family: the live rows occupy a recursive block, while
+the surviving output direction fixes the low `log2(m)` path bits.

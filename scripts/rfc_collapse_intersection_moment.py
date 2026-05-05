@@ -42,6 +42,8 @@ def main() -> None:
                 "copy_pair_log2_count",
                 "line_collision_log2_prob",
                 "union_log2_bound",
+                "matched_pair_log2_count",
+                "matched_union_log2_bound",
             ]
         )
 
@@ -58,6 +60,11 @@ def main() -> None:
                 # up to a negligible factor at q=2^field_bits.
                 collision_log = -(live_rows - 1) * args.field_bits
                 union_log = subcube_log + direction_pair_log + copy_pair_log + collision_log
+                # Exact extremizer scans suggest only k matched block/stride pairs:
+                # k/m live row blocks times m surviving output residues.
+                # For a two-copy event, choose two independent output residues.
+                matched_pair_log = math.log2(k // live_rows) + 2 * live_bits
+                matched_union_log = matched_pair_log + copy_pair_log + collision_log
                 writer.writerow(
                     [
                         depth,
@@ -69,6 +76,8 @@ def main() -> None:
                         f"{copy_pair_log:.8f}",
                         f"{collision_log:.8f}",
                         f"{union_log:.8f}",
+                        f"{matched_pair_log:.8f}",
+                        f"{matched_union_log:.8f}",
                     ]
                 )
 

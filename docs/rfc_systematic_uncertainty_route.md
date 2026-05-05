@@ -285,7 +285,8 @@ docs/rfc_collapse_intersection_moment_c8_depth1_to_11.csv
 The worst aligned two-copy union bound through depth `11` occurs for `m=2` and is already:
 
 ```text
-log2 bound = -108.14825096.
+log2 aligned-subcube bound = -108.14825096.
+log2 matched-extremizer bound = -111.60768258.
 ```
 
 The distance-dominant collapse at depth `11` uses `m=32`; its two-copy intersection term has
@@ -295,9 +296,16 @@ collision exponent:
 -(32-1) * 128 = -3968.
 ```
 
+With the matched block/stride extremizer count suggested by the exact scans, the full depth-`11`,
+`m=32` two-copy term is:
+
+```text
+log2 matched-extremizer bound = -3947.60768258.
+```
+
 So within the aligned extremal family, simultaneous two-copy sparsity is negligible. The real proof
-still needs the arbitrary-support/kernel-dimension count, but this check supports the picture that
-one sparse copy should dominate the systematic distance.
+still needs the arbitrary-support/kernel-dimension count and the exact stability theorem, but this
+check supports the picture that one sparse copy should dominate the systematic distance.
 
 ## Current Best Proof Shape
 
@@ -308,6 +316,12 @@ one-copy uncertainty theorem
   + per-copy kernel-dimension enumerator
   + multi-copy first moment over kernel intersections
   + Schwartz-Zippel/large-field charge for accidental determinant zeros
+```
+
+The conditional theorem statement is now split out in:
+
+```text
+docs/rfc_systematic_distance_certificate_outline.md
 ```
 
 This directly tracks the distribution, not just a failing threshold. It also explains the observed

@@ -218,12 +218,13 @@ value, including the root-equality terminal row case. That is the core logic nee
 openings to residual openings without treating the helper bucket as opaque authenticated data. That
 primitive is now wired into the production verifier path as an explicit residual-local helper
 binding: whenever a sampled Section 5 residual opening lands in the permutation residual row, the
-helper proof carries the corresponding product-tree leaves, the shared backend helper multiproof
-authenticates them, and the verifier recomputes the residual from those helper leaves before
-accepting the zero residual opening. A focused tamper test mutates one derived helper leaf and gets
-the expected relation-layer rejection. This is intentionally still a scaffolding step: those
-derived helper leaves must ultimately be internal to the shared holographic BaseFold relation, not
-an extra local-opening multiplier outside the paper accounting.
+typed holographic schedule derives the corresponding product-tree helper-authentication leaves, the
+helper proof carries those scheduled leaves, the shared backend helper multiproof authenticates
+them, and the verifier recomputes the residual from those helper leaves before accepting the zero
+residual opening. A focused tamper test mutates one scheduled helper-authentication leaf and gets the
+expected relation-layer rejection. This is intentionally still a scaffolding step: those scheduled
+helper-authentication leaves must ultimately be internal to the shared holographic BaseFold relation,
+not an extra local-opening multiplier outside the paper accounting.
 
 After re-reading Blaze Section 5, the honest implementation cannot be just "the same three rows
 with fewer openings." The paper relation uses MLIOP proof oracles for the RAA computation: the
@@ -262,9 +263,10 @@ B/C below, with a concrete Section 5 proof-oracle layout:
    collector, while folded-layer roots and authentication nodes are carried by the shared backend
    authentication object and the terminal folded-layer lane still has to be folded into the final
    shared proof-oracle/accounting model; helper product-tree local query derivation is tested and
-   wired into the residual/helper verifier relation for sampled permutation residual rows; the
-   remaining target is to move those derived helper leaves into the shared BaseFold relation rather
-   than serializing them as explicit helper openings]
+   wired into the residual/helper verifier relation for sampled permutation residual rows; those
+   helper leaves are now transcript-schedule-derived authentication queries rather than inferred
+   from proof contents; the remaining target is to move that scheduled helper-authentication lane
+   into the shared BaseFold relation rather than serializing it as explicit helper openings]
 5. switch the normal Blaze2 backend from `LocalQueries` to `Section5`; [Done for the normal
    Blaze2/BaseFold fixture]
 ```

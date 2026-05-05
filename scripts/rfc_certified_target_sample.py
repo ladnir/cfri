@@ -20,12 +20,15 @@ def main() -> None:
     parser.add_argument("--seed", type=int, default=17)
     parser.add_argument("--full-only", action="store_true")
     parser.add_argument("--out", required=True)
+    parser.add_argument("--defective-cores-out", default=None)
     args = parser.parse_args()
 
     rng = random.Random(args.seed)
     k = 1 << args.depth
     parity_expansion = args.total_expansion - 1
     parity_n = parity_expansion * k
+
+    defective_cores: set[tuple[int, ...]] = set()
 
     with Path(args.out).open("w", newline="") as handle:
         writer = csv.writer(handle)
@@ -58,6 +61,7 @@ def main() -> None:
                     defect = live_rows(systematic, args.depth) - certified_rank(systematic, parity, args.depth)
                 if defect > 0:
                     bad += 1
+                    defective_cores.add(tuple(columns))
                     if first_defective == "":
                         first_defective = ":".join(str(column) for column in columns)
             writer.writerow(
@@ -72,6 +76,13 @@ def main() -> None:
                     first_defective,
                 ]
             )
+
+    if args.defective_cores_out is not None:
+        with Path(args.defective_cores_out).open("w", newline="") as handle:
+            writer = csv.writer(handle)
+            writer.writerow(["index", "columns"])
+            for index, columns in enumerate(sorted(defective_cores)):
+                writer.writerow([index, ":".join(str(column) for column in columns)])
 
     print(f"depth={args.depth} zero_count={args.zero_count} samples={args.samples} out={args.out}")
 

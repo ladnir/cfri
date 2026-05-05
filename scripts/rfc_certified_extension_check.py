@@ -28,11 +28,14 @@ def main() -> None:
     parser.add_argument("--depth", type=int, required=True)
     parser.add_argument("--total-expansion", type=int, default=8)
     parser.add_argument("--cores-csv", required=True)
-    parser.add_argument("--target-z-parity", type=int, required=True)
+    parser.add_argument("--target-z-parity", type=int, default=None)
+    parser.add_argument("--target-zero-count", type=int, default=None)
     parser.add_argument("--out", required=True)
     parser.add_argument("--defective-cores-out", default=None)
     parser.add_argument("--max-records", type=int, default=20)
     args = parser.parse_args()
+    if (args.target_z_parity is None) == (args.target_zero_count is None):
+        raise SystemExit("provide exactly one of --target-z-parity or --target-zero-count")
 
     k = 1 << args.depth
     parity_expansion = args.total_expansion - 1
@@ -47,9 +50,14 @@ def main() -> None:
     for core_index, core in enumerate(cores):
         systematic_columns = [column for column in core if column < k]
         core_parity = sorted(column - k for column in core if column >= k)
-        add_count = args.target_z_parity - len(core_parity)
+        target_z_parity = (
+            args.target_z_parity
+            if args.target_z_parity is not None
+            else args.target_zero_count - len(systematic_columns)
+        )
+        add_count = target_z_parity - len(core_parity)
         if add_count < 0:
-            raise SystemExit("target parity count is smaller than a loaded core")
+            raise SystemExit("target parity/zero count is smaller than a loaded core")
 
         core_set = set(core_parity)
         available = [column for column in range(parity_n) if column not in core_set]
@@ -75,6 +83,7 @@ def main() -> None:
                 "total_expansion",
                 "cores",
                 "target_z_parity",
+                "target_zero_count",
                 "checked_extensions",
                 "defective_extensions",
                 "unique_defective_extensions",
@@ -86,7 +95,8 @@ def main() -> None:
                 args.depth,
                 args.total_expansion,
                 len(cores),
-                args.target_z_parity,
+                "" if args.target_z_parity is None else args.target_z_parity,
+                "" if args.target_zero_count is None else args.target_zero_count,
                 total_extensions,
                 defective_extensions,
                 len(unique_defective),
@@ -106,7 +116,8 @@ def main() -> None:
                 writer.writerow([index, ":".join(str(column) for column in columns)])
 
     print(
-        f"depth={args.depth} cores={len(cores)} target_z_parity={args.target_z_parity} "
+        f"depth={args.depth} cores={len(cores)} "
+        f"target_z_parity={args.target_z_parity} target_zero_count={args.target_zero_count} "
         f"checked={total_extensions} defective={defective_extensions} "
         f"unique_defective={len(unique_defective)} out={args.out}"
     )

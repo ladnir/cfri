@@ -414,6 +414,34 @@ docs/rfc_certified_target_sample_z19_depth4_c8_safe1k.csv
 docs/rfc_certificate_rank_resample_depth4_z17_c8.csv
 ```
 
-This depth-4 evidence is compatible with the `e=3` systematic target and, in fact, does not find
-`k+2` defects at this sample size. The depth-3 `k+2` counterexamples still force the uniform
-all-depth statement to use at least `e=3`.
+Layered extension checks from the sampled `z=17` cores then found surviving defects at:
+
+```text
+z=18, z=19, z=20, z=21, z=22
+```
+
+and no extension to:
+
+```text
+z=23.
+```
+
+The final `z=22` survivor:
+
+```text
+0:1:4:5:6:7:8:9:10:11:12:13:14:15:16:30:44:58:72:86:100:114
+```
+
+resamples as rank `15` over ten independent large-prime challenge assignments. This is the depth-4
+instance of the explicit collapse family documented in:
+
+```text
+docs/rfc_systematic_collapse_family.md
+```
+
+Therefore the `e=3` systematic target is false for the all-level systematic code. The additive loss
+is at least `k/2-2`, giving the asymptotic upper bound:
+
+```text
+delta_sys <= 1 - 3/(2c).
+```

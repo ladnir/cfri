@@ -87,6 +87,12 @@ This is minimized when the overlap is as large as possible, giving:
 wt(A_d x) >= 2 max(p,q) - min(p,q).
 ```
 
+In particular:
+
+```text
+wt(A_d x) >= max(p,q).
+```
+
 By induction, if `a = wt(x_0)` and `b = wt(x_1)`, then:
 
 ```text
@@ -94,11 +100,13 @@ p >= 2^(d-1)/a
 q >= 2^(d-1)/b
 ```
 
-with the convention that an absent child contributes no constraint. The worst case is balanced, and
-one obtains:
+with the convention that an absent child contributes no constraint. Therefore:
 
 ```text
-wt(A_d x) >= 2^d/(a+b)
+wt(A_d x) >= max(p,q)
+           >= max(2^(d-1)/a, 2^(d-1)/b)
+           = 2^(d-1) / min(a,b)
+           >= 2^d/(a+b)
            = k/wt(x).
 ```
 

@@ -62,6 +62,8 @@ The uncertainty proof used:
 p = wt(u) >= 2^(d-1)/a
 q = wt(v) >= 2^(d-1)/b
 wt(A_d x) >= 2 max(p,q) - min(p,q)
+           >= max(p,q)
+           >= max(2^(d-1)/a, 2^(d-1)/b)
            >= 2^d/(a+b).
 ```
 
@@ -71,7 +73,7 @@ Equality at depth `d` forces equality at every step:
 1. a = b = m/2;
 2. p = q = 2^(d-1)/a;
 3. supp(u) = supp(v);
-4. each active local 2 x 2 fold cancels one of the two parent outputs, never both;
+4. each active local 2 x 2 fold cancels exactly one of the two parent outputs, never both;
 5. the child messages are equality cases recursively.
 ```
 
@@ -145,6 +147,12 @@ only recursive subcube pairs, plus finite-field accidental cases when evaluated 
 
 This is the next concrete bridge from the current proof outline to a distance certificate near the
 `1-2/c` systematic ceiling.
+
+The exact proof skeleton and kernel-line uniqueness formulation are now in:
+
+```text
+docs/rfc_uncertainty_exact_stability_proof.md
+```
 
 ## Exact Small-Depth Scan
 

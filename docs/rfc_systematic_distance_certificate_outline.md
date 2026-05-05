@@ -92,6 +92,14 @@ k
 
 such exact extremizer support pairs for each `m`.
 
+Equivalently, at the exact boundary `|R| |W| = k`, the desired rank statement is:
+
+```text
+dim ker(A[R, [k]\W]) =
+  1 if (R,W) is a matched block/stride pair,
+  0 otherwise.
+```
+
 The small-depth scans support this:
 
 ```text

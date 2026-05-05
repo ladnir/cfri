@@ -569,13 +569,15 @@ impl Blaze2BaseFoldProofSizeBudget {
         let section5_relation_terminal_path_bytes = proof
             .backend_proof
             .authentication
-            .section5_relation_terminal_folded_layers
+            .section5_relation_terminal_core
+            .folded_layers
             .len()
             * hash_bytes
             + proof
                 .backend_proof
                 .authentication
-                .section5_relation_terminal_layer_authentication
+                .section5_relation_terminal_core
+                .layer_authentication
                 .iter()
                 .flat_map(|layer| layer.authentication_nodes.iter())
                 .map(|digest| digest.len())
@@ -765,13 +767,15 @@ fn blaze2_basefold_proof_size_breakdown(
     let section5_relation_terminal_path_bytes = proof
         .backend_proof
         .authentication
-        .section5_relation_terminal_folded_layers
+        .section5_relation_terminal_core
+        .folded_layers
         .len()
         * hash_bytes
         + proof
             .backend_proof
             .authentication
-            .section5_relation_terminal_layer_authentication
+            .section5_relation_terminal_core
+            .layer_authentication
             .iter()
             .flat_map(|layer| layer.authentication_nodes.iter())
             .map(|digest| digest.len())
@@ -1048,14 +1052,16 @@ fn blaze2_basefold_wire_payload_bytes_with_field_bytes(
     for layer in &proof
         .backend_proof
         .authentication
-        .section5_relation_terminal_folded_layers
+        .section5_relation_terminal_core
+        .folded_layers
     {
         push_wire_hash(&mut bytes, &layer.root);
     }
     for layer in &proof
         .backend_proof
         .authentication
-        .section5_relation_terminal_layer_authentication
+        .section5_relation_terminal_core
+        .layer_authentication
     {
         push_wire_hashes(&mut bytes, layer.authentication_nodes.iter());
     }

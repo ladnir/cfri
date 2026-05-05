@@ -1,0 +1,3 @@
+depth,total_expansion,s_identity,z_parity,checked_shapes,cert_defect,shape_count,first_defective
+3,8,6,2,43120,0,42560,
+3,8,6,2,43120,1,560,0:1:2:3:4:5:8:22

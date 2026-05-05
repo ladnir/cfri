@@ -197,3 +197,59 @@ structure. The no-dead-sibling profiles are currently explained by accidental fi
 determinant zeros, not by a new structural obstruction. The full proof still needs a coupling term,
 but the evidence now says it may be used to prove singleton couplings are harmless unless they feed
 into the same recursive dead-sibling collision.
+
+## Recursive Certificate Count
+
+The profiler now also computes a constructive certificate rank. The rule is:
+
+```text
+1. sibling parity pairs are split into left and right child obligations using the determinant-1
+   local transform;
+2. singleton parity columns are oriented to one live child as a leading-term obligation;
+3. the certified rank is the best recursive split rank over those singleton orientations.
+```
+
+This is still a proof heuristic rather than a generic-rank theorem, but it is now the right
+finite-depth model: it says exactly when the leading-monomial induction fails to cover every
+undeleted row.
+
+The exact row counter:
+
+```text
+scripts/rfc_certified_defect_row.py
+```
+
+matches the persistent structural rank failures in all exact rows currently checked:
+
+```text
+depth 2, s=2,zp=2:
+  rank failures:        28
+  certified defective:  28
+
+depth 3, s=6,zp=2:
+  persistent failures:  560
+  certified defective:  560
+
+depth 3, s=6,zp=3:
+  persistent failures:  224
+  certified defective:  224
+
+depth 3, s=5,zp=3:
+  sampled rank failures: 13027
+  accidental failures:      35
+  persistent failures:   12992
+  certified defective:   12992
+```
+
+The checked summaries are:
+
+```text
+docs/rfc_certified_defect_row_s2_zp2_depth2_c8.csv
+docs/rfc_certified_defect_row_s6_zp2_depth3_c8.csv
+docs/rfc_certified_defect_row_s6_zp3_depth3_c8.csv
+docs/rfc_certified_defect_row_s5_zp3_depth3_c8.csv
+```
+
+This is the strongest evidence so far that the structural family is exactly the failure set of the
+recursive leading-monomial certificate, while the remaining sampled rank defects are ordinary
+finite-field determinant zeros.

@@ -8,6 +8,7 @@ import csv
 import random
 from collections import Counter, defaultdict
 from dataclasses import dataclass
+from functools import lru_cache
 from pathlib import Path
 
 from sample_rfc_rank_failure import rank_selected_columns, systematic_generator_prime
@@ -102,6 +103,83 @@ def profile_node(systematic: set[int], parity: list[tuple[int, int]], depth: int
     return stats
 
 
+def live_rows(systematic: set[int], depth: int) -> int:
+    return (1 << depth) - len(systematic)
+
+
+def certified_rank(systematic: set[int], parity: list[tuple[int, int]], depth: int) -> int:
+    """Recursive rank certificate from sibling splits and singleton orientations.
+
+    This is not a rank computation over a sampled field. It is the constructive proof heuristic:
+    sibling pairs are split by the determinant-1 local transform, while singleton columns are
+    assigned to one live child as their leading-term obligation.
+    """
+
+    systematic_key = tuple(sorted(systematic))
+    parity_key = tuple(sorted(set(parity)))
+    return _certified_rank_cached(depth, systematic_key, parity_key)
+
+
+@lru_cache(maxsize=None)
+def _certified_rank_cached(depth: int, systematic_key: tuple[int, ...], parity_key: tuple[tuple[int, int], ...]) -> int:
+    systematic = set(systematic_key)
+    parity = list(parity_key)
+
+    if (1 << depth) - len(systematic) == 0:
+        return 0
+    if depth == 0:
+        return 1 if parity else 0
+
+    child_size = 1 << (depth - 1)
+    child_bit = child_size
+    low_mask = child_size - 1
+
+    systematic_left = {path & low_mask for path in systematic if (path & child_bit) == 0}
+    systematic_right = {path & low_mask for path in systematic if (path & child_bit) != 0}
+    left_live = len(systematic_left) < child_size
+    right_live = len(systematic_right) < child_size
+
+    groups: dict[tuple[int, int], set[int]] = defaultdict(set)
+    for copy, path in parity:
+        groups[(copy, path & low_mask)].add(1 if (path & child_bit) else 0)
+
+    left_forced: list[tuple[int, int]] = []
+    right_forced: list[tuple[int, int]] = []
+    choices: list[tuple[int, int]] = []
+    for copy_lower, sides in groups.items():
+        if len(sides) == 2:
+            if left_live:
+                left_forced.append(copy_lower)
+            if right_live:
+                right_forced.append(copy_lower)
+            continue
+        if left_live and right_live:
+            choices.append(copy_lower)
+        elif left_live:
+            left_forced.append(copy_lower)
+        elif right_live:
+            right_forced.append(copy_lower)
+
+    best = 0
+    choice_count = len(choices)
+    for mask in range(1 << choice_count):
+        left_parity = left_forced[:]
+        right_parity = right_forced[:]
+        for index, column in enumerate(choices):
+            if (mask >> index) & 1:
+                right_parity.append(column)
+            else:
+                left_parity.append(column)
+        rank = _certified_rank_cached(depth - 1, tuple(sorted(systematic_left)), tuple(sorted(set(left_parity)))) + (
+            _certified_rank_cached(depth - 1, tuple(sorted(systematic_right)), tuple(sorted(set(right_parity))))
+        )
+        if rank > best:
+            best = rank
+            if best == (1 << depth) - len(systematic):
+                break
+    return best
+
+
 def stats_key(stats: SplitStats, depth: int) -> tuple[int, ...]:
     values: list[int] = []
     for level in range(depth):
@@ -185,26 +263,36 @@ def main() -> None:
     with Path(args.out).open("w", newline="") as handle:
         writer = csv.writer(handle)
         rank_headers = ["deficient_samples"] if args.rank_samples > 0 else []
-        writer.writerow(["shape", "columns", "is_bad"] + rank_headers + feature_header)
+        certificate_headers = ["live_rows", "certified_rank", "certified_defect", "certified_full"]
+        writer.writerow(["shape", "columns", "is_bad"] + rank_headers + certificate_headers + feature_header)
         for name, columns, is_bad in shapes:
             systematic, parity = decode_shape(columns, args.depth, args.parity_expansion)
             stats = profile_node(systematic, parity, args.depth)
             key = stats_key(stats, args.depth)
+            live = live_rows(systematic, args.depth)
+            cert_rank = certified_rank(systematic, parity, args.depth)
+            cert_defect = live - cert_rank
+            cert_key = (live, cert_rank, cert_defect, int(cert_defect == 0))
+            summary_key = cert_key + key
             deficient_samples = None
             if generators:
                 k = 1 << args.depth
                 deficient_samples = sum(
                     1 for generator in generators if rank_selected_columns(generator, columns, args.prime) < k
                 )
-                summary[(key, deficient_samples == args.rank_samples)] += 1
+                summary[(summary_key, deficient_samples == args.rank_samples)] += 1
             else:
-                summary[(key, is_bad)] += 1
+                summary[(summary_key, is_bad)] += 1
             writer.writerow(
                 [
                     name,
                     ":".join(str(column) for column in columns),
                     "" if is_bad is None else int(is_bad),
                     *([] if deficient_samples is None else [deficient_samples]),
+                    live,
+                    cert_rank,
+                    cert_defect,
+                    int(cert_defect == 0),
                     *key,
                 ]
             )
@@ -215,7 +303,7 @@ def main() -> None:
             by_key[key][is_bad] += count
         with Path(args.summary_out).open("w", newline="") as handle:
             writer = csv.writer(handle)
-            writer.writerow(feature_header + ["unknown_count", "good_count", "bad_count", "total_count"])
+            writer.writerow(certificate_headers + feature_header + ["unknown_count", "good_count", "bad_count", "total_count"])
             for key, counts in sorted(by_key.items(), key=lambda item: (-sum(item[1].values()), item[0])):
                 unknown = counts[None]
                 good = counts[False]

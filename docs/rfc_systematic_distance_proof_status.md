@@ -287,7 +287,7 @@ P2. The charged-label overhead is B*e, not B*(e+h). This is fine only if hole/re
 ```
 
 These findings do not kill the direction, but they mean the proof is not "one lemma away" unless
-the rank-payment aggregation and no-double-spend interfaces are included in that lemma package.
+the global rank-budget and no-double-spend interfaces are included in that lemma package.
 
 ## Current Honesty Level
 

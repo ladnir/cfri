@@ -313,6 +313,12 @@ every unit-charge high-`M` imbalance. The needed local result is that unbalanced
 preserve an actual parent residue core, or any holes they create are globally coalesced and bounded
 by the first few row-split charges.
 
+The finite residue-Hall formulation of this local result is tracked in:
+
+```text
+docs/rfc_unbalanced_split_residue_hall.md
+```
+
 ## Core-Preservation Lemma
 
 The counted theorem reduces the exact classification problem to the following core-preservation

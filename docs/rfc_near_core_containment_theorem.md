@@ -282,6 +282,12 @@ unbalanced row-split pruning:
   globally tiny set of virtual holes.
 ```
 
+This is now isolated as a finite residue-Hall problem in:
+
+```text
+docs/rfc_unbalanced_split_residue_hall.md
+```
+
 For the all-level systematic certificate, this gap is less dangerous than cancellation because
 unbalanced splits have explicit integer cost and cannot occur in the uncharged skeleton. Still, the
 hole fallback is narrow: with `B=64`, the depth-11 `c=8` bound stays negative through `H=5` virtual

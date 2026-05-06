@@ -434,6 +434,11 @@ It should show that unit-charge high-`M` imbalances do not accumulate independen
 inside the same candidate parent core. They must either preserve a residue core, or their failures
 coalesce into the same bounded set of virtual holes.
 
+There is one more reason this case cannot be copied from the exact proof: after an unbalanced split,
+the child row weights `a` and `b` need not be powers of two. The exact matched-core theorem is a
+power-of-two skeleton statement. Thus the unbalanced proof must either pay to return to a
+power-of-two/balanced skeleton, or solve the finite residue-cover problem directly at the parent.
+
 After the balanced-case correction above, this is the only remaining core-preservation case. In
 particular:
 
@@ -448,6 +453,12 @@ So the remaining theorem can be phrased narrowly:
 ```text
 unbalanced row splits either preserve an actual parent core or can be covered by a bounded-hole /
 charged-tree fallback whose cost is paid by the integer split defect.
+```
+
+The deterministic residue-cover version of this remaining problem is split out in:
+
+```text
+docs/rfc_unbalanced_split_residue_hall.md
 ```
 
 ## Hall Conclusion

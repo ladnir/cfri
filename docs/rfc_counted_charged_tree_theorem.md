@@ -45,7 +45,11 @@ The counted charged-tree theorem should prove that the support pair of `x` can b
 
 In the literal contained-core version, the charged final output leaves are the `e` leaves outside
 the core. In the defect-coupled virtual-core version, there may be `h` holes inside the virtual core
-and `e+h` real output leaves outside it, with `h<=e`.
+and `e+h` real output leaves outside it, with:
+
+```text
+h <= alpha e.
+```
 
 Therefore the number of possible near support/output certificates is at most:
 
@@ -62,10 +66,10 @@ charged leaves subset supp(A_d x) \ C.
 ```
 
 A new admissible relaxation is now under consideration: allow a virtual core with `h` holes only
-when those holes are charged to real extra outputs, with:
+when those holes are coupled to real output defect, with:
 
 ```text
-h <= e.
+h <= alpha e.
 ```
 
 Then the support count changes from:
@@ -77,18 +81,22 @@ binom(k-k/m, e)
 to:
 
 ```text
-sum_{h<=e} binom(k/m, h) binom(k-k/m, e+h).
+sum_{h<=alpha e} binom(k/m, h) binom(k-k/m, e+h).
 ```
 
-The depth-11 `c=8`, `B=64` union bound remains essentially unchanged under this constrained
-virtual-core model:
+The depth-11 `c=8`, `B=64` union bound remains essentially unchanged for `alpha=1,2` and remains
+negative through `alpha=5` after charging stride-dimension growth using `extra+holes`:
 
 ```text
-total log2 union = -99.60768253.
+alpha=1: total log2 union = -99.60768253
+alpha=2: total log2 union = -99.60689084
+alpha=5: total log2 union = -21.53925283
+alpha=6: total log2 union =  25.89359792
 ```
 
 So the theorem can be completed either by actual core containment, or by defect-coupled virtual-core
-containment where every hole is injectively charged to a real non-core output leaf.
+containment where the number of parent-core holes is bounded by a small constant times the output
+defect. The local target is `alpha=2`; the current count has slack through `alpha=5`.
 
 For exact defect `e`, this can be used as:
 
@@ -350,6 +358,7 @@ The finite residue-Hall formulation of this local result is tracked in:
 
 ```text
 docs/rfc_unbalanced_split_residue_hall.md
+docs/rfc_defect_coupled_virtual_core_theorem.md
 ```
 
 ## Core-Preservation Lemma
@@ -419,7 +428,7 @@ The unbalanced case now appears to be a true obstruction to literal actual-core 
 replacement target is:
 
 ```text
-virtual holes introduced by unbalanced splits <= charged extra output leaves.
+virtual holes introduced by unbalanced splits <= alpha * output defect.
 ```
 
 This is tracked in:
@@ -486,11 +495,11 @@ Pr[d_sys < 12384] <= 2^-99.60768258.
 Under the defect-coupled virtual-core variant, replace `binom(k-k/m,e)` by:
 
 ```text
-sum_{h<=e} binom(k/m,h) binom(k-k/m,e+h).
+sum_{h<=alpha e} binom(k/m,h) binom(k-k/m,e+h).
 ```
 
-The checked bound is still:
+For the target `alpha=2`, the checked bound is:
 
 ```text
-Pr[d_sys < 12384] <= 2^-99.60768253.
+Pr[d_sys < 12384] <= 2^-99.60689084.
 ```

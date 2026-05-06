@@ -465,10 +465,11 @@ That note now indicates actual parent-core preservation is probably too strong f
 splits. The more robust statement is defect-coupled virtual containment:
 
 ```text
-virtual core holes <= real extra output leaves.
+virtual core holes <= alpha * output defect.
 ```
 
-The corresponding first-moment count remains safe at depth 11, `c=8`.
+The corresponding first-moment count remains safe at depth 11, `c=8` for `alpha=2`, with slack
+remaining through `alpha=5`.
 
 ## Hall Conclusion
 

@@ -207,8 +207,8 @@ V = { j : j = 35 mod 65 },     |V|=16=ceil(1024/65)
 every parent residue modulo `128` has at least six missing projected child coordinates:
 
 ```text
-min_rho h_det(rho) = 6,
-hole histogram over rho: 6:2, 7:28, 8:98.
+min_rho child-coordinate coverage holes = 6,
+child-hole histogram over rho: 6:2, 7:28, 8:98.
 ```
 
 One minimizing residue is:
@@ -220,8 +220,9 @@ covered = 880,1008
 holes   = 112,240,368,496,624,752
 ```
 
-So the statement "unit high-`M` imbalance preserves a parent residue core" is false in this
-relaxed residue model.
+Each missing child coordinate corresponds to two missing parent residue positions, one in each
+sibling half. So this relaxed model has at least `12` parent-core holes in the best parent residue.
+The statement "unit high-`M` imbalance preserves a parent residue core" is false in this model.
 
 However this is not a low-total-defect local extremizer. The same example has almost no child
 support overlap. Even if `|U cap V|` were maximized at `16`, no-early-gluing would force parent
@@ -238,22 +239,31 @@ extra output leaves.
 This suggests a stronger and probably certificate-sufficient target:
 
 ```text
-For the selected parent residue, h_det(rho) <= local extra-output defect,
-with an injective first-divergence charge from holes to non-core output leaves.
+For the selected parent residue, parent-core holes <= alpha * local output defect,
+with a small absolute constant alpha.
 ```
 
-A formula check of the existing first-moment count supports this target: if virtual core holes are
-allowed but constrained by `holes <= extra`, then even allowing a large hole cap leaves the depth-11,
-`c=8`, `B=64` total at the original corrected value:
+Formula checks of the existing first-moment count support this target. If virtual core holes are
+allowed but constrained by:
 
 ```text
-total log2 union = -99.60768253.
+holes <= alpha * extra,
+```
+
+then the depth-11, `c=8`, `B=64` totals are:
+
+```text
+alpha=1: total log2 union = -99.60768253
+alpha=2: total log2 union = -99.60689084
+alpha=5: total log2 union = -21.53925283
+alpha=6: total log2 union =  25.89359792
 ```
 
 The dangerous `H=8` failure came from allowing holes at `extra=0`. The unbalanced residue models
 found so far do not behave that way; their holes come with overlap/cancellation extras. Therefore
-the best next theorem is defect-coupled virtual-core containment, not absolute actual-core
-containment.
+the best next theorem is constant-defect-coupled virtual-core containment, not absolute actual-core
+containment. The proof should aim for `alpha=2`; after the corrected dimension accounting, the
+certificate has slack through `alpha=5` and breaks at `alpha=6` under the current crude count.
 
 ## Defect-Coupled Local Lemma Candidate
 
@@ -297,9 +307,10 @@ Then:
 ```
 
 Every coordinate in `S \ C` produces at least one parent output outside the selected parent residue
-core. These outputs are distinct for distinct child coordinates, so they are injective charge
-targets. The first `h_cov` such outputs pay for deterministic coverage holes inside the virtual
-core.
+core, and usually two. These outputs are distinct for distinct child coordinates, so they are charge
+targets. A missing child coordinate in `C` creates two parent-core holes, so the right statement is
+not the overly optimistic `holes <= extra`; it is a small-constant coupling between parent-core
+holes and local output defect.
 
 The remaining `+1` pays the possible cancellation hole inside the selected parent residue. Indeed,
 if a coordinate of `C` lies in both `U` and `V`, local invertibility leaves at least one parent
@@ -311,14 +322,14 @@ Thus a candidate local theorem is:
 
 ```text
 At an unbalanced two-child node with L>=2, every parent residue rho defines a virtual parent
-matched core whose holes can be injectively charged to non-core parent outputs created at the same
-node.
+matched core whose parent-position holes are bounded by alpha times the local output defect,
+for a small constant alpha, ideally alpha=2.
 ```
 
 Equivalently:
 
 ```text
-virtual holes introduced by an unbalanced split <= local extra-output defect.
+virtual holes introduced by an unbalanced split <= alpha * local output defect.
 ```
 
 The `L=1` full-live case is harmless: a parent core has size one, and any nonzero parent output is
@@ -328,16 +339,21 @@ This lemma would replace the fragile absolute `H<=5` fallback with the much stro
 fallback:
 
 ```text
-holes <= extra.
+holes <= alpha * extra.
 ```
 
-The current first-moment formula is essentially unchanged under this constrained fallback; the
-dangerous terms were precisely the artificial `extra=0, holes>0` cases.
+The current first-moment formula is essentially unchanged for `alpha=1,2`, and remains negative
+through `alpha=5`. The dangerous terms were precisely the artificial `extra=0, holes>0` cases. The
+calculation uses the corrected stride-dimension factor `floor((extra+holes)/(k/m))`, since virtual
+holes add outside-core output positions that can complete additional stride classes.
 
-The reproducible arithmetic artifact is:
+The reproducible arithmetic artifacts are:
 
 ```text
 docs/rfc_near_extremizer_total_union_depth11_c8_e128_stride_dim_overhead64_holes_coupled_extra.csv
+docs/rfc_near_extremizer_total_union_depth11_c8_e128_stride_dim_overhead64_holes_le2extra.csv
+docs/rfc_near_extremizer_total_union_depth11_c8_e128_stride_dim_overhead64_holes_le5extra.csv
+docs/rfc_near_extremizer_total_union_depth11_c8_e128_stride_dim_overhead64_holes_le6extra.csv
 ```
 
 ## Why This Is The Right Remaining Object

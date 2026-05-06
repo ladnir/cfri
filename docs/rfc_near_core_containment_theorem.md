@@ -292,11 +292,12 @@ The current evidence says literal actual-core containment is likely too strong i
 case. The certificate-sufficient replacement is defect-coupled virtual containment:
 
 ```text
-number of virtual core holes <= number of real extra output leaves.
+number of virtual core holes <= alpha * output defect.
 ```
 
-The union bound remains essentially unchanged under this replacement, because the dangerous hole
-terms were the artificial `extra=0, holes>0` cases.
+The union bound remains essentially unchanged for the target `alpha=2`, and stays negative through
+`alpha=5`, because the dangerous hole terms were the artificial `extra=0, holes>0` cases. The
+dimension factor must be charged using outside-core extras `extra+holes`.
 
 For the all-level systematic certificate, this gap is less dangerous than cancellation because
 unbalanced splits have explicit integer cost and cannot occur in the uncharged skeleton. Still, the

@@ -61,7 +61,13 @@ def main() -> None:
     parser.add_argument(
         "--virtual-core-holes-coupled-to-extra",
         action="store_true",
-        help="Constrain virtual core holes by holes <= extra output defect.",
+        help="Constrain virtual core holes by holes <= factor * extra output defect.",
+    )
+    parser.add_argument(
+        "--virtual-core-hole-extra-factor",
+        type=int,
+        default=1,
+        help="When holes are coupled to extra, constrain holes <= factor * extra.",
     )
     parser.add_argument("--out", required=True)
     args = parser.parse_args()
@@ -86,27 +92,50 @@ def main() -> None:
         worst_log = NEG_INF
         cumulative_near_count_log = NEG_INF
         for extra in range(max_extra + 1):
-            exact_extra_log = NEG_INF
+            exact_extra_logs_by_dimension: dict[int, float] = {}
             max_holes = min(args.virtual_core_holes_max, exact_output, extras_available - extra)
             if args.virtual_core_holes_coupled_to_extra:
-                max_holes = min(max_holes, extra)
+                max_holes = min(max_holes, args.virtual_core_hole_extra_factor * extra)
             for holes in range(max_holes + 1):
-                exact_extra_log = log2_add(
-                    exact_extra_log,
-                    log2_comb(exact_output, holes) + log2_comb(extras_available, extra + holes),
+                outside_extra = extra + holes
+                dimension_excess_for_holes = (
+                    outside_extra // exact_output if args.stride_dimension_bound else 0
                 )
+                exact_extra_logs_by_dimension[dimension_excess_for_holes] = log2_add(
+                    exact_extra_logs_by_dimension.get(dimension_excess_for_holes, NEG_INF),
+                    log2_comb(exact_output, holes) + log2_comb(extras_available, outside_extra),
+                )
+            exact_extra_log = NEG_INF
+            for value in exact_extra_logs_by_dimension.values():
+                exact_extra_log = log2_add(exact_extra_log, value)
             cumulative_near_count_log = log2_add(cumulative_near_count_log, exact_extra_log)
-            chosen_extra_log = cumulative_near_count_log if args.cumulative_count else exact_extra_log
-            charge_overhead_log = extra * args.charge_overhead_log2
-            near_count_log = math.log2(parity_copies) + math.log2(k) + chosen_extra_log + charge_overhead_log
             if args.target_sparse_sum >= 0:
                 needed_zeros = max(1, m + exact_output + extra - args.target_sparse_sum + 1)
             else:
                 needed_zeros = extra + 1
-            dimension_excess = extra // exact_output if args.stride_dimension_bound else 0
-            dimension_log = dimension_excess * args.field_bits
             aggregate_tail_log = log2_comb(other_copies * k, needed_zeros) - needed_zeros * args.field_bits
-            term = near_count_log + dimension_log + aggregate_tail_log
+            charge_overhead_log = extra * args.charge_overhead_log2
+            near_prefix_log = math.log2(parity_copies) + math.log2(k) + charge_overhead_log
+            if args.cumulative_count:
+                term = near_prefix_log + cumulative_near_count_log + aggregate_tail_log
+                # Cumulative mode is retained for older stress checks; use the largest possible
+                # dimension excess at this extra value as a conservative summary.
+                dimension_excess = (
+                    (extra + max_holes) // exact_output if args.stride_dimension_bound else 0
+                )
+                term += dimension_excess * args.field_bits
+            else:
+                term = NEG_INF
+                dimension_excess = 0
+                for dimension_key, count_log in exact_extra_logs_by_dimension.items():
+                    dimension_excess = max(dimension_excess, dimension_key)
+                    term = log2_add(
+                        term,
+                        near_prefix_log
+                        + count_log
+                        + dimension_key * args.field_bits
+                        + aggregate_tail_log,
+                    )
             subtotal = log2_add(subtotal, term)
             if term > worst_log:
                 worst_log = term
@@ -145,6 +174,7 @@ def main() -> None:
                 "charge_overhead_log2",
                 "virtual_core_holes_max",
                 "virtual_core_holes_coupled_to_extra",
+                "virtual_core_hole_extra_factor",
                 "total_log2_union",
             ]
         )
@@ -162,6 +192,7 @@ def main() -> None:
                 f"{args.charge_overhead_log2:.8f}",
                 args.virtual_core_holes_max,
                 int(args.virtual_core_holes_coupled_to_extra),
+                args.virtual_core_hole_extra_factor,
                 f"{total_log:.8f}",
             ]
         )

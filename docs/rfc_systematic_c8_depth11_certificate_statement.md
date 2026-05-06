@@ -168,6 +168,7 @@ The counted charged-tree theorem is tracked in:
 
 ```text
 docs/rfc_counted_charged_tree_theorem.md
+docs/rfc_defect_coupled_virtual_core_theorem.md
 ```
 
 A virtual-core-with-holes fallback was also stress-tested with `B=64`:
@@ -187,23 +188,31 @@ A stronger and more relevant fallback was then checked: allow virtual core holes
 coupled to output defect:
 
 ```text
-holes <= extra.
+holes <= alpha * extra.
 ```
 
 The artifact:
 
 ```text
 docs/rfc_near_extremizer_total_union_depth11_c8_e128_stride_dim_overhead64_holes_coupled_extra.csv
+docs/rfc_near_extremizer_total_union_depth11_c8_e128_stride_dim_overhead64_holes_le2extra.csv
+docs/rfc_near_extremizer_total_union_depth11_c8_e128_stride_dim_overhead64_holes_le5extra.csv
+docs/rfc_near_extremizer_total_union_depth11_c8_e128_stride_dim_overhead64_holes_le6extra.csv
 ```
 
 gives:
 
 ```text
-log2 failure bound = -99.60768253
+alpha=1: log2 failure bound = -99.60768253
+alpha=2: log2 failure bound = -99.60689084
+alpha=5: log2 failure bound = -21.53925283
+alpha=6: log2 failure bound =  25.89359792
 ```
 
 So the certificate does not need literal actual-core preservation if every virtual hole is charged
-to a real extra output leaf. This is now the better target for unbalanced splits.
+to a small constant number of output-defect units. This is now the better target for unbalanced
+splits. The proof should aim for `alpha=2`; after corrected dimension accounting, the count
+currently tolerates through `alpha=5`.
 
 Thus, within the corrected matched-plus-extra model:
 
@@ -211,10 +220,10 @@ Thus, within the corrected matched-plus-extra model:
 Pr[d_sys < 12384] <= 2^-99.60768258.
 ```
 
-Within the defect-coupled virtual-core model, the corresponding audited number is:
+Within the defect-coupled virtual-core model at `alpha=2`, the corresponding audited number is:
 
 ```text
-Pr[d_sys < 12384] <= 2^-99.60768253.
+Pr[d_sys < 12384] <= 2^-99.60689084.
 ```
 
 ## Lemma Status

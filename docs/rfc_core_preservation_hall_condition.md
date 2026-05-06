@@ -214,6 +214,54 @@ If all common child-core continuations are killed, then
 is at least the number of child-core continuations that must be hit.
 ```
 
+This separates into two sublemmas.
+
+#### Core Alignment
+
+First, the intersection:
+
+```text
+U cap V
+```
+
+must contain a child matched core. It is not enough for `U` and `V` to contain possibly different
+cores. If no child core is contained in `U cap V`, then every child core contained in `U` has at
+least one hole in `V`, or every child core contained in `V` has at least one hole in `U`.
+
+The overlap charge:
+
+```text
+(p-h) + (q-h) = |U \ V| + |V \ U|
+```
+
+is exactly the budget for these holes. Thus the core-alignment lemma should say:
+
+```text
+Either U cap V contains a child matched core, or the missing-core obstruction is encoded by overlap
+charge labels.
+```
+
+For the exact theorem, the overlap charge is zero, so `U=V` and alignment is automatic.
+
+#### Parent Sibling Survival
+
+Second, once a common child core:
+
+```text
+C' subset U cap V
+```
+
+is found, parent gluing must choose one surviving sibling over every coordinate of `C'`. The
+no-early-gluing algebra says at most one coordinate can have the exact sibling cancellation pattern
+unless the node is the full-live glue point. Therefore killing all parent continuations inside
+`C'` costs cancellation labels:
+
+```text
+max(0, |C'|-1).
+```
+
+At the full-live node `|C'|=1`, no cancellation charge is needed and the exact glue step survives.
+
 Since an exact child core has size `L` before the full-live glue point, killing all continuations
 should cost at least `L`. But a parent with output size `L+E_parent` can only afford this if the
 extra support is large enough to label those killed continuations. This is precisely the charged

@@ -65,6 +65,19 @@ h - 1
 
 extra outputs are charged to the defect budget.
 
+Before cancellation, child support mismatch is also charged. If:
+
+```text
+U = supp(u), V = supp(v), h = |U cap V|,
+```
+
+then coordinates in `U triangle V` have no cancellation partner and contribute two parent outputs.
+The conservative overlap charge is:
+
+```text
+|U \ V| + |V \ U|.
+```
+
 There is also a row-split defect. If the parent live weight `m=a+b` is split across both children
 with `a,b>0`, then:
 
@@ -114,6 +127,7 @@ The intended induction:
 
 2. Two-child branch:
    If the row split is unbalanced, charge the row-split defect first.
+   If child output supports do not match, charge the symmetric-difference overlap defect.
    If common child output support h > 1, charge h-1 cancellation extras.
    Remove those charged extras; the uncharged part has h=1 and follows the exact glue step.
 

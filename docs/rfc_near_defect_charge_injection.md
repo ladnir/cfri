@@ -10,7 +10,11 @@ There are two local ways to lose exactness:
 1. row-split defect:
    both children are live but their row weights are not the exact balanced split;
 
-2. cancellation defect:
+2. overlap defect:
+   child output supports are not identical, so unmatched child coordinates lift to two parent
+   outputs with no chance of cancellation;
+
+3. cancellation defect:
    both child outputs overlap in more than one coordinate, so one scalar cannot cancel one sibling
    over every common coordinate.
 ```
@@ -80,6 +84,32 @@ W' = supp(u) cap supp(v)
 h = |W'|.
 ```
 
+Also write:
+
+```text
+U = supp(u)
+V = supp(v)
+p = |U|
+q = |V|
+```
+
+Every coordinate in the symmetric difference `U triangle V` has only one active child value, hence
+it contributes two nonzero parent outputs. Relative to the exact balanced branch, these unmatched
+coordinates are pure extra output leaves. A conservative overlap charge is:
+
+```text
+overlap_charge = (p-h) + (q-h).
+```
+
+This is zero exactly when:
+
+```text
+U = V.
+```
+
+After charging the symmetric-difference coordinates, the only possible gluing coordinates are the
+`h` common coordinates in `W'`.
+
 For each `j in W'`, the parent has two sibling output positions:
 
 ```text
@@ -98,6 +128,15 @@ h - 1
 
 coordinates in `W'` have both parent siblings present. For each such coordinate, choose one of the
 two siblings as the core-continuation position and charge the other sibling as an extra output.
+
+Combining overlap and cancellation, a balanced two-child branch with child output supports `U,V`
+pays at least:
+
+```text
+(p-h) + (q-h) + max(0, h-1)
+```
+
+extra leaves before it can expose a single exact continuation coordinate.
 
 ## Disjointness Principle
 
@@ -168,6 +207,7 @@ two-child exact glue (h=1):
 
 two-child near glue (h>1):
   row weights split evenly, or the row-split defect is charged first;
+  child output support mismatch is charged by symmetric difference;
   at most one coordinate continues as exact glue;
   every other common coordinate contributes one charged sibling leaf;
   these charged leaves are outside the core and disjoint by first-divergence assignment.
@@ -232,6 +272,11 @@ h - 1
 ```
 
 new leaves outside the selected core continuation.
+
+If the two child supports are not identical, the symmetric difference is charged first. Those
+charges are even more direct than cancellation charges: a coordinate seen by only one child produces
+two nonzero parent siblings, while the exact skeleton can use none of that coordinate unless it is
+selected as the unique continuation.
 
 Before applying the cancellation charge, the row split must also be exact or paid for. In the
 integer support setting, the clean recurrence should use:
@@ -303,8 +348,9 @@ The one-child descent is now exact under the budget recurrence. The remaining fo
 
 ```text
 1. prove an integer row-split charge that is injective into extra output leaves;
-2. prove the cancellation charges are injective by first-divergence;
-3. combine the two charges without double-counting the same output leaf.
+2. prove symmetric-difference overlap charges are injective into extra output leaves;
+3. prove the cancellation charges are injective by first-divergence;
+4. combine the three charge types without double-counting the same output leaf.
 ```
 
 A clean way to avoid ambiguity is to prove the near theorem top-down on support pairs rather than on

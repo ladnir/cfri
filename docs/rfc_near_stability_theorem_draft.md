@@ -271,6 +271,19 @@ q^floor(e/(k/m))
 
 rather than assuming every matched-core-plus-extra pair contributes only one line.
 
+The classifier:
+
+```text
+scripts/rfc_classify_near_core_dimension.py
+```
+
+checks the sharper relation between dimension excess and complete extra stride classes. For the
+generated `m=4`, `e=2,3,4` models, every pair satisfies:
+
+```text
+kernel_dim - 1 = complete_extra_stride_count.
+```
+
 The kernel-dimension sublemma is split out in:
 
 ```text

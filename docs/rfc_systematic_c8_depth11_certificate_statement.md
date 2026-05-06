@@ -159,6 +159,16 @@ The `e=4` generated model is the first point where kernel dimension grows:
 ```
 
 Those dimension-`2` cases occur when the extras contain a complete additional stride class.
+The classifier artifacts:
+
+```text
+docs/rfc_near_core_stride_dimension_class_depth4_m4_e2.csv
+docs/rfc_near_core_stride_dimension_class_depth4_m4_e3.csv
+docs/rfc_near_core_stride_dimension_class_depth4_m4_e4.csv
+```
+
+show `kernel_dim - 1` equals the number of complete extra stride classes for all generated
+`m=4`, `e=2,3,4` pairs.
 
 The main remaining proof obligation is the near-stability theorem:
 

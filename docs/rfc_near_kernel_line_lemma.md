@@ -78,6 +78,9 @@ The generated-family artifacts are:
 docs/rfc_near_pair_kernel_dim_depth4_m4_e2_model.csv
 docs/rfc_near_pair_kernel_dim_depth4_m4_e3_model.csv
 docs/rfc_near_pair_kernel_dim_depth4_m4_e4_model.csv
+docs/rfc_near_core_stride_dimension_class_depth4_m4_e2.csv
+docs/rfc_near_core_stride_dimension_class_depth4_m4_e3.csv
+docs/rfc_near_core_stride_dimension_class_depth4_m4_e4.csv
 ```
 
 with:
@@ -90,6 +93,25 @@ e=4: 7920 pairs, 7872 have kernel_dim = 1 and 48 have kernel_dim = 2
 
 The `e=4` dimension-`2` cases are exactly the warning sign: for depth `4`, `m=4`, the matched core
 has size `|C|=4`, and dimension first grows when the extras can include a full second stride class.
+
+The stride-class classifier checks the sharper identity:
+
+```text
+kernel_dim - 1 = number of complete extra stride classes
+```
+
+for the generated `m=4`, `e=2,3,4` models. The e=4 classification is:
+
+```text
+complete extra strides 0, kernel_dim 1: 7872 pairs
+complete extra strides 1, kernel_dim 2:   48 pairs
+```
+
+and every checked pair has:
+
+```text
+complete_extra_strides - (kernel_dim - 1) = 0.
+```
 
 ## Proof Shape
 
@@ -116,6 +138,17 @@ stride residue to be allowed.
 Thus every new degree of freedom consumes at least `|C|` extra output leaves. This is the rank
 analogue of the defect-charge statement: isolated extras do not create a new line; complete
 stride-class extras can.
+
+The stronger conjectural form is:
+
+```text
+dim { x in F^R : supp(A_d x) subset C union E }
+  = number of complete stride classes contained in C union E.
+```
+
+The certificate only needs the upper bound, but this equality is a useful proof target because it
+matches the recursive structure: a matched row block is naturally diagonalized by output stride
+classes.
 
 ## Relationship To Near Stability
 

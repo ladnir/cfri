@@ -138,3 +138,140 @@ local defect charges satisfy a Hall condition for the survival of at least one e
 ```
 
 This is the next proof target.
+
+## Minimal Counterexample Form
+
+A clean proof should use a minimal counterexample.
+
+Choose a smallest node, by output length `K`, for which there is an actual output support `Y` from
+some live vector of weight `M` such that:
+
+```text
+|Y| = K/M + E
+Y contains no matched core of size K/M.
+```
+
+Every active child node of this minimal counterexample satisfies core preservation by minimality.
+So child supports contain child matched cores after deleting their child defects.
+
+Then split into cases.
+
+### Case 1: One Live Child
+
+If only one child is live, then:
+
+```text
+Y_parent = lift(Y_child).
+```
+
+Any child matched core contained in `Y_child` lifts to a parent matched core contained in
+`Y_parent`, because both sibling lifts are present for every child output coordinate. This
+contradicts minimality.
+
+Therefore a minimal counterexample cannot be a one-child node.
+
+### Case 2: Balanced Two-Child Node
+
+Let:
+
+```text
+U = supp(Ax_0)
+V = supp(Ax_1)
+L = K/M
+p = |U|
+q = |V|
+h = |U cap V|.
+```
+
+By minimality, both children have contained matched cores:
+
+```text
+C_0 subset U
+C_1 subset V.
+```
+
+If these child cores expose a common continuation coordinate and the parent has a surviving sibling
+over that coordinate, then the parent has a matched core, contradiction.
+
+Thus every possible child-core continuation is killed by either:
+
+```text
+1. child-core mismatch / overlap failure;
+2. parent sibling cancellation failure.
+```
+
+The balanced defect identity gives budget for exactly these failures:
+
+```text
+E_parent >= E_0 + E_1 + (p-h) + (q-h) + max(0,h-1).
+```
+
+The local Hall lemma needed here is:
+
+```text
+If all common child-core continuations are killed, then
+(p-h) + (q-h) + max(0,h-1)
+is at least the number of child-core continuations that must be hit.
+```
+
+Since an exact child core has size `L` before the full-live glue point, killing all continuations
+should cost at least `L`. But a parent with output size `L+E_parent` can only afford this if the
+extra support is large enough to label those killed continuations. This is precisely the charged
+tree count; it is also why a positive-defect counterexample is not ruled out by size alone.
+
+The certificate does not need to rule out such configurations uniquely. It needs to show that the
+killed continuations can be labeled with bounded local data and charged leaves.
+
+### Case 3: Unbalanced Two-Child Node
+
+If the row split is unbalanced, the split-defect lower bound is positive:
+
+```text
+ceil(max((K/2)/a, (K/2)/b)) - ceil(K/(a+b)) > 0.
+```
+
+A minimal counterexample can include such a node only by spending that many units of defect. The
+charged-tree theorem should label the row split:
+
+```text
+node id, a, b, selected skeleton side, charged leaf marker.
+```
+
+Then it recurses into the selected lower-defect side. The unselected side contributes only charged
+or residual support.
+
+The local proof obligation is to show that selecting the lower-defect side cannot increase the
+number of required labels beyond the row-split charge plus residual output leaves.
+
+## Hall Conclusion
+
+The certificate-facing Hall conclusion remains:
+
+```text
+some matched core survives
+```
+
+The counted charged-tree theorem relaxes uniqueness and charge bookkeeping, but it does not remove
+this requirement. If no actual core survives, the current binomial count:
+
+```text
+k * binom(k-k/m, e)
+```
+
+would be invalid, because the support would have holes inside the proposed core.
+
+There is a possible fallback with virtual cores:
+
+```text
+choose a core, choose h holes inside it, choose e+h extras outside it.
+```
+
+but that is a different counting model and must be evaluated separately before use.
+
+So the next proof target is still the actual Hall survival statement:
+
+```text
+local defect charges cannot kill every exact continuation unless the defect budget is exceeded.
+```
+
+The counted theorem then labels the leaves outside the surviving core.

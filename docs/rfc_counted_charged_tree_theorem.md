@@ -331,6 +331,12 @@ One possible route is a local Hall/survival condition, split out in:
 docs/rfc_core_preservation_hall_condition.md
 ```
 
+That note now phrases the remaining argument as a minimal-counterexample proof: a one-child node
+cannot be minimal, a balanced two-child node must pay overlap/cancellation labels for every killed
+continuation, and an unbalanced two-child node must pay row-split labels before selecting a
+lower-defect skeleton side. The final conclusion still must be that an actual matched core survives;
+otherwise the binomial count would need a separate holes-inside-core model.
+
 The checker:
 
 ```text

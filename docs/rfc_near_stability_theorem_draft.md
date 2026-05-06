@@ -65,6 +65,21 @@ h - 1
 
 extra outputs are charged to the defect budget.
 
+There is also a row-split defect. If the parent live weight `m=a+b` is split across both children
+with `a,b>0`, then:
+
+```text
+wt(Ax at parent) >= max((K/2)/a, (K/2)/b).
+```
+
+So an unbalanced split pays at least:
+
+```text
+max((K/2)/a, (K/2)/b) - K/(a+b)
+```
+
+before any cancellation accounting. This vanishes only at the balanced split `a=b`.
+
 ## Induction Invariant
 
 For a node of size `K`, live support size `M`, and output budget:
@@ -98,7 +113,8 @@ The intended induction:
    two parent extra leaves, so the charged-extra count remains bounded by the parent defect budget.
 
 2. Two-child branch:
-   If common child output support h > 1, charge h-1 extras.
+   If the row split is unbalanced, charge the row-split defect first.
+   If common child output support h > 1, charge h-1 cancellation extras.
    Remove those charged extras; the uncharged part has h=1 and follows the exact glue step.
 
 3. Repeat until the matched core is exposed.

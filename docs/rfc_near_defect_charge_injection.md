@@ -4,6 +4,75 @@ This note sketches the bookkeeping needed to complete near-stability.
 
 ## Local Charge
 
+There are two local ways to lose exactness:
+
+```text
+1. row-split defect:
+   both children are live but their row weights are not the exact balanced split;
+
+2. cancellation defect:
+   both child outputs overlap in more than one coordinate, so one scalar cannot cancel one sibling
+   over every common coordinate.
+```
+
+The exact theorem is the case where both defects are zero at every active node.
+
+## Row-Split Defect
+
+At a node of output length `K`, suppose the live row weight is:
+
+```text
+M = a + b
+```
+
+with both child weights `a,b` nonzero. Let:
+
+```text
+p = wt(A x_0)
+q = wt(A x_1).
+```
+
+By one-copy uncertainty in the children:
+
+```text
+p >= (K/2)/a
+q >= (K/2)/b.
+```
+
+The parent output weight is at least `max(p,q)`, hence:
+
+```text
+wt(Ax at node) >= max((K/2)/a, (K/2)/b).
+```
+
+Relative to the exact node target `K/M`, the row split alone forces defect at least:
+
+```text
+split_defect(a,b;K)
+  = max((K/2)/a, (K/2)/b) - K/(a+b).
+```
+
+This is zero exactly when:
+
+```text
+a = b = M/2.
+```
+
+Thus any unbalanced two-child split must be paid for by the output slack before cancellation is
+even considered. A fully formal near-stability proof should either:
+
+```text
+charge this positive integer-rounded split defect to extra output leaves,
+```
+
+or route around it by proving that the low-defect support must follow one-child descent until the
+first balanced full-node split.
+
+For the systematic certificate, the useful regime is very low defect near the collapse live sizes.
+There, even mild imbalance at high levels is expensive because `K/M` is still large.
+
+## Cancellation Charge
+
 At a node where both child outputs are nonzero, let the common child output support be:
 
 ```text
@@ -93,10 +162,12 @@ one-child descent:
   both the defect and the number of extra leaves double when moving from the child to the parent.
 
 two-child exact glue (h=1):
+  row weights split evenly;
   Core chooses one sibling;
   no extra is charged.
 
 two-child near glue (h>1):
+  row weights split evenly, or the row-split defect is charged first;
   at most one coordinate continues as exact glue;
   every other common coordinate contributes one charged sibling leaf;
   these charged leaves are outside the core and disjoint by first-divergence assignment.
@@ -162,6 +233,23 @@ h - 1
 
 new leaves outside the selected core continuation.
 
+Before applying the cancellation charge, the row split must also be exact or paid for. In the
+integer support setting, the clean recurrence should use:
+
+```text
+E(node) >= rounded_split_defect + cancellation_charge
+```
+
+where:
+
+```text
+rounded_split_defect
+  = ceil(max((K/2)/a, (K/2)/b)) - ceil(K/(a+b))
+```
+
+is a conservative integer version of the row-split lower bound. This term vanishes on the balanced
+split and is positive otherwise.
+
 ## Counting
 
 Once the containment is proved, counting is immediate:
@@ -181,10 +269,18 @@ The final theorem may naturally produce the cumulative `<= e` form. That only ch
 bound by a small factor for the target parameters, and can be handled by summing over all smaller
 defects.
 
-## Remaining Formal Detail
+## Remaining Formal Details
 
-The subtle point is the one-child descent line above. A clean way to avoid ambiguity is to prove the
-near theorem top-down on support pairs rather than on already-formed cores:
+The one-child descent is now exact under the budget recurrence. The remaining formal details are:
+
+```text
+1. prove an integer row-split charge that is injective into extra output leaves;
+2. prove the cancellation charges are injective by first-divergence;
+3. combine the two charges without double-counting the same output leaf.
+```
+
+A clean way to avoid ambiguity is to prove the near theorem top-down on support pairs rather than on
+already-formed cores:
 
 ```text
 At every node, choose a maximal exact matched core contained in the current output support.

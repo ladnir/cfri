@@ -195,3 +195,10 @@ The near-stability strategy using this defect charge is in:
 docs/rfc_near_stability_theorem_draft.md
 docs/rfc_near_defect_charge_injection.md
 ```
+
+For the defect-coupled virtual-core proof, the same lemma is applied only after reducing the child
+supports to their uncharged one-dimensional skeleton lines. That reduction is isolated in:
+
+```text
+docs/rfc_uncharged_skeleton_reduction.md
+```

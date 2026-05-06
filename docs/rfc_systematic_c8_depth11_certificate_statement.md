@@ -181,8 +181,8 @@ H=8:  log2 failure bound =   3.75441819
 H=16: log2 failure bound =  79.12109543
 ```
 
-This confirms very small hole counts are affordable, but the proof should still target actual core
-preservation. Under the present crude hole count, five global holes remain safe and eight do not.
+This confirms very small absolute hole counts are affordable, but an unconstrained hole fallback is
+too narrow. Under the present crude hole count, five global holes remain safe and eight do not.
 
 A stronger and more relevant fallback was then checked: allow virtual core holes only when they are
 coupled to output defect:

@@ -199,7 +199,7 @@ L = K/M,
 
 For the systematic certificate strata under discussion, `M` is a power-of-two divisor of `K` at the
 node where the parent virtual core is selected. Therefore, if `L>=2`, the parent residue projects to
-one child residue class in each sibling half. Choose a parent residue `rho mod M`. Its child
+one child residue class in each sibling half. Choose any parent residue `rho mod M`. Its child
 projection `C_child` has size:
 
 ```text
@@ -274,6 +274,12 @@ child defects and extra child dimensions. On the remaining uncharged local skele
 outputs have only one relative scalar. The quantitative no-early-gluing lemma then says two
 different vanished siblings would impose two incompatible fresh-random ratio equations.
 
+The reduction to this one-scalar skeleton is tracked in:
+
+```text
+docs/rfc_uncharged_skeleton_reduction.md
+```
+
 Then:
 
 ```text
@@ -289,6 +295,12 @@ The child support lower bound should use the smaller child row weight:
 max(|U|, |V|) >= max(ceil(N/a), ceil(N/b)) >= L.
 ```
 
+The last inequality is deterministic because `a+b=M`, so one of `a,b` is at most `M/2`; hence:
+
+```text
+max(N/a, N/b) >= 2N/M = K/M = L.
+```
+
 Since `|C|=R`, this gives:
 
 ```text
@@ -302,6 +314,10 @@ In other words:
 ```text
 O >= R + A.
 ```
+
+This holds for every parent residue `rho`, not just for a Hall-selected residue. The unbalanced
+case therefore no longer needs an existence argument for a well-covered residue; arbitrary residues
+may have holes, but the same size inequality supplies proportional outside mass.
 
 For every coordinate in `S \ C`, the parent has support outside the selected residue. Before
 cancellations, this gives two non-core parent outputs per coordinate. After the remaining uncharged

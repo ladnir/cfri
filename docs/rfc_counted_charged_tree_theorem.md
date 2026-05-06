@@ -384,6 +384,7 @@ The finite residue-Hall formulation of this local result is tracked in:
 ```text
 docs/rfc_unbalanced_split_residue_hall.md
 docs/rfc_defect_coupled_virtual_core_theorem.md
+docs/rfc_uncharged_skeleton_reduction.md
 ```
 
 ## Core / Virtual-Core Lemma

@@ -1,4 +1,4 @@
-# RFC Unbalanced Split Residue-Hall Target
+# RFC Unbalanced Split Residue Accounting
 
 This note isolates the remaining core-preservation gap after the one-child and balanced two-child
 cases.
@@ -68,7 +68,7 @@ M mod b = a mod b.
 
 So the exact balanced lift argument cannot be copied. This is the actual obstruction.
 
-## Hall Form
+## Former Hall Form
 
 For a candidate parent residue `rho`, define its deterministic hole count:
 
@@ -97,6 +97,13 @@ with `H <= 5` at the current depth-11, `c=8`, `B=64` certificate point.
 The second statement is much weaker than exact core preservation, but still strong enough for the
 current first-moment bound. The H=8 stress run already fails, so the hole bound must be genuinely
 small.
+
+This former Hall form was useful for finding the obstruction, but it is no longer the proof target.
+The current target is defect-coupled virtual containment:
+
+```text
+holes <= alpha * output defect.
+```
 
 ## Charge Interface
 
@@ -372,8 +379,10 @@ The field algebra is already doing two jobs:
 ```
 
 Unbalanced splitting fails before either of those tools can finish the lift, because the child
-stride moduli `a,b` are not the parent stride modulus `M`. The missing step is therefore a finite
-residue covering/Hall lemma, not a new random-field identity.
+stride moduli `a,b` are not the parent stride modulus `M`. The missing step is therefore finite
+residue accounting, not a new random-field identity. After the alpha-2 pivot, the proof no longer
+needs to find a perfectly covered parent residue: every parent residue may have holes, but one-copy
+uncertainty supplies enough outside child mass to pay those holes within a constant factor.
 
 This also explains why the proof cannot simply copy the exact RFC paper. The exact proof only uses
 balanced two-child gluing at the full-live node; an unbalanced near-extremizer can be close in

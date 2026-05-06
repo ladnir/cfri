@@ -208,6 +208,12 @@ So adding extra output positions around a matched core does not appear to create
 families in these checks. This supports the counting model: each near support pair contributes one
 candidate line, not a high-dimensional subspace that would need extra first-moment mass.
 
+The line-uniqueness sublemma is split out in:
+
+```text
+docs/rfc_near_kernel_line_lemma.md
+```
+
 ## Remaining Proof Gap
 
 The remaining proof obligation is specific:

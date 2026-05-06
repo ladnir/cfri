@@ -135,7 +135,22 @@ wt(x)=m, wt(Ax)<=k/m+e
   => support/output pair contains a matched stride core plus e extras
 ```
 
-or a sufficiently close upper count. The exact depth-4 checks match the strongest form:
+plus the near-core line lemma:
+
+```text
+dim {x supported on R : supp(Ax) subset C union E} = 1
+```
+
+for matched `R,C` and arbitrary extra set `E`.
+
+These are tracked separately in:
+
+```text
+docs/rfc_near_defect_charge_injection.md
+docs/rfc_near_kernel_line_lemma.md
+```
+
+The exact depth-4 checks match the strongest count:
 
 ```text
 k * binom(k-k/m, e).

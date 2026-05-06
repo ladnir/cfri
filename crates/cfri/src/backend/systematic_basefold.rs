@@ -294,8 +294,17 @@ pub struct BaseFoldTerminalCoreProof<H: Hash> {
 
 #[derive(Clone, Debug, Default, Eq, PartialEq)]
 pub struct BaseFoldTerminalCoreRowProof<H: Hash> {
+    pub source: BaseFoldTerminalCoreRowSource,
+    pub challenges: Vec<B128>,
+    pub claim: B128,
     pub paths: Vec<BaseFoldTerminalCorePath>,
     _hash_marker: PhantomData<H>,
+}
+
+#[derive(Clone, Copy, Debug, Default, Eq, PartialEq)]
+pub struct BaseFoldTerminalCoreRowSource {
+    pub row_index: usize,
+    pub domain_len: usize,
 }
 
 #[derive(Clone, Debug, Eq, PartialEq)]
@@ -5206,6 +5215,12 @@ fn prove_section5_relation_terminal_row_proof<H: Hash>(
     }
 
     Ok(RaaSection5RelationTerminalRowProof {
+        source: BaseFoldTerminalCoreRowSource {
+            row_index,
+            domain_len,
+        },
+        challenges: check.challenges.clone(),
+        claim: check.terminal_claim,
         paths,
         _hash_marker: PhantomData,
     })
@@ -5374,6 +5389,16 @@ impl<H: Hash> BaseFoldTerminalCoreProof<H> {
         let mut queries = Vec::new();
         for (row_index, row) in self.rows.iter().enumerate() {
             let check = section5_relation_terminal_row_check(checks, row_index)?;
+            if row.source.row_index != row_index
+                || row.source.domain_len != domain_len
+                || row.challenges != check.challenges
+                || row.claim != check.terminal_claim
+            {
+                return Err(Error::InvalidPcsOpen(
+                    "BaseFold terminal core row metadata does not match verifier context"
+                        .to_string(),
+                ));
+            }
             let top_indices = section5_relation_terminal_query_indices::<H>(
                 row_index,
                 check,
@@ -5510,6 +5535,16 @@ impl<H: Hash> BaseFoldTerminalCoreRowProof<H> {
         openings: &BTreeMap<RaaSection5RelationTerminalValueKey, B128>,
         required_openings: &mut BTreeMap<RaaSection5RelationTerminalValueKey, ()>,
     ) -> Result<(), Error> {
+        if self.source.row_index != row_index || self.source.domain_len != domain_len {
+            return Err(Error::InvalidPcsOpen(
+                "BaseFold terminal core row source does not match verifier context".to_string(),
+            ));
+        }
+        if self.challenges != check.challenges || self.claim != check.terminal_claim {
+            return Err(Error::InvalidPcsOpen(
+                "BaseFold terminal core row claim does not match verifier context".to_string(),
+            ));
+        }
         let num_vars = log2_strict(domain_len);
         if check.challenges.len() != num_vars {
             return Err(Error::InvalidPcsOpen(
@@ -5829,6 +5864,15 @@ fn section5_relation_terminal_combined_folded_layer_queries<H: Hash>(
     let mut queries = Vec::new();
     for (row_index, row) in rows.iter().enumerate() {
         let check = section5_relation_terminal_row_check(checks, row_index)?;
+        if row.source.row_index != row_index
+            || row.source.domain_len != domain_len
+            || row.challenges != check.challenges
+            || row.claim != check.terminal_claim
+        {
+            return Err(Error::InvalidPcsOpen(
+                "BaseFold terminal core row metadata does not match verifier context".to_string(),
+            ));
+        }
         let top_indices = section5_relation_terminal_query_indices::<H>(
             row_index,
             check,
@@ -8602,6 +8646,27 @@ mod tests {
         params
             .verify_query_proof(&prequery, &request, &schedule, &proof, &top_queries)
             .unwrap();
+
+        let mut tampered_terminal_core_claim = proof.clone();
+        tampered_terminal_core_claim
+            .section5_relation_residual
+            .as_mut()
+            .unwrap()
+            .terminal_proof
+            .as_mut()
+            .unwrap()
+            .rows[0]
+            .claim += B128::ONE;
+        let err = params
+            .verify_query_proof(
+                &prequery,
+                &request,
+                &schedule,
+                &tampered_terminal_core_claim,
+                &top_queries,
+            )
+            .unwrap_err();
+        assert!(format!("{err:?}").contains("terminal core row"));
 
         let mut tampered_sumcheck = proof.clone();
         if let RaaRelationProof::Section5(section5) =

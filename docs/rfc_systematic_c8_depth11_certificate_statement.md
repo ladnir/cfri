@@ -220,11 +220,11 @@ docs/rfc_near_core_stride_dimension_class_depth4_m4_e4.csv
 show `kernel_dim - 1` equals the number of complete extra stride classes for all generated
 `m=4`, `e=2,3,4` pairs.
 
-The main remaining proof obligation is now the core-containment part of near stability:
+The main remaining proof obligation is now the core-preservation part of near stability:
 
 ```text
 wt(x)=m, wt(Ax)<=k/m+e
-  => support/output pair contains a matched stride core plus e extras
+  => supp(Ax) contains an actual matched stride core C of size k/m
 ```
 
 The local accounting for this theorem is now:
@@ -236,8 +236,9 @@ parent defect >= child defects
                + cancellation charge.
 ```
 
-The remaining formal step is the global injection: charged local defects must map to distinct
-output leaves outside the extracted matched core.
+After such a core is selected, the counted charged-tree theorem labels the `e` remaining output
+leaves with bounded charge records. The proof no longer needs exact near-extremizer classification,
+but it still needs the core to be contained in the actual sparse output support.
 
 The near-core dimension lemma is:
 

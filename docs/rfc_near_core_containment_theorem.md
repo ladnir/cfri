@@ -57,6 +57,16 @@ There exists a set P subset Y with |P| <= E such that Y \ P is a matched core of
 
 At the root this is exactly the target statement. The set `P` is the set of charged extra leaves.
 
+The counted fallback still needs this core-preservation statement. It relaxes the uniqueness and
+exact charge injection, but not the requirement:
+
+```text
+matched core C subset Y.
+```
+
+Without `C subset Y`, the support count would have to include holes inside the core as well as
+extras outside it.
+
 ## One-Child Step
 
 If the live rows occupy only one child, then the parent output support is the two-sibling lift of
@@ -240,7 +250,13 @@ This is the intended reason local pruning costs add globally:
 
 ## Current Gap
 
-The local defect decomposition is now explicit, but two global pruning lemmas remain:
+The local defect decomposition is now explicit, but the central global lemma is core preservation:
+
+```text
+after charging local defects, at least one exact matched skeleton remains inside the actual support.
+```
+
+Two sublemmas remain:
 
 ```text
 1. overlap leaf selection:

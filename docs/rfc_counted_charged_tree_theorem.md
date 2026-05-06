@@ -49,6 +49,14 @@ Therefore the number of possible near support/output certificates is at most:
 k * binom(k-k/m, <= e) * 2^(B e).
 ```
 
+The core must be an actual subset of the sparse output support. A virtual core with holes would not
+justify the binomial count above. Thus the encoder invariant is:
+
+```text
+C subset supp(A_d x),
+charged leaves subset supp(A_d x) \ C.
+```
+
 For exact defect `e`, this can be used as:
 
 ```text
@@ -179,6 +187,14 @@ charged final leaves,
 bounded labels for each charged unit.
 ```
 
+The critical invariant is:
+
+```text
+the skeleton choices always select output leaves that are actually present in Y_node.
+```
+
+This is automatic in the exact theorem. In the near theorem it is the main containment obligation.
+
 ### One-Child Case
 
 If only one child is live, recurse into that child. Every child charge lifts to two parent leaves,
@@ -246,6 +262,13 @@ one continuation coordinate.
 
 Thus the skeleton follows the matched glue recursion.
 
+The continuation coordinate and surviving sibling must be chosen from actual parent support. The
+local no-early-gluing lemma gives at most one coordinate with exact cancellation; if no such
+coordinate exists, the branch cannot define the uncharged skeleton and all mass at this node must be
+accounted for by residual labels. The counted theorem needs a selection rule proving that whenever
+the total defect budget is `E`, some recursive path of actual support leaves survives to form the
+matched core.
+
 ### Unbalanced Two-Child Case
 
 If both children are live but the row split is unbalanced, emit:
@@ -270,6 +293,37 @@ counted theorem only needs the emitted records to be bounded, not canonical.
 
 As in the balanced case, any support leaf outside the final selected skeleton that was not already
 used as a row-split witness receives a residual label.
+
+The unresolved part is to prove that this selected skeleton can still be made from actual output
+leaves after an unbalanced split. This is the same core-preservation issue as in the balanced case,
+but with row-split charges added.
+
+## Core-Preservation Lemma
+
+The counted theorem reduces the exact classification problem to the following core-preservation
+lemma.
+
+```text
+Given wt(x)=m and wt(A_d x)=k/m+e, the recursive encoder can select a matched skeleton C with
+C subset supp(A_d x).
+```
+
+Once this is known, the remaining `e` output leaves are exactly:
+
+```text
+supp(A_d x) \ C.
+```
+
+They can be labeled with the charged-tree records above. The count is then:
+
+```text
+choose C:              k choices
+choose extra leaves:   binom(k-k/m, e)
+choose labels:         2^(B e).
+```
+
+So the final hard theorem is no longer exact uniqueness of near-extremizers; it is existence of one
+actual matched core inside every near-extremizer.
 
 ## Why The Encoder Count Is Enough
 

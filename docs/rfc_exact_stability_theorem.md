@@ -187,7 +187,7 @@ The equality recursion consists of:
 Therefore every exact extremizer has matched block/stride support. The matched construction gives
 one-dimensional kernels for these pairs, and uncertainty rules out non-matched kernels.
 
-This proves the exact-boundary statement modulo the formal no-early-gluing rational-function lemma.
+This proves the exact-boundary statement using the local no-early-gluing rational-function lemma.
 
 ## Role In The Systematic Distance Certificate
 

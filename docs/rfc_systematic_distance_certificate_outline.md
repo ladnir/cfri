@@ -112,6 +112,12 @@ The assembled exact theorem draft is:
 docs/rfc_exact_stability_theorem.md
 ```
 
+The local rational-function proof that prevents gluing too early is:
+
+```text
+docs/rfc_no_early_gluing_lemma.md
+```
+
 The small-depth scans support this:
 
 ```text

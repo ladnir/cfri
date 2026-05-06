@@ -46,6 +46,12 @@ def main() -> None:
         action="store_true",
         help="Charge q^(floor(extra/(k/m))) for complete extra stride classes.",
     )
+    parser.add_argument(
+        "--charge-overhead-log2",
+        type=float,
+        default=0.0,
+        help="Additional log2 overhead per extra/charged defect in the near support-pair count.",
+    )
     parser.add_argument("--out", required=True)
     args = parser.parse_args()
 
@@ -72,7 +78,8 @@ def main() -> None:
             exact_extra_log = log2_comb(extras_available, extra)
             cumulative_near_count_log = log2_add(cumulative_near_count_log, exact_extra_log)
             chosen_extra_log = cumulative_near_count_log if args.cumulative_count else exact_extra_log
-            near_count_log = math.log2(parity_copies) + math.log2(k) + chosen_extra_log
+            charge_overhead_log = extra * args.charge_overhead_log2
+            near_count_log = math.log2(parity_copies) + math.log2(k) + chosen_extra_log + charge_overhead_log
             if args.target_sparse_sum >= 0:
                 needed_zeros = max(1, m + exact_output + extra - args.target_sparse_sum + 1)
             else:
@@ -116,6 +123,7 @@ def main() -> None:
                 "cumulative_count",
                 "target_sparse_sum",
                 "stride_dimension_bound",
+                "charge_overhead_log2",
                 "total_log2_union",
             ]
         )
@@ -130,6 +138,7 @@ def main() -> None:
                 int(args.cumulative_count),
                 args.target_sparse_sum,
                 int(args.stride_dimension_bound),
+                f"{args.charge_overhead_log2:.8f}",
                 f"{total_log:.8f}",
             ]
         )

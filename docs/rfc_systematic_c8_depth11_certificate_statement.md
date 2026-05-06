@@ -121,6 +121,35 @@ and gives:
 log2 failure bound = -99.60768258.
 ```
 
+The same script now supports an additional charged-defect counting overhead:
+
+```text
+--charge-overhead-log2 B
+```
+
+For:
+
+```text
+B in {16,32,64}
+```
+
+the total remains:
+
+```text
+log2 failure bound = -99.60768258.
+```
+
+Artifacts:
+
+```text
+docs/rfc_near_extremizer_total_union_depth11_c8_e128_stride_dim_overhead16.csv
+docs/rfc_near_extremizer_total_union_depth11_c8_e128_stride_dim_overhead32.csv
+docs/rfc_near_extremizer_total_union_depth11_c8_e128_stride_dim_overhead64.csv
+```
+
+This means the final proof can use a charged-tree count with substantial per-defect overhead; it
+does not need the exact strongest binomial classification for every positive-defect support.
+
 Thus, within the corrected matched-plus-extra model:
 
 ```text

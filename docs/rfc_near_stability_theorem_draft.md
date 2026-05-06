@@ -235,6 +235,16 @@ At depth `11`, `c=8`, both corrected versions give:
 -99.60768258.
 ```
 
+A charged-tree fallback count can multiply the near support count by:
+
+```text
+2^(B e)
+```
+
+without changing the displayed depth-11 bound for `B in {16,32,64}`. This is useful if the final
+core-containment proof naturally labels each row-split, overlap, or cancellation defect rather than
+proving the exact binomial support-pair count.
+
 ## Kernel-Dimension Check
 
 The helper:

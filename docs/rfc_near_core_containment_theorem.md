@@ -21,6 +21,18 @@ and supp(A_d x) \ C has size e.
 Equivalently, after deleting exactly `e` output leaves from `supp(A_d x)`, the remaining support is
 the output support of an exact uncertainty extremizer.
 
+This is the strongest structural form. The distance certificate can tolerate a weaker counted form:
+
+```text
+near support/output pairs with defect e
+  <= k * binom(k-k/m, e) * 2^(B e)
+```
+
+for a moderate overhead `B`. The depth-11 certificate has enough field slack that even
+`B=64` leaves the corrected union bound unchanged. Therefore the proof does not need the exact
+binomial count if row-split or overlap pruning naturally introduces a polynomial-in-`k` charge
+label.
+
 ## Pruning Form
 
 The clean induction is a pruning theorem.
@@ -236,3 +248,58 @@ The local defect decomposition is now explicit, but two global pruning lemmas re
 For the all-level systematic certificate, this gap is less dangerous than cancellation because
 both effects have explicit integer cost and cannot occur in the uncharged skeleton. Still, they must
 be written carefully to complete the theorem.
+
+## Counted Fallback
+
+If exact pruning to:
+
+```text
+k * binom(k-k/m, e)
+```
+
+is awkward, it is enough to label each charged defect by:
+
+```text
+node,
+charge type,
+local coordinate,
+optional side bit.
+```
+
+This costs at most a moderate factor per charge, for example:
+
+```text
+2^64
+```
+
+per charged defect is already far larger than the natural `O(d k)` label count at `d=11`,
+`k=2048`.
+
+The script:
+
+```text
+scripts/rfc_near_extremizer_total_union.py
+```
+
+supports this via:
+
+```text
+--charge-overhead-log2
+```
+
+The artifacts:
+
+```text
+docs/rfc_near_extremizer_total_union_depth11_c8_e128_stride_dim_overhead16.csv
+docs/rfc_near_extremizer_total_union_depth11_c8_e128_stride_dim_overhead32.csv
+docs/rfc_near_extremizer_total_union_depth11_c8_e128_stride_dim_overhead64.csv
+```
+
+all still give:
+
+```text
+total log2 union = -99.60768258.
+```
+
+So the proof strategy can prioritize a robust charged-tree count over the exact strongest
+matched-plus-extra classification.

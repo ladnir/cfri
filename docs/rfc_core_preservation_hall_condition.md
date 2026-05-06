@@ -309,6 +309,33 @@ max(0, |C'|-1).
 
 At the full-live node `|C'|=1`, no cancellation charge is needed and the exact glue step survives.
 
+There is an indexing constraint here. A parent matched core is not an arbitrary choice of one
+sibling over each child coordinate. The chosen siblings must form one parent stride residue modulo
+`M`. Therefore the survival set should be indexed by parent residues:
+
+```text
+rho in {0, ..., M-1}.
+```
+
+Each parent residue `rho` projects to a child residue:
+
+```text
+rho mod (M/2).
+```
+
+and prescribes a deterministic sibling pattern over the child stride class. The parent sibling
+survival lemma should be stated as:
+
+```text
+If a child residue lies in A(U) cap A(V), then every parent residue above it either survives as an
+actual parent stride core, or is paid for by a cancellation/residual label.
+```
+
+In the exact full-live glue point, the child core has size one, so this sibling pattern is just one
+local sibling choice. Above that point, no-early-gluing says the exact cancellation pattern cannot
+hold for all coordinates of a multi-coordinate child core. In the near theorem, those failed
+coordinates are exactly what the cancellation/residual labels pay for.
+
 Since an exact child core has size `L` before the full-live glue point, killing all continuations
 should cost at least `L`. But a parent with output size `L+E_parent` can only afford this if the
 extra support is large enough to label those killed continuations. This is precisely the charged

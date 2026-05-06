@@ -347,6 +347,11 @@ by the overlap charge `|U\V|+|V\U|`. This works because child stride cores are d
 
 where `A(U)` is the set of full child stride cores contained in `U`.
 
+The sibling-survival subproblem must respect parent residue geometry: a parent core is a fixed
+residue modulo `M`, not an arbitrary per-coordinate sibling choice. Thus each common child core
+offers two parent residue candidates, and failed residue candidates are paid by
+cancellation/residual labels.
+
 The checker:
 
 ```text

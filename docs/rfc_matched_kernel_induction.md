@@ -124,3 +124,28 @@ for non-matched pairs.
 So the remaining proof task is the classification direction: every exact extremizer must be
 matched. The matched-kernel induction above supplies the constructive side and the kernel-line
 uniqueness needed by the cancellation-consistency argument.
+
+## Why Gluing Starts Only At The Full Live Node
+
+The equality proof has a two-child branch, but the matched construction uses that branch only after
+descending to the node whose size is exactly `m`.
+
+If a two-child branch occurred earlier, then the common child output support would have size:
+
+```text
+> 1.
+```
+
+For each coordinate in that common support, killing one parent sibling imposes a ratio condition
+between the two child output values. Those ratio conditions involve independent fresh parent
+challenges at each coordinate. The two child kernel lines provide only one relative scalar, so two
+or more independent ratio conditions cannot be satisfied generically.
+
+This is the key classification intuition:
+
+```text
+Before reaching the full live node: only the one-child descent branch is possible.
+At the full live node: the common child output support has size one, so the two-child glue branch is possible.
+```
+
+That is exactly what produces row blocks and output stride classes.

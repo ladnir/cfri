@@ -106,6 +106,12 @@ The constructive matched half is:
 docs/rfc_matched_kernel_induction.md
 ```
 
+The assembled exact theorem draft is:
+
+```text
+docs/rfc_exact_stability_theorem.md
+```
+
 The small-depth scans support this:
 
 ```text

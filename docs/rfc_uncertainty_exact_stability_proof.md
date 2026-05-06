@@ -135,18 +135,38 @@ The two equality branches explain the block/stride form. The one-child branch ke
 inside one child and doubles the output stride. The two-child branch glues two sibling input blocks
 and chooses one output residue at the current bit.
 
-The remaining missing lemma is cancellation consistency:
+The remaining missing lemma is cancellation consistency. It has two parts.
+
+First, **no early gluing**:
 
 ```text
-If two child extremizers have the same output support and every active local coordinate cancels one
-parent side, then the two child input blocks must be sibling blocks and the cancellation side must
-select one fixed low-bit residue.
+If the two-child equality branch occurs at a node where the common child output support has size
+greater than one, then the required cancellations depend on two or more independent fresh parent
+challenges. The two child kernel lines have only one relative scalar, so the simultaneous
+cancellations cannot hold generically.
 ```
 
-This is the algebraic core of exact stability. It should follow from the fact that the child
-extremizer kernel line is unique for each matched block/stride pair. Once the child output support
-is fixed, two child kernel lines can be glued through the parent only when their block indices are
-siblings in the recursive tree.
+Thus the two-child branch can only occur after the one-child branch has descended to the node whose
+size equals the live support size. At that point the common child output support has size one.
+
+Second, **local glue consistency**:
+
+```text
+At the full live node, two child extremizer lines with the same single output coordinate can be
+glued by one nonzero linear relation. The surviving parent side selects the next low-bit residue of
+the output stride.
+```
+
+This is the algebraic core of exact stability. The no-early-gluing part is what rules out
+non-contiguous supports such as one small block in the left half and an unrelated small block in the
+right half. The local-glue part is exactly the constructive phase in
+`docs/rfc_matched_kernel_induction.md`.
+
+The no-early-gluing lemma is split out in:
+
+```text
+docs/rfc_no_early_gluing_lemma.md
+```
 
 ## Near-Extremizer Target
 
@@ -237,4 +257,10 @@ The constructive matched-pair half of this rank statement is expanded in:
 
 ```text
 docs/rfc_matched_kernel_induction.md
+```
+
+The assembled theorem-style draft is:
+
+```text
+docs/rfc_exact_stability_theorem.md
 ```

@@ -164,6 +164,12 @@ B=108: log2 failure bound = -67.37561327
 This means the final proof can use a charged-tree count with substantial per-defect overhead; it
 does not need the exact strongest binomial classification for every positive-defect support.
 
+The counted charged-tree theorem is tracked in:
+
+```text
+docs/rfc_counted_charged_tree_theorem.md
+```
+
 Thus, within the corrected matched-plus-extra model:
 
 ```text
@@ -247,6 +253,7 @@ These are tracked separately in:
 
 ```text
 docs/rfc_near_defect_charge_injection.md
+docs/rfc_counted_charged_tree_theorem.md
 docs/rfc_near_core_containment_theorem.md
 docs/rfc_near_kernel_line_lemma.md
 ```

@@ -245,6 +245,12 @@ without changing the displayed depth-11 bound for `B in {16,32,64}`. This is use
 core-containment proof naturally labels each row-split, overlap, or cancellation defect rather than
 proving the exact binomial support-pair count.
 
+The counted version is:
+
+```text
+docs/rfc_counted_charged_tree_theorem.md
+```
+
 ## Kernel-Dimension Check
 
 The helper:
@@ -374,5 +380,6 @@ The charge-injection bookkeeping is split out in:
 
 ```text
 docs/rfc_near_defect_charge_injection.md
+docs/rfc_counted_charged_tree_theorem.md
 docs/rfc_near_core_containment_theorem.md
 ```

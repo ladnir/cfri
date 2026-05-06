@@ -33,6 +33,12 @@ for a moderate overhead `B`. The depth-11 certificate has enough field slack tha
 binomial count if row-split or overlap pruning naturally introduces a polynomial-in-`k` charge
 label.
 
+The counted theorem is split out in:
+
+```text
+docs/rfc_counted_charged_tree_theorem.md
+```
+
 ## Pruning Form
 
 The clean induction is a pruning theorem.

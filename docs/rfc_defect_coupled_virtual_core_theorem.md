@@ -99,6 +99,51 @@ alpha=5: total log2 union = -21.53925283
 alpha=6: total log2 union =  25.89359792
 ```
 
+## Recursive Invariant
+
+The recursive encoder should carry a virtual-core triple:
+
+```text
+C_node      matched stride core at the current node,
+H_node      holes inside C_node,
+E_node      actual output leaves outside C_node.
+```
+
+with:
+
+```text
+supp(Ax at node) = (C_node \ H_node) union E_node,
+|E_node| = E_defect(node) + |H_node|,
+|H_node| <= alpha * E_defect(node).
+```
+
+Here:
+
+```text
+E_defect(node) = wt(Ax at node) - |C_node|.
+```
+
+The transitions are:
+
+```text
+one-child:
+  C, H, and E all lift to both parent siblings.
+  Both |H| and E_defect double, so |H| <= alpha E_defect is preserved.
+
+balanced two-child:
+  after overlap/cancellation charges, an actual parent core survives.
+  This contributes no new holes; extra leaves are paid by the usual charged-tree records.
+
+unbalanced two-child:
+  choose a parent residue core, allow local holes, and use the alpha-2 local lemma to charge those
+  holes to local output defect.
+```
+
+First-divergence accounting is still needed to ensure that extra leaves used by an unbalanced node
+are not reused by lower nodes. The natural rule is unchanged: a leaf outside the final virtual core
+is charged at the highest node where its path diverges from the chosen core path. Holes are charged
+to extra leaves created at the same highest divergence.
+
 ## Local Proof Obligation
 
 At one unbalanced node of output length `K`, live row split:

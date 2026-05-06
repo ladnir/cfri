@@ -285,11 +285,13 @@ show every saved/generated near pair contains at least one actual matched core. 
 `m=4,e=4` model has `48` pairs with two contained cores, exactly matching the complete-extra-stride
 dimension-growth cases.
 
-The main remaining proof obligation is now the unbalanced-row-split part of core preservation:
+The main remaining proof obligation is now the unbalanced-row-split part of defect-coupled
+virtual-core preservation:
 
 ```text
 wt(x)=m, wt(Ax)<=k/m+e
-  => supp(Ax) contains an actual matched stride core C of size k/m
+  => supp(Ax) equals a matched stride core with holes H and outside leaves E,
+     with |H| <= 2e
 ```
 
 The local accounting for this theorem is now:
@@ -301,9 +303,9 @@ parent defect >= child defects
                + cancellation charge.
 ```
 
-After such a core is selected, the counted charged-tree theorem labels the `e` remaining output
-leaves with bounded charge records. The proof no longer needs exact near-extremizer classification,
-but it still needs the core to be contained in the actual sparse output support.
+After such a virtual core is selected, the counted charged-tree theorem labels the outside leaves
+and local charges with bounded records. The proof no longer needs exact near-extremizer
+classification, and it no longer needs literal actual-core containment in the unbalanced case.
 
 The one-child and balanced two-child core-preservation cases are now reduced:
 

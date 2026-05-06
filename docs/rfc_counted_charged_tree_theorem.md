@@ -39,7 +39,7 @@ The counted charged-tree theorem should prove that the support pair of `x` can b
 
 ```text
 1. a matched core identifier;
-2. a set of at most e charged final output leaves outside that core;
+2. a set of charged final output leaves outside that core;
 3. one local charge label per unit of charge, from an alphabet of size at most 2^B.
 ```
 
@@ -51,14 +51,13 @@ and `e+h` real output leaves outside it, with:
 h <= alpha e.
 ```
 
-Therefore the number of possible near support/output certificates is at most:
+In the literal version, the number of possible near support/output certificates is at most:
 
 ```text
 k * binom(k-k/m, <= e) * 2^(B e).
 ```
 
-The core must be an actual subset of the sparse output support. A virtual core with holes would not
-justify the binomial count above. Thus the encoder invariant is:
+The literal version requires the core to be an actual subset of the sparse output support:
 
 ```text
 C subset supp(A_d x),
@@ -231,10 +230,19 @@ bounded labels for each charged unit.
 The critical invariant is:
 
 ```text
-the skeleton choices always select output leaves that are actually present in Y_node.
+the skeleton choices select either actual output leaves or virtual core positions whose holes are
+charged to output defect.
 ```
 
-This is automatic in the exact theorem. In the near theorem it is the main containment obligation.
+This is automatic in the exact theorem. In the near theorem it is replaced by the virtual-core
+invariant:
+
+```text
+supp(Ax) = (C \ H) union E,
+|H| <= alpha (|supp(Ax)|-|C|).
+```
+
+The target is `alpha=2`.
 
 ### One-Child Case
 
@@ -253,6 +261,15 @@ E_parent = 2 E_child.
 ```
 
 so the lifted charge budget is exact.
+
+In the virtual-core variant, child holes also lift to two parent holes. Since both the hole count
+and the output defect double, the bound:
+
+```text
+|H| <= alpha E
+```
+
+is preserved exactly.
 
 ### Balanced Two-Child Case
 
@@ -339,6 +356,14 @@ The unresolved part is to prove that this selected skeleton can still be made fr
 leaves after an unbalanced split. This is the same core-preservation issue as in the balanced case,
 but with row-split charges added.
 
+In the virtual-core variant, this unresolved part is weakened to proving:
+
+```text
+new parent holes <= alpha * new local output defect.
+```
+
+The target local constant is `alpha=2`.
+
 The certificate slack makes the required unbalanced statement fairly sharp. With `K=2048`, the
 minimum rounded unbalanced split charge is:
 
@@ -361,10 +386,10 @@ docs/rfc_unbalanced_split_residue_hall.md
 docs/rfc_defect_coupled_virtual_core_theorem.md
 ```
 
-## Core-Preservation Lemma
+## Core / Virtual-Core Lemma
 
-The counted theorem reduces the exact classification problem to the following core-preservation
-lemma.
+The literal counted theorem reduces the exact classification problem to the following
+core-preservation lemma.
 
 ```text
 Given wt(x)=m and wt(A_d x)=k/m+e, the recursive encoder can select a matched skeleton C with
@@ -385,8 +410,16 @@ choose extra leaves:   binom(k-k/m, e)
 choose labels:         2^(B e).
 ```
 
-So the final hard theorem is no longer exact uniqueness of near-extremizers; it is existence of one
-actual matched core inside every near-extremizer.
+The current evidence suggests this literal lemma is too strong for unbalanced splits. The
+certificate-sufficient replacement is the virtual-core lemma:
+
+```text
+Given wt(x)=m and wt(A_d x)=k/m+e, the recursive encoder can select a matched skeleton C and holes
+H subset C with |H| <= alpha e, such that supp(A_d x) = (C\H) union E.
+```
+
+The target is `alpha=2`. So the final hard theorem is no longer exact uniqueness of
+near-extremizers; it is existence of a defect-coupled virtual matched core.
 
 One possible route is a local Hall/survival condition, split out in:
 
@@ -394,11 +427,9 @@ One possible route is a local Hall/survival condition, split out in:
 docs/rfc_core_preservation_hall_condition.md
 ```
 
-That note now phrases the remaining argument as a minimal-counterexample proof: a one-child node
-cannot be minimal, a balanced two-child node must pay overlap/cancellation labels for every killed
-continuation, and an unbalanced two-child node must pay row-split labels before selecting a
-lower-defect skeleton side. The final conclusion still must be that an actual matched core survives;
-otherwise the binomial count would need a separate holes-inside-core model.
+That note originally phrases the remaining argument as a minimal-counterexample proof for actual
+core survival. The virtual-core replacement keeps the one-child and balanced conclusions, but lets
+an unbalanced two-child node introduce holes if those holes are coupled to local output defect.
 
 Within the balanced two-child case, core preservation is easier than exact equality: a child core
 contained in either `U` or `V` lifts to a parent core. It does not need to lie in `U cap V`.

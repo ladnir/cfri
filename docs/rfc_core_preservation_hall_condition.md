@@ -421,18 +421,17 @@ At an unbalanced split, either an actual parent core survives, or the number of 
 holes is at most the rounded split charge at that node.
 ```
 
-Summing this over the tree is still too crude when many unit-charge high-`M` splits occur, so the
-better certificate-facing form is slightly sharper:
+Summing an absolute hole budget over the tree is still too crude when many unit-charge high-`M`
+splits occur, so the better certificate-facing form is defect-coupled:
 
 ```text
-The recursive encoder may use the hole fallback only for the first few unbalanced split charges;
-after that, the remaining charged tree must select an actual contained core.
+The recursive encoder may use virtual holes at unbalanced splits, but the total number of holes must
+be at most alpha times the final output defect.
 ```
 
 Equivalently, the final hard local lemma should not merely say that unbalanced splits are expensive.
 It should show that unit-charge high-`M` imbalances do not accumulate independent missing positions
-inside the same candidate parent core. They must either preserve a residue core, or their failures
-coalesce into the same bounded set of virtual holes.
+inside the same candidate parent core without also creating proportional non-core output mass.
 
 There is one more reason this case cannot be copied from the exact proof: after an unbalanced split,
 the child row weights `a` and `b` need not be powers of two. The exact matched-core theorem is a
@@ -473,20 +472,30 @@ remaining through `alpha=5`.
 
 ## Hall Conclusion
 
-The certificate-facing Hall conclusion remains:
+The original certificate-facing Hall conclusion was:
 
 ```text
 some matched core survives
 ```
 
-The counted charged-tree theorem relaxes uniqueness and charge bookkeeping, but it does not remove
-this requirement. If no actual core survives, the current binomial count:
+The counted charged-tree theorem relaxes uniqueness and charge bookkeeping, but literal
+matched-core survival now appears too strong for unbalanced splits. If no actual core survives, the
+plain binomial count:
 
 ```text
 k * binom(k-k/m, e)
 ```
 
 would be invalid, because the support would have holes inside the proposed core.
+
+The replacement certificate-facing conclusion is:
+
+```text
+there is a virtual matched core C with holes H, and |H| <= alpha * output defect.
+```
+
+For the systematic depth-11 certificate the target is `alpha=2`, and the current count remains safe
+through `alpha=5`.
 
 There is a possible fallback with virtual cores:
 

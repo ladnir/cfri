@@ -49,7 +49,7 @@ At any node of output length `K`, live row weight `M`, and output support `Y`, d
 E = |Y| - K/M.
 ```
 
-The theorem says:
+The original pruning theorem says:
 
 ```text
 There exists a set P subset Y with |P| <= E such that Y \ P is a matched core of size K/M.
@@ -57,7 +57,7 @@ There exists a set P subset Y with |P| <= E such that Y \ P is a matched core of
 
 At the root this is exactly the target statement. The set `P` is the set of charged extra leaves.
 
-The counted fallback still needs this core-preservation statement. It relaxes the uniqueness and
+The first counted fallback still needed this core-preservation statement. It relaxed uniqueness and
 exact charge injection, but not the requirement:
 
 ```text
@@ -66,6 +66,19 @@ matched core C subset Y.
 
 Without `C subset Y`, the support count would have to include holes inside the core as well as
 extras outside it.
+
+The current replacement theorem permits a virtual core `C` with holes `H`,
+provided:
+
+```text
+|H| <= alpha * (|Y|-|C|)
+```
+
+with target `alpha=2`. The count and proof target are tracked in:
+
+```text
+docs/rfc_defect_coupled_virtual_core_theorem.md
+```
 
 ## One-Child Step
 
@@ -268,18 +281,19 @@ one-child:          child core lifts directly;
 balanced two-child: child core lifts through one surviving parent residue by no-early-gluing.
 ```
 
-The central remaining global lemma is therefore the unbalanced row-split part of core preservation:
+The central remaining global lemma is therefore the unbalanced row-split part of virtual-core
+preservation:
 
 ```text
-after charging local defects, at least one exact matched skeleton remains inside the actual support.
+after charging local defects, a matched skeleton remains with only defect-coupled holes.
 ```
 
 The remaining sublemma is:
 
 ```text
 unbalanced row-split pruning:
-  turn the positive split-defect lower bound into either an actual contained parent core or a
-  globally tiny set of virtual holes.
+  turn the positive split-defect lower bound into a virtual parent core with
+  holes <= alpha * output defect.
 ```
 
 This is now isolated as a finite residue-Hall problem in:
@@ -299,11 +313,9 @@ The union bound remains essentially unchanged for the target `alpha=2`, and stay
 `alpha=5`, because the dangerous hole terms were the artificial `extra=0, holes>0` cases. The
 dimension factor must be charged using outside-core extras `extra+holes`.
 
-For the all-level systematic certificate, this gap is less dangerous than cancellation because
-unbalanced splits have explicit integer cost and cannot occur in the uncharged skeleton. Still, the
-hole fallback is narrow: with `B=64`, the depth-11 `c=8` bound stays negative through `H=5` virtual
-core holes but fails by `H=8`. So the unbalanced proof should aim for actual core containment, using
-the bounded-hole model only as a backstop.
+For the all-level systematic certificate, this gap is less dangerous than a free-hole model because
+unbalanced splits have explicit output-defect cost. The proof should now aim for the
+defect-coupled virtual theorem rather than literal actual-core containment.
 
 ## Counted Fallback
 

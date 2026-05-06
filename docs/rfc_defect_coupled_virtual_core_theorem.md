@@ -159,8 +159,10 @@ one-child and balanced cases, no new holes are born. Thus every hole birth is at
 node.
 
 At an unbalanced node, the alpha-2 local lemma gives a set of non-core parent outputs whose
-cardinality is at least half the number of parent-position holes born at that node. Choose those
-paying outputs before recursing below the node. Their descendants have:
+cardinality exceeds the number of parent-position holes by at least half the number of holes. First
+reserve one non-core output as a replacement for each hole. The remaining non-core outputs are true
+local defect leaves. Choose the paying outputs from these true defect leaves before recursing below
+the node. Their descendants have:
 
 ```text
 first(ell) = that unbalanced node.
@@ -173,20 +175,28 @@ already differ at the charging node.
 This gives the global inequality:
 
 ```text
-|H_root| <= 2 * |E_root|
+|H_root| <= 2 * D_root
 ```
 
-provided the local paying outputs are selected injectively within each unbalanced node after
-cancellation charges are removed.
+where `D_root` is the number of true outside defect leaves after one replacement leaf has been
+reserved per hole. Equivalently, if the final support is `(C\H) union E_out`, then:
+
+```text
+|E_out| = |H| + e,
+|H| <= 2e.
+```
+
+The local paying outputs must be selected injectively within each unbalanced node after cancellation
+charges are removed.
 
 The proof obligation left here is finite and local:
 
 ```text
-At each unbalanced node, construct the paying output set from S\C and the paid cancellation records
-so that distinct local holes use distinct local non-core outputs.
+At each unbalanced node, partition the non-core parent outputs into replacement leaves and true
+defect leaves so that every two local holes have one distinct true defect leaf.
 ```
 
-Once this is done, first-divergence makes the global injection automatic.
+Once this is done, first-divergence makes the global alpha-2 injection automatic.
 
 ## Local Proof Obligation
 
@@ -337,6 +347,9 @@ e_local
   = 2R - (c_C+c_O)
  >= 2R - 1.
 ```
+
+Equivalently, after reserving one outside non-core parent output for each parent-position hole,
+`e_local` is the number of true local defect leaves left over.
 
 The parent-position hole count is:
 

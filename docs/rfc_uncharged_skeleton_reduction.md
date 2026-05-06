@@ -115,3 +115,11 @@ each charged leaf is assigned to the highest node where it leaves the selected v
 Complete extra stride-class dimensions do not need an injective leaf assignment beyond the
 `q^floor((e+h)/|C|)` factor in the first-moment count, but their outside leaves are still included
 in the chosen set `E`.
+
+For virtual holes, outside leaves have two bookkeeping roles. One outside leaf can serve as the
+replacement for a missing core position; only outside leaves left after these replacements are true
+output-defect leaves. The alpha-2 theorem is:
+
+```text
+holes <= 2 * true output-defect leaves.
+```

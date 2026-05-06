@@ -197,7 +197,15 @@ M = a+b,     a != b,
 L = K/M,
 ```
 
-choose a parent residue `rho mod M`. Its child projection `C_child` has size `L/2` when `L` is even.
+For the systematic certificate strata under discussion, `M` is a power-of-two divisor of `K` at the
+node where the parent virtual core is selected. Therefore, if `L>=2`, the parent residue projects to
+one child residue class in each sibling half. Choose a parent residue `rho mod M`. Its child
+projection `C_child` has size:
+
+```text
+R = L/2.
+```
+
 If:
 
 ```text
@@ -233,7 +241,8 @@ valid core choice.
 
 ## Alpha-2 Local Skeleton
 
-Here is the intended local inequality after local cancellation charges have been paid.
+Here is the intended local inequality after child defects and local cancellation charges have been
+paid.
 
 Let:
 
@@ -252,13 +261,18 @@ O = |S \ C|.
 ```
 
 Also let `c_C` be the number of vanished parent siblings over covered coordinates of `C`, and
-`c_O` the number of vanished parent siblings over coordinates in `S\C`. The charged-tree theorem
-should pay for all but at most one local sibling cancellation at this node, so the uncharged local
-skeleton satisfies:
+`c_O` the number of vanished parent siblings over coordinates in `S\C`.
+
+The cancellation input is:
 
 ```text
 c_C + c_O <= 1.
 ```
+
+This is not a statement about arbitrary child near-supports. The recursive encoder first charges
+child defects and extra child dimensions. On the remaining uncharged local skeleton, the two child
+outputs have only one relative scalar. The quantitative no-early-gluing lemma then says two
+different vanished siblings would impose two incompatible fresh-random ratio equations.
 
 Then:
 
@@ -335,6 +349,18 @@ parent holes <= 2 * local output defect.
 
 This is the desired `alpha=2` local coupling.
 
+The integer inequality is checked by:
+
+```text
+scripts/rfc_check_alpha2_local_inequality.py --max-r 64
+```
+
+which reports:
+
+```text
+checked_R=1..64 failures=0
+```
+
 ### Small Cases
 
 `R=1` means `L=2`: the parent residue has two positions over one child coordinate. If that child
@@ -355,9 +381,10 @@ c_C+c_O <= 1
 
 for the uncharged local skeleton. This should not be read as saying many local cancellations are
 deterministically impossible for arbitrary near supports. Rather, the charged-tree proof must first
-emit cancellation records for all but one vanished sibling at this node. This is the same interface
-as the balanced proof: no-early-gluing prevents multiple uncharged cancellations in an exact
-skeleton, while additional cancellations are paid local defects.
+charge child defects and local extra dimensions until the remaining comparison has one relative
+scalar. This is the same interface as the balanced proof: no-early-gluing prevents multiple
+uncharged cancellations in an exact skeleton, while additional degrees of freedom are paid local
+defects.
 
 ## Status
 

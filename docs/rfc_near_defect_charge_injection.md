@@ -238,6 +238,10 @@ where the selected virtual core asks for a missing child coordinate or a vanishe
 unbalanced case, the alpha-2 local lemma supplies non-core outputs at that same node. Those outputs
 have first divergence equal to the hole-birth node, so they cannot be reused by lower-node charges.
 
+The alpha-2 lemma uses no-early-gluing only after child defects and local extra dimensions have
+been charged away. On that uncharged skeleton, there is a single relative scalar between the two
+child outputs, so at most one sibling cancellation can remain uncharged at the node.
+
 ## Inductive Counting Form
 
 Let `Core(node)` be the matched stride core exposed by following the uncharged branch choices. Let

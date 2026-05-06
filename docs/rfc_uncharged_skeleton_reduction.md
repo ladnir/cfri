@@ -102,14 +102,143 @@ This is the input used in the alpha-2 local theorem:
 c_C + c_O <= 1.
 ```
 
-## What Is Still Formal
+## Non-Power Child Weights
 
-The remaining bookkeeping is to show that the charges above can be assigned to final output leaves
-without colliding with the local alpha-2 hole payments. This is handled by the same
-first-divergence rule:
+In an unbalanced split the child row weights `a,b` are usually not divisors of the child block
+length in the same way as the parent row weight. So the local support inequality:
 
 ```text
-each charged leaf is assigned to the highest node where it leaves the selected virtual core path.
+max(|U|,|V|) >= L
+```
+
+is deterministic and easy, but it is not by itself the one-scalar algebra needed for
+no-early-gluing.
+
+The intended order is therefore:
+
+```text
+1. use one-copy uncertainty only to prove enough outside mass;
+2. charge the child support outside the selected parent residue;
+3. charge every complete extra child stride-class dimension;
+4. apply no-early-gluing only to the residual one-line skeleton.
+```
+
+This is the remaining algebraic rank obligation. It is strictly narrower than proving literal
+actual-core containment for the unbalanced split: we only need to show that all child degrees of
+freedom beyond one line are already paid by the same `q^floor((e+h)/|C|)` dimension factor used in
+the first-moment count.
+
+## Rank-Cancellation Exchange
+
+The useful way to state the algebra is not that extra child rank is impossible. Extra child rank is
+allowed, but it is paid before the alpha-2 hole lemma is applied.
+
+Let `r_0,r_1` be the dimensions of the two child output spaces after the child zero constraints and
+the selected local outside sets are fixed. The dimension count pays:
+
+```text
+(r_0-1) + (r_1-1)
+```
+
+extra projective parameters. A sibling cancellation at parent child-coordinate `j` is one linear
+equation on these child parameters plus the one relative scalar between the two base lines.
+Generically:
+
+```text
+t cancelled siblings cost t equations,
+one equation can be absorbed by the relative scalar,
+each additional absorbed equation must use one paid child-rank parameter.
+```
+
+Thus the local proof can charge:
+
+```text
+max(0, t-1)
+```
+
+cancellations either to paid child-rank dimensions or to the no-early-gluing probability loss. In
+the deterministic charged-tree language, remove all cancellations paid this way before invoking
+the alpha-2 size lemma. The residual uncharged skeleton then satisfies:
+
+```text
+c_C + c_O <= 1.
+```
+
+This is exactly what the first-moment count already supports: every paid child-rank parameter
+requires a complete extra stride class, and the virtual-core count includes those outside leaves in
+`e+h` before applying the factor `q^floor((e+h)/|C|)`.
+
+## Charge Composition Lemma
+
+Fix the final root virtual core `C_root`. For every final output leaf `ell notin C_root`, define
+`first(ell)` to be the highest node where the path to `ell` leaves the selected virtual core path.
+Then the sets:
+
+```text
+E_v = { ell notin C_root : first(ell)=v }
+```
+
+partition the outside leaves.
+
+At an unbalanced node `v`, the local alpha-2 lemma should produce two disjoint subsets of `E_v`:
+
+```text
+R_v  replacement leaves, one for each newly born virtual hole;
+D_v  true defect leaves.
+```
+
+with:
+
+```text
+|R_v| = h_v,
+h_v <= 2 |D_v|.
+```
+
+The replacement leaves certify the identity:
+
+```text
+supp(Ax) = (C_root \ H_root) union E_root,
+|E_root| = |H_root| + e.
+```
+
+The true defect leaves certify:
+
+```text
+|H_root| <= 2e.
+```
+
+The proof is then automatic after summing over nodes, because the sets `E_v` are disjoint:
+
+```text
+|H_root|
+  = sum_v h_v
+ <= 2 sum_v |D_v|
+ <= 2e.
+```
+
+Balanced-node overlap and cancellation charges use the same first-divergence partition, but they do
+not create new holes. They only increase the true defect leaf set. Thus they cannot weaken the
+alpha-2 inequality.
+
+Complete extra stride-class dimensions are not a third kind of leaf payment. They are a rank
+payment attached to the already chosen outside set:
+
+```text
+q^floor((e+h)/|C|)
+```
+
+in the count. Their support leaves still lie in the partition `E_v`, but the dimension factor, not
+an additional leaf injection, pays for the extra scalar choices.
+
+## What Is Still Formal
+
+The remaining bookkeeping is no longer the global injection; the composition lemma above reduces
+that to local disjointness inside each node. The remaining formal point is the local rank
+reduction:
+
+```text
+after charging child defects and complete extra stride-class dimensions, each child has only one
+uncharged output line on the coordinates used by the parent comparison.
 ```
 
 Complete extra stride-class dimensions do not need an injective leaf assignment beyond the

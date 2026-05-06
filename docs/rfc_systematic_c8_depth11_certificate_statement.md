@@ -294,13 +294,25 @@ wt(x)=m, wt(Ax)<=k/m+e
      with |H| <= 2e
 ```
 
-The local accounting for this theorem is now:
+The deterministic local size accounting for this theorem is now:
 
 ```text
 parent defect >= child defects
                + row-split charge
                + overlap charge
                + cancellation charge.
+```
+
+The current unbalanced target is sharper:
+
+```text
+new virtual holes at a node <= 2 * new true output-defect leaves at that node.
+```
+
+Together with first-divergence, this composes globally as:
+
+```text
+|H_root| <= 2e.
 ```
 
 After such a virtual core is selected, the counted charged-tree theorem labels the outside leaves
@@ -317,7 +329,7 @@ balanced two-child: child core lifts through one surviving parent residue by no-
 The open case is:
 
 ```text
-unbalanced two-child split, paid by integer split defect.
+unbalanced two-child split, after paid child dimensions are reduced to one relative scalar.
 ```
 
 The near-core dimension lemma is:

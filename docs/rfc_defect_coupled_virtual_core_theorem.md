@@ -186,8 +186,8 @@ reserved per hole. Equivalently, if the final support is `(C\H) union E_out`, th
 |H| <= 2e.
 ```
 
-The local paying outputs must be selected injectively within each unbalanced node after cancellation
-charges are removed.
+The local paying outputs must be selected injectively within each unbalanced node after child
+defects, complete extra stride-class dimensions, and paid cancellation charges are removed.
 
 The proof obligation left here is finite and local:
 
@@ -197,6 +197,27 @@ defect leaves so that every two local holes have one distinct true defect leaf.
 ```
 
 Once this is done, first-divergence makes the global alpha-2 injection automatic.
+
+The clean composition form is:
+
+```text
+E_v = final outside leaves whose first divergence is v,
+R_v subset E_v replacement leaves,
+D_v subset E_v true defect leaves,
+R_v cap D_v = empty,
+|R_v| = h_v,
+h_v <= 2 |D_v|.
+```
+
+Summing over unbalanced nodes gives:
+
+```text
+|H_root| = sum_v h_v <= 2 sum_v |D_v| <= 2e.
+```
+
+Balanced-node charges are placed in the same first-divergence partition, but they only add true
+defect leaves and create no holes. Dimension growth is paid separately by the
+`q^floor((e+h)/|C|)` factor and does not require another leaf injection.
 
 ## Local Proof Obligation
 
@@ -415,8 +436,22 @@ scalar. This is the same interface as the balanced proof: no-early-gluing preven
 uncharged cancellations in an exact skeleton, while additional degrees of freedom are paid local
 defects.
 
+Equivalently, extra child rank is a cancellation currency before it is a hole issue. If `t`
+sibling cancellations occur at the node, then one can be absorbed by the relative scalar and the
+other `t-1` must be paid by child-rank dimension units or by the no-early-gluing probability loss.
+After those paid cancellations are removed, the alpha-2 size inequality only sees the residual
+case `c_C+c_O<=1`.
+
 ## Status
 
 One-child and balanced two-child nodes already preserve actual cores. This theorem is only needed
-for unbalanced two-child nodes. It is the current main proof obligation for the ceiling-level
-systematic distance certificate.
+for unbalanced two-child nodes. The deterministic size part of the unbalanced local theorem is now
+reduced to the alpha-2 inequality above. The remaining main proof obligation for the ceiling-level
+systematic distance certificate is the rank reduction recorded in:
+
+```text
+docs/rfc_uncharged_skeleton_reduction.md
+```
+
+namely, after all paid child dimensions are removed, the local comparison has only one relative
+scalar, so `c_C+c_O<=1`.

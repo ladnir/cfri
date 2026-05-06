@@ -396,6 +396,44 @@ or residual support.
 The local proof obligation is to show that selecting the lower-defect side cannot increase the
 number of required labels beyond the row-split charge plus residual output leaves.
 
+For the depth-11 certificate point, the minimum rounded split charge is already quite restrictive
+for coarse imbalances. With `K=2048` at the root:
+
+```text
+M       L=K/M     minimum rounded unbalanced split charge
+4       512       512
+8       256        86
+16      128        19
+32       64         5
+64       32         2
+128      16         1
+256       8         1
+512       4         1
+1024      2         1
+```
+
+This table is useful because the virtual-hole fallback only tolerates a global leak of about five
+holes at the present `B=64` label budget. Therefore any proof that converts unbalanced split
+charges into holes has to be almost lossless. A statement of the following strength would be enough:
+
+```text
+At an unbalanced split, either an actual parent core survives, or the number of newly-created core
+holes is at most the rounded split charge at that node.
+```
+
+Summing this over the tree is still too crude when many unit-charge high-`M` splits occur, so the
+better certificate-facing form is slightly sharper:
+
+```text
+The recursive encoder may use the hole fallback only for the first few unbalanced split charges;
+after that, the remaining charged tree must select an actual contained core.
+```
+
+Equivalently, the final hard local lemma should not merely say that unbalanced splits are expensive.
+It should show that unit-charge high-`M` imbalances do not accumulate independent missing positions
+inside the same candidate parent core. They must either preserve a residue core, or their failures
+coalesce into the same bounded set of virtual holes.
+
 After the balanced-case correction above, this is the only remaining core-preservation case. In
 particular:
 
@@ -447,6 +485,8 @@ Artifacts:
 ```text
 docs/rfc_near_extremizer_total_union_depth11_c8_e128_stride_dim_overhead64_holes1.csv
 docs/rfc_near_extremizer_total_union_depth11_c8_e128_stride_dim_overhead64_holes4.csv
+docs/rfc_near_extremizer_total_union_depth11_c8_e128_stride_dim_overhead64_holes5.csv
+docs/rfc_near_extremizer_total_union_depth11_c8_e128_stride_dim_overhead64_holes8.csv
 docs/rfc_near_extremizer_total_union_depth11_c8_e128_stride_dim_overhead64_holes16.csv
 ```
 
@@ -455,10 +495,16 @@ Results:
 ```text
 H=1:  total log2 union = -83.06077305
 H=4:  total log2 union = -42.01824475
+H=5:  total log2 union = -29.84764089
+H=8:  total log2 union =   3.75441819
 H=16: total log2 union =  79.12109543
 ```
 
-So a bounded-hole fallback exists, but unbounded holes are too expensive under this crude count.
+So a bounded-hole fallback exists, but the margin is not wide under this crude count. With the
+current `B=64` label budget, a global leak of at most five virtual core holes is still safe; a leak
+of eight holes is already too expensive. This makes the unbalanced-split target quite concrete:
+either prove actual core preservation, or prove that all unbalanced splits together create at most a
+very small global hole budget.
 
 So the next proof target is still the actual Hall survival statement:
 

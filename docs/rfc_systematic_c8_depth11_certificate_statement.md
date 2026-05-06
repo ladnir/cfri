@@ -175,11 +175,13 @@ A virtual-core-with-holes fallback was also stress-tested with `B=64`:
 ```text
 H=1:  log2 failure bound = -83.06077305
 H=4:  log2 failure bound = -42.01824475
+H=5:  log2 failure bound = -29.84764089
+H=8:  log2 failure bound =   3.75441819
 H=16: log2 failure bound =  79.12109543
 ```
 
-This confirms small hole counts are affordable, but the proof should still target actual core
-preservation or a very small hole bound.
+This confirms very small hole counts are affordable, but the proof should still target actual core
+preservation. Under the present crude hole count, five global holes remain safe and eight do not.
 
 Thus, within the corrected matched-plus-extra model:
 

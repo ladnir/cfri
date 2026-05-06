@@ -298,6 +298,21 @@ The unresolved part is to prove that this selected skeleton can still be made fr
 leaves after an unbalanced split. This is the same core-preservation issue as in the balanced case,
 but with row-split charges added.
 
+The certificate slack makes the required unbalanced statement fairly sharp. With `K=2048`, the
+minimum rounded unbalanced split charge is:
+
+```text
+M=32:   5
+M=64:   2
+M>=128: 1
+```
+
+and smaller `M` is much more expensive. Since the `B=64` virtual-hole model stays safe through
+`H=5` but fails by `H=8`, the encoder cannot afford a proof that leaks one independent hole for
+every unit-charge high-`M` imbalance. The needed local result is that unbalanced splits either
+preserve an actual parent residue core, or any holes they create are globally coalesced and bounded
+by the first few row-split charges.
+
 ## Core-Preservation Lemma
 
 The counted theorem reduces the exact classification problem to the following core-preservation

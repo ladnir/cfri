@@ -148,6 +148,16 @@ P_1 subset V, |P_1| <= e_1, V \ P_1 = C_1.
 The remaining task at this node is to pay for the mismatch between `C_0` and `C_1`, and then pay
 for all but one common continuation coordinate.
 
+For the counted certificate, the core-preservation part of this step is now settled in the weaker
+form we need. A child core contained in either `U` or `V` lifts to a parent residue core. The parent
+residue geometry splits the child core into two sub-residues modulo `M`; each parent residue
+candidate uses both siblings over one sub-residue. Quantitative no-early-gluing can destroy at most
+one sibling over the whole child core, so at most one of the two parent residue candidates is lost.
+The other candidate is fully contained in the actual parent output support.
+
+Thus overlap and cancellation still create charged leaves for counting, but they no longer threaten
+existence of an actual contained core in the balanced case.
+
 ## Overlap Pruning
 
 The symmetric difference:
@@ -250,26 +260,33 @@ This is the intended reason local pruning costs add globally:
 
 ## Current Gap
 
-The local defect decomposition is now explicit, but the central global lemma is core preservation:
+The local defect decomposition is now explicit, and the one-child and balanced two-child
+core-preservation cases are reduced:
+
+```text
+one-child:          child core lifts directly;
+balanced two-child: child core lifts through one surviving parent residue by no-early-gluing.
+```
+
+The central remaining global lemma is therefore the unbalanced row-split part of core preservation:
 
 ```text
 after charging local defects, at least one exact matched skeleton remains inside the actual support.
 ```
 
-Two sublemmas remain:
+The remaining sublemma is:
 
 ```text
-1. overlap leaf selection:
-   convert symmetric-difference support mismatch into deleted leaves without double-counting child
-   or cancellation charges;
-
-2. unbalanced row-split pruning:
-   turn the positive split-defect lower bound into canonical deleted leaves outside the final core.
+unbalanced row-split pruning:
+  turn the positive split-defect lower bound into either an actual contained parent core or a
+  globally tiny set of virtual holes.
 ```
 
 For the all-level systematic certificate, this gap is less dangerous than cancellation because
-both effects have explicit integer cost and cannot occur in the uncharged skeleton. Still, they must
-be written carefully to complete the theorem.
+unbalanced splits have explicit integer cost and cannot occur in the uncharged skeleton. Still, the
+hole fallback is narrow: with `B=64`, the depth-11 `c=8` bound stays negative through `H=5` virtual
+core holes but fails by `H=8`. So the unbalanced proof should aim for actual core containment, using
+the bounded-hole model only as a backstop.
 
 ## Counted Fallback
 

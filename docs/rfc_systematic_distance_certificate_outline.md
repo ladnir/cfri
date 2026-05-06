@@ -285,6 +285,12 @@ The proof strategy for this near-stability model is:
 docs/rfc_near_stability_proof_strategy.md
 ```
 
+and the theorem-style near-stability draft is:
+
+```text
+docs/rfc_near_stability_theorem_draft.md
+```
+
 Combining this count with the aggregate zero tail over the remaining parity copies gives:
 
 ```text

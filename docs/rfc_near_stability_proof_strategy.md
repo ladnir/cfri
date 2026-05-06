@@ -33,6 +33,12 @@ support pairs <= k * binom(k-k/m, e),
 
 i.e. choose one exact matched stride core and then add `e` arbitrary extra output positions.
 
+The theorem-style draft is:
+
+```text
+docs/rfc_near_stability_theorem_draft.md
+```
+
 ## Quantitative No-Early-Gluing
 
 The exact no-early-gluing lemma says that if the two-child branch tries to cancel over a common

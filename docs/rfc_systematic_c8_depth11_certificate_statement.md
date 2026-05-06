@@ -254,6 +254,7 @@ These are tracked separately in:
 
 ```text
 docs/rfc_near_defect_charge_injection.md
+docs/rfc_core_preservation_hall_condition.md
 docs/rfc_counted_charged_tree_theorem.md
 docs/rfc_near_core_containment_theorem.md
 docs/rfc_near_kernel_line_lemma.md

@@ -325,6 +325,12 @@ choose labels:         2^(B e).
 So the final hard theorem is no longer exact uniqueness of near-extremizers; it is existence of one
 actual matched core inside every near-extremizer.
 
+One possible route is a local Hall/survival condition, split out in:
+
+```text
+docs/rfc_core_preservation_hall_condition.md
+```
+
 ## Why The Encoder Count Is Enough
 
 For the certificate, we do not need to reconstruct `x`, only to union bound all possible bad support

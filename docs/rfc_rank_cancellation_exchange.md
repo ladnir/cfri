@@ -95,7 +95,8 @@ lambda, a_i/alpha, b_i/alpha.
 
 Each extra child direction can absorb at most one additional independent cancellation equation.
 Thus the proof should not try to forbid extra cancellations outright. It should charge them to the
-rank dimensions that the first-moment count already paid for.
+local rank dimensions, and then separately prove that those local payments are covered by the
+global first-moment count.
 
 ## First-Moment Interface
 
@@ -106,8 +107,9 @@ contribution should carry a factor:
 q^s * q^(-max(0,t-s-1)).
 ```
 
-The `q^s` term is already present in the near-kernel dimension count. The residual loss is the
-same no-early-gluing loss as the exact proof once `t>s+1`.
+The `q^s` term is present in the local near-kernel rank budget. A separate aggregation argument is
+needed before claiming that the current root-scale certificate count already pays all such local
+rank terms. The residual loss is the same no-early-gluing loss as the exact proof once `t>s+1`.
 
 For the structural part of the theorem, after the probabilistic loss has also been accounted for,
 we can phrase the local reduction as:
@@ -128,8 +130,9 @@ For every fixed child support/rank pattern and every cancellation set J,
 the cancellation matrix has generic rank at least |J|-1 over the paid child-rank quotient.
 ```
 
-This is now the only algebraic obstruction in the proof chain. If it holds, the rest of the
-systematic distance certificate is reduced to two counting-interface checks:
+This is now the central algebraic obstruction in the proof chain. If it holds, the rest of the
+systematic distance certificate is reduced to the following structural and counting-interface
+checks:
 
 ```text
 1. alpha-2 local size inequality;

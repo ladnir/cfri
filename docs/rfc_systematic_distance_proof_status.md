@@ -305,7 +305,8 @@ If these obligations are proved, the proof chain closes as:
 ```text
 rank-cancellation exchange
   + rank-payment aggregation / strengthened count
-  + no-double-spend first-divergence accounting
+  + disjoint resource accounting
+  + local-to-final first-divergence survival
   => residual c_C+c_O<=1
   => local alpha-2 hole/defect coupling
   => first-divergence global |H|<=2e

@@ -349,8 +349,10 @@ where `A(U)` is the set of full child stride cores contained in `U`.
 
 The sibling-survival subproblem must respect parent residue geometry: a parent core is a fixed
 residue modulo `M`, not an arbitrary per-coordinate sibling choice. Thus each common child core
-offers two parent residue candidates, and failed residue candidates are paid by
-cancellation/residual labels.
+offers two parent residue candidates. Quantitative no-early-gluing implies at most one sibling
+output vanishes over the whole common child core, so at least one of those two parent residue
+candidates is fully present. The opposite-side surviving outputs are paid by cancellation/residual
+labels when the child core has size greater than one.
 
 The checker:
 

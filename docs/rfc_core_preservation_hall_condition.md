@@ -298,16 +298,43 @@ Second, once a common child core:
 C' subset U cap V
 ```
 
-is found, parent gluing must choose one surviving sibling over every coordinate of `C'`. The
-no-early-gluing algebra says at most one coordinate can have the exact sibling cancellation pattern
-unless the node is the full-live glue point. Therefore killing all parent continuations inside
-`C'` costs cancellation labels:
+is found, parent gluing must choose one surviving sibling side over every coordinate of `C'`.
+This is easier than exact-support equality.
+
+For every coordinate of `C'`, the two child values are nonzero. The local `2 x 2` fold matrix is
+invertible, so at least one of the two parent siblings is nonzero at that coordinate. The
+quantitative no-early-gluing lemma says that, generically, at most one parent sibling vanishes over
+all coordinates of `C'`: two vanished siblings at two different coordinates would impose two
+independent fresh-random ratio conditions.
+
+Therefore one constant parent side survives across the entire child core:
 
 ```text
-max(0, |C'|-1).
+if the unique vanished sibling is lower, choose the upper parent residue;
+if the unique vanished sibling is upper, choose the lower parent residue;
+if no sibling vanishes, either parent residue survives.
 ```
 
-At the full-live node `|C'|=1`, no cancellation charge is needed and the exact glue step survives.
+Thus:
+
+```text
+C' subset U cap V  =>  some parent matched core is contained in Y_parent.
+```
+
+The cancellation charge:
+
+```text
+max(0, |C'|-1)
+```
+
+is still relevant for exact weight equality. If `|C'|>1`, the opposite sibling side survives at
+all but possibly one coordinate, producing extra outputs compared to the exact branch. These extra
+sibling outputs consume defect, but they do not prevent a parent core from being contained in the
+support.
+
+At the full-live node `|C'|=1`, no cancellation charge is needed and the exact glue step survives
+with exact support. Above that point, the core still survives but the extra sibling outputs are
+labeled as cancellation/residual charges.
 
 There is an indexing constraint here. A parent matched core is not an arbitrary choice of one
 sibling over each child coordinate. The chosen siblings must form one parent stride residue modulo
@@ -327,22 +354,18 @@ and prescribes a deterministic sibling pattern over the child stride class. The 
 survival lemma should be stated as:
 
 ```text
-If a child residue lies in A(U) cap A(V), then every parent residue above it either survives as an
-actual parent stride core, or is paid for by a cancellation/residual label.
+If a child residue lies in A(U) cap A(V), then at least one of the two parent residues above it
+survives as an actual parent stride core. The other side's extra outputs are paid for by
+cancellation/residual labels.
 ```
 
 In the exact full-live glue point, the child core has size one, so this sibling pattern is just one
 local sibling choice. Above that point, no-early-gluing says the exact cancellation pattern cannot
-hold for all coordinates of a multi-coordinate child core. In the near theorem, those failed
-coordinates are exactly what the cancellation/residual labels pay for.
+kill the opposite side at every coordinate of a multi-coordinate child core. In the near theorem,
+those surviving opposite-side outputs are exactly what the cancellation/residual labels pay for.
 
-Since an exact child core has size `L` before the full-live glue point, killing all continuations
-should cost at least `L`. But a parent with output size `L+E_parent` can only afford this if the
-extra support is large enough to label those killed continuations. This is precisely the charged
-tree count; it is also why a positive-defect counterexample is not ruled out by size alone.
-
-The certificate does not need to rule out such configurations uniquely. It needs to show that the
-killed continuations can be labeled with bounded local data and charged leaves.
+So after the core-alignment lemma, the balanced two-child core-preservation step is done. The
+remaining bookkeeping is only to label the extra sibling outputs created when `|C'|>1`.
 
 ### Case 3: Unbalanced Two-Child Node
 

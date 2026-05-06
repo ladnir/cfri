@@ -297,8 +297,22 @@ Once any child core:
 C' subset U
 ```
 
-is found, parent gluing must choose one surviving sibling side over every coordinate of `C'`.
-This is easier than exact-support equality.
+is found, parent gluing must choose one parent residue above it. This is easier than exact-support
+equality, but the indexing matters.
+
+The child core `C'` is one residue class modulo `M/2` in the child node. It splits into two
+sub-residue classes modulo `M`:
+
+```text
+C' = C'_0 disjoint_union C'_1.
+```
+
+The two parent residues above `C'` are:
+
+```text
+both parent siblings over C'_0,
+both parent siblings over C'_1.
+```
 
 For every coordinate of `C'`, at least one child value is nonzero. If only that child is active,
 both parent siblings are nonzero. If both children are active, the local `2 x 2` fold matrix is
@@ -306,21 +320,8 @@ invertible, so at least one parent sibling is nonzero. The quantitative no-early
 that, generically, at most one parent sibling vanishes over all coordinates of `C'`: two vanished
 siblings at two different coordinates would impose two independent fresh-random ratio conditions.
 
-Therefore one constant parent side survives across the entire child core:
-
-```text
-if the unique vanished sibling is lower, choose the upper parent residue;
-if the unique vanished sibling is upper, choose the lower parent residue;
-if no sibling vanishes, either parent residue survives.
-```
-
-Thus:
-
-```text
-C' subset U cap V  =>  some parent matched core is contained in Y_parent.
-```
-
-More generally:
+One vanished sibling can destroy at most one of the two parent residue candidates above `C'`.
+Therefore the other parent residue candidate is fully present. Thus:
 
 ```text
 C' subset U or C' subset V  =>  some parent matched core is contained in Y_parent.
@@ -349,25 +350,26 @@ sibling over each child coordinate. The chosen siblings must form one parent str
 rho in {0, ..., M-1}.
 ```
 
-Each parent residue `rho` projects to a child residue:
+Each parent residue `rho` projects to a child sub-residue:
 
 ```text
-rho mod (M/2).
+rho mod M.
 ```
 
-and prescribes a deterministic sibling pattern over the child stride class. The parent sibling
-survival lemma should be stated as:
+This sub-residue lies inside the child core of residue `rho mod (M/2)`, and the parent core uses
+both parent siblings over that sub-residue. The parent sibling survival lemma should be stated as:
 
 ```text
-If a child residue lies in A(U) cap A(V), then at least one of the two parent residues above it
-survives as an actual parent stride core. The other side's extra outputs are paid for by
-cancellation/residual labels.
+If a child residue lies in A(U) or A(V), then at least one of the two parent residues above it
+survives as an actual parent stride core. Extra outputs outside that selected parent residue are
+paid for by cancellation/residual labels.
 ```
 
 In the exact full-live glue point, the child core has size one, so this sibling pattern is just one
-local sibling choice. Above that point, no-early-gluing says the exact cancellation pattern cannot
-kill the opposite side at every coordinate of a multi-coordinate child core. In the near theorem,
-those surviving opposite-side outputs are exactly what the cancellation/residual labels pay for.
+local output choice. Above that point, no-early-gluing says cancellations cannot destroy both
+parent residue candidates over a multi-coordinate child core. In the near theorem, the surviving
+outputs outside the selected parent residue are exactly what the cancellation/residual labels pay
+for.
 
 So the balanced two-child core-preservation step is done by child minimality plus
 no-early-gluing. The remaining bookkeeping is only to label the extra sibling outputs created when

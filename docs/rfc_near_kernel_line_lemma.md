@@ -51,18 +51,21 @@ depth 4, m=4, e=1 exhaustive near pairs
 depth 4, m=2, e=1 exhaustive near pairs
 depth 4, m=2, e=2 exhaustive near pairs
 depth 4, m=4, e=2 generated matched-core pairs
+depth 4, m=4, e=3 generated matched-core pairs
 ```
 
-The newest generated-family artifact is:
+The generated-family artifacts are:
 
 ```text
 docs/rfc_near_pair_kernel_dim_depth4_m4_e2_model.csv
+docs/rfc_near_pair_kernel_dim_depth4_m4_e3_model.csv
 ```
 
 with:
 
 ```text
-1056 pairs, all kernel_dim = 1.
+e=2: 1056 pairs, all kernel_dim = 1
+e=3: 3520 pairs, all kernel_dim = 1
 ```
 
 ## Proof Shape

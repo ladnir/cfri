@@ -204,6 +204,20 @@ docs/rfc_near_pair_kernel_dim_depth4_m4_e2_model.csv
 
 finds kernel dimension exactly `1` for all `1056` generated pairs.
 
+The same generated-model check at `m=4`, `e=3` gives:
+
+```text
+16 * binom(12,3) = 3520
+```
+
+pairs, and:
+
+```text
+docs/rfc_near_pair_kernel_dim_depth4_m4_e3_model.csv
+```
+
+again finds kernel dimension exactly `1` for every pair.
+
 So adding extra output positions around a matched core does not appear to create larger kernel
 families in these checks. This supports the counting model: each near support pair contributes one
 candidate line, not a high-dimensional subspace that would need extra first-moment mass.

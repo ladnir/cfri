@@ -144,7 +144,7 @@ valid core choice.
 
 ## Alpha-2 Local Skeleton
 
-Here is the intended local inequality.
+Here is the intended local inequality after local cancellation charges have been paid.
 
 Let:
 
@@ -156,14 +156,29 @@ A = |C \ (U union V)|,
 S = U union V.
 ```
 
+Let:
+
+```text
+O = |S \ C|.
+```
+
+Also let `c_C` be the number of vanished parent siblings over covered coordinates of `C`, and
+`c_O` the number of vanished parent siblings over coordinates in `S\C`. The charged-tree theorem
+should pay for all but at most one local sibling cancellation at this node, so the uncharged local
+skeleton satisfies:
+
+```text
+c_C + c_O <= 1.
+```
+
 Then:
 
 ```text
-parent holes inside the selected residue <= 2A + 1.
+parent holes inside the selected residue = 2A + c_C.
 ```
 
 The `2A` term is because a missing child coordinate removes both sibling positions of the parent
-residue. The `+1` term is the possible single sibling cancellation inside `C`.
+residue. The `c_C` term is the possible sibling cancellation inside `C`.
 
 The child support lower bound should use the smaller child row weight:
 
@@ -179,26 +194,51 @@ Since `|C|=R`, this gives:
         = R + A.
 ```
 
-For every coordinate in `S \ C`, the parent has support outside the selected residue. A one-sided
-child coordinate gives two non-core parent outputs. A two-sided child coordinate gives two non-core
-outputs except for a sibling cancellation, and no-early-gluing permits at most one such cancellation
-over the selected local comparison. Therefore:
+In other words:
 
 ```text
-outside non-core parent outputs >= 2(R+A) - 1.
+O >= R + A.
 ```
 
-Combining:
+For every coordinate in `S \ C`, the parent has support outside the selected residue. Before
+cancellations, this gives two non-core parent outputs per coordinate. After the remaining uncharged
+cancellations:
 
 ```text
-local output defect
+outside non-core parent outputs >= 2O - c_O.
+```
+
+Thus the local output defect relative to the virtual parent core is:
+
+```text
+e_local
   = outside non-core parent outputs - parent holes
- >= (2R + 2A - 1) - (2A + 1)
-  = 2R - 2.
+ >= (2O - c_O) - (2A + c_C)
+ >= 2(R+A) - c_O - 2A - c_C
+  = 2R - (c_C+c_O)
+ >= 2R - 1.
 ```
 
-This lower bound is already much larger than the hole count for all moderate `R`; the small cases
-`R=1,2` should be checked directly. A sharper version keeps the actual `A` term and proves:
+The parent-position hole count is:
+
+```text
+h_local = 2A + c_C <= 2R + c_C.
+```
+
+For `R>=2`:
+
+```text
+h_local <= 2R + c_C <= 2R+1 <= 2(2R-1) <= 2 e_local.
+```
+
+If `A=R`, then `c_C=0` and the same inequality is even tighter:
+
+```text
+h_local = 2R <= 2(2R-1).
+```
+
+Therefore the local alpha-2 coupling holds for every `R>=2` once all but one sibling cancellation
+has been paid by the cancellation-charge mechanism:
 
 ```text
 parent holes <= 2 * local output defect.
@@ -206,10 +246,29 @@ parent holes <= 2 * local output defect.
 
 This is the desired `alpha=2` local coupling.
 
-The only delicate assumption in this skeleton is the cancellation bound outside `C`. It must be
-stated with the same rational-function/no-early-gluing hypothesis used in the balanced proof: many
-independent sibling cancellations at one node would impose incompatible fresh-random ratio
-conditions.
+### Small Cases
+
+`R=1` means `L=2`: the parent residue has two positions over one child coordinate. If that child
+coordinate is present, the residue has at most one cancellation hole; if it is absent, both holes
+are offset by at least `|S|>=L=2` outside child coordinates, giving at least four non-core parent
+outputs before paid cancellations. So the same alpha-2 inequality holds after cancellation charges.
+
+`L=1` is the full-live endpoint: a parent core has one position, and any nonzero output position is
+a valid core choice.
+
+### Cancellation Charge Interface
+
+The delicate assumption is the bound:
+
+```text
+c_C+c_O <= 1
+```
+
+for the uncharged local skeleton. This should not be read as saying many local cancellations are
+deterministically impossible for arbitrary near supports. Rather, the charged-tree proof must first
+emit cancellation records for all but one vanished sibling at this node. This is the same interface
+as the balanced proof: no-early-gluing prevents multiple uncharged cancellations in an exact
+skeleton, while additional cancellations are paid local defects.
 
 ## Status
 

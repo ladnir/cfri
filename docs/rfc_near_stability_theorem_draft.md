@@ -87,8 +87,15 @@ The intended induction:
 
 ```text
 1. One-child descent:
-   The child support pair has the same defect e.
-   Lifting preserves matched-core-plus-extras.
+   If the live rows occupy only one child, the parent output is the two-sibling lift of the child
+   output. Thus the parent defect is twice the child defect:
+
+   ```text
+   def_parent = 2 def_child.
+   ```
+
+   Lifting preserves matched-core-plus-extras with the same scaling: each child extra leaf lifts to
+   two parent extra leaves, so the charged-extra count remains bounded by the parent defect budget.
 
 2. Two-child branch:
    If common child output support h > 1, charge h-1 extras.
@@ -177,13 +184,33 @@ every saved near-extremizer still has kernel dimension exactly:
 1.
 ```
 
+The generated matched-core model at depth `4`, live size `m=4`, and defect `e=2` has:
+
+```text
+16 * binom(12,2) = 1056
+```
+
+candidate support pairs, saved in:
+
+```text
+docs/rfc_uncertainty_near_model_pairs_depth4_m4_e2.csv
+```
+
+The kernel-dimension check:
+
+```text
+docs/rfc_near_pair_kernel_dim_depth4_m4_e2_model.csv
+```
+
+finds kernel dimension exactly `1` for all `1056` generated pairs.
+
 So adding extra output positions around a matched core does not appear to create larger kernel
 families in these checks. This supports the counting model: each near support pair contributes one
 candidate line, not a high-dimensional subspace that would need extra first-moment mass.
 
 ## Remaining Proof Gap
 
-The proof gap is now narrow:
+The remaining proof obligation is specific:
 
 ```text
 Show that every deviation from matched-core recursion can be charged injectively to an extra output

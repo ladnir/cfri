@@ -50,6 +50,28 @@ different charged divergences produce different output leaves.
 
 This avoids double-counting across recursive levels.
 
+## Canonical First-Divergence Lemma
+
+Fix a candidate matched core `C` in the final output leaves. For an output leaf `ell notin C`, define
+`first(ell)` to be the highest internal node where the path to `ell` takes a sibling branch that is
+not used by the core path through that node.
+
+The bookkeeping lemma we need is:
+
+```text
+Every local failed cancellation at a two-child node can be assigned to an output leaf ell notin C
+whose first divergence is that node.
+```
+
+If this assignment exists, it is automatically injective. Indeed, two different nodes cannot have
+the same `first(ell)`. Two failed cancellations at the same node but at different child coordinates
+also produce different descendant leaves, because the child coordinate suffix differs.
+
+This is the combinatorial heart of the near theorem. The algebraic input only proves that a node
+with common continuation set of size `h` creates at least `h-1` non-core sibling leaves. The
+first-divergence lemma says those locally created leaves stay available for charging and are not
+reused by lower nodes.
+
 ## Inductive Counting Form
 
 Let `Core(node)` be the matched stride core exposed by following the uncharged branch choices. Let
@@ -67,8 +89,8 @@ The transitions are:
 ```text
 one-child descent:
   Core lifts to both siblings;
-  Extra lifts to both siblings only when those leaves are already in the output support budget;
-  defect count is preserved in the child coordinates.
+  Extra lifts to both siblings;
+  both the defect and the number of extra leaves double when moving from the child to the parent.
 
 two-child exact glue (h=1):
   Core chooses one sibling;
@@ -86,6 +108,59 @@ This yields the structural containment:
 support pair with defect e
   => contains a matched core plus at most e extra leaves.
 ```
+
+## Budget Recurrence
+
+The induction should track an integer budget `E(node)` rather than reusing the same symbol at every
+scale.
+
+For a node of output length `K`, live-row weight `M`, and output support `Y`, define:
+
+```text
+E(node) = |Y| - K/M.
+```
+
+The desired conclusion is:
+
+```text
+there is a matched core C(node) subset Y with |Y \ C(node)| = E(node).
+```
+
+This form makes the one-child case exact. If the live rows occupy only one child, then:
+
+```text
+Y_parent = lift(Y_child)
+|Y_parent| = 2 |Y_child|
+K_parent/M = 2 K_child/M
+E_parent = 2 E_child.
+```
+
+By induction the child has:
+
+```text
+Y_child = C_child union Extra_child
+|Extra_child| = E_child.
+```
+
+Lifting both sides gives:
+
+```text
+Y_parent = lift(C_child) union lift(Extra_child)
+|lift(Extra_child)| = 2 E_child = E_parent.
+```
+
+Thus the one-child step has no hidden loss.
+
+The two-child step is the only place where algebra is used. If the two child branches have common
+candidate continuation set of size `h`, the exact matched recursion can keep one coordinate without
+paying an extra leaf. Quantitative no-early-gluing forces every other attempted continuation to
+leave an additional sibling output. The local contribution is therefore at least:
+
+```text
+h - 1
+```
+
+new leaves outside the selected core continuation.
 
 ## Counting
 

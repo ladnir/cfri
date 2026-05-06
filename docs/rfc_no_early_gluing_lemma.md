@@ -167,3 +167,30 @@ dim ker(A[R, [k]\W]) =
 at the exact boundary `|R||W|=k`.
 
 This argument is local and independent of the rest of the distance counting machinery.
+
+## Quantitative Version
+
+The same proof gives the near-extremizer charging rule.
+
+With a single relative scalar `lambda`, at most one coordinate `j in W'` can satisfy the required
+cancellation equation generically. If two distinct coordinates cancelled, the proof above would
+produce the impossible equation:
+
+```text
+L_{j1}(T_{j1}) = c L_{j2}(T_{j2}).
+```
+
+Therefore, when `|W'|=h`, an attempted early two-child glue leaves at least:
+
+```text
+h-1
+```
+
+coordinates where both parent siblings survive instead of one. This costs at least `h-1` extra
+output positions compared to the exact extremal support.
+
+The near-stability strategy using this defect charge is in:
+
+```text
+docs/rfc_near_stability_proof_strategy.md
+```

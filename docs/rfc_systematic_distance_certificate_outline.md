@@ -273,6 +273,12 @@ For the depth-`11`, `m=32` distance-dominant point, this model is tabulated in:
 docs/rfc_near_extremizer_count_depth11_m32.csv
 ```
 
+The proof strategy for this near-stability model is:
+
+```text
+docs/rfc_near_stability_proof_strategy.md
+```
+
 Combining this count with the conditioned-copy zero tail gives:
 
 ```text

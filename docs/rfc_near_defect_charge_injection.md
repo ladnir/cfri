@@ -250,6 +250,34 @@ rounded_split_defect
 is a conservative integer version of the row-split lower bound. This term vanishes on the balanced
 split and is positive otherwise.
 
+When `M` is even, the cheapest unbalanced split is:
+
+```text
+(a,b) = (M/2 - 1, M/2 + 1)
+```
+
+up to swapping the children. Therefore every unbalanced two-child split pays at least:
+
+```text
+min_unbalanced_split_charge(K,M)
+  = ceil(K/(M-2)) - K/M.
+```
+
+Here `K/M` is an integer in the power-of-two boundary cases used by the certificate. Examples at
+the depth-11 collapse live size `M=32`:
+
+```text
+K = 2048: charge >= ceil(2048/30) - 64 = 5
+K = 1024: charge >= ceil(1024/30) - 32 = 3
+K = 512:  charge >= ceil(512/30)  - 16 = 2
+K = 256:  charge >= ceil(256/30)  - 8  = 1
+K = 64:   charge >= ceil(64/30)   - 2  = 1
+K = 32:   charge >= ceil(32/30)   - 1  = 1
+```
+
+So an unbalanced split can happen only by consuming explicit output slack. It cannot appear in the
+uncharged skeleton.
+
 ## Counting
 
 Once the containment is proved, counting is immediate:

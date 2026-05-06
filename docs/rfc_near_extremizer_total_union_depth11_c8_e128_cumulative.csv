@@ -1,5 +1,5 @@
 summary,depth,k,total_expansion,field_bits,max_extra,cumulative_count,total_log2_union
-total,11,2048,8,128.00000000,128,0,-97.14825096
+total,11,2048,8,128.00000000,128,1,-97.14825096
 
 depth,k,live_bits,live_rows,max_extra_checked,worst_extra_outputs,worst_term_log2,subtotal_log2
 11,2048,1,2,128,0,-100.60768258,-100.60768258

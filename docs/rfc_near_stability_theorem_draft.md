@@ -135,6 +135,25 @@ This is exactly the model evaluated in:
 docs/rfc_near_extremizer_total_union_depth11_c8_e128.csv
 ```
 
+The cumulative-count variant:
+
+```text
+number of near support/output pairs with defect at most e
+  <= k * sum_{i<=e} binom(k-k/m, i)
+```
+
+is evaluated in:
+
+```text
+docs/rfc_near_extremizer_total_union_depth11_c8_e128_cumulative.csv
+```
+
+At depth `11`, `c=8`, both versions give the same displayed total log2 union bound:
+
+```text
+-97.14825096.
+```
+
 ## Kernel-Dimension Check
 
 The helper:

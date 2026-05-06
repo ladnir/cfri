@@ -80,6 +80,24 @@ Artifact:
 docs/rfc_near_extremizer_total_union_depth11_c8_e128.csv
 ```
 
+The conservative variant using cumulative near counts:
+
+```text
+k * sum_{i<=e} binom(k-k/m, i)
+```
+
+is:
+
+```text
+docs/rfc_near_extremizer_total_union_depth11_c8_e128_cumulative.csv
+```
+
+and gives the same displayed total:
+
+```text
+log2 failure bound = -97.14825096.
+```
+
 Thus, within the matched-plus-extra model:
 
 ```text

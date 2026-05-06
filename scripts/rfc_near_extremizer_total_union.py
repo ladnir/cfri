@@ -34,6 +34,7 @@ def main() -> None:
     parser.add_argument("--total-expansion", type=int, default=8)
     parser.add_argument("--field-bits", type=float, default=128.0)
     parser.add_argument("--max-extra", type=int, default=-1)
+    parser.add_argument("--cumulative-count", action="store_true")
     parser.add_argument("--out", required=True)
     args = parser.parse_args()
 
@@ -53,8 +54,12 @@ def main() -> None:
         subtotal = NEG_INF
         worst_extra = 0
         worst_log = NEG_INF
+        cumulative_near_count_log = NEG_INF
         for extra in range(max_extra + 1):
-            near_count_log = math.log2(parity_copies) + math.log2(k) + log2_comb(extras_available, extra)
+            exact_extra_log = log2_comb(extras_available, extra)
+            cumulative_near_count_log = log2_add(cumulative_near_count_log, exact_extra_log)
+            chosen_extra_log = cumulative_near_count_log if args.cumulative_count else exact_extra_log
+            near_count_log = math.log2(parity_copies) + math.log2(k) + chosen_extra_log
             needed_zeros = extra + 1
             aggregate_tail_log = log2_comb(other_copies * k, needed_zeros) - needed_zeros * args.field_bits
             term = near_count_log + aggregate_tail_log
@@ -78,8 +83,21 @@ def main() -> None:
 
     with Path(args.out).open("w", newline="") as handle:
         writer = csv.writer(handle)
-        writer.writerow(["summary", "depth", "k", "total_expansion", "field_bits", "max_extra", "total_log2_union"])
-        writer.writerow(["total", args.depth, k, args.total_expansion, f"{args.field_bits:.8f}", args.max_extra, f"{total_log:.8f}"])
+        writer.writerow(
+            ["summary", "depth", "k", "total_expansion", "field_bits", "max_extra", "cumulative_count", "total_log2_union"]
+        )
+        writer.writerow(
+            [
+                "total",
+                args.depth,
+                k,
+                args.total_expansion,
+                f"{args.field_bits:.8f}",
+                args.max_extra,
+                int(args.cumulative_count),
+                f"{total_log:.8f}",
+            ]
+        )
         writer.writerow([])
         writer.writerow(
             [

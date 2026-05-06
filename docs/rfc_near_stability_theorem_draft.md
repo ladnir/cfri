@@ -135,6 +135,33 @@ This is exactly the model evaluated in:
 docs/rfc_near_extremizer_total_union_depth11_c8_e128.csv
 ```
 
+## Kernel-Dimension Check
+
+The helper:
+
+```text
+scripts/rfc_near_pair_kernel_dim.py
+```
+
+computes kernel dimensions for saved near-extremizer support pairs. For the checked depth-`4`
+families:
+
+```text
+docs/rfc_near_pair_kernel_dim_depth4_m4_w5.csv
+docs/rfc_near_pair_kernel_dim_depth4_m2_w9.csv
+docs/rfc_near_pair_kernel_dim_depth4_m2_w10.csv
+```
+
+every saved near-extremizer still has kernel dimension exactly:
+
+```text
+1.
+```
+
+So adding extra output positions around a matched core does not appear to create larger kernel
+families in these checks. This supports the counting model: each near support pair contributes one
+candidate line, not a high-dimensional subspace that would need extra first-moment mass.
+
 ## Remaining Proof Gap
 
 The proof gap is now narrow:

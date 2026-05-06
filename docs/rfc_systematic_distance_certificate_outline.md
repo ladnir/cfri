@@ -297,6 +297,12 @@ The defect-charge injection bookkeeping is:
 docs/rfc_near_defect_charge_injection.md
 ```
 
+The saved near-extremizer kernel-dimension check is:
+
+```text
+scripts/rfc_near_pair_kernel_dim.py
+```
+
 Combining this count with the aggregate zero tail over the remaining parity copies gives:
 
 ```text

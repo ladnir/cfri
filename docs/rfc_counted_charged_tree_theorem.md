@@ -331,6 +331,25 @@ One possible route is a local Hall/survival condition, split out in:
 docs/rfc_core_preservation_hall_condition.md
 ```
 
+The checker:
+
+```text
+scripts/rfc_check_matched_core_containment.py
+```
+
+verifies this invariant for saved support-pair artifacts. Current depth-4 results:
+
+```text
+exhaustive m=4,e=1: 192 pairs, exactly one contained core each
+exhaustive m=2,e=1: 128 pairs, exactly one contained core each
+exhaustive m=2,e=2: 448 pairs, exactly one contained core each
+generated  m=4,e=2: 1056 pairs, exactly one contained core each
+generated  m=4,e=3: 3520 pairs, exactly one contained core each
+generated  m=4,e=4: 7872 pairs with one core, 48 pairs with two cores
+```
+
+The `e=4` two-core cases are the same complete-extra-stride cases that give kernel dimension `2`.
+
 ## Why The Encoder Count Is Enough
 
 For the certificate, we do not need to reconstruct `x`, only to union bound all possible bad support

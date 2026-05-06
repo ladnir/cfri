@@ -116,9 +116,55 @@ complete_extra_strides - (kernel_dim - 1) = 0.
 ## Proof Shape
 
 The exact matched-kernel proof descends to the live block and then glues a single output coordinate
-through a full binary subtree. Extra allowed outputs remove some zero constraints. The corrected
-lemma says the kernel dimension can only grow when the removed constraints contain a complete
-additional global stride class.
+through a full binary subtree. For the dimension bound, the descent phase is the key simplification.
+
+Let the matched row block `R` have size `m`, and let `B` be the depth-`log2(m)` node whose leaves
+are exactly `R`. Above `B`, the message occupies only one child at every level. If the child output
+coordinate is `z_j`, then the parent exposes two sibling outputs:
+
+```text
+((1-T_j) z_j, -T_j z_j)
+```
+
+or the analogous right-child pair. Over the generic field both multipliers are nonzero. Therefore:
+
+```text
+z_j can be nonzero only if both sibling lifts of j are allowed.
+```
+
+Iterating from the root down to `B`, a local output coordinate of `B` can survive the global zero
+constraints only if every one of its `k/m` global lifts is allowed. Those global lifts are exactly
+one stride class modulo `m`.
+
+Thus, after applying all zero constraints from levels above the live block, the allowed output space
+inside `B` has dimension:
+
+```text
+number of complete stride classes contained in C union E.
+```
+
+Inside `B`, the full depth-`log2(m)` RFC transform is invertible: it is a product of invertible
+local `2 x 2` fold matrices. Hence constraining the output inside `B` to any set of `s` local
+coordinates leaves an `s`-dimensional message subspace.
+
+Consequently:
+
+```text
+dim { x in F^R : supp(A_d x) subset C union E }
+  = number of complete stride classes contained in C union E.
+```
+
+Since `C` is one complete stride class and each additional complete stride class costs `|C|=k/m`
+extra leaves from `E`, this gives:
+
+```text
+dim <= 1 + floor(|E| / |C|).
+```
+
+This proof uses only generic nonzero fold multipliers in the one-child descent and invertibility of
+the RFC transform on the full live block.
+
+## Recursive View
 
 A direct proof should use the same recursion as:
 
@@ -126,9 +172,16 @@ A direct proof should use the same recursion as:
 docs/rfc_matched_kernel_induction.md
 ```
 
-but with a punctured set of zero constraints.
+but with a punctured set of zero constraints. The invariant becomes exact:
 
-The intended invariant is:
+```text
+At a one-child descent node, a child coordinate is allowed iff both parent siblings are allowed.
+At the full live node, every allowed local output coordinate contributes one dimension.
+```
+
+This is equivalent to the stride-class equality above.
+
+The previous informal invariant was:
 
 ```text
 At each glue node, each independent new output direction requires all copies of one additional

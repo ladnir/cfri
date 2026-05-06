@@ -136,6 +136,7 @@ one-copy uncertainty:             drafted
 exact matched construction:       drafted
 no early gluing:                  local rational-function proof written
 exact stability theorem:          drafted from the previous lemmas
+near-core dimension bound:        direct stride-class proof written
 near-stability/counting:          strategy plus exact depth-4 evidence
 remaining-copy zero tail:         union bound written and tabulated
 ```
@@ -170,21 +171,22 @@ docs/rfc_near_core_stride_dimension_class_depth4_m4_e4.csv
 show `kernel_dim - 1` equals the number of complete extra stride classes for all generated
 `m=4`, `e=2,3,4` pairs.
 
-The main remaining proof obligation is the near-stability theorem:
+The main remaining proof obligation is now the core-containment part of near stability:
 
 ```text
 wt(x)=m, wt(Ax)<=k/m+e
   => support/output pair contains a matched stride core plus e extras
 ```
 
-plus the near-core dimension lemma:
+The near-core dimension lemma is:
 
 ```text
 dim {x supported on R : supp(Ax) subset C union E}
   <= 1 + floor(|E|/|C|)
 ```
 
-for matched `R,C` and arbitrary extra set `E`.
+for matched `R,C` and arbitrary extra set `E`. It follows by descending to the live block: a local
+coordinate survives the global zero constraints exactly when its whole stride class is allowed.
 
 These are tracked separately in:
 

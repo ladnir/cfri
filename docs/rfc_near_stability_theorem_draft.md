@@ -290,6 +290,11 @@ The kernel-dimension sublemma is split out in:
 docs/rfc_near_kernel_line_lemma.md
 ```
 
+That sublemma now has a direct proof: above the live row block, a child output coordinate can remain
+nonzero only when both sibling lifts are allowed; iterating this condition leaves exactly complete
+global stride classes. Inside the live block the RFC transform is invertible, so the kernel
+dimension equals the number of complete allowed stride classes.
+
 ## Remaining Proof Gap
 
 The remaining proof obligation is specific:

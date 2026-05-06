@@ -105,11 +105,14 @@ m=4,e=1: count = 16 * binom(12,1) = 192
 m=2,e=1: count = 16 * binom(8,1)  = 128
 m=2,e=2: count = 16 * binom(8,2)  = 448
 m=4,e=2: generated model count = 16 * binom(12,2) = 1056
+m=4,e=3: generated model count = 16 * binom(12,3) = 3520
+m=4,e=4: generated model count = 16 * binom(12,4) = 7920
 ```
 
 Each saved near-extremizer contains a matched stride core and uses all remaining allowed support as
-extras. The generated `m=4,e=2` matched-core model also has one-dimensional kernels for all `1056`
-pairs.
+extras. The generated `m=4,e=2` and `m=4,e=3` matched-core models have one-dimensional kernels.
+At `m=4,e=4`, exactly `48` generated pairs have kernel dimension `2`; these are the cases where
+the extras contain a full additional stride class.
 
 ## Proof Path
 

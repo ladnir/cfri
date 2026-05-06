@@ -44,8 +44,11 @@ with weight below `12384` must have:
 
 ```text
 1. one parity copy with output support k/m + e around a matched stride core;
-2. at least e+1 zeros across the remaining six parity copies.
+2. enough zeros across the remaining six parity copies to fall below the target.
 ```
+
+At the optimal collapse live sizes `m=32` and `m=64`, this is `e+1` zeros. For other `m`, the
+required number is larger.
 
 The matched-plus-extra support-pair count is:
 
@@ -98,10 +101,30 @@ and gives the same displayed total:
 log2 failure bound = -97.14825096.
 ```
 
-Thus, within the matched-plus-extra model:
+A corrected version also charges:
 
 ```text
-Pr[d_sys < 12384] <= 2^-97.14825096.
+needed zeros = max(1, m + k/m + e - 96 + 1)
+kernel dimension factor <= q^floor(e/(k/m))
+```
+
+where `96` is the collapse sparse-side target `m+k/m` at `m=32` or `m=64`. This is evaluated in:
+
+```text
+docs/rfc_near_extremizer_total_union_depth11_c8_e128_stride_dim.csv
+docs/rfc_near_extremizer_total_union_depth11_c8_e128_cumulative_stride_dim.csv
+```
+
+and gives:
+
+```text
+log2 failure bound = -99.60768258.
+```
+
+Thus, within the corrected matched-plus-extra model:
+
+```text
+Pr[d_sys < 12384] <= 2^-99.60768258.
 ```
 
 ## Lemma Status
@@ -125,9 +148,17 @@ depth 4, m=2, e=1: exhaustive scan gives 128 = 16*binom(8,1)
 depth 4, m=2, e=2: exhaustive scan gives 448 = 16*binom(8,2)
 depth 4, m=4, e=2: generated matched-core model gives 1056 = 16*binom(12,2)
 depth 4, m=4, e=3: generated matched-core model gives 3520 = 16*binom(12,3)
+depth 4, m=4, e=4: generated matched-core model gives 7920 = 16*binom(12,4)
 ```
 
-All saved or generated near-extremizer pairs checked so far have one-dimensional kernels.
+The `e=4` generated model is the first point where kernel dimension grows:
+
+```text
+7872 pairs have kernel_dim = 1
+48 pairs have kernel_dim = 2
+```
+
+Those dimension-`2` cases occur when the extras contain a complete additional stride class.
 
 The main remaining proof obligation is the near-stability theorem:
 
@@ -136,10 +167,11 @@ wt(x)=m, wt(Ax)<=k/m+e
   => support/output pair contains a matched stride core plus e extras
 ```
 
-plus the near-core line lemma:
+plus the near-core dimension lemma:
 
 ```text
-dim {x supported on R : supp(Ax) subset C union E} = 1
+dim {x supported on R : supp(Ax) subset C union E}
+  <= 1 + floor(|E|/|C|)
 ```
 
 for matched `R,C` and arbitrary extra set `E`.
@@ -165,7 +197,7 @@ This would certify the all-level systematic construction essentially at its know
 delta_sys = 0.755859375
 ```
 
-for the depth-11, c=8 parameter point, with about `97` bits of modeled large-field slack. The
+for the depth-11, c=8 parameter point, with about `99` bits of modeled large-field slack. The
 asymptotic target remains:
 
 ```text

@@ -122,8 +122,8 @@ Including the choice of sparse parity copy gives:
 c_p * k * binom(k-k/m, e).
 ```
 
-To beat the collapse baseline, the remaining `c_p-1` copies must provide at least `e+1` aggregate
-zeros, bounded by:
+For the optimal collapse live sizes this must be paired with at least `e+1` aggregate zeros in the
+remaining `c_p-1` copies, bounded by:
 
 ```text
 binom((c_p-1)k, e+1) q^{-(e+1)}.
@@ -159,6 +159,31 @@ At depth `11`, `c=8`, both versions give the same displayed total log2 union bou
 
 ```text
 -97.14825096.
+```
+
+The corrected certificate model uses the actual sparse-side gap for every `m`:
+
+```text
+needed_zeros = max(1, m + k/m + e - 96 + 1)
+```
+
+and pays for possible near-core kernel growth by:
+
+```text
+q^floor(e/(k/m)).
+```
+
+This is evaluated in:
+
+```text
+docs/rfc_near_extremizer_total_union_depth11_c8_e128_stride_dim.csv
+docs/rfc_near_extremizer_total_union_depth11_c8_e128_cumulative_stride_dim.csv
+```
+
+At depth `11`, `c=8`, both corrected versions give:
+
+```text
+-99.60768258.
 ```
 
 ## Kernel-Dimension Check
@@ -218,11 +243,35 @@ docs/rfc_near_pair_kernel_dim_depth4_m4_e3_model.csv
 
 again finds kernel dimension exactly `1` for every pair.
 
-So adding extra output positions around a matched core does not appear to create larger kernel
-families in these checks. This supports the counting model: each near support pair contributes one
-candidate line, not a high-dimensional subspace that would need extra first-moment mass.
+At `m=4`, `e=4`, the generated-model check gives:
 
-The line-uniqueness sublemma is split out in:
+```text
+16 * binom(12,4) = 7920
+```
+
+pairs, saved in:
+
+```text
+docs/rfc_near_pair_kernel_dim_depth4_m4_e4_model.csv
+```
+
+and the dimensions split as:
+
+```text
+kernel_dim 1: 7872 pairs
+kernel_dim 2:   48 pairs
+```
+
+This corrects the earlier line-uniqueness guess. Extras can create a new kernel direction when they
+contain an entire additional stride class. The first-moment model should therefore charge a factor:
+
+```text
+q^floor(e/(k/m))
+```
+
+rather than assuming every matched-core-plus-extra pair contributes only one line.
+
+The kernel-dimension sublemma is split out in:
 
 ```text
 docs/rfc_near_kernel_line_lemma.md

@@ -192,12 +192,20 @@ The first-divergence sets are disjoint across nodes, so:
 ```
 
 Balanced-node charges create no holes and only add true defect leaves. Complete extra stride-class
-dimensions are rank payments handled by the factor `q^floor((e+h)/|C|)`, not additional hole
-payments.
+dimensions are rank payments, not additional hole payments. The current count uses the root-scale
+factor:
+
+```text
+q^floor((e+h)/|C_root|)
+```
+
+It remains to prove that the local child-rank payments needed by the uncharged-skeleton reduction
+aggregate into this root-scale factor, or else to strengthen the first-moment count with explicit
+per-node rank-payment labels.
 
 ## Remaining Algebraic Lemma
 
-The remaining serious proof obligation is the rank-cancellation exchange:
+One remaining serious proof obligation is the rank-cancellation exchange:
 
 ```text
 after paying child rank dimensions, at most one sibling cancellation remains uncharged.
@@ -232,8 +240,8 @@ probability loss. In first-moment form this is:
 q^s * q^(-max(0,t-s-1)).
 ```
 
-After rank payments and probability-loss payments are removed from the structural case under
-consideration, at most one cancellation remains visible to the alpha-2 local size lemma.
+After rank payments and no-early-gluing probability-loss payments are removed from the structural
+case under consideration, at most one cancellation remains visible to the alpha-2 local size lemma.
 
 Equivalently, for every fixed child support/rank pattern and cancellation set `J`, the actual RFC
 cancellation matrix should have generic rank at least:
@@ -251,16 +259,53 @@ This is tracked in:
 docs/rfc_rank_cancellation_exchange.md
 ```
 
+## Audit Findings
+
+A fresh audit identified five issues that should be treated as active proof obligations, not
+cosmetic TODOs:
+
+```text
+P0. Rank-cancellation is not deterministic by itself.
+    Paying s rank parameters leaves max(0,t-s) cancellations; only one is absorbed by the
+    relative scalar. The remaining max(0,t-s-1) must be paid by no-early-gluing probability loss.
+
+P0. Local child-rank spending may exceed the root-scale dimension factor.
+    The notes use child-scale floors floor((e_child+h_child)/|C_child|), while the current
+    certificate count uses only floor((e_root+h_root)/|C_root|).
+
+P1. There is a possible double-spend between outside mass charged away for skeleton reduction and
+    outside mass later used as replacement/true defect leaves in the alpha-2 inequality.
+
+P1. First-divergence composition still needs a local-to-final survival proof: local non-core
+    parent outputs must correspond to final outside leaves with the same first-divergence node.
+
+P2. The charged-label overhead is B*e, not B*(e+h). This is fine only if hole/replacement labels
+    are already determined by support choices or are injectively charged to the true-defect budget.
+```
+
+These findings do not kill the direction, but they mean the proof is not "one lemma away" unless
+the rank-payment aggregation and no-double-spend interfaces are included in that lemma package.
+
 ## Current Honesty Level
 
 We have a plausible full proof architecture and the counting already supports the desired distance
-bound with real slack. We do not yet have a complete proof, because the rank-cancellation exchange
-is still an algebraic lemma, not a finished theorem.
+bound with real slack. We do not yet have a complete proof. The remaining work is:
 
-If the exchange lemma is proved, the proof chain closes as:
+```text
+1. rank-cancellation exchange over the actual RFC fold equations;
+2. aggregation of local child-rank payments into the counted dimension factor, or a strengthened
+   count that explicitly pays them;
+3. disjoint resource accounting between skeleton-reduction charges, replacement leaves, and true
+   defect leaves;
+4. local-to-final survival for first-divergence charged leaves.
+```
+
+If these obligations are proved, the proof chain closes as:
 
 ```text
 rank-cancellation exchange
+  + rank-payment aggregation / strengthened count
+  + no-double-spend first-divergence accounting
   => residual c_C+c_O<=1
   => local alpha-2 hole/defect coupling
   => first-divergence global |H|<=2e

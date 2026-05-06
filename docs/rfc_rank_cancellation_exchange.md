@@ -49,7 +49,16 @@ The near-kernel line lemma pays this by complete extra stride classes:
 s <= floor((e_child+h_child)/|C_child|)
 ```
 
-on each child, and the systematic first-moment count already includes the corresponding factor.
+on each child. This is the local rank budget. It is not automatically the same as the root-scale
+dimension factor:
+
+```text
+floor((e_root+h_root)/|C_root|).
+```
+
+The proof must either show that the local child-rank payments aggregate to the root-scale
+dimension factor already used in the certificate count, or the count must be strengthened to carry
+per-node rank-payment labels.
 
 ## Exchange Lemma Target
 
@@ -61,15 +70,16 @@ conditions impose independent equations except for:
 s paid child-rank parameters.
 ```
 
-So after paying `s` rank parameters, the residual number of uncharged sibling cancellations is at
-most one:
+After paying `s` rank parameters, the residual number of cancellations is:
 
 ```text
-|J| - s <= 1.
+max(0, |J| - s).
 ```
 
-The charged-tree proof can then remove `s` cancellations from the local hole calculation and pass
-only the residual set to the alpha-2 size lemma.
+Only the first residual cancellation can be absorbed by the relative scalar. Any further residual
+cancellations must be paid by the no-early-gluing probability loss. Therefore the deterministic
+alpha-2 local size lemma can see at most one residual cancellation only after both rank payments
+and no-early-gluing loss payments have been removed from the structural case being counted.
 
 ## Why This Is The Right Shape
 
@@ -99,11 +109,13 @@ q^s * q^(-max(0,t-s-1)).
 The `q^s` term is already present in the near-kernel dimension count. The residual loss is the
 same no-early-gluing loss as the exact proof once `t>s+1`.
 
-For the deterministic structural theorem, we can phrase this as:
+For the structural part of the theorem, after the probabilistic loss has also been accounted for,
+we can phrase the local reduction as:
 
 ```text
 pay min(s,t-1) cancellations by rank;
-leave at most one uncharged cancellation for the alpha-2 local lemma.
+pay max(0,t-s-1) cancellations by no-early-gluing loss;
+leave at most one cancellation for the alpha-2 local lemma.
 ```
 
 ## Remaining Algebraic Check
@@ -117,10 +129,11 @@ the cancellation matrix has generic rank at least |J|-1 over the paid child-rank
 ```
 
 This is now the only algebraic obstruction in the proof chain. If it holds, the rest of the
-systematic distance certificate is already reduced to:
+systematic distance certificate is reduced to two counting-interface checks:
 
 ```text
 1. alpha-2 local size inequality;
 2. first-divergence charge composition;
-3. first-moment count with virtual holes and q^floor((e+h)/|C|).
+3. aggregation of local rank payments into the first-moment dimension factor;
+4. first-moment count with virtual holes and q^floor((e+h)/|C|).
 ```

@@ -150,3 +150,9 @@ charges from different recursive nodes must not overcount the same extra output 
 A plausible way to formalize this is to charge each failed cancellation to the surviving sibling
 output position created at that node. That position is outside the eventual matched stride core and
 is unique to that node/coordinate in the recursion tree.
+
+The charge-injection bookkeeping is split out in:
+
+```text
+docs/rfc_near_defect_charge_injection.md
+```

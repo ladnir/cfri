@@ -291,6 +291,12 @@ and the theorem-style near-stability draft is:
 docs/rfc_near_stability_theorem_draft.md
 ```
 
+The defect-charge injection bookkeeping is:
+
+```text
+docs/rfc_near_defect_charge_injection.md
+```
+
 Combining this count with the aggregate zero tail over the remaining parity copies gives:
 
 ```text

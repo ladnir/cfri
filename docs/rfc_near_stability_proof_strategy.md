@@ -104,10 +104,12 @@ At depth `4`, the checked near-extremizers satisfy exactly this model:
 m=4,e=1: count = 16 * binom(12,1) = 192
 m=2,e=1: count = 16 * binom(8,1)  = 128
 m=2,e=2: count = 16 * binom(8,2)  = 448
+m=4,e=2: generated model count = 16 * binom(12,2) = 1056
 ```
 
 Each saved near-extremizer contains a matched stride core and uses all remaining allowed support as
-extras.
+extras. The generated `m=4,e=2` matched-core model also has one-dimensional kernels for all `1056`
+pairs.
 
 ## Proof Path
 
@@ -123,7 +125,8 @@ the equality proof branches become:
 
 ```text
 one-child descent:
-  preserves the defect e_node;
+  doubles both the child defect and the child extra leaves when lifted to the parent, so the
+  normalized budget is exact under the recurrence E_parent = 2 E_child;
 
 two-child glue over common child support h:
   consumes at least h-1 units of defect unless h=1.

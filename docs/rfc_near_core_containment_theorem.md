@@ -281,6 +281,8 @@ This costs at most a moderate factor per charge, for example:
 per charged defect is already far larger than the natural `O(d k)` label count at `d=11`,
 `k=2048`. Even if the label must also carry a collision marker for repeated charges on the same
 final leaf, the crude natural budget is below `2^37`, still well under the tested `B=64` model.
+The label alphabet also includes a `residual` type for output leaves outside the selected skeleton
+that are not minimal row-split/overlap/cancellation witnesses.
 
 The script:
 
@@ -317,3 +319,9 @@ B=108: total log2 union = -67.37561327
 So the proof strategy can prioritize a robust charged-tree count over the exact strongest
 matched-plus-extra classification. The break point is between `B=108` and `B=112`, so there is far
 more overhead budget than a natural charged-tree labeling should need.
+
+The recursive encoder for this counted route is drafted in:
+
+```text
+docs/rfc_counted_charged_tree_theorem.md
+```

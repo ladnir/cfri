@@ -62,11 +62,11 @@ conservative label can include:
 
 ```text
 node id:             at most 2k choices
-charge type:         row-split / overlap / cancellation
+charge type:         row-split / overlap / cancellation / residual
 side bit:            at most 2 choices
 local selector:      at most k choices
 depth/order marker:  at most d choices
-collision marker:    at most e_max choices
+charged-leaf marker: at most e_max choices
 ```
 
 Thus:
@@ -90,8 +90,9 @@ log2(12*d*e_max*k^2) < 37.
 ```
 
 So `B=64` comfortably covers this crude encoding, including repeated charges assigned to the same
-final leaf. If an injective final-leaf assignment is proved, the collision marker can be removed and
-`B=32` already covers the natural label budget.
+final leaf. The charged-leaf marker tells which leaf in the chosen charged-leaf set a given local
+charge uses. If an injective final-leaf assignment is proved, this marker can be removed and `B=32`
+already covers the natural label budget.
 
 ## Slack Check
 
@@ -144,7 +145,7 @@ To prove the counted theorem, it is enough to show:
 
 ```text
 Every unit of local charge can be assigned to one charged final output leaf and one bounded-size
-charge label. Repeated use of a final leaf is allowed if the charge label carries a collision
+charge label. Repeated use of a final leaf is allowed if the charge label carries a charged-leaf
 marker.
 ```
 
@@ -156,6 +157,137 @@ requires an injective accounting into:
 ```
 
 This should be much easier than proving the exact strongest structural classification.
+
+## Recursive Encoder
+
+The counted theorem can be proved by a recursive encoder `Encode(node, x_node, Y_node)`.
+
+At each node, compute:
+
+```text
+K = node output length
+M = wt(x_node)
+E = |Y_node| - K/M
+```
+
+The encoder outputs:
+
+```text
+matched skeleton choices,
+charged final leaves,
+bounded labels for each charged unit.
+```
+
+### One-Child Case
+
+If only one child is live, recurse into that child. Every child charge lifts to two parent leaves,
+but the final-leaf component of the charge record already identifies the lifted leaf. The label adds
+only:
+
+```text
+side bit.
+```
+
+The defect doubles:
+
+```text
+E_parent = 2 E_child.
+```
+
+so the lifted charge budget is exact.
+
+### Balanced Two-Child Case
+
+If both children are live and the row split is balanced, recurse into both children. The local
+defect identity gives:
+
+```text
+E_parent >= E_left + E_right
+          + overlap_charge
+          + cancellation_charge.
+```
+
+Child charges keep their labels and gain a side bit. Then emit local charge records for:
+
+```text
+overlap units:       one record per coordinate in U triangle V;
+cancellation units:  one record for every non-continuation coordinate in U cap V.
+```
+
+Each local record contains:
+
+```text
+node id,
+charge type,
+local coordinate or final leaf suffix,
+side / continuation choice,
+charged-leaf marker if needed.
+```
+
+The local terms above are minimal witnesses that exactness has failed. The actual parent support
+may contain additional leaves outside the selected skeleton. Label every such remaining leaf with:
+
+```text
+charge type = residual.
+```
+
+This is safe because the total number of non-skeleton output leaves is exactly the defect budget at
+that node. The local defect identity is used to prove an exact skeleton can be selected; the final
+support count is paid by labeling all leaves outside that skeleton.
+
+After these records are emitted, the uncharged local branch is exactly the exact-stability branch:
+
+```text
+balanced rows,
+matching child supports,
+one continuation coordinate.
+```
+
+Thus the skeleton follows the matched glue recursion.
+
+### Unbalanced Two-Child Case
+
+If both children are live but the row split is unbalanced, emit:
+
+```text
+rounded_split_defect
+```
+
+row-split charge records at the current node. The label records:
+
+```text
+node id,
+charge type = row-split,
+(a,b),
+selector for a charged final leaf,
+charged-leaf marker if needed.
+```
+
+After paying this charge, the encoder proceeds by selecting a maximal lower-defect branch to define
+the skeleton and treats the other local mass as charged. This is the least formal step, but the
+counted theorem only needs the emitted records to be bounded, not canonical.
+
+As in the balanced case, any support leaf outside the final selected skeleton that was not already
+used as a row-split witness receives a residual label.
+
+## Why The Encoder Count Is Enough
+
+For the certificate, we do not need to reconstruct `x`, only to union bound all possible bad support
+certificates. A bad certificate is described by:
+
+```text
+matched core id,
+charged final leaf set,
+charge labels, each pointing to one leaf in that set.
+```
+
+The number of such descriptions is at most:
+
+```text
+k * binom(k-k/m, <= e) * 2^(B e).
+```
+
+Even if the same support pair has many descriptions, this is fine for a union bound.
 
 ## Relation To The Certificate
 

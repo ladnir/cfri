@@ -279,7 +279,8 @@ This costs at most a moderate factor per charge, for example:
 ```
 
 per charged defect is already far larger than the natural `O(d k)` label count at `d=11`,
-`k=2048`.
+`k=2048`. Even if the label must also carry a collision marker for repeated charges on the same
+final leaf, the crude natural budget is below `2^37`, still well under the tested `B=64` model.
 
 The script:
 

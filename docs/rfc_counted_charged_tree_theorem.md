@@ -40,7 +40,7 @@ The counted charged-tree theorem should prove that the support pair of `x` can b
 ```text
 1. a matched core identifier;
 2. a set of at most e charged final output leaves outside that core;
-3. one local charge label per charged leaf, from an alphabet of size at most 2^B.
+3. one local charge label per unit of charge, from an alphabet of size at most 2^B.
 ```
 
 Therefore the number of possible near support/output certificates is at most:
@@ -61,17 +61,18 @@ A charge label only needs enough information to reconstruct where the local defe
 conservative label can include:
 
 ```text
-node id:          at most 2k choices
-charge type:      row-split / overlap / cancellation
-side bit:         at most 2 choices
-local selector:   at most k choices
-ordering marker:  at most d choices
+node id:             at most 2k choices
+charge type:         row-split / overlap / cancellation
+side bit:            at most 2 choices
+local selector:      at most k choices
+depth/order marker:  at most d choices
+collision marker:    at most e_max choices
 ```
 
 Thus:
 
 ```text
-label count <= 12 d k^2.
+label count <= 12 d e_max k^2.
 ```
 
 At the certificate point:
@@ -79,16 +80,18 @@ At the certificate point:
 ```text
 d = 11
 k = 2048
+e_max = 128
 ```
 
 this is:
 
 ```text
-log2(12*d*k^2) < 30.
+log2(12*d*e_max*k^2) < 37.
 ```
 
-So `B=32` already comfortably covers this crude encoding. Even `B=64` is enormous relative to the
-natural charged-tree label count.
+So `B=64` comfortably covers this crude encoding, including repeated charges assigned to the same
+final leaf. If an injective final-leaf assignment is proved, the collision marker can be removed and
+`B=32` already covers the natural label budget.
 
 ## Slack Check
 
@@ -141,7 +144,8 @@ To prove the counted theorem, it is enough to show:
 
 ```text
 Every unit of local charge can be assigned to one charged final output leaf and one bounded-size
-charge label.
+charge label. Repeated use of a final leaf is allowed if the charge label carries a collision
+marker.
 ```
 
 Unlike exact containment, this does not require proving a canonical minimal deletion set. It only

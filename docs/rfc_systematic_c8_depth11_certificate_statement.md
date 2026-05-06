@@ -246,7 +246,7 @@ show every saved/generated near pair contains at least one actual matched core. 
 `m=4,e=4` model has `48` pairs with two contained cores, exactly matching the complete-extra-stride
 dimension-growth cases.
 
-The main remaining proof obligation is now the core-preservation part of near stability:
+The main remaining proof obligation is now the unbalanced-row-split part of core preservation:
 
 ```text
 wt(x)=m, wt(Ax)<=k/m+e
@@ -265,6 +265,19 @@ parent defect >= child defects
 After such a core is selected, the counted charged-tree theorem labels the `e` remaining output
 leaves with bounded charge records. The proof no longer needs exact near-extremizer classification,
 but it still needs the core to be contained in the actual sparse output support.
+
+The one-child and balanced two-child core-preservation cases are now reduced:
+
+```text
+one-child:          child core lifts directly;
+balanced two-child: child core lifts through one surviving parent residue by no-early-gluing.
+```
+
+The open case is:
+
+```text
+unbalanced two-child split, paid by integer split defect.
+```
 
 The near-core dimension lemma is:
 

@@ -396,6 +396,22 @@ or residual support.
 The local proof obligation is to show that selecting the lower-defect side cannot increase the
 number of required labels beyond the row-split charge plus residual output leaves.
 
+After the balanced-case correction above, this is the only remaining core-preservation case. In
+particular:
+
+```text
+one-child node:               cannot be minimal;
+balanced two-child node:      child core lifts to parent core;
+unbalanced two-child node:    open case, paid by split defect.
+```
+
+So the remaining theorem can be phrased narrowly:
+
+```text
+unbalanced row splits either preserve an actual parent core or can be covered by a bounded-hole /
+charged-tree fallback whose cost is paid by the integer split defect.
+```
+
 ## Hall Conclusion
 
 The certificate-facing Hall conclusion remains:

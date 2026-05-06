@@ -358,6 +358,9 @@ implies at most one sibling output vanishes over the whole child core, so at mos
 parent residue candidates is destroyed. The other candidate is fully present. Outputs outside the
 selected parent residue are paid by cancellation/residual labels.
 
+Thus the only remaining core-preservation case is an unbalanced row split. Balanced two-child nodes
+preserve a core; one-child nodes preserve a core by lifting.
+
 The checker:
 
 ```text

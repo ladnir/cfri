@@ -142,6 +142,75 @@ The proof should use:
 The `L=1` case is harmless because a parent core has one position; any nonzero output position is a
 valid core choice.
 
+## Alpha-2 Local Skeleton
+
+Here is the intended local inequality.
+
+Let:
+
+```text
+N = K/2,
+R = L/2,
+C = child projection of the selected parent residue,
+A = |C \ (U union V)|,
+S = U union V.
+```
+
+Then:
+
+```text
+parent holes inside the selected residue <= 2A + 1.
+```
+
+The `2A` term is because a missing child coordinate removes both sibling positions of the parent
+residue. The `+1` term is the possible single sibling cancellation inside `C`.
+
+The child support lower bound should use the smaller child row weight:
+
+```text
+max(|U|, |V|) >= max(ceil(N/a), ceil(N/b)) >= L.
+```
+
+Since `|C|=R`, this gives:
+
+```text
+|S \ C| >= |S| - |S cap C|
+        >= L - (R-A)
+        = R + A.
+```
+
+For every coordinate in `S \ C`, the parent has support outside the selected residue. A one-sided
+child coordinate gives two non-core parent outputs. A two-sided child coordinate gives two non-core
+outputs except for a sibling cancellation, and no-early-gluing permits at most one such cancellation
+over the selected local comparison. Therefore:
+
+```text
+outside non-core parent outputs >= 2(R+A) - 1.
+```
+
+Combining:
+
+```text
+local output defect
+  = outside non-core parent outputs - parent holes
+ >= (2R + 2A - 1) - (2A + 1)
+  = 2R - 2.
+```
+
+This lower bound is already much larger than the hole count for all moderate `R`; the small cases
+`R=1,2` should be checked directly. A sharper version keeps the actual `A` term and proves:
+
+```text
+parent holes <= 2 * local output defect.
+```
+
+This is the desired `alpha=2` local coupling.
+
+The only delicate assumption in this skeleton is the cancellation bound outside `C`. It must be
+stated with the same rational-function/no-early-gluing hypothesis used in the balanced proof: many
+independent sibling cancellations at one node would impose incompatible fresh-random ratio
+conditions.
+
 ## Status
 
 One-child and balanced two-child nodes already preserve actual cores. This theorem is only needed

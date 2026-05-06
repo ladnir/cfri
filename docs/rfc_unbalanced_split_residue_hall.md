@@ -356,6 +356,12 @@ docs/rfc_near_extremizer_total_union_depth11_c8_e128_stride_dim_overhead64_holes
 docs/rfc_near_extremizer_total_union_depth11_c8_e128_stride_dim_overhead64_holes_le6extra.csv
 ```
 
+The factor-2 local proof skeleton is split out in:
+
+```text
+docs/rfc_defect_coupled_virtual_core_theorem.md
+```
+
 ## Why This Is The Right Remaining Object
 
 The field algebra is already doing two jobs:

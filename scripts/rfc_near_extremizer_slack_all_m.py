@@ -56,7 +56,7 @@ def main() -> None:
             for extra in range(max_extra + 1):
                 near_count_log = math.log2(parity_copies) + math.log2(k) + log2_comb(extras_available, extra)
                 needed_zeros = extra + 1
-                tail_log = math.log2(other_copies) + log2_comb(k, needed_zeros) - needed_zeros * args.field_bits
+                tail_log = log2_comb(other_copies * k, needed_zeros) - needed_zeros * args.field_bits
                 union_log = near_count_log + tail_log
                 if extra == 0:
                     exact_union = union_log

@@ -1,5 +1,5 @@
 #!/usr/bin/env python3
-"""Combine near-extremizer counts with conditioned-copy zero tails."""
+"""Combine near-extremizer counts with aggregate remaining-copy zero tails."""
 
 from __future__ import annotations
 
@@ -47,7 +47,7 @@ def main() -> None:
                 "near_output_support",
                 "near_count_log2",
                 "needed_other_copy_zeros",
-                "conditioned_tail_log2",
+                "aggregate_tail_log2",
                 "union_log2",
             ]
         )
@@ -56,7 +56,7 @@ def main() -> None:
                 break
             near_count_log = math.log2(parity_copies) + math.log2(k) + log2_comb(extras_available, extra)
             needed_zeros = extra + 1
-            tail_log = math.log2(other_copies) + log2_comb(k, needed_zeros) - needed_zeros * args.field_bits
+            tail_log = log2_comb(other_copies * k, needed_zeros) - needed_zeros * args.field_bits
             writer.writerow(
                 [
                     args.depth,

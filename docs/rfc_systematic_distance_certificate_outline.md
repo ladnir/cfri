@@ -46,6 +46,12 @@ For `c=8`, this means a distance certificate near:
 0.75.
 ```
 
+The current depth-`11`, `c=8` certificate statement is:
+
+```text
+docs/rfc_systematic_c8_depth11_certificate_statement.md
+```
+
 ## Lemma Stack
 
 The certificate should follow from four lemmas.
@@ -279,7 +285,7 @@ The proof strategy for this near-stability model is:
 docs/rfc_near_stability_proof_strategy.md
 ```
 
-Combining this count with the conditioned-copy zero tail gives:
+Combining this count with the aggregate zero tail over the remaining parity copies gives:
 
 ```text
 docs/rfc_near_extremizer_slack_depth11_m32_c8.csv
@@ -297,21 +303,27 @@ For depth `11`, `c=8`, and `q=2^128`, the worst term for every `m` checked is st
 log2 union bound = -100.60768258.
 ```
 
-Here `e` extra outputs in the first sparse copy require at least `e+1` zeros in some independent
-copy to beat the collapse baseline. The resulting union terms are:
+Here `e` extra outputs in the first sparse copy require at least `e+1` zeros across the remaining
+parity copies to beat the collapse baseline. The resulting union terms for `m=32` are:
 
 ```text
 e    log2 union bound
 0     -100.60768258
-1     -207.65419088
-2     -316.28709399
-4     -536.29416556
-8     -982.78823448
-16   -1890.11183560
-32   -3735.18084799
-64   -7488.51449998
-128 -15125.78793032
+1     -205.06864118
+2     -311.11540705
+4     -525.94844020
+8     -962.08736707
+16   -1848.68895928
+32   -3652.22099979
+64   -7321.35838459
+128 -14787.19882553
 ```
 
 So, under the near-extremizer counting model, the dangerous term is still the exact extremizer case,
 and even that has about `100` bits of slack in this depth-`11`, `c=8`, `q=2^128` calculation.
+Summing all power-of-two `m` and all `e <= 128` gives:
+
+```text
+docs/rfc_near_extremizer_total_union_depth11_c8_e128.csv
+total log2 union bound = -97.14825096.
+```

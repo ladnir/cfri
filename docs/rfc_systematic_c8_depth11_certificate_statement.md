@@ -137,7 +137,7 @@ exact matched construction:       drafted
 no early gluing:                  local rational-function proof written
 exact stability theorem:          drafted from the previous lemmas
 near-core dimension bound:        direct stride-class proof written
-near-stability/counting:          strategy plus exact depth-4 evidence
+near-stability/counting:          local defect decomposition plus exact depth-4 evidence
 remaining-copy zero tail:         union bound written and tabulated
 ```
 
@@ -177,6 +177,18 @@ The main remaining proof obligation is now the core-containment part of near sta
 wt(x)=m, wt(Ax)<=k/m+e
   => support/output pair contains a matched stride core plus e extras
 ```
+
+The local accounting for this theorem is now:
+
+```text
+parent defect >= child defects
+               + row-split charge
+               + overlap charge
+               + cancellation charge.
+```
+
+The remaining formal step is the global injection: charged local defects must map to distinct
+output leaves outside the extracted matched core.
 
 The near-core dimension lemma is:
 

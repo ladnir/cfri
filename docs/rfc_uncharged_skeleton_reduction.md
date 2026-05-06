@@ -164,9 +164,14 @@ the alpha-2 size lemma. The residual uncharged skeleton then satisfies:
 c_C + c_O <= 1.
 ```
 
-This is exactly what the first-moment count already supports: every paid child-rank parameter
-requires a complete extra stride class, and the virtual-core count includes those outside leaves in
-`e+h` before applying the factor `q^floor((e+h)/|C|)`.
+The audit found that this should not be interpreted as a fresh child-local dimension payment at
+every node. The current first-moment count pays only the global near-kernel dimension factor. The
+preferred repair is to fix the final virtual support and charge all excess cancellation equations
+against the global admissible dimension budget:
+
+```text
+docs/rfc_global_rank_budget_pivot.md
+```
 
 The precise algebraic sublemma is tracked in:
 

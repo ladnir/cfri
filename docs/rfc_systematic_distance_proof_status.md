@@ -203,6 +203,15 @@ It remains to prove that the local child-rank payments needed by the uncharged-s
 aggregate into this root-scale factor, or else to strengthen the first-moment count with explicit
 per-node rank-payment labels.
 
+The current better pivot is to avoid local rank spending entirely: fix the final virtual support
+first, use the global near-kernel dimension bound once, and charge all excess cancellation
+equations against that global projective dimension plus no-early-gluing probability loss. This is
+tracked in:
+
+```text
+docs/rfc_global_rank_budget_pivot.md
+```
+
 ## Remaining Algebraic Lemma
 
 One remaining serious proof obligation is the rank-cancellation exchange:
@@ -293,8 +302,7 @@ bound with real slack. We do not yet have a complete proof. The remaining work i
 
 ```text
 1. rank-cancellation exchange over the actual RFC fold equations;
-2. aggregation of local child-rank payments into the counted dimension factor, or a strengthened
-   count that explicitly pays them;
+2. global rank-budget cancellation accounting, replacing local child-rank spending;
 3. disjoint resource accounting between skeleton-reduction charges, replacement leaves, and true
    defect leaves;
 4. local-to-final survival for first-divergence charged leaves.
@@ -304,7 +312,7 @@ If these obligations are proved, the proof chain closes as:
 
 ```text
 rank-cancellation exchange
-  + rank-payment aggregation / strengthened count
+  + global rank-budget cancellation accounting
   + disjoint resource accounting
   + local-to-final first-divergence survival
   => residual c_C+c_O<=1

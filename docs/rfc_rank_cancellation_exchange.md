@@ -1,6 +1,11 @@
 # RFC Rank-Cancellation Exchange
 
-This note isolates the algebraic lemma left after the alpha-2 size accounting.
+This note isolates the algebraic lemma left after the alpha-2 size accounting. The current best
+form pays rank globally rather than summing child-local rank budgets; see:
+
+```text
+docs/rfc_global_rank_budget_pivot.md
+```
 
 ## Goal
 
@@ -37,7 +42,7 @@ The relative base scalar is:
 lambda = beta / alpha.
 ```
 
-The paid child-rank budget is:
+The local child-rank budget would be:
 
 ```text
 s = s_0 + s_1.
@@ -56,9 +61,12 @@ dimension factor:
 floor((e_root+h_root)/|C_root|).
 ```
 
-The proof must either show that the local child-rank payments aggregate to the root-scale
-dimension factor already used in the certificate count, or the count must be strengthened to carry
-per-node rank-payment labels.
+The current pivot is to avoid summing these local budgets. Instead, fix the final virtual support
+and pay rank once using the global admissible space:
+
+```text
+dim <= 1 + floor((e_root+h_root)/|C_root|).
+```
 
 ## Exchange Lemma Target
 
@@ -107,9 +115,14 @@ contribution should carry a factor:
 q^s * q^(-max(0,t-s-1)).
 ```
 
-The `q^s` term is present in the local near-kernel rank budget. A separate aggregation argument is
-needed before claiming that the current root-scale certificate count already pays all such local
-rank terms. The residual loss is the same no-early-gluing loss as the exact proof once `t>s+1`.
+In the revised global formulation, `s` should be the global projective excess dimension:
+
+```text
+s = dim V_root - 1 <= floor((e_root+h_root)/|C_root|).
+```
+
+Then the `q^s` term is exactly the dimension factor in the certificate count. The residual loss is
+the same no-early-gluing loss as the exact proof once `t>s+1`.
 
 For the structural part of the theorem, after the probabilistic loss has also been accounted for,
 we can phrase the local reduction as:
@@ -130,13 +143,15 @@ For every fixed child support/rank pattern and every cancellation set J,
 the cancellation matrix has generic rank at least |J|-1 over the paid child-rank quotient.
 ```
 
-This is now the central algebraic obstruction in the proof chain. If it holds, the rest of the
-systematic distance certificate is reduced to the following structural and counting-interface
-checks:
+This is now the central algebraic obstruction in the proof chain. The preferred formulation is
+global: for a fixed final virtual support, all excess sibling-cancellation equations throughout the
+tree have generic rank at least the number of excess cancellations minus the global near-kernel
+excess dimension. If that holds, the rest of the systematic distance certificate is reduced to the
+following structural and counting-interface checks:
 
 ```text
 1. alpha-2 local size inequality;
 2. first-divergence charge composition;
-3. aggregation of local rank payments into the first-moment dimension factor;
+3. global rank-budget cancellation accounting;
 4. first-moment count with virtual holes and q^floor((e+h)/|C|).
 ```

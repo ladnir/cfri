@@ -146,4 +146,6 @@ Current results:
 depth=3, max_extra=2, max_holes=1: checked=1240 failures=0 worst_gap=0
 depth=4, max_extra=2, max_holes=1: checked=8512 failures=0 worst_gap=0
 depth=5, max_extra=1, max_holes=1: checked=6624 failures=0 worst_gap=0
+depth=5, live_bits=4, random, max_extra=2, max_holes=1: checked=1860 failures=0 worst_gap=0
+depth=6, live_bits=5, random, max_extra=2, max_holes=1: checked=1717 failures=0 worst_gap=0
 ```

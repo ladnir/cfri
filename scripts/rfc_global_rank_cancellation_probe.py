@@ -69,11 +69,29 @@ def kernel_dim(
     return len(rows) - rank
 
 
-def limited_combinations(values: tuple[int, ...], choose: int, limit: int) -> list[tuple[int, ...]]:
+def limited_combinations(
+    values: tuple[int, ...],
+    choose: int,
+    limit: int,
+    rng: random.Random,
+    randomize: bool,
+) -> list[tuple[int, ...]]:
+    if choose == 0:
+        return [()]
+    if choose > len(values):
+        return []
+    if randomize:
+        out_set: set[tuple[int, ...]] = set()
+        attempts = 0
+        max_attempts = max(100, 20 * limit)
+        while len(out_set) < limit and attempts < max_attempts:
+            out_set.add(tuple(sorted(rng.sample(values, choose))))
+            attempts += 1
+        return sorted(out_set)
     out: list[tuple[int, ...]] = []
     for combo in itertools.combinations(values, choose):
         out.append(combo)
-        if len(out) >= limit:
+        if limit > 0 and len(out) >= limit:
             break
     return out
 
@@ -87,11 +105,14 @@ def main() -> None:
     parser.add_argument("--max-extra", type=int, default=2)
     parser.add_argument("--max-holes", type=int, default=2)
     parser.add_argument("--combo-limit", type=int, default=200)
+    parser.add_argument("--case-limit", type=int, default=0)
+    parser.add_argument("--random-combos", action="store_true")
     parser.add_argument("--out", required=True)
     args = parser.parse_args()
 
     k = 1 << args.depth
-    generator = rfc_generator_prime(args.depth, 1, args.prime, random.Random(args.seed))
+    rng = random.Random(args.seed)
+    generator = rfc_generator_prime(args.depth, 1, args.prime, rng)
     live_bits_values = [args.live_bits] if args.live_bits >= 0 else list(range(1, args.depth + 1))
     rows_out: list[list[int | str]] = []
     failures = 0
@@ -107,10 +128,10 @@ def main() -> None:
                 core_set = set(core)
                 outside = tuple(column for column in range(k) if column not in core_set)
                 for h in range(args.max_holes + 1):
-                    for holes in limited_combinations(core, h, args.combo_limit):
+                    for holes in limited_combinations(core, h, args.combo_limit, rng, args.random_combos):
                         hole_set = set(holes)
                         for e in range(args.max_extra + 1):
-                            for extras in limited_combinations(outside, e + h, args.combo_limit):
+                            for extras in limited_combinations(outside, e + h, args.combo_limit, rng, args.random_combos):
                                 support = (core_set - hole_set) | set(extras)
                                 dim_final = kernel_dim(generator, rows, support, k, args.prime)
                                 if dim_final <= 0:
@@ -158,6 +179,20 @@ def main() -> None:
                                         gap,
                                     ]
                                 )
+                                if args.case_limit > 0 and checked >= args.case_limit:
+                                    break
+                            if args.case_limit > 0 and checked >= args.case_limit:
+                                break
+                        if args.case_limit > 0 and checked >= args.case_limit:
+                            break
+                    if args.case_limit > 0 and checked >= args.case_limit:
+                        break
+                if args.case_limit > 0 and checked >= args.case_limit:
+                    break
+            if args.case_limit > 0 and checked >= args.case_limit:
+                break
+        if args.case_limit > 0 and checked >= args.case_limit:
+            break
 
     with Path(args.out).open("w", newline="") as handle:
         writer = csv.writer(handle)

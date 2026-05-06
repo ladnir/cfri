@@ -57,6 +57,11 @@ The current probe artifacts are:
 docs/rfc_global_rank_cancellation_probe_depth3_e2_h1.csv
 docs/rfc_global_rank_cancellation_probe_depth4_e2_h1.csv
 docs/rfc_global_rank_cancellation_probe_depth5_e1_h1.csv
+docs/rfc_global_rank_cancellation_probe_depth5_live3_e2_h1_random.csv
+docs/rfc_global_rank_cancellation_probe_depth5_live4_e2_h1_random.csv
+docs/rfc_global_rank_cancellation_probe_depth6_live3_e2_h1_random.csv
+docs/rfc_global_rank_cancellation_probe_depth6_live4_e2_h1_random.csv
+docs/rfc_global_rank_cancellation_probe_depth6_live5_e2_h1_random.csv
 ```
 
 Runs:
@@ -65,10 +70,17 @@ Runs:
 depth=3, max_extra=2, max_holes=1: checked=1240 failures=0 worst_gap=0
 depth=4, max_extra=2, max_holes=1: checked=8512 failures=0 worst_gap=0
 depth=5, max_extra=1, max_holes=1: checked=6624 failures=0 worst_gap=0
+depth=5, live_bits=3, random, max_extra=2, max_holes=1: checked=1888 failures=0 worst_gap=0
+depth=5, live_bits=4, random, max_extra=2, max_holes=1: checked=1860 failures=0 worst_gap=0
+depth=6, live_bits=3, random, max_extra=2, max_holes=1: checked=2368 failures=0 worst_gap=0
+depth=6, live_bits=4, random, max_extra=2, max_holes=1: checked=2112 failures=0 worst_gap=0
+depth=6, live_bits=5, random, max_extra=2, max_holes=1: checked=1717 failures=0 worst_gap=0
 ```
 
 The depth-4 run included active cancellation counts up to `9`. The depth-5 narrow run included
-active cancellation counts up to `10`.
+active cancellation counts up to `10`. The randomized live-bits-4 and live-bits-5 runs included
+nontrivial active cancellation counts up to `2`; some smaller-live randomized runs were clean but
+had no active cancellation zeros.
 
 ## Interpretation
 

@@ -192,5 +192,6 @@ output positions compared to the exact extremal support.
 The near-stability strategy using this defect charge is in:
 
 ```text
-docs/rfc_near_stability_proof_strategy.md
+docs/rfc_near_stability_theorem_draft.md
+docs/rfc_near_defect_charge_injection.md
 ```

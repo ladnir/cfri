@@ -117,6 +117,17 @@ near-stability/counting:          strategy plus exact depth-4 evidence
 remaining-copy zero tail:         union bound written and tabulated
 ```
 
+The near-stability evidence now includes:
+
+```text
+depth 4, m=4, e=1: exhaustive scan gives 192 = 16*binom(12,1)
+depth 4, m=2, e=1: exhaustive scan gives 128 = 16*binom(8,1)
+depth 4, m=2, e=2: exhaustive scan gives 448 = 16*binom(8,2)
+depth 4, m=4, e=2: generated matched-core model gives 1056 = 16*binom(12,2)
+```
+
+All saved or generated near-extremizer pairs checked so far have one-dimensional kernels.
+
 The main remaining proof obligation is the near-stability theorem:
 
 ```text

@@ -137,6 +137,25 @@ The intended induction:
 The exact theorem is the special case `e=0`; no early gluing forces all two-child branches to occur
 only at `h=1`.
 
+The balanced two-child accounting decomposes cleanly. With:
+
+```text
+L = K/M
+p = L + e_0
+q = L + e_1
+h = |supp(u) cap supp(v)|,
+```
+
+the generic parent lower bound gives:
+
+```text
+wt(parent) - L
+  >= e_0 + e_1 + (p-h) + (q-h) + max(0,h-1).
+```
+
+Thus the parent defect pays for child defects, support mismatch, and early-glue cancellation
+failure in one recurrence.
+
 ## Counting Consequence
 
 If the theorem holds, then for one sparse parity copy:

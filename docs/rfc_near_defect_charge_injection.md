@@ -138,6 +138,59 @@ pays at least:
 
 extra leaves before it can expose a single exact continuation coordinate.
 
+## Balanced Two-Child Defect Identity
+
+The balanced case is the one that remains after row-split defect is zero. Let:
+
+```text
+M = 2a = 2b
+L = K/M = (K/2)/a = (K/2)/b
+p = L + e_0
+q = L + e_1
+h = |supp(u) cap supp(v)|.
+```
+
+For `h>0`, quantitative no-early-gluing gives the parent lower bound:
+
+```text
+wt(parent output) >= 2p + 2q - 2h - 1.
+```
+
+Therefore:
+
+```text
+wt(parent output) - L
+  >= (p-L) + (q-L) + (p-h) + (q-h) + (h-1)
+  = e_0 + e_1 + overlap_charge + cancellation_charge.
+```
+
+For `h=0`, there is no continuation coordinate and the parent output has weight `2p+2q`; the same
+formula with `cancellation_charge=0` gives:
+
+```text
+wt(parent output) - L
+  >= e_0 + e_1 + p + q.
+```
+
+So a balanced two-child node spends its defect budget on exactly three things:
+
+```text
+child defects,
+child-support mismatch,
+early cancellation failure.
+```
+
+This identity is the main induction accounting. The uncharged case forces:
+
+```text
+e_0=e_1=0,
+p=q=h=L,
+h=1.
+```
+
+Hence uncharged two-child gluing can occur only at `L=1`, the full live node of the exact matched
+construction.
+
 ## Disjointness Principle
 
 Charges can be made injective by assigning every charge to the first node on the root-to-leaf path

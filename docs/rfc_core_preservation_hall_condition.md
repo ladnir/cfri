@@ -266,7 +266,30 @@ There is a possible fallback with virtual cores:
 choose a core, choose h holes inside it, choose e+h extras outside it.
 ```
 
-but that is a different counting model and must be evaluated separately before use.
+This was evaluated as a stress model with:
+
+```text
+charge overhead B=64,
+virtual core holes <= H.
+```
+
+Artifacts:
+
+```text
+docs/rfc_near_extremizer_total_union_depth11_c8_e128_stride_dim_overhead64_holes1.csv
+docs/rfc_near_extremizer_total_union_depth11_c8_e128_stride_dim_overhead64_holes4.csv
+docs/rfc_near_extremizer_total_union_depth11_c8_e128_stride_dim_overhead64_holes16.csv
+```
+
+Results:
+
+```text
+H=1:  total log2 union = -83.06077305
+H=4:  total log2 union = -42.01824475
+H=16: total log2 union =  79.12109543
+```
+
+So a bounded-hole fallback exists, but unbounded holes are too expensive under this crude count.
 
 So the next proof target is still the actual Hall survival statement:
 

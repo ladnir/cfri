@@ -170,6 +170,17 @@ The counted charged-tree theorem is tracked in:
 docs/rfc_counted_charged_tree_theorem.md
 ```
 
+A virtual-core-with-holes fallback was also stress-tested with `B=64`:
+
+```text
+H=1:  log2 failure bound = -83.06077305
+H=4:  log2 failure bound = -42.01824475
+H=16: log2 failure bound =  79.12109543
+```
+
+This confirms small hole counts are affordable, but the proof should still target actual core
+preservation or a very small hole bound.
+
 Thus, within the corrected matched-plus-extra model:
 
 ```text

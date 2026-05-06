@@ -52,6 +52,12 @@ def main() -> None:
         default=0.0,
         help="Additional log2 overhead per extra/charged defect in the near support-pair count.",
     )
+    parser.add_argument(
+        "--virtual-core-holes-max",
+        type=int,
+        default=0,
+        help="Experimental: allow up to this many holes in the selected core and compensate with extras outside it.",
+    )
     parser.add_argument("--out", required=True)
     args = parser.parse_args()
 
@@ -75,7 +81,13 @@ def main() -> None:
         worst_log = NEG_INF
         cumulative_near_count_log = NEG_INF
         for extra in range(max_extra + 1):
-            exact_extra_log = log2_comb(extras_available, extra)
+            exact_extra_log = NEG_INF
+            max_holes = min(args.virtual_core_holes_max, exact_output, extras_available - extra)
+            for holes in range(max_holes + 1):
+                exact_extra_log = log2_add(
+                    exact_extra_log,
+                    log2_comb(exact_output, holes) + log2_comb(extras_available, extra + holes),
+                )
             cumulative_near_count_log = log2_add(cumulative_near_count_log, exact_extra_log)
             chosen_extra_log = cumulative_near_count_log if args.cumulative_count else exact_extra_log
             charge_overhead_log = extra * args.charge_overhead_log2
@@ -124,6 +136,7 @@ def main() -> None:
                 "target_sparse_sum",
                 "stride_dimension_bound",
                 "charge_overhead_log2",
+                "virtual_core_holes_max",
                 "total_log2_union",
             ]
         )
@@ -139,6 +152,7 @@ def main() -> None:
                 args.target_sparse_sum,
                 int(args.stride_dimension_bound),
                 f"{args.charge_overhead_log2:.8f}",
+                args.virtual_core_holes_max,
                 f"{total_log:.8f}",
             ]
         )

@@ -6,6 +6,7 @@ form pays rank globally rather than summing child-local rank budgets; see:
 ```text
 docs/rfc_global_rank_budget_pivot.md
 docs/rfc_global_rank_cancellation_probe.md
+docs/rfc_rank_active_cancellation_independence.md
 ```
 
 ## Goal

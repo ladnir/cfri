@@ -96,4 +96,10 @@ generically independent modulo the global admissible projective dimension, up to
 allowance from no-early-gluing.
 ```
 
+This is stated more explicitly in:
+
+```text
+docs/rfc_rank_active_cancellation_independence.md
+```
+
 This target matches the first-moment count more closely than child-local rank spending.

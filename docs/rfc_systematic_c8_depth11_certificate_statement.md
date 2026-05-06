@@ -354,6 +354,7 @@ docs/rfc_near_kernel_line_lemma.md
 docs/rfc_rank_cancellation_exchange.md
 docs/rfc_global_rank_budget_pivot.md
 docs/rfc_global_rank_cancellation_probe.md
+docs/rfc_rank_active_cancellation_independence.md
 ```
 
 The exact depth-4 checks match the strongest count:

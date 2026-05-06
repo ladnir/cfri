@@ -337,9 +337,12 @@ continuation, and an unbalanced two-child node must pay row-split labels before 
 lower-defect skeleton side. The final conclusion still must be that an actual matched core survives;
 otherwise the binomial count would need a separate holes-inside-core model.
 
-Within the balanced two-child case, the main subproblem is core alignment: `U` and `V` must share a
-child core inside `U cap V`, not merely contain separate child cores. Failure of alignment is paid
-by the overlap charge `|U\V|+|V\U|`. This works because child stride cores are disjoint, so:
+Within the balanced two-child case, core preservation is easier than exact equality: a child core
+contained in either `U` or `V` lifts to a parent core. It does not need to lie in `U cap V`.
+No-early-gluing ensures one constant parent side survives across that child core.
+
+Core alignment is still useful for counting exact deviations. Failure of alignment is paid by the
+overlap charge `|U\V|+|V\U|`. This works because child stride cores are disjoint, so:
 
 ```text
 |U\V| + |V\U| >= |A(U) triangle A(V)|
@@ -348,9 +351,9 @@ by the overlap charge `|U\V|+|V\U|`. This works because child stride cores are d
 where `A(U)` is the set of full child stride cores contained in `U`.
 
 The sibling-survival subproblem must respect parent residue geometry: a parent core is a fixed
-residue modulo `M`, not an arbitrary per-coordinate sibling choice. Thus each common child core
-offers two parent residue candidates. Quantitative no-early-gluing implies at most one sibling
-output vanishes over the whole common child core, so at least one of those two parent residue
+residue modulo `M`, not an arbitrary per-coordinate sibling choice. Thus each child core offers two
+parent residue candidates. Quantitative no-early-gluing implies at most one sibling output vanishes
+over the whole child core, so at least one of those two parent residue
 candidates is fully present. The opposite-side surviving outputs are paid by cancellation/residual
 labels when the child core has size greater than one.
 

@@ -190,15 +190,8 @@ C_0 subset U
 C_1 subset V.
 ```
 
-If these child cores expose a common continuation coordinate and the parent has a surviving sibling
-over that coordinate, then the parent has a matched core, contradiction.
-
-Thus every possible child-core continuation is killed by either:
-
-```text
-1. child-core mismatch / overlap failure;
-2. parent sibling cancellation failure.
-```
+If either child core lifts to a parent matched core, contradiction. The key point is that a child
+core on one side alone is already enough; it need not be a common core.
 
 The balanced defect identity gives budget for exactly these failures:
 
@@ -214,34 +207,40 @@ If all common child-core continuations are killed, then
 is at least the number of child-core continuations that must be hit.
 ```
 
-This separates into two sublemmas.
+This separates into two observations.
 
 #### Core Alignment
 
-First, the intersection:
+The earlier version of this note treated alignment of `U` and `V` as necessary. It is not necessary
+for core preservation. Alignment is necessary only for exact equality support.
+
+Suppose:
 
 ```text
-U cap V
+C' subset U
 ```
 
-must contain a child matched core. It is not enough for `U` and `V` to contain possibly different
-cores. If no child core is contained in `U cap V`, then every child core contained in `U` has at
-least one hole in `V`, or every child core contained in `V` has at least one hole in `U`.
+is a child matched core. For every coordinate in `C'`, the left child value is nonzero. If the right
+child value is zero, then both parent siblings are nonzero scalar multiples of the left value. If
+the right child value is nonzero, then at least one parent sibling is nonzero by local invertibility.
+Quantitative no-early-gluing says at most one sibling vanishes over all coordinates where both
+children are active.
 
-The overlap charge:
+Therefore one of the two constant parent sides over `C'` is fully present. Hence `C'` lifts to a
+parent matched core contained in `Y_parent`.
 
-```text
-(p-h) + (q-h) = |U \ V| + |V \ U|
-```
+The same argument applies to a child core contained in `V`.
 
-is exactly the budget for these holes. Thus the core-alignment lemma should say:
+Thus a balanced two-child minimal counterexample is impossible as soon as either child satisfies
+core preservation. By minimality, both children do. So balanced two-child nodes cannot be minimal
+counterexamples.
 
-```text
-Either U cap V contains a child matched core, or the missing-core obstruction is encoded by overlap
-charge labels.
-```
+The overlap charge remains useful for counting exact deviations, but it is not needed to prove mere
+core preservation.
 
-For the exact theorem, the overlap charge is zero, so `U=V` and alignment is automatic.
+#### Alignment Charge For Counting
+
+The useful overlap combinatorics is still worth recording because it controls labels.
 
 The useful combinatorial fact is stronger because child stride cores are disjoint.
 
@@ -287,25 +286,25 @@ least one available core but no common core, then overlap charge is at least:
 |A(U)| + |A(V)| >= 2.
 ```
 
-The remaining balanced-node problem is then not alignment of child core sets; it is choosing a
-common residue from `A(U) cap A(V)` that also survives parent sibling selection.
+This is the precise Hall alignment statement for the counted theorem: overlap charge pays for the
+symmetric difference between the sets of child cores available on the two sides.
 
 #### Parent Sibling Survival
 
-Second, once a common child core:
+Once any child core:
 
 ```text
-C' subset U cap V
+C' subset U
 ```
 
 is found, parent gluing must choose one surviving sibling side over every coordinate of `C'`.
 This is easier than exact-support equality.
 
-For every coordinate of `C'`, the two child values are nonzero. The local `2 x 2` fold matrix is
-invertible, so at least one of the two parent siblings is nonzero at that coordinate. The
-quantitative no-early-gluing lemma says that, generically, at most one parent sibling vanishes over
-all coordinates of `C'`: two vanished siblings at two different coordinates would impose two
-independent fresh-random ratio conditions.
+For every coordinate of `C'`, at least one child value is nonzero. If only that child is active,
+both parent siblings are nonzero. If both children are active, the local `2 x 2` fold matrix is
+invertible, so at least one parent sibling is nonzero. The quantitative no-early-gluing lemma says
+that, generically, at most one parent sibling vanishes over all coordinates of `C'`: two vanished
+siblings at two different coordinates would impose two independent fresh-random ratio conditions.
 
 Therefore one constant parent side survives across the entire child core:
 
@@ -319,6 +318,12 @@ Thus:
 
 ```text
 C' subset U cap V  =>  some parent matched core is contained in Y_parent.
+```
+
+More generally:
+
+```text
+C' subset U or C' subset V  =>  some parent matched core is contained in Y_parent.
 ```
 
 The cancellation charge:
@@ -364,8 +369,9 @@ local sibling choice. Above that point, no-early-gluing says the exact cancellat
 kill the opposite side at every coordinate of a multi-coordinate child core. In the near theorem,
 those surviving opposite-side outputs are exactly what the cancellation/residual labels pay for.
 
-So after the core-alignment lemma, the balanced two-child core-preservation step is done. The
-remaining bookkeeping is only to label the extra sibling outputs created when `|C'|>1`.
+So the balanced two-child core-preservation step is done by child minimality plus
+no-early-gluing. The remaining bookkeeping is only to label the extra sibling outputs created when
+`|C'|>1`.
 
 ### Case 3: Unbalanced Two-Child Node
 

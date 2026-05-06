@@ -243,6 +243,53 @@ charge labels.
 
 For the exact theorem, the overlap charge is zero, so `U=V` and alignment is automatic.
 
+The useful combinatorial fact is stronger because child stride cores are disjoint.
+
+Let `A(U)` be the set of child stride residues whose full stride class is contained in `U`, and
+define `A(V)` similarly. Then:
+
+```text
+child cores contained in U cap V are exactly A(U) cap A(V).
+```
+
+If a residue lies in:
+
+```text
+A(U) \ A(V),
+```
+
+then its whole stride class is contained in `U`, but at least one leaf of that stride class is
+missing from `V`. Since distinct stride classes are disjoint, these missing leaves are distinct.
+Therefore:
+
+```text
+|U \ V| >= |A(U) \ A(V)|.
+```
+
+Similarly:
+
+```text
+|V \ U| >= |A(V) \ A(U)|.
+```
+
+Hence:
+
+```text
+overlap_charge = |U \ V| + |V \ U|
+  >= |A(U) triangle A(V)|.
+```
+
+This is the precise Hall alignment statement: overlap charge pays for the symmetric difference
+between the sets of child cores available on the two sides. In particular, if both children have at
+least one available core but no common core, then overlap charge is at least:
+
+```text
+|A(U)| + |A(V)| >= 2.
+```
+
+The remaining balanced-node problem is then not alignment of child core sets; it is choosing a
+common residue from `A(U) cap A(V)` that also survives parent sibling selection.
+
 #### Parent Sibling Survival
 
 Second, once a common child core:

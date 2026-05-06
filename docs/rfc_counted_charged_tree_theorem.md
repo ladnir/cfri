@@ -339,7 +339,13 @@ otherwise the binomial count would need a separate holes-inside-core model.
 
 Within the balanced two-child case, the main subproblem is core alignment: `U` and `V` must share a
 child core inside `U cap V`, not merely contain separate child cores. Failure of alignment is paid
-by the overlap charge `|U\V|+|V\U|`.
+by the overlap charge `|U\V|+|V\U|`. This works because child stride cores are disjoint, so:
+
+```text
+|U\V| + |V\U| >= |A(U) triangle A(V)|
+```
+
+where `A(U)` is the set of full child stride cores contained in `U`.
 
 The checker:
 

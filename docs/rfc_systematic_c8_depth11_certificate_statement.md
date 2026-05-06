@@ -147,6 +147,20 @@ docs/rfc_near_extremizer_total_union_depth11_c8_e128_stride_dim_overhead32.csv
 docs/rfc_near_extremizer_total_union_depth11_c8_e128_stride_dim_overhead64.csv
 ```
 
+Additional stress artifacts:
+
+```text
+docs/rfc_near_extremizer_total_union_depth11_c8_e128_stride_dim_overhead104.csv
+docs/rfc_near_extremizer_total_union_depth11_c8_e128_stride_dim_overhead108.csv
+```
+
+give:
+
+```text
+B=104: log2 failure bound = -98.65570921
+B=108: log2 failure bound = -67.37561327
+```
+
 This means the final proof can use a charged-tree count with substantial per-defect overhead; it
 does not need the exact strongest binomial classification for every positive-defect support.
 

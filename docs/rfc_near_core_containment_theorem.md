@@ -293,13 +293,20 @@ The artifacts:
 docs/rfc_near_extremizer_total_union_depth11_c8_e128_stride_dim_overhead16.csv
 docs/rfc_near_extremizer_total_union_depth11_c8_e128_stride_dim_overhead32.csv
 docs/rfc_near_extremizer_total_union_depth11_c8_e128_stride_dim_overhead64.csv
+docs/rfc_near_extremizer_total_union_depth11_c8_e128_stride_dim_overhead104.csv
+docs/rfc_near_extremizer_total_union_depth11_c8_e128_stride_dim_overhead108.csv
 ```
 
-all still give:
+give:
 
 ```text
-total log2 union = -99.60768258.
+B=16:  total log2 union = -99.60768258
+B=32:  total log2 union = -99.60768258
+B=64:  total log2 union = -99.60768258
+B=104: total log2 union = -98.65570921
+B=108: total log2 union = -67.37561327
 ```
 
 So the proof strategy can prioritize a robust charged-tree count over the exact strongest
-matched-plus-extra classification.
+matched-plus-extra classification. The break point is between `B=108` and `B=112`, so there is far
+more overhead budget than a natural charged-tree labeling should need.

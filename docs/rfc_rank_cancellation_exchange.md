@@ -70,12 +70,12 @@ dim <= 1 + floor((e_root+h_root)/|C_root|).
 
 ## Exchange Lemma Target
 
-For any set `J` of parent child-coordinates where sibling cancellations occur, the cancellation
-conditions impose independent equations except for:
+For any set `J` of sibling cancellations in the fixed final support pattern, the cancellation
+conditions should impose independent equations except for:
 
 ```text
 1 relative scalar lambda,
-s paid child-rank parameters.
+s global projective dimensions.
 ```
 
 After paying `s` rank parameters, the residual number of cancellations is:
@@ -95,21 +95,20 @@ The exact no-early-gluing proof is the `s=0` case. Two different cancelled sibli
 different equations for the same `lambda`; fresh independent fold challenges make this impossible
 except on the usual bad-challenge event.
 
-With paid child rank, the equations become linear constraints in:
+With global admissible rank, the equations become linear constraints in:
 
 ```text
-lambda, a_i/alpha, b_i/alpha.
+lambda and coordinates on the projective admissible space V_root.
 ```
 
-Each extra child direction can absorb at most one additional independent cancellation equation.
+Each extra global direction can absorb at most one additional independent cancellation equation.
 Thus the proof should not try to forbid extra cancellations outright. It should charge them to the
-local rank dimensions, and then separately prove that those local payments are covered by the
-global first-moment count.
+global admissible dimension that the first-moment count pays once.
 
 ## First-Moment Interface
 
-For a fixed local pattern with `s` paid rank parameters and `t` sibling cancellations, the expected
-contribution should carry a factor:
+For a fixed final support pattern with global projective excess dimension `s` and `t` excess
+sibling cancellations, the expected contribution should carry a factor:
 
 ```text
 q^s * q^(-max(0,t-s-1)).
@@ -139,8 +138,8 @@ The real work is to prove the independence statement for the actual RFC fold equ
 current challenge choice `T` uniform nonzero. A useful local certificate would be:
 
 ```text
-For every fixed child support/rank pattern and every cancellation set J,
-the cancellation matrix has generic rank at least |J|-1 over the paid child-rank quotient.
+For every fixed final virtual support and every cancellation set J,
+the cancellation matrix has generic rank at least |J|-1 over the global admissible quotient.
 ```
 
 This is now the central algebraic obstruction in the proof chain. The preferred formulation is

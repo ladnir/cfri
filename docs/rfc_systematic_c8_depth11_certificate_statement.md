@@ -329,7 +329,8 @@ balanced two-child: child core lifts through one surviving parent residue by no-
 The open case is:
 
 ```text
-unbalanced two-child split, after paid child dimensions are reduced to one relative scalar.
+unbalanced two-child split, after globally paid excess cancellations leave one local residual
+cancellation.
 ```
 
 The near-core dimension lemma is:
@@ -351,6 +352,7 @@ docs/rfc_counted_charged_tree_theorem.md
 docs/rfc_near_core_containment_theorem.md
 docs/rfc_near_kernel_line_lemma.md
 docs/rfc_rank_cancellation_exchange.md
+docs/rfc_global_rank_budget_pivot.md
 ```
 
 The exact depth-4 checks match the strongest count:

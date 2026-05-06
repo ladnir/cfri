@@ -300,10 +300,11 @@ The cancellation input is:
 c_C + c_O <= 1.
 ```
 
-This is not a statement about arbitrary child near-supports. The recursive encoder first charges
-child defects and extra child dimensions. On the remaining uncharged local skeleton, the two child
-outputs have only one relative scalar. The quantitative no-early-gluing lemma then says two
-different vanished siblings would impose two incompatible fresh-random ratio equations.
+This is not a statement about arbitrary child near-supports. The proof first fixes the final
+virtual support and pays excess cancellation equations using the global admissible rank budget and
+no-early-gluing loss. On the remaining local skeleton, the two child outputs have only one relative
+scalar. The quantitative no-early-gluing lemma then says two different vanished siblings would
+impose two incompatible fresh-random ratio equations.
 
 The reduction to this one-scalar skeleton is tracked in:
 
@@ -436,16 +437,17 @@ scalar. This is the same interface as the balanced proof: no-early-gluing preven
 uncharged cancellations in an exact skeleton, while additional degrees of freedom are paid local
 defects.
 
-Equivalently, extra child rank is a cancellation currency before it is a hole issue. If `t`
-sibling cancellations occur at the node, then one can be absorbed by the relative scalar and the
-other `t-1` must be paid by child-rank dimension units or by the no-early-gluing probability loss.
-After those paid cancellations are removed, the alpha-2 size inequality only sees the residual
-case `c_C+c_O<=1`.
+Equivalently, excess cancellation is a rank/probability issue before it is a hole issue. The
+current proof route does not pay fresh child-rank dimension units at every node. Instead, fix the
+final virtual support, use its global admissible dimension budget, and pay any remaining excess
+cancellations by no-early-gluing probability loss. After those paid cancellations are removed, the
+alpha-2 size inequality only sees the residual case `c_C+c_O<=1`.
 
-The isolated exchange lemma is:
+The isolated exchange lemma and the global-rank pivot are:
 
 ```text
 docs/rfc_rank_cancellation_exchange.md
+docs/rfc_global_rank_budget_pivot.md
 ```
 
 ## Status
@@ -453,11 +455,11 @@ docs/rfc_rank_cancellation_exchange.md
 One-child and balanced two-child nodes already preserve actual cores. This theorem is only needed
 for unbalanced two-child nodes. The deterministic size part of the unbalanced local theorem is now
 reduced to the alpha-2 inequality above. The remaining main proof obligation for the ceiling-level
-systematic distance certificate is the rank reduction recorded in:
+systematic distance certificate is the global rank-cancellation reduction recorded in:
 
 ```text
 docs/rfc_uncharged_skeleton_reduction.md
 ```
 
-namely, after all paid child dimensions are removed, the local comparison has only one relative
-scalar, so `c_C+c_O<=1`.
+namely, after globally paid excess cancellations are removed, each local comparison has only one
+residual cancellation visible to the alpha-2 size lemma, so `c_C+c_O<=1`.

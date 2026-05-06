@@ -124,13 +124,13 @@ The intended order is therefore:
 ```
 
 This is the remaining algebraic rank obligation. It is strictly narrower than proving literal
-actual-core containment for the unbalanced split: we only need to show that all child degrees of
-freedom beyond one line are already paid by the same `q^floor((e+h)/|C|)` dimension factor used in
-the first-moment count.
+actual-core containment for the unbalanced split. The current formulation should be read globally:
+fix the final virtual support first, then use the global admissible dimension to pay excess
+cancellation equations before applying the local alpha-2 size lemma.
 
 ## Rank-Cancellation Exchange
 
-The useful way to state the algebra is not that extra child rank is impossible. Extra child rank is
+The useful way to state the algebra is not that extra rank is impossible. Extra admissible rank is
 allowed, but it is paid before the alpha-2 hole lemma is applied.
 
 Let `r_0,r_1` be the dimensions of the two child output spaces after the child zero constraints and
@@ -140,14 +140,17 @@ the selected local outside sets are fixed. The dimension count pays:
 (r_0-1) + (r_1-1)
 ```
 
-extra projective parameters. A sibling cancellation at parent child-coordinate `j` is one linear
-equation on these child parameters plus the one relative scalar between the two base lines.
+extra projective parameters in the local view. In the repaired proof these local parameters are
+only a diagnostic; the actual count pays the global admissible dimension. A sibling cancellation at
+parent child-coordinate `j` is one linear equation on the admissible parameters plus the one
+relative scalar between the two base lines.
 Generically:
 
 ```text
 t cancelled siblings cost t equations,
 one equation can be absorbed by the relative scalar,
-each additional absorbed equation must use one paid child-rank parameter.
+each additional absorbed equation must use one paid global admissible-rank parameter or a
+no-early-gluing probability loss.
 ```
 
 Thus the local proof can charge:
@@ -156,9 +159,9 @@ Thus the local proof can charge:
 max(0, t-1)
 ```
 
-cancellations either to paid child-rank dimensions or to the no-early-gluing probability loss. In
-the deterministic charged-tree language, remove all cancellations paid this way before invoking
-the alpha-2 size lemma. The residual uncharged skeleton then satisfies:
+cancellations either to paid global admissible-rank dimensions or to the no-early-gluing
+probability loss. In the deterministic charged-tree language, remove all cancellations paid this
+way before invoking the alpha-2 size lemma. The residual uncharged skeleton then satisfies:
 
 ```text
 c_C + c_O <= 1.

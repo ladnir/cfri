@@ -130,8 +130,8 @@ One-copy uncertainty gives:
 O >= R + A.
 ```
 
-After all paid child dimensions and paid cancellations are removed, the residual skeleton should
-have:
+After globally paid excess cancellations are removed, the residual skeleton seen by this local
+size argument should have:
 
 ```text
 c_C + c_O <= 1.
@@ -199,12 +199,9 @@ factor:
 q^floor((e+h)/|C_root|)
 ```
 
-It remains to prove that the local child-rank payments needed by the uncharged-skeleton reduction
-aggregate into this root-scale factor, or else to strengthen the first-moment count with explicit
-per-node rank-payment labels.
-
-The current better pivot is to avoid local rank spending entirely: fix the final virtual support
-first, use the global near-kernel dimension bound once, and charge all excess cancellation
+An earlier local-rank formulation would have needed to aggregate child-scale rank payments into
+this root-scale factor. The current better pivot avoids local rank spending: fix the final virtual
+support first, use the global near-kernel dimension bound once, and charge all excess cancellation
 equations against that global projective dimension plus no-early-gluing probability loss. This is
 tracked in:
 
@@ -214,52 +211,49 @@ docs/rfc_global_rank_budget_pivot.md
 
 ## Remaining Algebraic Lemma
 
-One remaining serious proof obligation is the rank-cancellation exchange:
+One remaining serious proof obligation is the global rank-cancellation exchange:
 
 ```text
-after paying child rank dimensions, at most one sibling cancellation remains uncharged.
+after paying the global admissible-support dimension and no-early-gluing loss, at most one sibling
+cancellation remains visible at each alpha-2 local node.
 ```
 
-Local formulation:
+Global formulation:
 
 ```text
-r_0 = 1 + s_0,
-r_1 = 1 + s_1,
-s = s_0+s_1.
+V = admissible vector space for the fixed final virtual support,
+s = dim(V)-1 <= floor((e+h)/|C_root|).
 ```
 
-If `t` sibling cancellations occur at the parent node, then generically:
+If `t` excess sibling cancellations occur across the recursive tree, then generically:
 
 ```text
 t cancellations impose t equations,
-one equation is absorbed by the relative scalar,
-each additional absorbed equation consumes one paid child-rank parameter.
+the global projective dimension absorbs at most s equations,
+any remaining equations are paid by no-early-gluing probability loss.
 ```
 
-So the intended exchange is:
-
-```text
-pay min(s,t-1) cancellations by rank.
-```
-
-If `t>s+1`, the remaining `t-s-1` cancellations must be paid by the usual no-early-gluing
-probability loss. In first-moment form this is:
+So the intended first-moment factor is:
 
 ```text
 q^s * q^(-max(0,t-s-1)).
 ```
 
-After rank payments and no-early-gluing probability-loss payments are removed from the structural
-case under consideration, at most one cancellation remains visible to the alpha-2 local size lemma.
+The optional `-1` convention reserves one relative scalar in the exact no-early-gluing style. The
+formal version must fix whether that scalar is already part of `V`.
 
-Equivalently, for every fixed child support/rank pattern and cancellation set `J`, the actual RFC
-cancellation matrix should have generic rank at least:
+After global rank payments and no-early-gluing probability-loss payments are removed from the
+structural case under consideration, at most one cancellation remains visible to each alpha-2 local
+size lemma.
+
+Equivalently, for every fixed final virtual support and selected excess-cancellation family `J`,
+the actual RFC cancellation matrix should have generic rank at least:
 
 ```text
-|J|-1
+|J| - floor((e+h)/|C_root|)
 ```
 
-over the paid child-rank quotient. This must be proved for the actual fold equations with `T`
+up to the same scalar convention. This must be proved for the actual fold equations with `T`
 uniform nonzero.
 
 This is tracked in:

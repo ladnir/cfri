@@ -136,3 +136,27 @@ near support pairs with defect e
 
 or a slightly looser `k * (ek)^e` bound. The exact binomial form is supported by the current scans;
 the looser form would still be enough for the depth-`11`, `c=8` slack estimates.
+
+## All-`m` Slack Check
+
+The helper:
+
+```text
+scripts/rfc_near_extremizer_slack_all_m.py
+```
+
+evaluates the matched-plus-extra model over every power-of-two live size `m`. At depth `11`,
+`c=8`, and `q=2^128`, the table:
+
+```text
+docs/rfc_near_extremizer_slack_all_m_depth11_c8.csv
+```
+
+shows that the worst term for every `m` is the exact case `e=0`:
+
+```text
+log2 union bound = -100.60768258.
+```
+
+So the distance-dominant `m=32` case is not hiding a worse small- or large-`m` near-extremal leak
+under this model.

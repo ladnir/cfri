@@ -285,6 +285,18 @@ Combining this count with the conditioned-copy zero tail gives:
 docs/rfc_near_extremizer_slack_depth11_m32_c8.csv
 ```
 
+The same calculation over every power-of-two `m` is:
+
+```text
+docs/rfc_near_extremizer_slack_all_m_depth11_c8.csv
+```
+
+For depth `11`, `c=8`, and `q=2^128`, the worst term for every `m` checked is still `e=0` with:
+
+```text
+log2 union bound = -100.60768258.
+```
+
 Here `e` extra outputs in the first sparse copy require at least `e+1` zeros in some independent
 copy to beat the collapse baseline. The resulting union terms are:
 

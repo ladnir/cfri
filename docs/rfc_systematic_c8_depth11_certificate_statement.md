@@ -350,6 +350,7 @@ docs/rfc_core_preservation_hall_condition.md
 docs/rfc_counted_charged_tree_theorem.md
 docs/rfc_near_core_containment_theorem.md
 docs/rfc_near_kernel_line_lemma.md
+docs/rfc_rank_cancellation_exchange.md
 ```
 
 The exact depth-4 checks match the strongest count:

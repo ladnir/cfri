@@ -168,6 +168,12 @@ This is exactly what the first-moment count already supports: every paid child-r
 requires a complete extra stride class, and the virtual-core count includes those outside leaves in
 `e+h` before applying the factor `q^floor((e+h)/|C|)`.
 
+The precise algebraic sublemma is tracked in:
+
+```text
+docs/rfc_rank_cancellation_exchange.md
+```
+
 ## Charge Composition Lemma
 
 Fix the final root virtual core `C_root`. For every final output leaf `ell notin C_root`, define

@@ -442,6 +442,12 @@ other `t-1` must be paid by child-rank dimension units or by the no-early-gluing
 After those paid cancellations are removed, the alpha-2 size inequality only sees the residual
 case `c_C+c_O<=1`.
 
+The isolated exchange lemma is:
+
+```text
+docs/rfc_rank_cancellation_exchange.md
+```
+
 ## Status
 
 One-child and balanced two-child nodes already preserve actual cores. This theorem is only needed

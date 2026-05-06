@@ -353,6 +353,7 @@ docs/rfc_near_core_containment_theorem.md
 docs/rfc_near_kernel_line_lemma.md
 docs/rfc_rank_cancellation_exchange.md
 docs/rfc_global_rank_budget_pivot.md
+docs/rfc_global_rank_cancellation_probe.md
 ```
 
 The exact depth-4 checks match the strongest count:

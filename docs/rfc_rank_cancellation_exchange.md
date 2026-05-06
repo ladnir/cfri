@@ -5,6 +5,7 @@ form pays rank globally rather than summing child-local rank budgets; see:
 
 ```text
 docs/rfc_global_rank_budget_pivot.md
+docs/rfc_global_rank_cancellation_probe.md
 ```
 
 ## Goal
@@ -70,8 +71,8 @@ dim <= 1 + floor((e_root+h_root)/|C_root|).
 
 ## Exchange Lemma Target
 
-For any set `J` of sibling cancellations in the fixed final support pattern, the cancellation
-conditions should impose independent equations except for:
+For any set `J` of rank-active excess sibling cancellations in the fixed final support pattern, the
+cancellation conditions should impose independent equations except for:
 
 ```text
 1 relative scalar lambda,
@@ -143,10 +144,10 @@ the cancellation matrix has generic rank at least |J|-1 over the global admissib
 ```
 
 This is now the central algebraic obstruction in the proof chain. The preferred formulation is
-global: for a fixed final virtual support, all excess sibling-cancellation equations throughout the
-tree have generic rank at least the number of excess cancellations minus the global near-kernel
-excess dimension. If that holds, the rest of the systematic distance certificate is reduced to the
-following structural and counting-interface checks:
+global: for a fixed final virtual support, all rank-active excess sibling-cancellation equations
+throughout the tree have generic rank at least the number of active excess cancellations minus the
+global near-kernel excess dimension. If that holds, the rest of the systematic distance certificate
+is reduced to the following structural and counting-interface checks:
 
 ```text
 1. alpha-2 local size inequality;

@@ -207,6 +207,7 @@ tracked in:
 
 ```text
 docs/rfc_global_rank_budget_pivot.md
+docs/rfc_global_rank_cancellation_probe.md
 ```
 
 ## Remaining Algebraic Lemma

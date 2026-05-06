@@ -130,3 +130,20 @@ the global near-kernel excess dimension.
 
 This is closer to what the first-moment count actually measures, and it avoids the child-scale
 rank-payment aggregation problem.
+
+## Probe Status
+
+A small-model probe now suggests the lemma must be phrased using rank-active excess cancellation
+equations, not raw tree sibling absences. The diagnostic is:
+
+```text
+docs/rfc_global_rank_cancellation_probe.md
+```
+
+Current results:
+
+```text
+depth=3, max_extra=2, max_holes=1: checked=1240 failures=0 worst_gap=0
+depth=4, max_extra=2, max_holes=1: checked=8512 failures=0 worst_gap=0
+depth=5, max_extra=1, max_holes=1: checked=6624 failures=0 worst_gap=0
+```

@@ -58,6 +58,11 @@ def main() -> None:
         default=0,
         help="Experimental: allow up to this many holes in the selected core and compensate with extras outside it.",
     )
+    parser.add_argument(
+        "--virtual-core-holes-coupled-to-extra",
+        action="store_true",
+        help="Constrain virtual core holes by holes <= extra output defect.",
+    )
     parser.add_argument("--out", required=True)
     args = parser.parse_args()
 
@@ -83,6 +88,8 @@ def main() -> None:
         for extra in range(max_extra + 1):
             exact_extra_log = NEG_INF
             max_holes = min(args.virtual_core_holes_max, exact_output, extras_available - extra)
+            if args.virtual_core_holes_coupled_to_extra:
+                max_holes = min(max_holes, extra)
             for holes in range(max_holes + 1):
                 exact_extra_log = log2_add(
                     exact_extra_log,
@@ -137,6 +144,7 @@ def main() -> None:
                 "stride_dimension_bound",
                 "charge_overhead_log2",
                 "virtual_core_holes_max",
+                "virtual_core_holes_coupled_to_extra",
                 "total_log2_union",
             ]
         )
@@ -153,6 +161,7 @@ def main() -> None:
                 int(args.stride_dimension_bound),
                 f"{args.charge_overhead_log2:.8f}",
                 args.virtual_core_holes_max,
+                int(args.virtual_core_holes_coupled_to_extra),
                 f"{total_log:.8f}",
             ]
         )

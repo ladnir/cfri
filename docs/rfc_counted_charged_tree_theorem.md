@@ -43,6 +43,10 @@ The counted charged-tree theorem should prove that the support pair of `x` can b
 3. one local charge label per unit of charge, from an alphabet of size at most 2^B.
 ```
 
+In the literal contained-core version, the charged final output leaves are the `e` leaves outside
+the core. In the defect-coupled virtual-core version, there may be `h` holes inside the virtual core
+and `e+h` real output leaves outside it, with `h<=e`.
+
 Therefore the number of possible near support/output certificates is at most:
 
 ```text
@@ -56,6 +60,35 @@ justify the binomial count above. Thus the encoder invariant is:
 C subset supp(A_d x),
 charged leaves subset supp(A_d x) \ C.
 ```
+
+A new admissible relaxation is now under consideration: allow a virtual core with `h` holes only
+when those holes are charged to real extra outputs, with:
+
+```text
+h <= e.
+```
+
+Then the support count changes from:
+
+```text
+binom(k-k/m, e)
+```
+
+to:
+
+```text
+sum_{h<=e} binom(k/m, h) binom(k-k/m, e+h).
+```
+
+The depth-11 `c=8`, `B=64` union bound remains essentially unchanged under this constrained
+virtual-core model:
+
+```text
+total log2 union = -99.60768253.
+```
+
+So the theorem can be completed either by actual core containment, or by defect-coupled virtual-core
+containment where every hole is injectively charged to a real non-core output leaf.
 
 For exact defect `e`, this can be used as:
 
@@ -382,6 +415,19 @@ selected parent residue are paid by cancellation/residual labels.
 Thus the only remaining core-preservation case is an unbalanced row split. Balanced two-child nodes
 preserve a core; one-child nodes preserve a core by lifting.
 
+The unbalanced case now appears to be a true obstruction to literal actual-core preservation. The
+replacement target is:
+
+```text
+virtual holes introduced by unbalanced splits <= charged extra output leaves.
+```
+
+This is tracked in:
+
+```text
+docs/rfc_unbalanced_split_residue_hall.md
+```
+
 The checker:
 
 ```text
@@ -435,4 +481,16 @@ At `d=11`, `c=8`, `q=2^128`, and `B<=64`, the displayed bound remains:
 
 ```text
 Pr[d_sys < 12384] <= 2^-99.60768258.
+```
+
+Under the defect-coupled virtual-core variant, replace `binom(k-k/m,e)` by:
+
+```text
+sum_{h<=e} binom(k/m,h) binom(k-k/m,e+h).
+```
+
+The checked bound is still:
+
+```text
+Pr[d_sys < 12384] <= 2^-99.60768253.
 ```

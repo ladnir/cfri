@@ -288,6 +288,16 @@ This is now isolated as a finite residue-Hall problem in:
 docs/rfc_unbalanced_split_residue_hall.md
 ```
 
+The current evidence says literal actual-core containment is likely too strong in this unbalanced
+case. The certificate-sufficient replacement is defect-coupled virtual containment:
+
+```text
+number of virtual core holes <= number of real extra output leaves.
+```
+
+The union bound remains essentially unchanged under this replacement, because the dangerous hole
+terms were the artificial `extra=0, holes>0` cases.
+
 For the all-level systematic certificate, this gap is less dangerous than cancellation because
 unbalanced splits have explicit integer cost and cannot occur in the uncharged skeleton. Still, the
 hole fallback is narrow: with `B=64`, the depth-11 `c=8` bound stays negative through `H=5` virtual

@@ -122,6 +122,224 @@ into at most five virtual core holes.
 The first clause preserves the existing counted theorem with no holes. The second clause uses the
 experimentally safe virtual-hole fallback.
 
+## Small Adversarial Models
+
+The helper:
+
+```text
+scripts/rfc_unbalanced_residue_hall_search.py
+```
+
+checks two deterministic relaxations.
+
+First, if `M | K/2`, each parent residue projects to one child residue class modulo `M`, with both
+parent siblings over those child coordinates. A support set `S subset {0,...,K/2-1}` kills every
+parent residue exactly when it omits at least one coordinate from every child class modulo `M`.
+Thus the largest arbitrary `S` with no surviving parent residue has size:
+
+```text
+K/2 - M.
+```
+
+For the depth-11 root scale, the cheapest unbalanced splits satisfy:
+
+```text
+K=2048
+
+M     split charge   cheapest split   child lower bounds   arbitrary disjoint supports can kill all residues
+32    5              15+17            69,61                yes
+64    2              31+33            34,32                yes
+128   1              61+67            17,16                yes
+256   1              114+142           9, 8                yes
+512   1              205+307           5, 4                yes
+1024  1              342+682           3, 2                no
+```
+
+So a size-only Hall proof is impossible in the high-`M` regime. Arbitrary child supports satisfying
+only the uncertainty lower bounds can hide inside a set that misses every parent residue class.
+
+Second, the script checks an optimistic child-residue model: pretend the unbalanced children expose
+single residue classes modulo `a` and `b`, even though non-power child weights do not have an
+established exact matched-core theorem. At `K=256`, the most balanced cheapest unbalanced split at
+each `M` gives:
+
+```text
+K,M,a,b,split_charge,L,child_period,pairs,zero_pairs,min_holes,worst_min_holes,histogram
+256,8,3,5,11,32,16,15,0,16,16,16:15
+256,16,7,9,3,16,8,63,0,10,12,10:51;12:12
+256,32,15,17,1,8,4,255,0,4,6,4:98;6:157
+256,64,31,33,1,4,2,1023,66,0,2,0:66;2:957
+256,128,63,65,1,2,1,4095,4095,0,0,0:4095
+```
+
+The artifact is:
+
+```text
+docs/rfc_unbalanced_residue_hall_child_residue_k256.csv
+```
+
+This model is not a counterexample to RFC distance, because child residue classes modulo non-power
+`a,b` are not known to be attainable sparse child supports. But it is a genuine warning: even
+stride-like child structure does not automatically align with the parent modulus. The final proof
+must exploit more than "one residue in each child"; it must use the actual recursive/algebraic
+constraints that make non-power unbalanced child supports costly.
+
+The depth-11 scale has the same warning in a sharper unit-charge example. Take:
+
+```text
+K=2048, M=128, L=16, N=K/2=1024,
+a=63, b=65.
+```
+
+The rounded row-split charge is only:
+
+```text
+ceil(max(1024/63, 1024/65)) - 16 = 1.
+```
+
+But in the optimistic child-residue model:
+
+```text
+U = { j : j = 0 mod 63 },      |U|=17=ceil(1024/63)
+V = { j : j = 35 mod 65 },     |V|=16=ceil(1024/65)
+```
+
+every parent residue modulo `128` has at least six missing projected child coordinates:
+
+```text
+min_rho h_det(rho) = 6,
+hole histogram over rho: 6:2, 7:28, 8:98.
+```
+
+One minimizing residue is:
+
+```text
+rho = 112
+C_rho = 112,240,368,496,624,752,880,1008
+covered = 880,1008
+holes   = 112,240,368,496,624,752
+```
+
+So the statement "unit high-`M` imbalance preserves a parent residue core" is false in this
+relaxed residue model.
+
+However this is not a low-total-defect local extremizer. The same example has almost no child
+support overlap. Even if `|U cap V|` were maximized at `16`, no-early-gluing would force parent
+support at least:
+
+```text
+2|U| + 2|V| - 2|U cap V| - 1 >= 33,
+```
+
+so the parent defect relative to `L=16` is at least `17`. In the displayed residue example the
+overlap is smaller, so the defect is larger. Thus the six virtual holes are coupled to many actual
+extra output leaves.
+
+This suggests a stronger and probably certificate-sufficient target:
+
+```text
+For the selected parent residue, h_det(rho) <= local extra-output defect,
+with an injective first-divergence charge from holes to non-core output leaves.
+```
+
+A formula check of the existing first-moment count supports this target: if virtual core holes are
+allowed but constrained by `holes <= extra`, then even allowing a large hole cap leaves the depth-11,
+`c=8`, `B=64` total at the original corrected value:
+
+```text
+total log2 union = -99.60768253.
+```
+
+The dangerous `H=8` failure came from allowing holes at `extra=0`. The unbalanced residue models
+found so far do not behave that way; their holes come with overlap/cancellation extras. Therefore
+the best next theorem is defect-coupled virtual-core containment, not absolute actual-core
+containment.
+
+## Defect-Coupled Local Lemma Candidate
+
+The promising deterministic constraint is simple and does not depend on child residue alignment.
+
+Assume `L=K/M >= 2` is even, so each parent residue `rho mod M` projects to one child-coordinate
+class:
+
+```text
+C = { rho + tM : 0 <= t < L/2 } subset {0,...,K/2-1}.
+```
+
+Let:
+
+```text
+R = |C| = L/2,
+S = U union V.
+```
+
+For an unbalanced split `M=a+b`, both child weights are at most `M-1`. One-copy uncertainty gives:
+
+```text
+|S| >= max(|U|, |V|)
+    >= ceil((K/2)/(M-1))
+    = ceil(R * M/(M-1))
+    >= R + 1.
+```
+
+Now let:
+
+```text
+h_cov = |C \ S|.
+```
+
+Then:
+
+```text
+|S \ C| = |S| - |S cap C|
+        = |S| - (R - h_cov)
+        >= h_cov + 1.
+```
+
+Every coordinate in `S \ C` produces at least one parent output outside the selected parent residue
+core. These outputs are distinct for distinct child coordinates, so they are injective charge
+targets. The first `h_cov` such outputs pay for deterministic coverage holes inside the virtual
+core.
+
+The remaining `+1` pays the possible cancellation hole inside the selected parent residue. Indeed,
+if a coordinate of `C` lies in both `U` and `V`, local invertibility leaves at least one parent
+sibling nonzero, and quantitative no-early-gluing allows at most one vanished sibling over the
+fixed residue class. Coordinates of `C` that lie in only one child have both siblings nonzero and
+create no cancellation hole.
+
+Thus a candidate local theorem is:
+
+```text
+At an unbalanced two-child node with L>=2, every parent residue rho defines a virtual parent
+matched core whose holes can be injectively charged to non-core parent outputs created at the same
+node.
+```
+
+Equivalently:
+
+```text
+virtual holes introduced by an unbalanced split <= local extra-output defect.
+```
+
+The `L=1` full-live case is harmless: a parent core has size one, and any nonzero parent output is
+already an actual contained core.
+
+This lemma would replace the fragile absolute `H<=5` fallback with the much stronger constrained
+fallback:
+
+```text
+holes <= extra.
+```
+
+The current first-moment formula is essentially unchanged under this constrained fallback; the
+dangerous terms were precisely the artificial `extra=0, holes>0` cases.
+
+The reproducible arithmetic artifact is:
+
+```text
+docs/rfc_near_extremizer_total_union_depth11_c8_e128_stride_dim_overhead64_holes_coupled_extra.csv
+```
+
 ## Why This Is The Right Remaining Object
 
 The field algebra is already doing two jobs:

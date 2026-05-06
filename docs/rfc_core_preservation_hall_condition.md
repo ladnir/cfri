@@ -461,6 +461,15 @@ The deterministic residue-cover version of this remaining problem is split out i
 docs/rfc_unbalanced_split_residue_hall.md
 ```
 
+That note now indicates actual parent-core preservation is probably too strong for unbalanced
+splits. The more robust statement is defect-coupled virtual containment:
+
+```text
+virtual core holes <= real extra output leaves.
+```
+
+The corresponding first-moment count remains safe at depth 11, `c=8`.
+
 ## Hall Conclusion
 
 The certificate-facing Hall conclusion remains:

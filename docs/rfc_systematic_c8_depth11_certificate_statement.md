@@ -183,10 +183,38 @@ H=16: log2 failure bound =  79.12109543
 This confirms very small hole counts are affordable, but the proof should still target actual core
 preservation. Under the present crude hole count, five global holes remain safe and eight do not.
 
+A stronger and more relevant fallback was then checked: allow virtual core holes only when they are
+coupled to output defect:
+
+```text
+holes <= extra.
+```
+
+The artifact:
+
+```text
+docs/rfc_near_extremizer_total_union_depth11_c8_e128_stride_dim_overhead64_holes_coupled_extra.csv
+```
+
+gives:
+
+```text
+log2 failure bound = -99.60768253
+```
+
+So the certificate does not need literal actual-core preservation if every virtual hole is charged
+to a real extra output leaf. This is now the better target for unbalanced splits.
+
 Thus, within the corrected matched-plus-extra model:
 
 ```text
 Pr[d_sys < 12384] <= 2^-99.60768258.
+```
+
+Within the defect-coupled virtual-core model, the corresponding audited number is:
+
+```text
+Pr[d_sys < 12384] <= 2^-99.60768253.
 ```
 
 ## Lemma Status

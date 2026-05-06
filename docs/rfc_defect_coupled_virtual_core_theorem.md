@@ -144,6 +144,50 @@ are not reused by lower nodes. The natural rule is unchanged: a leaf outside the
 is charged at the highest node where its path diverges from the chosen core path. Holes are charged
 to extra leaves created at the same highest divergence.
 
+## Hole First-Divergence Injection
+
+Fix the final virtual matched core `C_root`. Every final output position has a path through the
+binary recursion tree. For a leaf `ell notin C_root`, define:
+
+```text
+first(ell) = highest node where ell leaves the selected core residue path.
+```
+
+For a hole `h in H_root`, define `birth(h)` as the highest node where the selected virtual core
+path required a child coordinate or sibling that was not present in the actual support. In the
+one-child and balanced cases, no new holes are born. Thus every hole birth is at an unbalanced
+node.
+
+At an unbalanced node, the alpha-2 local lemma gives a set of non-core parent outputs whose
+cardinality is at least half the number of parent-position holes born at that node. Choose those
+paying outputs before recursing below the node. Their descendants have:
+
+```text
+first(ell) = that unbalanced node.
+```
+
+Therefore they cannot be used by lower nodes, whose charged leaves have strictly lower first
+divergence. They also cannot collide with charges from sibling subtrees, because their path prefixes
+already differ at the charging node.
+
+This gives the global inequality:
+
+```text
+|H_root| <= 2 * |E_root|
+```
+
+provided the local paying outputs are selected injectively within each unbalanced node after
+cancellation charges are removed.
+
+The proof obligation left here is finite and local:
+
+```text
+At each unbalanced node, construct the paying output set from S\C and the paid cancellation records
+so that distinct local holes use distinct local non-core outputs.
+```
+
+Once this is done, first-divergence makes the global injection automatic.
+
 ## Local Proof Obligation
 
 At one unbalanced node of output length `K`, live row split:

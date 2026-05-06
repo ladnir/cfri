@@ -233,6 +233,11 @@ with common continuation set of size `h` creates at least `h-1` non-core sibling
 first-divergence lemma says those locally created leaves stay available for charging and are not
 reused by lower nodes.
 
+The same first-divergence rule now also pays virtual-core holes. A hole is born at the highest node
+where the selected virtual core asks for a missing child coordinate or a vanished sibling. In the
+unbalanced case, the alpha-2 local lemma supplies non-core outputs at that same node. Those outputs
+have first divergence equal to the hole-birth node, so they cannot be reused by lower-node charges.
+
 ## Inductive Counting Form
 
 Let `Core(node)` be the matched stride core exposed by following the uncharged branch choices. Let

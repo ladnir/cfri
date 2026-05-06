@@ -364,4 +364,5 @@ The charge-injection bookkeeping is split out in:
 
 ```text
 docs/rfc_near_defect_charge_injection.md
+docs/rfc_near_core_containment_theorem.md
 ```

@@ -4,7 +4,7 @@ This note sketches the bookkeeping needed to complete near-stability.
 
 ## Local Charge
 
-There are two local ways to lose exactness:
+There are three local ways to lose exactness:
 
 ```text
 1. row-split defect:

@@ -1,0 +1,238 @@
+# RFC Near-Core Containment Theorem
+
+This note states the remaining near-stability theorem in a proof-ready form.
+
+## Target
+
+Let `A_d` be one generic RFC transform, `k=2^d`, and let `x` be nonzero with:
+
+```text
+wt(x) = m
+wt(A_d x) = k/m + e.
+```
+
+The target theorem is:
+
+```text
+supp(A_d x) contains a matched stride core C of size k/m,
+and supp(A_d x) \ C has size e.
+```
+
+Equivalently, after deleting exactly `e` output leaves from `supp(A_d x)`, the remaining support is
+the output support of an exact uncertainty extremizer.
+
+## Pruning Form
+
+The clean induction is a pruning theorem.
+
+At any node of output length `K`, live row weight `M`, and output support `Y`, define:
+
+```text
+E = |Y| - K/M.
+```
+
+The theorem says:
+
+```text
+There exists a set P subset Y with |P| <= E such that Y \ P is a matched core of size K/M.
+```
+
+At the root this is exactly the target statement. The set `P` is the set of charged extra leaves.
+
+## One-Child Step
+
+If the live rows occupy only one child, then the parent output support is the two-sibling lift of
+the child output support:
+
+```text
+Y = lift(Y_child)
+|Y| = 2 |Y_child|
+K/M = 2 K_child/M
+E = 2 E_child.
+```
+
+By induction choose:
+
+```text
+P_child subset Y_child
+|P_child| <= E_child
+Y_child \ P_child = C_child.
+```
+
+Then set:
+
+```text
+P = lift(P_child).
+```
+
+This gives:
+
+```text
+|P| = 2 |P_child| <= E
+Y \ P = lift(C_child),
+```
+
+and `lift(C_child)` is the matched stride core at the parent.
+
+## Two-Child Balanced Step
+
+Assume the live rows split evenly:
+
+```text
+M = 2a.
+```
+
+Let child output supports be:
+
+```text
+U, V
+```
+
+with:
+
+```text
+p = |U|
+q = |V|
+h = |U cap V|
+L = K/M.
+```
+
+Write child defects:
+
+```text
+e_0 = p - L
+e_1 = q - L.
+```
+
+The local defect decomposition gives:
+
+```text
+E >= e_0 + e_1 + (p-h) + (q-h) + max(0,h-1).
+```
+
+Inductively prune the children:
+
+```text
+P_0 subset U, |P_0| <= e_0, U \ P_0 = C_0
+P_1 subset V, |P_1| <= e_1, V \ P_1 = C_1.
+```
+
+The remaining task at this node is to pay for the mismatch between `C_0` and `C_1`, and then pay
+for all but one common continuation coordinate.
+
+## Overlap Pruning
+
+The symmetric difference:
+
+```text
+(U \ V) union (V \ U).
+```
+
+A coordinate in `U triangle V` has only one active child value, so both parent siblings are nonzero
+and it cannot participate in exact cancellation at this node. The local defect identity allocates:
+
+```text
+(p-h) + (q-h)
+```
+
+units to this mismatch.
+
+The remaining overlap-pruning lemma is:
+
+```text
+After child pruning has exposed child cores, the parent leaves forced by U triangle V can be assigned
+injectively to output leaves outside the final parent core, with total cost bounded by the overlap
+charge plus the lifted child charges.
+```
+
+This is the first place where the proof is genuinely global rather than purely local. The local
+identity says the budget exists; the pruning lemma must show the same leaves are not also needed for
+child-defect or cancellation charges.
+
+## Cancellation Pruning
+
+After overlap pruning, only the common coordinates remain. Quantitative no-early-gluing says at
+most one common coordinate can participate in exact cancellation generically. Choose that coordinate
+as the continuation coordinate.
+
+For every other common coordinate, at least one sibling parent leaf is outside the exact skeleton.
+Charge one such leaf. This uses:
+
+```text
+max(0,h-1)
+```
+
+charges.
+
+After deleting these charged leaves, and after resolving overlap mismatch, the uncharged support
+follows the exact two-child glue step:
+
+```text
+one continuation coordinate,
+one surviving sibling choice,
+balanced live rows.
+```
+
+Thus the uncharged node is the full-live matched glue skeleton.
+
+## Unbalanced Row Split
+
+If the row split is unbalanced, the split defect is positive:
+
+```text
+ceil(max((K/2)/a, (K/2)/b)) - ceil(K/(a+b)) > 0.
+```
+
+This defect must be charged before the balanced two-child pruning can apply. The intended pruning
+rule is:
+
+```text
+delete arbitrary extra parent leaves outside a maximal child-supported exact skeleton
+until the remaining uncharged support has either one live child or a balanced split.
+```
+
+The local lower bound in:
+
+```text
+docs/rfc_near_defect_charge_injection.md
+```
+
+shows enough slack exists. The remaining detail is to make this deletion canonical and disjoint from
+the overlap/cancellation charges.
+
+## First-Divergence Injection
+
+Once an exact skeleton core `C` is selected, every charged output leaf `ell notin C` has a unique
+highest node where its path first diverges from the core path.
+
+Use:
+
+```text
+first(ell)
+```
+
+to assign charges. Charges from different nodes cannot collide, and charges from different child
+coordinates at the same node have different suffixes.
+
+This is the intended reason local pruning costs add globally:
+
+```text
+|P| <= total local defect <= E(root).
+```
+
+## Current Gap
+
+The local defect decomposition is now explicit, but two global pruning lemmas remain:
+
+```text
+1. overlap leaf selection:
+   convert symmetric-difference support mismatch into deleted leaves without double-counting child
+   or cancellation charges;
+
+2. unbalanced row-split pruning:
+   turn the positive split-defect lower bound into canonical deleted leaves outside the final core.
+```
+
+For the all-level systematic certificate, this gap is less dangerous than cancellation because
+both effects have explicit integer cost and cannot occur in the uncharged skeleton. Still, they must
+be written carefully to complete the theorem.

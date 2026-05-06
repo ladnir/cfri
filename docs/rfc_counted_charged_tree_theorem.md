@@ -128,7 +128,8 @@ B=104: total log2 union = -98.65570921
 B=108: total log2 union = -67.37561327
 ```
 
-The natural label budget is below `B=32`, and the certificate remains strong even at `B=108`.
+The natural label budget with charged-leaf markers is below `B=64`, and the certificate remains
+strong even at `B=108`.
 
 ## Proof Obligations
 

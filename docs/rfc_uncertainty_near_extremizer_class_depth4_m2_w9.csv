@@ -1,5 +1,0 @@
-pairs_csv,depth,k,pairs,row_block_count,contains_matched_stride_core_count,multi_core_count,first_missing_core
-docs/rfc_uncertainty_near_extremizer_pairs_depth4_m2_w9.csv,4,16,128,128,128,0,
-
-extra_outputs,pair_count
-1,128

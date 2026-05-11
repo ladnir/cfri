@@ -23,15 +23,15 @@ build/systematic_rfc_cert_cpp/systematic_rfc_cert.exe ^
   --security-bits 84 ^
   --compare ^
   --monotone-thresholds ^
-  --certificate-path docs/systematic_rfc_c8_depth9_global80_certificate.csv ^
-  --full-thresholds-path docs/systematic_rfc_c8_depth9_global80_thresholds.csv
+  --certificate-path docs/rfc_distance_analysis/systematic_rfc_c8_depth9_global80_certificate.csv ^
+  --full-thresholds-path docs/rfc_distance_analysis/systematic_rfc_c8_depth9_global80_thresholds.csv
 ```
 
 Example verify:
 
 ```text
 build/systematic_rfc_cert_cpp/systematic_rfc_cert.exe ^
-  --verify docs/systematic_rfc_c8_depth9_global80_thresholds.csv ^
+  --verify docs/rfc_distance_analysis/systematic_rfc_c8_depth9_global80_thresholds.csv ^
   --field-bits 128 ^
   --security-bits 84
 ```
@@ -57,8 +57,8 @@ build/systematic_rfc_cert_cpp/systematic_rfc_cert.exe ^
   --total-expansion 8 ^
   --samples 100 ^
   --seed 11 ^
-  --spectrum-path docs/sample_first_moment_gf5_depth3_c8_cpp.csv ^
-  --support-spectrum-path docs/sample_first_moment_gf5_depth3_c8_by_support_cpp.csv
+  --spectrum-path docs/rfc_distance_analysis/sample_first_moment_gf5_depth3_c8_cpp.csv ^
+  --support-spectrum-path docs/rfc_distance_analysis/sample_first_moment_gf5_depth3_c8_by_support_cpp.csv
 ```
 
 Tiny-field product first-moment calibration:
@@ -71,8 +71,8 @@ build/systematic_rfc_cert_cpp/systematic_rfc_cert.exe ^
   --total-expansion 8 ^
   --samples 1000 ^
   --seed 29 ^
-  --spectrum-path docs/sample_product_first_moment_gf5_depth3_c8_cpp.csv ^
-  --support-spectrum-path docs/sample_product_first_moment_gf5_depth3_c8_by_support_cpp.csv
+  --spectrum-path docs/rfc_distance_analysis/sample_product_first_moment_gf5_depth3_c8_cpp.csv ^
+  --support-spectrum-path docs/rfc_distance_analysis/sample_product_first_moment_gf5_depth3_c8_by_support_cpp.csv
 ```
 
 This samples the single-tree output-weight law for each message and then raises that law to the
@@ -89,6 +89,6 @@ build/systematic_rfc_cert_cpp/systematic_rfc_cert.exe ^
   --total-expansion 8 ^
   --samples 100 ^
   --seed 11 ^
-  --spectrum-path docs/sample_one_step_first_moment_gf5_depth3_c8_cpp.csv ^
-  --category-path docs/sample_one_step_categories_gf5_depth3_c8_cpp.csv
+  --spectrum-path docs/rfc_distance_analysis/sample_one_step_first_moment_gf5_depth3_c8_cpp.csv ^
+  --category-path docs/rfc_distance_analysis/sample_one_step_categories_gf5_depth3_c8_cpp.csv
 ```

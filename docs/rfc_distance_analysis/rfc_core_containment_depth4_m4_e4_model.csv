@@ -1,0 +1,10 @@
+pairs_csv,depth,k,pairs,first_missing_core
+docs\\rfc_distance_analysis\\rfc_uncertainty_near_model_pairs_depth4_m4_e4.csv,4,16,7920,
+
+contained_core_count,pair_count
+1,7872
+2,48
+
+extra_outputs,contained_core_count,pair_count
+4,1,7872
+4,2,48

@@ -1,8 +1,0 @@
-pairs_csv,depth,k,pairs
-docs\rfc_uncertainty_near_model_pairs_depth4_m4_e3.csv,4,16,3520
-
-kernel_dim,pair_count,first_pair
-1,3520,0:1:2:3|0:1:2:3:4:8:12
-
-extra_outputs,kernel_dim,pair_count
-3,1,3520

@@ -1,8 +1,0 @@
-pairs_csv,depth,k,pairs
-docs/rfc_uncertainty_near_extremizer_pairs_depth4_m2_w10.csv,4,16,448
-
-kernel_dim,pair_count,first_pair
-1,448,0:1|0:1:2:3:4:6:8:10:12:14
-
-extra_outputs,kernel_dim,pair_count
-2,1,448

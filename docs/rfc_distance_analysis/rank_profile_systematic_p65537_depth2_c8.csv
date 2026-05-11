@@ -1,0 +1,7 @@
+ensemble,prime,depth,k,n,zero_count,checked_shapes,rank_deficient_shapes,min_rank,first_bad
+systematic,65537,2,4,32,0,1,1,0,
+systematic,65537,2,4,32,1,32,32,1,0
+systematic,65537,2,4,32,2,496,496,2,0:1
+systematic,65537,2,4,32,3,4960,4960,3,0:1:2
+systematic,65537,2,4,32,4,35960,28,3,0:1:4:18
+systematic,65537,2,4,32,5,201376,0,4,

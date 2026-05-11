@@ -1,0 +1,6 @@
+depth,k,live_rows,output_support,checked_pairs,first_bad_matched,first_bad_nonmatched
+4,16,2,8,1544400,,
+
+matched,kernel_dim,pair_count
+0,0,1544384
+1,1,16

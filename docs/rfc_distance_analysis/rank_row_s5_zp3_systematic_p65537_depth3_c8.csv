@@ -1,0 +1,2 @@
+ensemble,prime,depth,k,n,parity_n,s_identity,z_parity,checked_shapes,rank_deficient_shapes,min_rank,first_bad
+systematic,65537,3,8,64,56,5,3,1552320,13027,7,0:1:2:3:4:8:9:36

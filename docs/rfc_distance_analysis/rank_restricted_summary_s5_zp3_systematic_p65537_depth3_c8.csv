@@ -1,0 +1,3 @@
+remaining_rows,parity_columns,restricted_rank,projective_classes,zero_columns,count,first_shape
+3,3,2,2,0,12096,0:1:2:3:4:8:9:36
+3,3,2,3,0,931,0:1:2:3:5:29:31:33

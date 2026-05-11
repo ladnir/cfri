@@ -1,0 +1,4 @@
+depth,total_expansion,cores,target_z_parity,checked_extensions,defective_extensions,unique_defective_extensions,first_defective
+3,8,3248,5,168896,0,0,
+
+core_index,columns,cert_defect

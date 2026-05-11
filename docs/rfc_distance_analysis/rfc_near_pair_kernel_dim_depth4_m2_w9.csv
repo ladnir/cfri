@@ -1,0 +1,8 @@
+pairs_csv,depth,k,pairs
+docs/rfc_distance_analysis/rfc_uncertainty_near_extremizer_pairs_depth4_m2_w9.csv,4,16,128
+
+kernel_dim,pair_count,first_pair
+1,128,0:1|0:1:2:4:6:8:10:12:14
+
+extra_outputs,kernel_dim,pair_count
+1,1,128

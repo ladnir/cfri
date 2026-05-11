@@ -1,0 +1,13 @@
+ensemble,mode,crossing,value_at_crossing,crossing_loss
+original,exact,16,1.0226353718154133,
+original,support,10,64.01708984375124,-6
+original,support_active,16,1.6252787368185824,0
+original,support_equal_root,16,1.3018789260275663,0
+original,support_single_double,16,1.7852063645236194,0
+original,full,16,1.0226353718154133,0
+systematic,exact,20,1.6985780413341127,
+systematic,support,13,6.849182128906553,-7
+systematic,support_active,18,1.0157654116116461,-2
+systematic,support_equal_root,19,2.1453532979148444,-1
+systematic,support_single_double,19,1.122174258737359,-1
+systematic,full,20,1.6985780413341127,0

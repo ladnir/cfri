@@ -1,0 +1,5 @@
+depth,k,live_rows,output_support,zero_count,checked_pairs,extremal_pairs,extremal_both_subcube,first_non_subcube_extremal
+4,16,2,9,7,1372800,128,0,0:1|0:1:2:4:6:8:10:12:14
+
+rows_subcube,outputs_subcube,extremal_pairs
+1,0,128

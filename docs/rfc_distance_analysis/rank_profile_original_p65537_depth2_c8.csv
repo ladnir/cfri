@@ -1,0 +1,6 @@
+ensemble,prime,depth,k,n,zero_count,checked_shapes,rank_deficient_shapes,min_rank,first_bad
+original,65537,2,4,32,0,1,1,0,
+original,65537,2,4,32,1,32,32,1,0
+original,65537,2,4,32,2,496,496,2,0:1
+original,65537,2,4,32,3,4960,4960,3,0:1:2
+original,65537,2,4,32,4,35960,0,4,

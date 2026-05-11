@@ -2045,82 +2045,105 @@ redundancy for the proximity argument.
 
 \section{The Packed RAA Code}
 
-The packed RAA code has parameters
+The packed RAA code is the relation code that Blaze uses before the BaseFold
+backend is invoked.  It is easiest to understand it as a small trace with one
+message row, three auxiliary rows, and one output row.  The rows are indexed by
+ordinary integers because the code itself is built from repetition,
+permutations, and prefix sums.  Later, the backend views the same length-$N$
+rows as tensors over $\B^\ell$; in the backend parameter set below,
+$N=2^\ell$.
+
+Fix public parameters
 \[
   (k,r,\pi_1,\pi_2),
   \qquad N=kr,
 \]
-where $k$ is the message length, $r$ is the repetition rate, $N$ is the codeword
-length, and $\pi_1,\pi_2$ are permutations of $\{0,\ldots,N-1\}$.
-The parameter $r$ says how many repeated slots each message coordinate receives
-before the first permutation.  If there were no permutation, the length-$N$
-repetition row would be
+where $k$ is the message length, $r$ is the repetition rate, $N$ is the output
+length, and $\pi_1,\pi_2$ are public permutations of $\{0,\ldots,N-1\}$.  For a
+message
 \[
-  m[0],\ldots,m[0],
-  m[1],\ldots,m[1],
-  \ldots,
-  m[k-1],\ldots,m[k-1],
+  m\in\F^{\{0,\ldots,k-1\}},
 \]
-with exactly $r$ copies of each $m[a]$.  Thus a repeated-row index $j$ maps back
-to its source message coordinate by $\lfloor j/r\rfloor$.
-
-For a message $m\in\F^k$, the codeword $c=\RAA(m)\in\F^N$ is defined through
-three auxiliary rows $u_2,u_3,u_4$:
+first form the repeated row $u_1\in\F^{\{0,\ldots,N-1\}}$ by
 \[
-  u_2[i] = m[\lfloor \pi_1[i]/r \rfloor],
+  u_1[j]=m[\lfloor j/r\rfloor].
+\]
+Thus every message entry appears in one contiguous block of $r$ positions.
+Then define the permuted repeated row, first accumulator row, permuted
+accumulator row, and output row by
+\[
+  u_2[i]=u_1[\pi_1[i]]
+        =m[\lfloor \pi_1[i]/r \rfloor],
 \]
 \[
   u_3[i] = \sum_{q=0}^{i} u_2[q],
-\]
-\[
+  \qquad
   u_4[i] = u_3[\pi_2[i]],
 \]
 \[
   c[i] = \sum_{q=0}^{i} u_4[q].
 \]
-The name RAA reflects the shape ``repeat, accumulate, accumulate,'' with
-permutations inserted to spread local structure.
+The codeword is $c=\RAA(m)\in\F^{\{0,\ldots,N-1\}}$.  The name RAA reflects the
+visible shape: repeat, accumulate, accumulate, with permutations inserted between
+the stages to spread local structure.
 
 \subsection{Why These Rows Are Useful}
 
-The definitions above contain global prefix sums.  A verifier cannot afford to
-recompute every prefix sum.  The auxiliary rows turn the global statement into
-local recurrences:
+The verifier will never receive the whole message, the whole codeword, or the
+whole auxiliary trace.  The point of the rows $u_2,u_3,u_4$ is that each global
+definition above has a local face.
+
+For the two accumulators, use the boundary convention
+$u_3[-1]=c[-1]=0$.  Then the prefix-sum definitions are equivalent to the local
+recurrences
 \[
   u_3[i]-u_3[i-1]-u_2[i]=0,
 \]
 \[
   c[i]-c[i-1]-u_4[i]=0,
 \]
-with the convention that $u_3[-1]=c[-1]=0$.  These equations can be checked at
-sampled positions.
+for every $i\in\{0,\ldots,N-1\}$.
 
-The repetition and permutation parts are checked by additional local residuals
-and product-tree helper witnesses.  The verifier does not read the whole trace;
-it samples positions and uses random batching to make a cheating prover unlikely
-to hide a nonzero error.
+For the repeated row, the verifier-facing object is not a separately committed
+$u_1$ row.  It is the implicit unpermutation of $u_2$.  Let $\pi_1^{-1}$ be the
+inverse permutation and define
+\[
+  \mathsf{block}(j)=j-(j\bmod r).
+\]
+The repetition condition says that
+$u_1[j]=u_2[\pi_1^{-1}[j]]$ is constant inside each length-$r$ block:
+\[
+  u_2[\pi_1^{-1}[j]]
+  -
+  u_2[\pi_1^{-1}[\mathsf{block}(j)]]
+  =
+  0.
+\]
+This is the local equality later named $R_{\mathrm{rep}}[j]$.
+
+These local equations are not, by themselves, a proximity proof.  They are the
+relations that later become residual rows.  The backend commits to those rows,
+opens queried operands, and ties the opened values to folded terminal claims
+through the shared BaseFold proof.
 
 \subsection{How The Permutation Proof Works}
 
-The RAA definition uses two public permutations.  The first one hides the
-repetition pattern:
-\[
-  u_2[i]=m[\lfloor\pi_1[i]/r\rfloor].
-\]
-Equivalently, if we define an implicit row $u_1$ by
+The RAA trace has two permutation claims.  The first says that $u_2$ is the
+implicit row $u_1$ read through $\pi_1$:
 \[
   u_1[\pi_1[i]]=u_2[i],
 \]
-then $u_1$ should be constant on every length-$r$ repetition block.  The second
-permutation says
+where $u_1$ is not committed separately.  The second says that $u_4$ is the row
+$u_3$ read through $\pi_2$:
 \[
   u_4[i]=u_3[\pi_2[i]].
 \]
-So the verifier must be convinced that the prover did not invent unrelated
-values for $u_2,u_3,u_4$.
+The verifier needs these as global multiset statements, but it should not sort
+or scan all $N$ positions.
 
-For a tiny example, suppose a prover claims that two indexed lists are the same
-after permutation:
+The standard trick is to attach the index to each value and then compress the
+whole indexed multiset into one randomized product.  Suppose a prover claims
+that two indexed lists are the same after permutation:
 \[
   (x_0,0),(x_1,1),(x_2,2),(x_3,3)
 \]
@@ -2159,32 +2182,49 @@ Blaze applies this idea twice:
 The corresponding product leaves are
 \[
   f_1[i]=\alpha-(u_2[i]+\beta\pi_1[i]),
-  \qquad
-  g_1[j]=\alpha-(u_1[j]+\beta j),
+\]
+\[
+  g_1[j]=\alpha-(u_2[\pi_1^{-1}[j]]+\beta j),
 \]
 \[
   f_2[i]=\alpha-(u_4[i]+\beta\pi_2[i]),
-  \qquad
+\]
+\[
   g_2[j]=\alpha-(u_3[j]+\beta j).
 \]
+The $g_1$ formula is the implicit-row definition
+$u_1[j]=u_2[\pi_1^{-1}[j]]$ written in the form the verifier can open.  There
+is no separate $u_1$ oracle.
+
 The verifier still cannot multiply all $N$ leaves directly, so the prover
-commits to product trees for $f_1,g_1,f_2,g_2$.  A product tree stores the leaves
-at the bottom, each parent as the product of two children, and the final product
-at the root.  The verifier checks sampled parent equations and root equalities:
+commits to product-tree helper oracles for $f_1,g_1,f_2,g_2$.  A product tree
+stores the leaves at the bottom, each parent as the product of two children, and
+the final product at the root.  The root equalities are
 \[
   \mathsf{root}(f_1)=\mathsf{root}(g_1),
   \qquad
   \mathsf{root}(f_2)=\mathsf{root}(g_2).
 \]
-Sampled helper leaves are also bound back to the auxiliary rows, so a prover
-cannot use a correct product tree for the wrong leaves.  The later RAA residual
-rows turn these sampled tree checks and root equalities into local error rows
-that can be batched with the accumulator and repetition checks.
+Local tree openings check parent equations.  Leaf openings also bind helper
+leaves back to the auxiliary rows using the displayed formulas.  This second
+binding matters: a product tree with internally consistent leaves is useless if
+those leaves were not actually derived from $u_2,u_3,u_4$ and the public
+permutations.
+
+The later permutation residual row packages the parent equations and the two
+root equalities into one locally checkable error signal.  The query schedule also
+checks the leaf bindings when a sampled helper opening touches a leaf.  Together
+these checks are batched with the repetition and accumulator residuals before the
+shared folded proof is applied.
 
 \subsection{Linearity}
 
-Packed RAA is linear.  Each step is a linear operation: copying a message entry,
-taking prefix sums, permuting a flat vector, and taking prefix sums again.  Therefore
+Packed RAA is linear.  Each step in the map
+\[
+  m\mapsto u_1\mapsto u_2\mapsto u_3\mapsto u_4\mapsto c
+\]
+is linear over $\F$: repeating entries, permuting entries, and taking prefix
+sums are all linear operations.  Therefore
 for any scalars $\rho_0,\ldots,\rho_{t-1}$,
 \[
   \sum_{j=0}^{t-1}\rho_j\RAA(m_j)

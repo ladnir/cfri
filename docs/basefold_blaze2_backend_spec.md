@@ -122,6 +122,15 @@ fold equation for raw systematic coordinates. There are only two acceptable impl
 Choice 2 is not directly Blaze-friendly because the second coordinate is not a raw external oracle
 entry. For Blaze, use choice 1 unless a later same-rate systematic RFC construction proves a better
 layout. The RFC/parity block still uses the sampled RFC diagonal schedule with `T' = T + 1`.
+With choice 1, the parity pair for child encodings `L = P(m_l)` and `R = P(m_r)` must interpolate
+between `L` and `R`:
+
+```text
+(L[j] + T[j] * (R[j] - L[j]), L[j] + (T[j] + 1) * (R[j] - L[j]))
+```
+
+not between `L` and a raw `R` direction. This is what makes the parity fold land on
+`P((1-alpha) * m_l + alpha * m_r)`.
 The power-of-two restriction below avoids non-power-of-two codeword plumbing; it does not license
 the old linear fold equation for raw systematic coordinates.
 

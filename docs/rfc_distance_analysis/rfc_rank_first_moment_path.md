@@ -245,7 +245,7 @@ The distinction between structural defects and accidental finite-field zeros is 
 resampling selected shapes:
 
 ```text
-python scripts/resample_rank_shapes.py \
+python scripts/rfc_distance_analysis/resample_rank_shapes.py \
   --depth 3 \
   --total-expansion 8 \
   --prime 65537 \

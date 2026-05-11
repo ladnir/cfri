@@ -34,7 +34,7 @@ build/systematic_rfc_cert_cpp/systematic_rfc_cert.exe \
 The emitted table is saved in:
 
 ```text
-docs/ideal_random_first_moment_c8_depth1_to_11_global80.csv
+docs/rfc_distance_analysis/ideal_random_first_moment_c8_depth1_to_11_global80.csv
 ```
 
 At depth 11 and total expansion `c=8`, both the fully random linear and systematic-random-parity

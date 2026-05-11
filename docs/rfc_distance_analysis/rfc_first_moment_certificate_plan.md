@@ -201,7 +201,7 @@ messages without enumerating messages.
 The exact tiny-field script:
 
 ```text
-python scripts/single_tree_product_first_moment.py \
+python scripts/rfc_distance_analysis/single_tree_product_first_moment.py \
   --p 5 \
   --depth 2 \
   --total-expansion 8 \
@@ -270,7 +270,7 @@ into many different single-tree laws.
 The postprocessor:
 
 ```text
-python scripts/analyze_one_step_categories.py \
+python scripts/rfc_distance_analysis/analyze_one_step_categories.py \
   docs/rfc_distance_analysis/sample_one_step_categories_gf5_depth3_c8_cpp.csv \
   --prime 5 \
   --old-cutoff 16 \
@@ -363,7 +363,7 @@ The challenge is to derive this state recursively without sampling child codes.
 The script:
 
 ```text
-python scripts/compressed_one_step_crossing.py \
+python scripts/rfc_distance_analysis/compressed_one_step_crossing.py \
   docs/rfc_distance_analysis/sample_one_step_categories_gf5_depth3_c8_cpp.csv \
   --prime 5 \
   --total-n 64 \

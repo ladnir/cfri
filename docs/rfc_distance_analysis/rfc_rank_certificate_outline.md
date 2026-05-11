@@ -240,8 +240,8 @@ The structural proof should show that outside the recursive collision family, `M
 rank `k-|S|`. The scripts:
 
 ```text
-scripts/restricted_parity_relations.py
-scripts/summarize_restricted_relations.py
+scripts/rfc_distance_analysis/restricted_parity_relations.py
+scripts/rfc_distance_analysis/summarize_restricted_relations.py
 ```
 
 confirm this view on the exact depth-3 rows. For example:

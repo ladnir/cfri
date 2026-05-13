@@ -1,38 +1,33 @@
 # Blaze Modular Protocol Requirements
 
-This document states the requirements for replacing the current monolithic Blaze
-protocol presentation with modular protocol boxes.  The goal is to expose the
-true API boundaries:
+This document states the requirements for the modular protocol boxes in the
+Blaze theory explainer.  The goal is to expose the true API boundaries:
 
 - `Blaze.Commit`
 - `Blaze.Open`
-- `blazeCommit.Commit` and `blazeCommit.Open`
+- `Pi_blazeCommit.Com` and `Pi_blazeCommit.Open`
+- `RAAAdapter.Prepare`
 - `BaseFold.Commit`
 - `BaseFold.Open`
 
-The boxes should be readable as structured pseudocode.  Do not use gotos,
-resampling jumps, or references such as "repeat B12."  Use structured loops,
-nested loops, local subroutines, and explicit `If`/`While` blocks.
+The companion change spec is `docs/basefold_generic_api_change_spec.md`.
 
 ## Global Style Requirements
 
-Each protocol box should begin with an underlined signature, followed by a short
-plain-text public-parameter paragraph, followed by a structured step list.  The
-public-parameter paragraph should not be a bullet point.  Example:
+Each protocol box begins with a short plain-text public-parameter paragraph at
+the top of the figure, followed by a small spacer, followed by an underlined
+signature, followed by a structured step list.
 
 ```text
-underline{Blaze.Open(P: f, V: (C_f,z,v)) -> {0,1}}
-
 Public parameters: field F; sizes L=2^ell, K=2^k, N=2^n; ...
+
+underline{Blaze.Open(P: f, V: (C_f,z,v)) -> {0,1}}
 
 1. P: ...
 2. V: ...
 ```
 
-For a module with two API calls, such as `blazeCommit.Com` and
-`blazeCommit.Open`, use two signatures in the same box when that is clearer.
-
-Every executable line should begin with a party identifier:
+Every executable line begins with a party identifier:
 
 - `P:` for prover-only computation or messages.
 - `V:` for verifier-only sampling/checking.
@@ -40,13 +35,16 @@ Every executable line should begin with a party identifier:
 - `P -> V:` for prover messages.
 
 Use `L=2^\ell`, `K=2^k`, and `N=2^n`.  Words such as `Public parameters`,
-`For`, `While`, `If`, `Let`, `Sample`, `Check`, and `Return` should anchor the
-code, but the protocol semantics should live in explicit variables, domains,
-and API calls.
+`For`, `If`, `Let`, `Sample`, `Check`, and `Return` may anchor the code, but
+the protocol semantics should live in explicit variables, domains, and API
+calls.
 
-## Abstract Commitment API
+Use structured loops.  Do not use gotos, labels such as "repeat B12",
+resampling jumps, or stateful acceptance flags.
 
-The paper should treat `F_commit` as a handle-based logical tensor commitment
+## Commitment API
+
+The paper treats `F_commit` as a handle-based logical tensor commitment
 interface:
 
 ```text
@@ -57,44 +55,60 @@ x <- F_commit.Open(R, a)
 The representation `rep` is implementation-specific.  A Merkle implementation
 uses the literal tensor as `rep`.  A virtual implementation may store handles
 and public randomness, provided its `Open` procedure returns the logical tensor
-value.
+value.  Failed authentication is represented by `bot`, so
+`F_commit.Open(R,a)` has output type `L union {bot}`.
 
-## Box: blazeCommit
+## Composite Commitment API
 
-`blazeCommit` is a virtual implementation of the same commitment API.  It is
-not a new algebraic proof system and not a separate PCS.
+Composite commitment is a logical routing layer over existing handles.  It is
+not a new cryptographic primitive.
+
+```text
+C <- CompositeCommit((Omega_i, psi_i, C_i)_i)
+x <- CompositeOpen(C, omega)
+```
+
+The subsets `Omega_i` are public and disjoint.  The maps
+`psi_i : Omega_i -> D_i` are public fixed formulas or tables.  Opening at
+`omega` routes to the unique part containing `omega` and calls
+`F_commit.Open(C_i, psi_i(omega))`.
+
+## Box: Pi_blazeCommit
+
+`Pi_blazeCommit` is a virtual implementation of the same commitment API.  It is
+not a separate PCS.
 
 Required API:
 
 ```text
-R_star <- blazeCommit.Com(R_outer, rho)
-x <- blazeCommit.Open(R_star, b)
+R_star <- Pi_blazeCommit.Com(R_outer, rho)
+x <- Pi_blazeCommit.Open(R_star, b)
 ```
 
 Required behavior:
 
 ```text
-blazeCommit.Com(R_outer, rho):
+Pi_blazeCommit.Com(R_outer, rho):
   Store (R_outer, rho).
   Return R_star with logical domain B^n.
 
-blazeCommit.Open(R_star, b):
+Pi_blazeCommit.Open(R_star, b):
   col <- F_commit.Open(R_outer, b)
   Return <rho, col>.
 ```
 
-The backend must see only `R_star` and `F_commit.Open(R_star,b)`.  It should not
-inline the column-opening calculation.
+The backend sees only `R_star` and `F_commit.Open(R_star,b)`.
 
-## Box: Blaze.Commit
+## Box: Blaze
 
-Required API:
+The Blaze PCS surface should be one box with two function signatures:
 
 ```text
 C_f <- Blaze.Commit(P: f, V: bottom)
+accept/reject <- Blaze.Open(P: f, V: (C_f,z,v))
 ```
 
-Required behavior:
+Required `Blaze.Commit` behavior:
 
 ```text
 P: choose/derive y in F^{B^ell x B^k} representing f.
@@ -106,17 +120,7 @@ V: set C_f = R_outer.
 Return C_f.
 ```
 
-`C_f` is the PCS commitment handle.  It is the outer column commitment.
-
-## Box: Blaze.Open
-
-Required API:
-
-```text
-accept/reject <- Blaze.Open(P: f, V: C_f, z, v)
-```
-
-Required behavior:
+Required `Blaze.Open` behavior:
 
 ```text
 P: use y representing f.
@@ -124,85 +128,104 @@ P: for h in B^ell, set u[h] = MLE(y[h,*])(z_col).
 P -> V: u.
 V: check v = sum_h chi_h(z_row) u[h].
 V: sample rho <- F^{B^ell}.
-P,V: R_star <- blazeCommit.Com(C_f, rho).
+V -> P: rho.
+P,V: R_star <- Pi_blazeCommit.Com(C_f, rho).
 P,V: v_star = <rho,u>.
 P: y_star[a] = sum_h rho[h] y[h,a].
-P,V: run BaseFold.Commit using R_star and the compressed claim.
-P,V: run BaseFold.Open using the backend state.
+P,V: run RAAAdapter.Prepare(y_star; R_star,z_col,v_star).
+P: retain A.
+P,V: receive (C_A,w,S,Relations).
+P,V: C_code <- BaseFold.Commit(A; C_A).
+P,V: run BaseFold.Open(A; C_code,w,S,Relations).
 V: return the BaseFold result.
 ```
 
 `Blaze.Open` is the only box that translates the original PCS claim
-`MLE(y)(z_row,z_col)=v` into the compressed backend claim
-`MLE(y_star)(z_col)=v_star`.
+`MLE(y)(z_row,z_col)=v` into the compressed backend claim.
 
-## Box: BaseFold.Commit
+## Box: RAAAdapter.Prepare
 
-Required API:
+This box is Blaze-specific.  It constructs the message tensor passed to
+BaseFold and the commitment handle for that tensor.
 
-```text
-B <- BaseFold.Commit(public: R_star, z_col, v_star; P witness: y_star)
-```
-
-Required behavior:
+Required output:
 
 ```text
-P: build the RAA helper tensors u1,u2,u3,u4,c_star_wit.
-P: commit helper tensors u2,u3,u4.
-V: sample residual challenges.
-P: commit product-tree helpers and component residual tensors.
-V: sample eta.
-P,V: define R_eta from component residual openings.
-P,V: define base handles H0=R_star, H1=C_u2, H2=C_u3, H3=C_u4, H4=CheckResidualAt.
-P,V: define A^(0)=(c_star_wit,u2,u3,u4,R_eta).
-P,V: define w^(0) and S_0=v_star.
-P: commit initial compiler parity P^(0).
-P -> V: backend handles.
-Return backend commitment state B.
+P witness: A = (c_star, u2, u3, u4, R_eta) in F^D
+D = {0,1,2,3,4} x B^n
+C_A = CompositeCommit(row handles for A)
+w in F^D
+S = v_star
+Relations = fixed zero-residual local check over row 4
 ```
 
-This box binds backend-owned data.  It should not verify queries.
+The verifier receives `C_A`, `w`, `S`, and `Relations`; it does not receive
+`A`.
 
-## Box: BaseFold.Open
+For Blaze, product-tree and component-residual checks are inside the opening
+rule for the virtual handle `C_eta`.  The relation descriptor passed to
+BaseFold is the fixed check: for `b in B^n`, open `(4,b)` and verify that the
+value is `0`.
 
-Required API:
+The handle for row `0` is `R_star`.  The handles for rows `1,2,3` are helper
+Merkle handles.  The handle for row `4` is a virtual residual handle whose
+opening is implemented by the residual-opening subroutine using `R_star`, the
+helper handles, product-tree helper handles, component-residual handles, public
+layout/root addresses, and the residual challenges.
+
+## Box: BaseFold
+
+BaseFold is generic.  It does not mention RAA, Blaze columns, product trees, or
+the five-row adapter layout.
+
+The BaseFold backend surface should be one box with two function signatures:
 
 ```text
-accept/reject <- BaseFold.Open(public: B, R_star, z_col, v_star)
+C_code <- BaseFold.Commit(P: A, V: C_A)
+accept/reject <- BaseFold.Open(P: A, V: (C_code,w,S,Relations))
 ```
 
-Required behavior:
-
-1. Run the fold/evaluation spine.
-2. Sample query sets.
-3. Close the query sets with structured loops.
-4. Open all required handles through a unified `OpenLayer`.
-5. Check path equations, parity equations, terminal scalar equation, and
-   residual terminal equation.
-
-The query closure must be structured.  A valid shape is:
+Required `BaseFold.Commit` behavior:
 
 ```text
-V: initialize query sets.
-V: changed = 1.
-V: while changed = 1:
-     changed = 0.
-     for each newly required path/parity/residual item:
-       add its dependencies.
-       if a dependency was new, set changed = 1.
-V: if input query count is too large, reject this sampling attempt and resample
-   by enclosing the whole sampling procedure in a bounded/structured outer
-   loop.
+P: y = Enc_BF(A) in F^Omega.
+P: y_ext = y restricted to Omega_ext.
+P: C_ext <- F_commit.Com(y_ext).
+P -> V: C_ext.
+P,V: C_code <- CompositeCommit((Omega_msg, iota^{-1}, C_A),
+                               (Omega_ext, id, C_ext)).
+Return C_code.
 ```
 
-The box should not use labels or gotos such as "repeat B12."
+Here `Enc_BF : F^D -> F^Omega` is systematic, `Omega = Omega_msg union
+Omega_ext`, and `iota : D -> Omega_msg` identifies the systematic coordinates.
+
+Required `BaseFold.Open` behavior:
+
+1. Run the BaseFold evaluation/folding/proximity protocol for the claim
+   `<w,A>=S`.
+2. Whenever the verifier samples a challenge or query set that the prover must
+   use, the verifier sends it explicitly.
+3. Sample path queries from an explicit path query domain `T_path`; do not write
+   bare placeholders such as `sample Q_path`.
+4. Open codeword coordinates only through `C_code`; the prover sends opened
+   values and authentication data for explicitly named coordinates.
+5. When a relation check needs a message coordinate `a in D`, open it at the
+   systematic coordinate `iota(a)` through `C_code`.
+6. Apply any adapter-supplied local relation descriptors.  Each descriptor has
+   query domain `T_tau`, arity `m_tau`, maps `phi_tau,j : T_tau -> D`, and
+   check polynomial `P_tau : F^{m_tau} -> F`.
+7. Use immediate reject conditions for each concrete check; do not end a box
+   with vague phrases such as `accept iff all checks pass`.
+
+The relation descriptors are fixed public local checks.  They are not arbitrary
+callbacks or a place to hide extra proof logic.
 
 ## Responsibility Boundary
 
-The modular invariant should be visible:
-
 - `Blaze.Commit` owns the outer column commitment `C_f=R_outer`.
-- `blazeCommit` turns `(R_outer,rho)` into a virtual handle `R_star`.
-- `BaseFold.Commit/Open` consume `R_star` only through the abstract opening API.
-- `Blaze.Open` orchestrates the claim translation and delegates the compressed
-  backend proof to BaseFold.
+- `Pi_blazeCommit` turns `(R_outer,rho)` into a virtual handle `R_star`.
+- `RAAAdapter.Prepare` constructs the backend message tensor `A`, the handle
+  `C_A`, the linear claim `<w,A>=S`, and the fixed RAA relation descriptors.
+- `BaseFold.Commit/Open` consumes `A`, `C_A`, `w`, `S`, and the descriptors
+  without knowing their Blaze-specific origin.

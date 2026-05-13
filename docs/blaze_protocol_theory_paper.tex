@@ -14,16 +14,17 @@
 
 \newcommand{\F}{\mathbb{F}}
 \newcommand{\B}{\{0,1\}}
-\newcommand{\Com}{\operatorname{Com}}
-\newcommand{\Open}{\operatorname{Open}}
-\newcommand{\Eval}{\operatorname{Eval}}
-\newcommand{\Enc}{\operatorname{Enc}}
-\newcommand{\Fold}{\operatorname{Fold}}
-\newcommand{\MsgFold}{\operatorname{MsgFold}}
-\newcommand{\CodeFold}{\operatorname{CodeFold}}
-\newcommand{\RAA}{\operatorname{RAA}}
-\newcommand{\MLE}{\operatorname{MLE}}
-\newcommand{\PT}{\operatorname{PT}}
+\newcommand{\Com}{\mathsf{Com}}
+\newcommand{\Open}{\mathsf{Open}}
+\newcommand{\Eval}{\mathsf{Eval}}
+\newcommand{\Enc}{\mathsf{Enc}}
+\newcommand{\Fold}{\mathsf{Fold}}
+\newcommand{\MsgFold}{\mathsf{MsgFold}}
+\newcommand{\CodeFold}{\mathsf{CodeFold}}
+\newcommand{\RAA}{\mathsf{RAA}}
+\newcommand{\MLE}{\mathsf{MLE}}
+\newcommand{\PT}{\mathsf{PT}}
+\newcommand{\Handle}{\mathsf{Handle}}
 \newcommand{\prover}{\mathbb{P}}
 \newcommand{\verifier}{\mathbb{V}}
 \newcommand{\ip}[2]{\left\langle #1,#2 \right\rangle}
@@ -342,26 +343,31 @@ selected entries.  We will use this through a generic functionality; a Merkle
 tree is one implementation, but not the only one we will need.
 
 \begin{protocolbox}{Functionality: $\mathcal{F}_{\mathrm{Commit}}$}{fig:func-commit}
-For a public coordinate domain $D$ and value space $\mathcal{L}$, the
-functionality binds a handle to a logical tensor $x\in\mathcal{L}^D$.  The
-representation submitted at commit time is implementation-specific.
+Public parameters: coordinate domain \(D\) and value space \(\mathcal{L}\).
 
-\begin{description}[leftmargin=0.35in,style=nextline]
-  \item[Commit.]
-        The prover submits a representation $\mathsf{rep}$ of a logical tensor
-        $x\in\mathcal{L}^D$.  The verifier receives a commitment handle $R$ for
-        domain $D$.
-  \item[Open.]
-        On public input $(R,a)$ with $a\in D$, the prover and verifier run the
-        opening procedure for $R$.  If it accepts, the verifier receives the
-        unique logical value $x[a]\in\mathcal{L}$ bound to $R$.
-\end{description}
+\smallskip
+\noindent\(\underline{\mathcal{F}_{\mathrm{Commit}}.\Com(\prover:\mathsf{rep},\ \verifier:D)\to R}\)
+
+\smallskip
+\begin{enumerate}[leftmargin=0.24in,label=\textbf{C\arabic*.},itemsep=0.08em,topsep=0.1em,parsep=0pt]
+  \item \(\prover\): \(\mathsf{rep}\) represents a logical tensor \(x\in\mathcal{L}^D\).
+  \item \(\prover\to\verifier\): \(R\).
+\end{enumerate}
+
+\smallskip
+\noindent\(\underline{\mathcal{F}_{\mathrm{Commit}}.\Open(\prover:R,\ \verifier:(R,a))\to o}\), for \(a\in D\).
+
+\smallskip
+\begin{enumerate}[leftmargin=0.24in,label=\textbf{O\arabic*.},itemsep=0.08em,topsep=0.1em,parsep=0pt]
+  \item \(\prover\to\verifier\): opening data for \((R,a)\).
+  \item \(\verifier\): return \(o\in\mathcal{L}\cup\{\bot\}\).
+\end{enumerate}
 \end{protocolbox}
 
-In the codeword commitments below, $\mathcal{L}=\F$.  We write
-$\mathcal{F}_{\mathrm{Commit}}.\Open(R,a)=x[a]$ for the accepted opening value.
-Equivalently, a verifier can check a claimed value $v$ by opening $R$ at $a$ and
-checking that the returned value equals $v$.
+In the codeword commitments below, $\mathcal{L}=\F$.  If
+$\mathcal{F}_{\mathrm{Commit}}.\Open(R,a)\ne\bot$, its value is the unique
+logical value $x[a]$ bound to $R$.  Equivalently, a verifier can check a claimed
+value $v$ by opening $R$ at $a$ and checking that the returned value equals $v$.
 
 In a real Merkle implementation, the handle $R$ is the Merkle root.  To compute
 it, the prover hashes every leaf value, repeatedly hashes neighboring pairs, and
@@ -369,19 +375,70 @@ keeps the final root.  To open entry $i$, the prover sends $v=x[i]$ and the
 sibling hashes along the path from that leaf to the root.  The verifier
 recomputes the path and checks that it ends at $R$.
 
-We will use two implementations of this same API.  The ordinary implementation
-is Merkle: $\Pi_{\mathrm{merkleCommit}}.\Com(x\in\mathcal{L}^D)$ stores the
-logical tensor itself and opens coordinates by Merkle paths.  Blaze also uses a
-virtual implementation.  If $R_c$ is a handle to a column tensor
-$C\in(\F^{\B^\ell})^{\B^n}$ and $\rho\in\F^{\B^\ell}$, then
-$\Pi_{\mathrm{blazeCommit}}.\Com(R_c,\rho)$ returns a handle $R_\star$ whose
-logical domain is $\B^n$ and whose logical tensor is
+We will use several implementations of this same API.  The ordinary
+implementation is Merkle: $\Pi_{\mathrm{merkleCommit}}.\Com(x\in\mathcal{L}^D)$
+stores the logical tensor itself and opens coordinates by Merkle paths.  Blaze
+also uses virtual handles: a virtual handle does not store one flat tensor
+directly, but it still implements the same $\Com/\Open$ behavior.  We use two
+virtual implementations.  The first, \(\Pi_{\mathrm{rowFoldCommit}}\), folds the
+committed row-codeword matrix into the compressed codeword handle \(R_\star\).
+The second, \(\Pi_{\mathrm{backendCommit}}\), extends \(R_\star\) with the
+auxiliary RAA lanes and exposes the full backend message handle \(C_A\).
+
+For example, if $R_c$ is a handle to a column tensor
+$C\in(\F^{\B^\ell})^{\B^n}$ and $\rho\in\F^{\B^\ell}$, then a compressed
+\(\Pi_{\mathrm{rowFoldCommit}}.\mathsf{Commit}(R_c,\rho)\) returns a handle
+\(R_\star\) whose logical domain is \(\B^n\) and whose logical tensor is
 \[
   c_\star[b]=\ip{\rho}{C[b]}.
 \]
 Opening $R_\star$ at $b$ opens the column $C[b]$ through $R_c$ and returns the
 inner product with $\rho$.  The backend sees only the handle $R_\star$ and the
 operation $\mathcal{F}_{\mathrm{Commit}}.\Open(R_\star,b)$.
+
+The backend message handle is virtual in the same sense.  It is a handle over
+the lane domain $\mathcal L\times\B^n$.  Opening lane \(0\) routes to
+$R_\star$; opening the RAA lanes routes through the single residual-phase handle
+\(C_{\mathrm{raa}}\).  BaseFold sees only this one backend handle, not the
+machinery behind each lane.
+
+We will also use a composite handle.  This is just public routing between
+existing handles over disjoint coordinate sets; it is not a new cryptographic
+assumption.
+
+\begin{protocolbox}{Functionality: Composite Commitment}{fig:func-composite-commit}
+\noindent Public parameters: a logical domain written as a natural disjoint
+union \(D=D_1\sqcup\cdots\sqcup D_m\).  A coordinate in \(D_i\) has its natural
+local coordinate in the \(i\)-th component.
+
+\smallskip
+\noindent\(\underline{\mathsf{CompositeCommit}(R_1,\ldots,R_m)\to R}\)
+
+\smallskip
+\begin{enumerate}[leftmargin=0.24in,label=\textbf{M\arabic*.},itemsep=0.08em,topsep=0.1em,parsep=0pt]
+  \item \(\prover,\verifier\): return the handle \(R\) that opens component
+        \(D_i\) through \(R_i\).
+\end{enumerate}
+
+\smallskip
+\noindent\(\underline{\mathsf{CompositeOpen}(R,a)\to o\in\mathsf{Val}\cup\{\bot\}}\), for \(a\in D\), where \(\mathsf{Val}\) is the value type stored by the selected component handle.
+
+\smallskip
+\begin{enumerate}[leftmargin=0.24in,label=\textbf{M\arabic*.},resume,itemsep=0.08em,topsep=0.1em,parsep=0pt]
+  \item \(\prover,\verifier\): let \(i\) be the unique index with \(a\in D_i\).
+  \item \(\prover,\verifier\): let \(a_i\) be the natural local coordinate of
+        \(a\) inside \(D_i\).
+  \item \(\prover,\verifier\): return \(o=\mathcal{F}_{\mathrm{Commit}}.\Open(R_i,a_i)\).
+\end{enumerate}
+\end{protocolbox}
+
+For the systematic split used by BaseFold, the message addresses are
+\(\mathcal L\times\B^k\).  The codeword addresses are
+\(\mathcal L\times\B^n\).  The systematic address of
+\((q,a)\in\mathcal L\times\B^k\) is \((q,0^{n-k}\Vert a)\).  Thus
+\(\mathsf{CompositeCommit}(C_A,C_{\mathrm{ext}})\) opens systematic codeword
+addresses through \(C_A\), and opens the remaining codeword addresses through
+\(C_{\mathrm{ext}}\).
 
 The functionality is binding at the logical-tensor level.  It is not an
 algebraic commitment: it does not by itself prove that the logical tensor is a
@@ -396,21 +453,28 @@ binds the prover to one polynomial before the verifier chooses evaluation
 questions.  The clean ideal functionality is representation-free.
 
 \begin{protocolbox}{Ideal Functionality: $\mathcal{F}_{\mathrm{PCS}}$}{fig:func-pcs}
-For a number of variables $d$, the functionality
-\[
-  \mathcal{F}_{\mathrm{PCS}}
-\]
-behaves as follows.
+Public parameter: number of variables \(d\).
 
-\begin{description}[leftmargin=0.35in,style=nextline]
-  \item[Commit.]
-        The prover submits a multilinear polynomial
-        $f:\F^d\to\F$.  The verifier receives a commitment handle $C$.
-  \item[Evaluate.]
-        On public input $(C,z,v)$, where $z\in\F^d$ and $v\in\F$, the
-        functionality outputs $1$ if the polynomial bound to $C$ satisfies
-        $f(z)=v$, and outputs $0$ otherwise.
-\end{description}
+\smallskip
+\noindent\(\underline{\mathcal{F}_{\mathrm{PCS}}.\mathsf{Commit}(\prover:f,\ \verifier:\bot)\to C}\), for \(f:\F^d\to\F\).
+
+\smallskip
+\begin{enumerate}[leftmargin=0.24in,label=\textbf{P\arabic*.},itemsep=0.08em,topsep=0.1em,parsep=0pt]
+  \item \(\prover\to\mathcal{F}_{\mathrm{PCS}}\): \(f\).
+  \item \(\mathcal{F}_{\mathrm{PCS}}\): choose a fresh handle \(C\).
+  \item \(\mathcal{F}_{\mathrm{PCS}}\): store \(f\) under \(C\).
+  \item \(\mathcal{F}_{\mathrm{PCS}}\to\prover,\verifier\): \(C\).
+\end{enumerate}
+
+\smallskip
+\noindent\(\underline{\mathcal{F}_{\mathrm{PCS}}.\mathsf{Evaluate}(\prover:\bot,\ \verifier:(C,z,v))\to b}\), for \(z\in\F^d\), \(v\in\F\), and \(b\in\{0,1\}\).
+
+\smallskip
+\begin{enumerate}[leftmargin=0.24in,label=\textbf{E\arabic*.},itemsep=0.08em,topsep=0.1em,parsep=0pt]
+  \item \(\mathcal{F}_{\mathrm{PCS}}\): retrieve \(f\) stored under \(C\).
+  \item \(\mathcal{F}_{\mathrm{PCS}}\): if \(f(z)=v\), set \(b\gets1\); otherwise set \(b\gets0\).
+  \item \(\mathcal{F}_{\mathrm{PCS}}\to\verifier\): \(b\).
+\end{enumerate}
 \end{protocolbox}
 
 The functionality in Figure~\ref{fig:func-pcs} deliberately commits to the
@@ -460,15 +524,24 @@ the entire representation tensor to the verifier.  Figure~\ref{fig:protocol-triv
 is useful as a baseline: it is correct, but it gives up succinctness completely.
 
 \begin{protocolbox}{Protocol: Trivial PCS}{fig:protocol-trivial-pcs}
-\begin{description}[leftmargin=0.28in,style=nextline]
-  \item[Commit.]
-        The prover sends the whole tensor representation $y$ of $f$ to the
-        verifier.  The commitment handle $C$ is just this stored data.
-  \item[Evaluate.]
-        Given $(C,z,v)$, the verifier computes $f(z)$ from the stored tensor
-        using the formula for the chosen representation, and accepts iff
-        $f(z)=v$.
-\end{description}
+\noindent\(\underline{\mathsf{TrivialPCS.Commit}(\prover:y,\ \verifier:\bot)\to C}\)
+
+\smallskip
+\begin{enumerate}[leftmargin=0.24in,label=\textbf{T\arabic*.},itemsep=0.08em,topsep=0.1em,parsep=0pt]
+  \item \(\prover\to\verifier\): \(y\).
+  \item \(\verifier\): \(C\gets y\).
+  \item \(\verifier\): return \(C\).
+\end{enumerate}
+
+\smallskip
+\noindent\(\underline{\mathsf{TrivialPCS.Evaluate}(\prover:y,\ \verifier:(C,z,v))\to\{0,1\}}\)
+
+\smallskip
+\begin{enumerate}[leftmargin=0.24in,label=\textbf{U\arabic*.},itemsep=0.08em,topsep=0.1em,parsep=0pt]
+  \item \(\verifier\): compute \(u=f_C(z)\) from the stored tensor \(C\).
+  \item \(\verifier\): if \(u\ne v\), return reject.
+  \item \(\verifier\): return accept.
+\end{enumerate}
 \end{protocolbox}
 
 The protocol in Figure~\ref{fig:protocol-trivial-pcs} is correct.  It is also
@@ -609,7 +682,8 @@ The verifier can check the claimed total without evaluating $H$:
 \[
   g_1(0)+g_1(1)=v.
 \]
-If this passes, the verifier samples $r_1\leftarrow\F$ and changes the claim to
+If this passes, the verifier samples $r_1\leftarrow\F$, sends it to the prover,
+and changes the claim to
 \[
   H(0,r_1)+H(1,r_1)=g_1(r_1).
 \]
@@ -621,7 +695,7 @@ The verifier checks
 \[
   g_0(0)+g_0(1)=g_1(r_1),
 \]
-samples $r_0\leftarrow\F$, and changes the claim to
+samples $r_0\leftarrow\F$, sends it to the prover, and changes the claim to
 \[
   H(r_0,r_1)=g_0(r_0).
 \]
@@ -638,50 +712,27 @@ random challenge $r_i$.  A false polynomial identity can agree at a random
 field point only with small probability, bounded by its degree over $|\F|$.
 
 \begin{protocolbox}{Protocol: Sumcheck Randomizes A PCS Evaluation Claim}{fig:protocol-sumcheck-randomizes-pcs}
-\begin{description}[leftmargin=0.28in,style=nextline]
-  \item[Public input.]
-        A PCS commitment handle $C$ for a multilinear polynomial $f:\F^d\to\F$,
-        an evaluation point $z\in\F^d$, and a claimed value $v\in\F$.
-  \item[Initialize.]
-        Define $H(Y)=f(Y)\chi_z(Y)$ and set $s_d\gets v$.  At the start of
-        round $i$, the maintained claim is
-        \[
-          s_{i+1}
-          =
-          \sum_{b\in\B^{i+1}}H(b,r_{i+1},\ldots,r_{d-1}).
-        \]
-  \item[For $i=d-1,d-2,\ldots,0$.]
-        The prover sends a univariate polynomial $g_i(X)$ of degree at most
-        $2$ claiming to equal
-        \[
-          \sum_{b\in\B^i}
-            H(b,X,r_{i+1},\ldots,r_{d-1}),
-        \]
-        where $r_{i+1},\ldots,r_{d-1}$ are the challenges already sampled.
-        The verifier checks
-        \[
-          g_i(0)+g_i(1)=s_{i+1}.
-        \]
-        Then the verifier samples $r_i\leftarrow\F$ and sets
-        $s_i\gets g_i(r_i)$.
-  \item[After the loop.]
-        The verifier has sampled $r=(r_0,\ldots,r_{d-1})$ and the remaining
-        claim is
-        \[
-          H(r)=s_0.
-        \]
-        Since $H(r)=f(r)\chi_z(r)$, and assuming $\chi_z(r)\ne0$ in this
-        simplified presentation, the loop determines the randomized PCS claim
-        \[
-          (C,r,u),
-          \qquad
-          u=s_0/\chi_z(r).
-        \]
-  \item[Endpoint check.]
-        To complete the check using the ideal PCS functionality, the verifier
-        calls $\mathcal{F}_{\mathrm{PCS}}$ from Figure~\ref{fig:func-pcs} on
-        $(C,r,u)$ and accepts only if that call returns $1$.
-\end{description}
+\noindent Public input: \(C\), \(z\in\F^d\), \(v\in\F\).
+
+\smallskip
+\begin{enumerate}[leftmargin=0.24in,label=\textbf{S\arabic*.},itemsep=0.08em,topsep=0.1em,parsep=0pt]
+  \item \(\verifier\): \(s_d\gets v\).
+  \item For \(i=d-1,d-2,\ldots,0\):
+        \begin{enumerate}[leftmargin=0.28in,label=\textbf{S\arabic*.\alph*.},itemsep=0.05em,topsep=0.05em,parsep=0pt]
+          \item \(\prover\to\verifier\): \(g_i\in\F[X]\).
+          \item \(\verifier\): if \(\deg(g_i)>2\), return reject.
+          \item \(\verifier\): if \(g_i(0)+g_i(1)\ne s_{i+1}\), return reject.
+          \item \(\verifier\): \(r_i\leftarrow\F\).
+          \item \(\verifier\to\prover\): \(r_i\).
+          \item \(\verifier\): \(s_i\gets g_i(r_i)\).
+        \end{enumerate}
+  \item \(\verifier\): \(r\gets(r_0,\ldots,r_{d-1})\).
+  \item \(\verifier\): if \(\chi_z(r)=0\), return reject.
+  \item \(\verifier\): \(u\gets s_0/\chi_z(r)\).
+  \item \(\verifier\): \(b\gets\mathcal{F}_{\mathrm{PCS}}.\mathsf{Evaluate}(C,r,u)\).
+  \item \(\verifier\): if \(b=0\), return reject.
+  \item \(\verifier\): return \((1,C,r,u)\).
+\end{enumerate}
 \end{protocolbox}
 
 The protocol in Figure~\ref{fig:protocol-sumcheck-randomizes-pcs} is
@@ -745,7 +796,8 @@ This polynomial has a clear job:
 \[
   p(0)+p(1)=s_d.
 \]
-After checking this equation, the verifier samples $r_{d-1}\leftarrow\F$ and
+After checking this equation, the verifier samples $r_{d-1}\leftarrow\F$, sends
+it to the prover, and
 the new claim becomes
 \[
   \sum_{a\in\B^{d-1}} w_a(r_{d-1})x_a(r_{d-1})=s_{d-1},
@@ -798,19 +850,30 @@ The code is built so that the answer is yes.
 Fix a public linear code $C\subseteq\F^N$.
 
 \begin{protocolbox}{Ideal Functionality: $\mathcal{F}_{\mathrm{IOPP}}^C$}{fig:func-iopp}
-The ideal proximity functionality
-\[
-  \mathcal{F}_{\mathrm{IOPP}}^C
-\]
-behaves as follows.
+\noindent Public parameters: code \(C\subseteq\F^N\), distance threshold
+\(\delta\in[0,1]\).
 
-\begin{description}[leftmargin=0.35in,style=nextline]
-  \item[Submit.]
-        The prover submits an oracle word $\pi\in\F^N$.
-  \item[Check.]
-        The verifier receives $1$ if $\pi$ is close to some codeword in $C$,
-        and receives $0$ if $\pi$ is far from every codeword in $C$.
-\end{description}
+\smallskip
+\noindent\(\underline{\mathcal{F}_{\mathrm{IOPP}}^C.\mathsf{Submit}(\prover:\pi,\ \verifier:\bot)\to I}\)
+
+\smallskip
+\begin{enumerate}[leftmargin=0.24in,label=\textbf{I\arabic*.},itemsep=0.08em,topsep=0.1em,parsep=0pt]
+  \item \(\prover\to\mathcal{F}_{\mathrm{IOPP}}^C\): \(\pi\in\F^N\).
+  \item \(\mathcal{F}_{\mathrm{IOPP}}^C\): choose a fresh handle \(I\).
+  \item \(\mathcal{F}_{\mathrm{IOPP}}^C\): store \(\pi\) under \(I\).
+  \item \(\mathcal{F}_{\mathrm{IOPP}}^C\to\prover,\verifier\): \(I\).
+\end{enumerate}
+
+\smallskip
+\noindent\(\underline{\mathcal{F}_{\mathrm{IOPP}}^C.\mathsf{Check}(\prover:\bot,\ \verifier:I)\to\{0,1\}}\)
+
+\smallskip
+\begin{enumerate}[leftmargin=0.24in,label=\textbf{J\arabic*.},itemsep=0.08em,topsep=0.1em,parsep=0pt]
+  \item \(\mathcal{F}_{\mathrm{IOPP}}^C\): retrieve \(\pi\) stored under \(I\).
+  \item \(\mathcal{F}_{\mathrm{IOPP}}^C\): \(\Delta_\pi\gets\min_{c\in C}\Delta(\pi,c)\).
+  \item \(\mathcal{F}_{\mathrm{IOPP}}^C\): if \(\Delta_\pi\le\delta\), set \(b\gets1\); otherwise set \(b\gets0\).
+  \item \(\mathcal{F}_{\mathrm{IOPP}}^C\to\verifier\): \(b\).
+\end{enumerate}
 \end{protocolbox}
 
 The functionality in Figure~\ref{fig:func-iopp} is useful, but it is not a
@@ -1118,7 +1181,8 @@ a message tensor $m_d\in\F^{\B^{k_d}}$, and the committed top oracle is
   \pi_d=\Enc_d(m_d)\in\F^{\B^{n_d}}.
 \]
 For each layer $i=d-1,\ldots,0$, the verifier samples a fresh challenge
-$\alpha_i\leftarrow\F$ and then the prover commits to the next child oracle.  In
+$\alpha_i\leftarrow\F$, sends it to the prover, and then the prover commits to
+the next child oracle.  In
 the concrete coefficient-style BaseFold convention of the previous subsection,
 the honest prover splits $m_{i+1}=(m_L\mid m_R)$ with
 $m_L,m_R\in\F^{\B^{k_i}}$ and sets
@@ -1148,67 +1212,57 @@ then checks a few complete parent-child paths.
 
 \begin{protocolbox}{Protocol: BaseFold IOPP}{fig:protocol-basefold-iopp}
 \label{fig:protocol-basefold-iopp-query}
-\begin{description}[leftmargin=0.28in,style=nextline]
-  \item[Input oracle.]
-        The prover has already supplied $\pi_d\in\F^{\B^{n_d}}$ or committed to it
-        using the Commit operation of $\mathcal{F}_{\mathrm{Commit}}$ from
-        Figure~\ref{fig:func-commit}.  The verifier also has a query count
-        $Q_{\mathrm{BF}}\in\mathbb{N}$.
-  \item[Pre-query phase.]
-        For each $i=d-1,d-2,\ldots,0$, the verifier samples a fresh challenge
-        $\alpha_i\leftarrow\F$.  The prover submits and commits to a child
-        oracle $\pi_i\in\F^{\B^{n_i}}$ using
-        $\mathcal{F}_{\mathrm{Commit}}$ from Figure~\ref{fig:func-commit}.
-        An honest prover computes this child by, for each $a\in\B^{n_i}$,
-        interpolating the line $L_a(X)$ through
-        \[
-          (t_{i,a},\pi_{i+1}[a,0])
-          \quad\text{and}\quad
-          (t_{i,a}+1,\pi_{i+1}[a,1]),
-        \]
-        and setting
-        \[
-          \pi_i[a]=L_a(\alpha_i).
-        \]
-        Each committed oracle is bound by one commitment handle.
-  \item[Query phase.]
-        After all folded-layer commitments are fixed, the verifier runs
-        $Q_{\mathrm{BF}}$ independent query paths.  For each
-        $q\in\{0,\ldots,Q_{\mathrm{BF}}-1\}$, it samples the first path
-        coordinate
-        \[
-          a_{q,d-1}\leftarrow\B^{n_{d-1}}.
-        \]
-        For each $i\in\{0,\ldots,d-1\}$, define
-        $a_{q,i}\in\B^{n_i}$ to be the length-$n_i$ prefix of
-        $a_{q,d-1}$.  Equivalently, for every $i>0$ there is a bit
-        $b_{q,i}\in\B$ such that
-        \[
-          a_{q,i}=(a_{q,i-1},b_{q,i}).
-        \]
-        Then, for $i=d-1,d-2,\ldots,0$, the verifier asks the prover to open
-        \[
-          \pi_{i+1}[a_{q,i},0],
-          \qquad
-          \pi_{i+1}[a_{q,i},1],
-          \qquad
-          \pi_i[a_{q,i}].
-        \]
-        Each revealed value is checked against the corresponding commitment handle.
-        The verifier reconstructs the line $L(X)$ through
-        \[
-          (t_{i,a_{q,i}},\pi_{i+1}[a_{q,i},0])
-          \quad\text{and}\quad
-          (t_{i,a_{q,i}}+1,\pi_{i+1}[a_{q,i},1])
-        \]
-        and checks
-        \[
-          L(\alpha_i)=\pi_i[a_{q,i}].
-        \]
-  \item[Base check.]
-        The verifier checks, by exhaustive membership in the public base code,
-        that the tiny word $\pi_0$ is a valid codeword of $C_0$.
-\end{description}
+\noindent Public parameters: \(d,Q_{\mathrm{BF}}\in\mathbb{N}\), codes
+\(\mathcal{C}_i\subseteq\F^{\B^{n_i}}\), interpolation points
+\(t_{i,a}\in\F\) for \(i=0,\ldots,d-1\) and \(a\in\B^{n_i}\).
+
+\smallskip
+\begin{enumerate}[leftmargin=0.24in,label=\textbf{P\arabic*.},itemsep=0.08em,topsep=0.1em,parsep=0pt]
+  \item \(\prover\): \(R_d\gets\mathcal{F}_{\mathrm{Commit}}.\Com(\pi_d)\).
+  \item \(\prover\to\verifier\): \(R_d\).
+  \item For \(i=d-1,d-2,\ldots,0\):
+        \begin{enumerate}[leftmargin=0.28in,label=\textbf{P\arabic*.\alph*.},itemsep=0.05em,topsep=0.05em,parsep=0pt]
+          \item \(\verifier\): \(\alpha_i\leftarrow\F\).
+          \item \(\verifier\to\prover\): \(\alpha_i\).
+          \item \(\prover\): for every \(a\in\B^{n_i}\), let
+                \(L_{i,a}(X)\in\F[X]\) be the line with
+                \(L_{i,a}(t_{i,a})=\pi_{i+1}[a,0]\) and
+                \(L_{i,a}(t_{i,a}+1)=\pi_{i+1}[a,1]\).
+          \item \(\prover\): for every \(a\in\B^{n_i}\), set
+                \(\pi_i[a]\gets L_{i,a}(\alpha_i)\).
+          \item \(\prover\): \(R_i\gets\mathcal{F}_{\mathrm{Commit}}.\Com(\pi_i)\).
+          \item \(\prover\to\verifier\): \(R_i\).
+        \end{enumerate}
+  \item For \(q=0,1,\ldots,Q_{\mathrm{BF}}-1\):
+        \begin{enumerate}[leftmargin=0.28in,label=\textbf{P\arabic*.\alph*.},itemsep=0.05em,topsep=0.05em,parsep=0pt]
+          \item \(\verifier\): \(a_{q,d-1}\leftarrow\B^{n_{d-1}}\).
+          \item \(\verifier\to\prover\): \(a_{q,d-1}\).
+          \item \(\verifier\): for every \(i=0,\ldots,d-1\), set
+                \(a_{q,i}\in\B^{n_i}\) to the length-\(n_i\) prefix of
+                \(a_{q,d-1}\).
+          \item For \(i=d-1,d-2,\ldots,0\):
+                \begin{enumerate}[leftmargin=0.32in,label=\textbf{P\arabic*.\alph*.\roman*.},itemsep=0.04em,topsep=0.04em,parsep=0pt]
+                  \item \(\prover,\verifier\):
+                        \(x_0\gets\mathcal{F}_{\mathrm{Commit}}.\Open(R_{i+1},(a_{q,i},0))\).
+                  \item \(\prover,\verifier\):
+                        \(x_1\gets\mathcal{F}_{\mathrm{Commit}}.\Open(R_{i+1},(a_{q,i},1))\).
+                  \item \(\prover,\verifier\):
+                        \(x_\star\gets\mathcal{F}_{\mathrm{Commit}}.\Open(R_i,a_{q,i})\).
+                  \item \(\verifier\): if \(x_0=\bot\) or \(x_1=\bot\) or
+                        \(x_\star=\bot\), return reject.
+                  \item \(\verifier\): let \(L(X)\in\F[X]\) be the line with
+                        \(L(t_{i,a_{q,i}})=x_0\) and
+                        \(L(t_{i,a_{q,i}}+1)=x_1\).
+                  \item \(\verifier\): if \(L(\alpha_i)\ne x_\star\), return reject.
+                \end{enumerate}
+        \end{enumerate}
+  \item \(\verifier\): for every \(a\in\B^{n_0}\), set
+        \(x_a\gets\mathcal{F}_{\mathrm{Commit}}.\Open(R_0,a)\).
+  \item \(\verifier\): if \(x_a=\bot\) for any \(a\in\B^{n_0}\), return reject.
+  \item \(\verifier\): set \(\widehat\pi_0\gets(x_a)_{a\in\B^{n_0}}\).
+  \item \(\verifier\): if \(\widehat\pi_0\notin\mathcal{C}_0\), return reject.
+  \item \(\verifier\): return accept.
+\end{enumerate}
 \end{protocolbox}
 
 \paragraph{Soundness view.}
@@ -1699,6 +1753,7 @@ clear check that replaces the original large committed evaluation claim.
   \item[Verifier input.]
         $(z,v)$.
   \item[Interpret $y_d$.]
+        \(\prover\):
         \[
           f_d(X)\gets
           \begin{cases}
@@ -1710,27 +1765,29 @@ clear check that replaces the original large committed evaluation claim.
         \]
   \item[Commit phase.]
         \begin{enumerate}[leftmargin=0.28in,label=\textbf{C\arabic*.},itemsep=0.08em,topsep=0.1em,parsep=0pt]
-          \item $\pi_d\gets\Enc_d(y_d)\in\F^{\B^{n_d}}$.
-          \item $C_d\gets\mathcal{F}_{\mathrm{Commit}}.\Com(\pi_d)$.
-          \item Prover sends $C_d$ to the verifier.
+          \item \(\prover\): \(\pi_d\gets\Enc_d(y_d)\in\F^{\B^{n_d}}\).
+          \item \(\prover\): \(C_d\gets\mathcal{F}_{\mathrm{Commit}}.\Com(\pi_d)\).
+          \item \(\prover\to\verifier\): \(C_d\).
         \end{enumerate}
   \item[Open phase.]
         \begin{enumerate}[leftmargin=0.28in,label=\textbf{O\arabic*.},itemsep=0.08em,topsep=0.1em,parsep=0pt]
-          \item $H(Y)\gets f_d(Y)\chi_z(Y)$; \quad $s_d\gets v$.
+          \item \(\prover\): \(H(Y)\gets f_d(Y)\chi_z(Y)\).
+          \item \(\verifier\): \(s_d\gets v\).
           \item For $i=d-1,d-2,\ldots,0$:
             \begin{enumerate}[leftmargin=0.24in,label=\textbf{\alph*.},itemsep=0.06em,topsep=0.06em,parsep=0pt]
-              \item
+              \item \(\prover\):
                 \[
                   g_i(X)\gets
                   \sum_{b\in\B^i}H(b,X,r_{i+1},\ldots,r_{d-1}).
                 \]
-                Prover sends $g_i$.
-              \item Verifier checks $\deg(g_i)\le 2$ and
-                $g_i(0)+g_i(1)=s_{i+1}$.
-              \item Verifier samples $r_i\leftarrow\F$ and sets
-                $s_i\gets g_i(r_i)$.
-              \item Split $y_{i+1}=(y_L\mid y_R)$ with
-                $y_L,y_R\in\F^{\B^i}$, and set
+                \(\prover\to\verifier\): \(g_i\).
+              \item \(\verifier\): if \(\deg(g_i)>2\) or
+                \(g_i(0)+g_i(1)\ne s_{i+1}\), return reject.
+              \item \(\verifier\): \(r_i\leftarrow\F\).\\
+                \(\verifier\to\prover\): \(r_i\).\\
+                \(\verifier\): \(s_i\gets g_i(r_i)\).
+              \item \(\prover\): split \(y_{i+1}=(y_L\mid y_R)\) with
+                \(y_L,y_R\in\F^{\B^i}\), and set
                 \[
                   y_i[b]\gets
                   \begin{cases}
@@ -1741,7 +1798,7 @@ clear check that replaces the original large committed evaluation claim.
                   \end{cases}
                   \qquad b\in\B^i.
                 \]
-              \item For every $a\in\B^{n_i}$:
+              \item \(\prover\): for every \(a\in\B^{n_i}\), compute
                 \[
                   L_{i,a}(X)\gets
                   \operatorname{line}\bigl((t_{i,a},\pi_{i+1}[a,0]),
@@ -1749,50 +1806,41 @@ clear check that replaces the original large committed evaluation claim.
                   \qquad
                   \pi_i[a]\gets L_{i,a}(r_i).
                 \]
-              \item $C_i\gets\mathcal{F}_{\mathrm{Commit}}.\Com(\pi_i)$.
-                Prover sends $C_i$.
+              \item \(\prover\): \(C_i\gets\mathcal{F}_{\mathrm{Commit}}.\Com(\pi_i)\).\\
+                \(\prover\to\verifier\): \(C_i\).
             \end{enumerate}
-          \item $r\gets(r_0,\ldots,r_{d-1})$.  If $\chi_z(r)=0$, reject.
-            Otherwise set $u\gets s_0/\chi_z(r)$.
-          \item For every $a\in\B^{n_0}$, verify
-            $\mathcal{F}_{\mathrm{Commit}}.\Open(C_0,a,\pi_0[a])=1$.
-            Check $\pi_0=\Enc_0(u)$.
+          \item \(\verifier\): \(r\gets(r_0,\ldots,r_{d-1})\).
+          \item \(\verifier\): if \(\chi_z(r)=0\), return reject.
+          \item \(\verifier\): \(u\gets s_0/\chi_z(r)\).
+          \item \(\prover,\verifier\): for every \(a\in\B^{n_0}\), set
+            \(o_a\gets\mathcal{F}_{\mathrm{Commit}}.\Open(C_0,a)\).
+          \item \(\verifier\): if \(o_a=\bot\) for any \(a\in\B^{n_0}\), return reject.
+          \item \(\verifier\): set \(\widehat\pi_0\gets(o_a)_{a\in\B^{n_0}}\).
+          \item \(\verifier\): if \(\widehat\pi_0\ne\Enc_0(u)\), return reject.
           \item For $q=0,\ldots,Q_{\mathrm{BF}}-1$:
             \begin{enumerate}[leftmargin=0.24in,label=\textbf{\alph*.},itemsep=0.06em,topsep=0.06em,parsep=0pt]
-              \item Sample $a_{q,d-1}\leftarrow\B^{n_{d-1}}$.
-              \item For $i=d-1,d-2,\ldots,0$, with
-                $a_{q,i}\in\B^{n_i}$:
+              \item \(\verifier\): \(a_{q,d-1}\leftarrow\B^{n_{d-1}}\).\\
+                \(\verifier\to\prover\): \(a_{q,d-1}\).
+              \item \(\verifier\): for every \(i=0,\ldots,d-1\), set
+                \(a_{q,i}\in\B^{n_i}\) to the length-\(n_i\) prefix of
+                \(a_{q,d-1}\).
+              \item For $i=d-1,d-2,\ldots,0$:
                 \begin{enumerate}[leftmargin=0.24in,label=\textbf{\roman*.},itemsep=0.06em,topsep=0.06em,parsep=0pt]
-                  \item
-                    \[
-                      x_0\gets\pi_{i+1}[a_{q,i},0],
-                      \qquad
-                      x_1\gets\pi_{i+1}[a_{q,i},1],
-                      \qquad
-                      x_\star\gets\pi_i[a_{q,i}].
-                    \]
-                  \item Check
-                    \[
-                      \begin{aligned}
-                        \mathcal{F}_{\mathrm{Commit}}.\Open(C_{i+1},(a_{q,i},0),x_0)&=1,\\
-                        \mathcal{F}_{\mathrm{Commit}}.\Open(C_{i+1},(a_{q,i},1),x_1)&=1,\\
-                        \mathcal{F}_{\mathrm{Commit}}.\Open(C_i,a_{q,i},x_\star)&=1.
-                      \end{aligned}
-                    \]
-                  \item
+                  \item \(\prover,\verifier\): set
+                    \(x_0\gets\mathcal{F}_{\mathrm{Commit}}.\Open(C_{i+1},(a_{q,i},0))\),
+                    \(x_1\gets\mathcal{F}_{\mathrm{Commit}}.\Open(C_{i+1},(a_{q,i},1))\),
+                    and \(x_\star\gets\mathcal{F}_{\mathrm{Commit}}.\Open(C_i,a_{q,i})\).
+                  \item \(\verifier\): if \(x_0=\bot\) or \(x_1=\bot\) or \(x_\star=\bot\), return reject.
+                  \item \(\verifier\):
                     \[
                       L(X)\gets
                       \operatorname{line}\bigl((t_{i,a_{q,i}},x_0),
                       (t_{i,a_{q,i}}+1,x_1)\bigr);
-                      \qquad
-                      \text{check }L(r_i)=x_\star.
                     \]
-                  \item If $i>0$, write
-                    $a_{q,i}=(a_{q,i-1},b_{q,i})$ with
-                    $a_{q,i-1}\in\B^{n_{i-1}}$ and $b_{q,i}\in\B$.
+                  \item \(\verifier\): if \(L(r_i)\ne x_\star\), return reject.
                 \end{enumerate}
             \end{enumerate}
-          \item Accept iff all checks above pass.
+          \item \(\verifier\): return accept.
         \end{enumerate}
 \end{description}
 \end{protocolbox}
@@ -2290,24 +2338,27 @@ Because $c_\star=E(y_\star)$, the evaluation claim
 $\MLE(y_\star)(z_{\mathrm{col}})=v_\star$ can also be rewritten as a linear
 claim on the compressed codeword $c_\star$:
 \[
-  \ip{w}{c_\star}=v_\star
+  \sum_{b\in\B^n}W(b)c_\star[b]=v_\star
 \]
-for a public weight tensor $w\in\F^{\B^n}$ determined by the code $E$ and
-the point $z_{\mathrm{col}}$.  The equation $\ip{w}{c_\star}=v_\star$ is the
-compressed evaluation claim that the backend must authenticate.
+for a public weight function \(W:\B^n\to\F\) determined by the code $E$ and
+the point $z_{\mathrm{col}}$.  The function $W$ is an evaluation procedure, not
+a serialized tensor that the verifier must materialize.  The displayed equation
+is the compressed evaluation claim that the backend must authenticate.
 
 Conceptually, then, Blaze needs to prove two things about the compressed
 codeword $c_\star$:
 \begin{enumerate}[label=\textbf{B\arabic*.}]
   \item $c_\star$ is consistent with the fast outer encoding relation
         $c_\star=E(y_\star)$.
-  \item The translated evaluation claim $\ip{w}{c_\star}=v_\star$ is true.
+  \item The translated evaluation claim
+        \(\sum_{b\in\B^n}W(b)c_\star[b]=v_\star\) is true.
 \end{enumerate}
 BaseFold is the implementation of the authentication for the two claims
-$c_\star=E(y_\star)$ and $\ip{w}{c_\star}=v_\star$.  The systematic BaseFold
-interface lets the backend use externally authenticated openings of $c_\star$
-as its top input, while backend-owned commitments authenticate auxiliary
-tensors, residual tensors, parity, and folded layers.
+$c_\star=E(y_\star)$ and
+\(\sum_{b\in\B^n}W(b)c_\star[b]=v_\star\).  The systematic BaseFold interface
+lets the backend use externally authenticated openings of $c_\star$ as its top
+input, while backend-owned commitments authenticate auxiliary tensors, residual
+tensors, parity, and folded layers.
 
 The soundness intuition is the reverse.  Suppose the prover commits to a
 codeword slot $c[h,\ast]$ that is not a valid codeword.  Let $E(y[h,\ast])$ be
@@ -2330,7 +2381,7 @@ matrix $c$.  The backend will not receive a fresh Merkle commitment to all of
 $c_\star$.  Instead, after $\rho$ is sampled, Blaze constructs the virtual
 handle
 \[
-  R_\star=\Pi_{\mathrm{blazeCommit}}.\Com(R_{\mathrm{outer}},\rho).
+  R_\star=\Pi_{\mathrm{rowFoldCommit}}.\mathsf{Commit}(R_{\mathrm{outer}},\rho).
 \]
 This handle implements the same opening API as any other
 $\mathcal{F}_{\mathrm{Commit}}$ handle.  To open the compressed symbol
@@ -2369,7 +2420,7 @@ statement being proved.  The public backend request is
 \[
   (E,R_\star,z_{\mathrm{col}},v_\star),
 \]
-where $R_\star=\Pi_{\mathrm{blazeCommit}}.\Com(R_{\mathrm{outer}},\rho)$ is
+where $R_\star=\Pi_{\mathrm{rowFoldCommit}}.\mathsf{Commit}(R_{\mathrm{outer}},\rho)$ is
 the virtual commitment handle for the compressed codeword $c_\star$ defined by
 \[
   c_\star[b]=\ip{\rho}{c[\ast,b]}
@@ -2595,7 +2646,7 @@ checks.  The protocol constantly moves values between four statuses:
 
   \item[Derived openings.]
         A value like $c_\star[b]$ is opened through the virtual handle
-        $R_\star=\Pi_{\mathrm{blazeCommit}}.\Com(R_{\mathrm{outer}},\rho)$.
+        $R_\star=\Pi_{\mathrm{rowFoldCommit}}.\mathsf{Commit}(R_{\mathrm{outer}},\rho)$.
         Its opening procedure derives the value from an opened outer column:
         $c_\star[b]=\ip{\rho}{c[\ast,b]}$.  Similarly, $R_\eta[b]$ is not opened
         from its own commitment handle; it is recomputed from authenticated
@@ -2870,10 +2921,10 @@ $R_\eta[b]$ opens all four component residuals at the same address and recompute
 \]
 
 The verifier does not see the full tensor $R_\eta$.  Instead the backend puts
-$R_\eta$ into the shared augmented matrix, folds it with the same challenges as
-the other backend tensors, and checks the terminal equation
+$R_\eta$ into lane \(q=4\), folds it with the same challenges as the other
+backend lanes, and checks the terminal equation
 \[
-  A^{(n)}[4,\emptyset]=0.
+  A_4^{(n)}[\emptyset]=0.
 \]
 If $R_\eta$ is a nonzero tensor, its multilinear extension is a nonzero
 multilinear polynomial, which vanishes at a random point with probability at
@@ -2886,225 +2937,186 @@ sampled entries were locally recomputed.  Without those correlated fold paths,
 the prover could publish a zero terminal value that is not actually the fold of
 the committed residual data.
 
-The local work is best read as a verifier subroutine, not as a new oracle.
-Figure~\ref{fig:subroutine-check-residual-at} names that repeated work.  The
-subroutine opens one committed component residual, opens the operands required
-by that residual's formula, recomputes the value, and returns the authenticated
-field element.  It has no independent soundness meaning; it is just verifier
-pseudocode for one queried address.
+The local work is best read as verifier subroutines, not as new oracles.
+Figure~\ref{fig:subroutine-tree-res-open} opens one local product-tree residual.
+Figure~\ref{fig:subroutine-check-residual-at} uses it to open one committed
+component residual and verify the local formula.
+
+\begin{protocolbox}{Verifier Subroutine: $\mathsf{TreeResOpen}(T,b)$}{fig:subroutine-tree-res-open}
+\scriptsize\raggedright
+\noindent Public parameters: \(T\in\{f_1,g_1,f_2,g_2\}\), address \(b\in\B^n\), challenges \(\alpha,\beta\), grouped handles \(C_{\mathrm{tree}}\) and \(C_{\mathrm{stage}}\), and public maps \(\operatorname{role}(b)\), \(\operatorname{node}(b)\), \(\operatorname{leaf}(b)\), and \(\operatorname{pad}(b)\).
+
+\smallskip
+\noindent\(\underline{\mathsf{TreeResOpen}(T,b)\to h_T\in\F\cup\{\bot\}}\)
+
+\smallskip
+\begin{enumerate}[leftmargin=0.24in,label=\textbf{T\arabic*.},itemsep=0.08em,topsep=0.1em,parsep=0pt]
+  \item \(\prover,\verifier\): if \(\operatorname{role}(b)=\mathsf{parent}\), set \(\nu=\operatorname{node}(b)\),\\
+        \(p\gets\mathcal{F}_{\mathrm{Commit}}.\Open(C_{\mathrm{tree}},(T,\nu))\),\\
+        \(l\gets\mathcal{F}_{\mathrm{Commit}}.\Open(C_{\mathrm{tree}},(T,\operatorname{left}(\nu)))\),\\
+        \(r\gets\mathcal{F}_{\mathrm{Commit}}.\Open(C_{\mathrm{tree}},(T,\operatorname{right}(\nu)))\).\\
+        \(\verifier\): if \(p=\bot\) or \(l=\bot\) or \(r=\bot\), return \(\bot\); otherwise return \(h_T=p-lr\).
+  \item \(\prover,\verifier\): if \(\operatorname{role}(b)=\mathsf{leaf}\), set \(a=\operatorname{leaf}(b)\),\\
+        \(p\gets\mathcal{F}_{\mathrm{Commit}}.\Open(C_{\mathrm{tree}},(T,\operatorname{leaf}(a)))\).
+        \begin{enumerate}[leftmargin=0.22in,label=\textbf{\alph*.},itemsep=0.04em,topsep=0.04em,parsep=0pt]
+          \item \(\prover,\verifier\): if \(T=f_1\), set \(x\gets\mathcal{F}_{\mathrm{Commit}}.\Open(C_{\mathrm{stage}},(2,a))\) and \(v=\alpha-(x+\beta\,\iota(\pi_1(a)))\).
+          \item \(\prover,\verifier\): if \(T=g_1\), set \(x\gets\mathcal{F}_{\mathrm{Commit}}.\Open(C_{\mathrm{stage}},(2,\pi_1^{-1}(a)))\) and \(v=\alpha-(x+\beta\,\iota(a))\).
+          \item \(\prover,\verifier\): if \(T=f_2\), set \(x\gets\mathcal{F}_{\mathrm{Commit}}.\Open(C_{\mathrm{stage}},(4,a))\) and \(v=\alpha-(x+\beta\,\iota(\pi_2(a)))\).
+          \item \(\prover,\verifier\): if \(T=g_2\), set \(x\gets\mathcal{F}_{\mathrm{Commit}}.\Open(C_{\mathrm{stage}},(3,a))\) and \(v=\alpha-(x+\beta\,\iota(a))\).
+        \end{enumerate}
+        \(\verifier\): if \(p=\bot\) or \(x=\bot\), return \(\bot\); otherwise return \(h_T=p-v\).
+  \item \(\prover,\verifier\): if \(\operatorname{role}(b)=\mathsf{pad}\), set
+        \(p\gets\mathcal{F}_{\mathrm{Commit}}.\Open(C_{\mathrm{tree}},(T,\operatorname{pad}(b)))\).\\
+        \(\verifier\): if \(p=\bot\), return \(\bot\); otherwise return \(h_T=p\).
+\end{enumerate}
+\end{protocolbox}
 
 \begin{protocolbox}{Verifier Subroutine: $\mathsf{CheckResidualAt}(R,b)$}{fig:subroutine-check-residual-at}
-\scriptsize
-\begin{description}[leftmargin=0.2in,style=nextline,itemsep=0.12em,topsep=0.15em,parsep=0pt]
-  \item[Inputs.]
-        Residual name
-        $R\in\{R_{\mathrm{rep}},R_{\mathrm{perm}},R_{\mathrm{acc1}},R_{\mathrm{acc2}}\}$,
-        address $b\in\B^n$, public challenges $\alpha,\beta,\gamma$,
-        virtual compressed-codeword handle $R_\star$, auxiliary handles
-        $C_{u_2},C_{u_3},C_{u_4}$, helper handles
-        $C_{\PT(f_1)},C_{\PT(g_1)},C_{\PT(f_2)},C_{\PT(g_2)}$, and component
-        residual handles
-        $C_{\mathrm{rep}},C_{\mathrm{perm}},C_{\mathrm{acc1}},C_{\mathrm{acc2}}$.
-        The public product-tree layout and root-check addresses
-        $b_{\mathrm{root},1},b_{\mathrm{root},2}$ are also fixed.
-  \item[Product-tree notation.]
-        For $T\in\{f_1,g_1,f_2,g_2\}$, $\PT(T)$ is the product-tree tensor
-        from Equation~\eqref{eq:product-tree-definition}.
-        For an ordinary helper address $b$, the public layout specifies one of:
-        a parent node $\nu$, a leaf address $a$, or a padding slot.  The value
-        $\mathsf{TreeRes}_T[b]$ is the local residual for that role: parent
-        equation, leaf binding, or padding value:
-        \[
-          \mathsf{TreeRes}_T[b]=
-          \begin{cases}
-            \PT(T)[\nu]-\PT(T)[\operatorname{left}(\nu)]
-              \PT(T)[\operatorname{right}(\nu)],
-              & b\text{ checks parent node }\nu,\\
-            \PT(T)[\operatorname{leaf}(a)]-T[a],
-              & b\text{ checks leaf address }a,\\
-            \PT(T)[\operatorname{pad}(b)],
-              & b\text{ checks a padding slot.}
-          \end{cases}
-        \]
-  \item[Output.]
-        The opened value $r_R=R[b]\in\F$, or reject.
-  \item[First step.]
-        Open $r_R=R[b]$ from the commitment handle for $R$.
-  \item[Case $R=R_{\mathrm{rep}}$.]
-        Open from $C_{u_2}$:
-        \[
-          x_0=u_2[\pi_1^{-1}(b)],
-          \qquad
-          x_1=u_2[\pi_1^{-1}(\mathsf{block}(b))].
-        \]
-        Check $r_R=x_0-x_1$.
-  \item[Case $R=R_{\mathrm{acc1}}$.]
-        Open $x=u_3[b]$ from $C_{u_3}$ and $z=u_2[b]$ from $C_{u_2}$.  If
-        $b$ is the first address, set $y=0$; otherwise open
-        $y=u_3[\operatorname{pred}(b)]$ from $C_{u_3}$.  Check $r_R=x-y-z$.
-  \item[Case $R=R_{\mathrm{acc2}}$.]
-        Open $z=u_4[b]$ from $C_{u_4}$.  Open
-        $x=c_\star[b]$ from the virtual handle $R_\star$.  If $b$ is the first
-        address, set $y=0$; otherwise open
-        $y=c_\star[\operatorname{pred}(b)]$ from $R_\star$.
-        Check $r_R=x-y-z$.
-  \item[Case $R=R_{\mathrm{perm}}$.]
-        If $b=b_{\mathrm{root},1}$, open the root entries from
-        $\PT(f_1)$ and $\PT(g_1)$ under $C_{\PT(f_1)}$ and $C_{\PT(g_1)}$,
-        denoted
-        $\mathsf{root}(f_1)$ and $\mathsf{root}(g_1)$, and check
-        $r_R=\mathsf{root}(f_1)-\mathsf{root}(g_1)$.  If
-        $b=b_{\mathrm{root},2}$, open the root entries from
-        $\PT(f_2)$ and $\PT(g_2)$ under $C_{\PT(f_2)}$ and $C_{\PT(g_2)}$,
-        denoted
-        $\mathsf{root}(f_2)$ and $\mathsf{root}(g_2)$, and check
-        $r_R=\mathsf{root}(f_2)-\mathsf{root}(g_2)$.  Otherwise, for every
-        $T\in\{f_1,g_1,f_2,g_2\}$, open the product-tree entries named by the
-        public role of $b$:
-        \begin{enumerate}[leftmargin=0.22in,label=\textbf{\alph*.},itemsep=0.04em,topsep=0.04em,parsep=0pt]
-          \item parent slot: open parent and two children from $C_{\PT(T)}$;
-          \item padding slot: open the padding entry from $C_{\PT(T)}$;
-          \item leaf slot with leaf address $a$: open the tree leaf from
-                $C_{\PT(T)}$ and the
-                stage value used in the leaf formula, namely
-                $u_2[a]$ from $C_{u_2}$ for $f_1$,
-                $u_2[\pi_1^{-1}(a)]$ from $C_{u_2}$ for $g_1$,
-                $u_4[a]$ from $C_{u_4}$ for $f_2$, and
-                $u_3[a]$ from $C_{u_3}$ for $g_2$.
-        \end{enumerate}
-        Recompute $\mathsf{TreeRes}_T[b]$ for each $T$ and check
-        \[
-          r_R
-          =
-          \mathsf{TreeRes}_{f_1}[b]
-          +\gamma\mathsf{TreeRes}_{g_1}[b]
-          +\gamma^2\mathsf{TreeRes}_{f_2}[b]
-          +\gamma^3\mathsf{TreeRes}_{g_2}[b].
-        \]
-\end{description}
+\scriptsize\raggedright
+\noindent Public parameters: \(R\in\{R_{\mathrm{rep}},R_{\mathrm{perm}},R_{\mathrm{acc1}},R_{\mathrm{acc2}}\}\), \(b\in\B^n\), challenges \(\alpha,\beta,\gamma\), handle \(R_\star\), grouped handles \(C_{\mathrm{stage}},C_{\mathrm{tree}},C_{\mathrm{res}}\), and public product-tree layout.
+
+\smallskip
+\noindent\(\underline{\mathsf{CheckResidualAt}(R,b)\to o_R\in\F\cup\{\bot\}}\)
+
+\smallskip
+\begin{enumerate}[leftmargin=0.24in,label=\textbf{R\arabic*.},itemsep=0.08em,topsep=0.1em,parsep=0pt]
+  \item \(\prover,\verifier\): \(r_R\gets\mathcal{F}_{\mathrm{Commit}}.\Open(C_{\mathrm{res}},(R,b))\).
+  \item \(\verifier\): if \(r_R=\bot\), return \(\bot\).
+  \item \(\prover,\verifier\): if \(R=R_{\mathrm{rep}}\), set\\
+        \(x_0\gets\mathcal{F}_{\mathrm{Commit}}.\Open(C_{\mathrm{stage}},(2,\pi_1^{-1}(b)))\),\\
+        \(x_1\gets\mathcal{F}_{\mathrm{Commit}}.\Open(C_{\mathrm{stage}},(2,\pi_1^{-1}(\mathsf{block}(b))))\).\\
+        \(\verifier\): if \(x_0=\bot\) or \(x_1=\bot\) or \(r_R\ne x_0-x_1\), return \(\bot\); otherwise return \(r_R\).
+  \item \(\prover,\verifier\): if \(R=R_{\mathrm{acc1}}\), set\\
+        \(x\gets\mathcal{F}_{\mathrm{Commit}}.\Open(C_{\mathrm{stage}},(3,b))\), \(z\gets\mathcal{F}_{\mathrm{Commit}}.\Open(C_{\mathrm{stage}},(2,b))\),\\
+        \(y\gets0\) if \(b=b_{\mathrm{first}}\), and \(y\gets\mathcal{F}_{\mathrm{Commit}}.\Open(C_{\mathrm{stage}},(3,\operatorname{pred}(b)))\) otherwise.\\
+        \(\verifier\): if \(x=\bot\) or \(y=\bot\) or \(z=\bot\) or \(r_R\ne x-y-z\), return \(\bot\); otherwise return \(r_R\).
+  \item \(\prover,\verifier\): if \(R=R_{\mathrm{acc2}}\), set\\
+        \(z\gets\mathcal{F}_{\mathrm{Commit}}.\Open(C_{\mathrm{stage}},(4,b))\), \(x\gets\mathcal{F}_{\mathrm{Commit}}.\Open(R_\star,b)\),\\
+        \(y\gets0\) if \(b=b_{\mathrm{first}}\), and \(y\gets\mathcal{F}_{\mathrm{Commit}}.\Open(R_\star,\operatorname{pred}(b))\) otherwise.\\
+        \(\verifier\): if \(x=\bot\) or \(y=\bot\) or \(z=\bot\) or \(r_R\ne x-y-z\), return \(\bot\); otherwise return \(r_R\).
+  \item \(\prover,\verifier\): if \(R=R_{\mathrm{perm}}\) and \(b=b_{\mathrm{root},1}\), set\\
+        \(a\gets\mathcal{F}_{\mathrm{Commit}}.\Open(C_{\mathrm{tree}},(f_1,\nu_{\mathrm{root}}))\),\\
+        \(a'\gets\mathcal{F}_{\mathrm{Commit}}.\Open(C_{\mathrm{tree}},(g_1,\nu_{\mathrm{root}}))\).\\
+        \(\verifier\): if \(a=\bot\) or \(a'=\bot\) or \(r_R\ne a-a'\), return \(\bot\); otherwise return \(r_R\).
+  \item \(\prover,\verifier\): if \(R=R_{\mathrm{perm}}\) and \(b=b_{\mathrm{root},2}\), set\\
+        \(a\gets\mathcal{F}_{\mathrm{Commit}}.\Open(C_{\mathrm{tree}},(f_2,\nu_{\mathrm{root}}))\),\\
+        \(a'\gets\mathcal{F}_{\mathrm{Commit}}.\Open(C_{\mathrm{tree}},(g_2,\nu_{\mathrm{root}}))\).\\
+        \(\verifier\): if \(a=\bot\) or \(a'=\bot\) or \(r_R\ne a-a'\), return \(\bot\); otherwise return \(r_R\).
+  \item \(\prover,\verifier\): if \(R=R_{\mathrm{perm}}\), set \(h_T\gets\mathsf{TreeResOpen}(T,b)\) for \(T\in\{f_1,g_1,f_2,g_2\}\).
+  \item \(\verifier\): if \(h_{f_1}=\bot\) or \(h_{g_1}=\bot\) or \(h_{f_2}=\bot\) or \(h_{g_2}=\bot\), return \(\bot\).
+  \item \(\verifier\): if \(r_R\ne h_{f_1}+\gamma h_{g_1}+\gamma^2h_{f_2}+\gamma^3h_{g_2}\), return \(\bot\); otherwise return \(r_R\).
+\end{enumerate}
 \end{protocolbox}
 
 With that subroutine in hand, the residual protocol itself becomes small.
 Figure~\ref{fig:protocol-raa-residual-commit} fixes the tensors and challenge
-order; Figure~\ref{fig:protocol-raa-residual-query} explains how the final query
-schedule uses the subroutine.
+order; Figure~\ref{fig:protocol-raa-residual-query} defines how the resulting
+handle opens one RAA lane value.
 
 \begin{protocolbox}{Protocol: RAA Residual Commit Phase}{fig:protocol-raa-residual-commit}
-\scriptsize
-\begin{description}[leftmargin=0.2in,style=nextline,itemsep=0.12em,topsep=0.15em,parsep=0pt]
-  \item[Public parameters.]
-        RAA parameters $(K,N,r,\pi_1,\pi_2)$ with $K=2^k$, $N=2^n$, $N=Kr$;
-        public embedding $\iota:\B^n\to\F$; public product-tree layout and
-        root-check addresses $b_{\mathrm{root},1},b_{\mathrm{root},2}\in\B^n$.
-  \item[Public input.]
-        Virtual compressed-codeword handle $R_\star$.
-  \item[Prover input.]
-        $u_2,u_3,u_4,c_\star\in\F^{\B^n}$, where $c_\star[b]$ is opened only
-        through $R_\star$.
-  \item[Commit/build phase.]
-        \begin{enumerate}[leftmargin=0.28in,label=\textbf{C\arabic*.},itemsep=0.06em,topsep=0.06em,parsep=0pt]
-          \item
-            \[
-              C_{u_2}\gets\mathcal{F}_{\mathrm{Commit}}.\Com(u_2),
-              \qquad
-              C_{u_3}\gets\mathcal{F}_{\mathrm{Commit}}.\Com(u_3),
-              \qquad
-              C_{u_4}\gets\mathcal{F}_{\mathrm{Commit}}.\Com(u_4).
-            \]
-            Prover sends $C_{u_2},C_{u_3},C_{u_4}$.
-          \item Verifier samples $\alpha,\beta,\gamma\leftarrow\F$.
-          \item For every $b\in\B^n$, prover computes
-            \[
-              f_1[b]\gets\alpha-(u_2[b]+\beta\,\iota(\pi_1(b))),
-              \quad
-              g_1[b]\gets\alpha-(u_2[\pi_1^{-1}(b)]+\beta\,\iota(b)),
-            \]
-            \[
-              f_2[b]\gets\alpha-(u_4[b]+\beta\,\iota(\pi_2(b))),
-              \quad
-              g_2[b]\gets\alpha-(u_3[b]+\beta\,\iota(b)).
-            \]
-          \item Prover builds product trees and commits:
-            \[
-              C_{\PT(f_1)}\gets\mathcal{F}_{\mathrm{Commit}}.\Com(\PT(f_1)),
-              \quad
-              C_{\PT(g_1)}\gets\mathcal{F}_{\mathrm{Commit}}.\Com(\PT(g_1)),
-            \]
-            \[
-              C_{\PT(f_2)}\gets\mathcal{F}_{\mathrm{Commit}}.\Com(\PT(f_2)),
-              \quad
-              C_{\PT(g_2)}\gets\mathcal{F}_{\mathrm{Commit}}.\Com(\PT(g_2)).
-            \]
-          \item Prover computes $R_{\mathrm{rep}}$, $R_{\mathrm{acc1}}$,
-                $R_{\mathrm{acc2}}$, and $R_{\mathrm{perm}}$ from the residual
-                formulas above, including the two root-check cases for
-                $R_{\mathrm{perm}}$.  Commit:
-            \[
-              C_{\mathrm{rep}}\gets\mathcal{F}_{\mathrm{Commit}}.\Com(R_{\mathrm{rep}}),
-              \quad
-              C_{\mathrm{perm}}\gets\mathcal{F}_{\mathrm{Commit}}.\Com(R_{\mathrm{perm}}),
-            \]
-            \[
-              C_{\mathrm{acc1}}\gets\mathcal{F}_{\mathrm{Commit}}.\Com(R_{\mathrm{acc1}}),
-              \quad
-              C_{\mathrm{acc2}}\gets\mathcal{F}_{\mathrm{Commit}}.\Com(R_{\mathrm{acc2}}).
-            \]
-          \item Verifier samples $\eta\leftarrow\F$ and defines the virtual
-                tensor
-                \[
-                  R_\eta[b]=
-                  R_{\mathrm{rep}}[b]
-                  +\eta R_{\mathrm{perm}}[b]
-                  +\eta^2R_{\mathrm{acc1}}[b]
-                  +\eta^3R_{\mathrm{acc2}}[b].
-                \]
-                No commitment handle is created for $R_\eta$.
-        \end{enumerate}
-\end{description}
+\scriptsize\raggedright
+\noindent Public parameters: \(K=2^k\), \(N=2^n\), \(N=Kr\), permutations \(\pi_1,\pi_2:\B^n\to\B^n\), embedding \(\iota:\B^n\to\F\), product-tree layout, and \(b_{\mathrm{root},1},b_{\mathrm{root},2}\in\B^n\).
+
+\smallskip
+\noindent\(\underline{\mathsf{RAAResidualCommit}(\prover:(u_2,u_3,u_4,c_\star^{\mathrm{wit}}\in\F^{\B^n}),\ \verifier:R_\star:\Handle)\to(C_{\mathrm{raa}}:\Handle,\alpha,\beta,\gamma,\eta)}\)
+
+\smallskip
+\begin{enumerate}[leftmargin=0.24in,label=\textbf{C\arabic*.},itemsep=0.06em,topsep=0.06em,parsep=0pt]
+  \item \(\prover\): \(C_{\mathrm{stage}}\gets
+        \mathcal{F}_{\mathrm{Commit}}.\Com((u_2,u_3,u_4)\in(\F^{\B^n})^{\{2,3,4\}})\).\\
+        \(\prover\to\verifier\): \(C_{\mathrm{stage}}\).
+  \item \(\verifier\): \(\alpha,\beta\leftarrow\F\).\\
+        \(\verifier\to\prover\): \(\alpha,\beta\).
+  \item \(\prover\): for \(b\in\B^n\),
+        \[
+          f_1[b]\gets\alpha-(u_2[b]+\beta\,\iota(\pi_1(b))),\quad
+          g_1[b]\gets\alpha-(u_2[\pi_1^{-1}(b)]+\beta\,\iota(b)),
+        \]
+        \[
+          f_2[b]\gets\alpha-(u_4[b]+\beta\,\iota(\pi_2(b))),\quad
+          g_2[b]\gets\alpha-(u_3[b]+\beta\,\iota(b)).
+        \]
+  \item \(\prover\): \(C_{\mathrm{tree}}\gets
+        \mathcal{F}_{\mathrm{Commit}}.\Com((\PT(f_1),\PT(g_1),\PT(f_2),\PT(g_2)))\).\\
+        \(\prover\to\verifier\): \(C_{\mathrm{tree}}\).
+  \item \(\verifier\): \(\gamma\leftarrow\F\).\\
+        \(\verifier\to\prover\): \(\gamma\).
+  \item \(\prover\): for \(b\in\B^n\),
+        \[
+          u_3^{-}[b]\gets
+          \begin{cases}
+            0, & b=b_{\mathrm{first}},\\
+            u_3[\operatorname{pred}(b)], & \text{otherwise,}
+          \end{cases}
+          \qquad
+          c_\star^{-}[b]\gets
+          \begin{cases}
+            0, & b=b_{\mathrm{first}},\\
+            c_\star^{\mathrm{wit}}[\operatorname{pred}(b)], & \text{otherwise.}
+          \end{cases}
+        \]
+  \item \(\prover\): for \(b\in\B^n\),
+        \[
+          R_{\mathrm{rep}}[b]\gets u_2[\pi_1^{-1}(b)]-u_2[\pi_1^{-1}(\mathsf{block}(b))],
+        \]
+        \[
+          R_{\mathrm{acc1}}[b]\gets u_3[b]-u_3^{-}[b]-u_2[b],\quad
+          R_{\mathrm{acc2}}[b]\gets c_\star^{\mathrm{wit}}[b]-c_\star^{-}[b]-u_4[b].
+        \]
+  \item \(\prover\): \(\mathsf{RootRes}_1\gets\PT(f_1)[\nu_{\mathrm{root}}]-\PT(g_1)[\nu_{\mathrm{root}}]\),\\
+        \(\prover\): \(\mathsf{RootRes}_2\gets\PT(f_2)[\nu_{\mathrm{root}}]-\PT(g_2)[\nu_{\mathrm{root}}]\).
+  \item \(\prover\): for \(b\in\B^n\),
+        \[
+          R_{\mathrm{perm}}[b]\gets
+          \begin{cases}
+            \mathsf{RootRes}_1, & b=b_{\mathrm{root},1},\\
+            \mathsf{RootRes}_2, & b=b_{\mathrm{root},2},\\
+            \mathsf{TreeRes}_{f_1}[b]+\gamma\mathsf{TreeRes}_{g_1}[b]
+            +\gamma^2\mathsf{TreeRes}_{f_2}[b]
+            +\gamma^3\mathsf{TreeRes}_{g_2}[b], & \text{otherwise.}
+          \end{cases}
+        \]
+  \item \(\prover\): \(C_{\mathrm{res}}\gets
+        \mathcal{F}_{\mathrm{Commit}}.\Com((R_{\mathrm{rep}},R_{\mathrm{perm}},R_{\mathrm{acc1}},R_{\mathrm{acc2}}))\).\\
+        \(\prover\to\verifier\): \(C_{\mathrm{res}}\).
+  \item \(\verifier\): \(\eta\leftarrow\F\).\\
+        \(\verifier\to\prover\): \(\eta\).
+  \item \(\prover\): for \(b\in\B^n\),
+        \[
+          R_\eta[b]\gets R_{\mathrm{rep}}[b]
+          +\eta R_{\mathrm{perm}}[b]
+          +\eta^2R_{\mathrm{acc1}}[b]
+          +\eta^3R_{\mathrm{acc2}}[b].
+        \]
+  \item \(\prover,\verifier\): return \(C_{\mathrm{raa}}\) with logical domain
+        \(\{1,2,3,4\}\times\B^n\), storing
+        \(R_\star,C_{\mathrm{stage}},C_{\mathrm{tree}},C_{\mathrm{res}},\alpha,\beta,\gamma,\eta\).
+\end{enumerate}
 \end{protocolbox}
 
-\begin{protocolbox}{Protocol: Batched Residual Query Check}{fig:protocol-raa-residual-query}
-\scriptsize
-\begin{description}[leftmargin=0.2in,style=nextline,itemsep=0.12em,topsep=0.15em,parsep=0pt]
-  \item[Input.]
-        The residual query set $\mathcal{Q}_{\mathrm{res}}\subseteq\B^n$ chosen
-        by the final query schedule.
-  \item[For every $b\in\mathcal{Q}_{\mathrm{res}}$.]
-        \begin{enumerate}[leftmargin=0.28in,label=\textbf{Q\arabic*.},itemsep=0.06em,topsep=0.06em,parsep=0pt]
-          \item
-            \[
-              r_{\mathrm{rep}}\gets
-              \mathsf{CheckResidualAt}(R_{\mathrm{rep}},b),
-              \quad
-              r_{\mathrm{perm}}\gets
-              \mathsf{CheckResidualAt}(R_{\mathrm{perm}},b),
-            \]
-            \[
-              r_{\mathrm{acc1}}\gets
-              \mathsf{CheckResidualAt}(R_{\mathrm{acc1}},b),
-              \quad
-              r_{\mathrm{acc2}}\gets
-              \mathsf{CheckResidualAt}(R_{\mathrm{acc2}},b).
-            \]
-          \item Compute
-            \[
-              r_\eta\gets
-              r_{\mathrm{rep}}
-              +\eta r_{\mathrm{perm}}
-              +\eta^2r_{\mathrm{acc1}}
-              +\eta^3r_{\mathrm{acc2}}.
-            \]
-          \item Use $r_\eta$ as the opened value of the virtual tensor
-                $R_\eta[b]$ in slot $4$ of
-                $A^{(0)}=(c_\star,u_2,u_3,u_4,R_\eta)$.
-        \end{enumerate}
-  \item[Folded zero claim.]
-        The shared BaseFold proof authenticates these same $R_\eta$ openings
-        against the terminal check
-        \[
-          A^{(n)}[4,\emptyset]=0.
-        \]
-\end{description}
+\begin{protocolbox}{Protocol: RAA Residual Handle Opening}{fig:protocol-raa-residual-query}
+\scriptsize\raggedright
+\noindent\(\underline{\Pi_{\mathrm{raaResidual}}.\mathsf{Open}(\prover:C_{\mathrm{raa}}:\Handle,\ \verifier:(C_{\mathrm{raa}}:\Handle,(q,b)\in\{1,2,3,4\}\times\B^n))\to o\in\F\cup\{\bot\}}\)
+
+\smallskip
+\begin{enumerate}[leftmargin=0.24in,label=\textbf{Q\arabic*.},itemsep=0.06em,topsep=0.06em,parsep=0pt]
+  \item \(\prover,\verifier\): if \(q=1\), return
+        \(o=\mathcal{F}_{\mathrm{Commit}}.\Open(C_{\mathrm{stage}},(2,b))\).
+  \item \(\prover,\verifier\): if \(q=2\), return
+        \(o=\mathcal{F}_{\mathrm{Commit}}.\Open(C_{\mathrm{stage}},(3,b))\).
+  \item \(\prover,\verifier\): if \(q=3\), return
+        \(o=\mathcal{F}_{\mathrm{Commit}}.\Open(C_{\mathrm{stage}},(4,b))\).
+  \item \(\prover,\verifier\): if \(q=4\), set
+        \(r_{\mathrm{rep}}\gets\mathsf{CheckResidualAt}(R_{\mathrm{rep}},b)\),
+        \(r_{\mathrm{perm}}\gets\mathsf{CheckResidualAt}(R_{\mathrm{perm}},b)\),
+        \(r_{\mathrm{acc1}}\gets\mathsf{CheckResidualAt}(R_{\mathrm{acc1}},b)\),
+        \(r_{\mathrm{acc2}}\gets\mathsf{CheckResidualAt}(R_{\mathrm{acc2}},b)\).
+  \item \(\verifier\): if \(q=4\) and any of
+        \(r_{\mathrm{rep}},r_{\mathrm{perm}},r_{\mathrm{acc1}},r_{\mathrm{acc2}}\)
+        equals \(\bot\), return \(\bot\).
+  \item \(\verifier\): if \(q=4\), return
+        \(o=r_{\mathrm{rep}}+\eta r_{\mathrm{perm}}+\eta^2r_{\mathrm{acc1}}+\eta^3r_{\mathrm{acc2}}\).
+\end{enumerate}
 \end{protocolbox}
 
 \subsection{Evaluation Binding For A Valid RAA Codeword}
@@ -3118,14 +3130,14 @@ that codeword.  The statement is
 where $y_\star\in\F^{\B^k}$ is the message tensor whose RAA encoding is
 $c_\star$.
 
-Because RAA is linear, the verifier can use a public weight tensor
-$w\in\F^{\B^n}$ such that
+Because RAA is linear, the verifier can use a public weight function
+\(W:\B^n\to\F\) such that
 \[
-  \ip{w}{c_\star}=\MLE(y_\star)(z_{\mathrm{col}}).
+  \sum_{b\in\B^n}W(b)c_\star[b]=\MLE(y_\star)(z_{\mathrm{col}}).
 \]
 Then the evaluation statement becomes the codeword inner-product statement
 \[
-  \ip{w}{c_\star}=v_\star.
+  \sum_{b\in\B^n}W(b)c_\star[b]=v_\star.
 \]
 The RAA formulas naturally speak about the ordered binary address set $\B^n$,
 because accumulators depend on the predecessor relation induced by the public
@@ -3150,31 +3162,32 @@ The RAA encoder is the linear map already defined above:
   =
   \mathsf{Acc}\,\Pi_2\,\mathsf{Acc}\,\Pi_1\,\mathsf{Rep}.
 \]
-The weight tensor $w\in\F^{\B^n}$ should make the codeword inner product equal
+The weight function \(W:\B^n\to\F\) should make the codeword inner product equal
 to the message inner product for every message tensor $y_\star$:
 \[
-  \ip{w}{Gy_\star}
+  \sum_{b\in\B^n}W(b)(Gy_\star)[b]
   =
   \ip{\mu_{z_{\mathrm{col}}}}{y_\star}.
 \]
 Equivalently, using the ordinary transpose with respect to these inner
 products,
 \[
-  G^\top w=\mu_{z_{\mathrm{col}}}.
+  G^\top W=\mu_{z_{\mathrm{col}}}.
 \]
-So the backend needs one public solution $w$ to this linear equation.  Written
+So the backend needs one public solution \(W\) to this linear equation.  Written
 as the RAA factors, the condition is
 \[
   \mathsf{Rep}^{\top}\Pi_1^{\top}\mathsf{Acc}^{\top}
-  \Pi_2^{\top}\mathsf{Acc}^{\top}w
+  \Pi_2^{\top}\mathsf{Acc}^{\top}W
   =
   \mu_{z_{\mathrm{col}}}.
 \]
-The implementation recurrence below is one explicit way to construct such a
-solution:
+The implementation recurrence below is one explicit way to define such a
+function:
 \[
-  w=\mathsf{raaCodewordEvalWeights}(\RAA,z_{\mathrm{col}})
-  \in\F^{\B^n}.
+  W=\mathsf{raaCodewordEvalWeightFunction}(\RAA,z_{\mathrm{col}}),
+  \qquad
+  W:\B^n\to\F.
 \]
 
 For the target implementation, the recurrence chooses a sparse representative.
@@ -3202,13 +3215,13 @@ the codeword side:
   w^{(4)}[b]=w^{(3)}[\pi_2(b)],
 \]
 \[
-  w[b]=w^{(4)}[b]+
+  W(b)=w^{(4)}[b]+
   \begin{cases}
     w^{(4)}[\operatorname{succ}(b)],&\text{if }b\text{ is not the last address},\\
     0,&\text{if }b\text{ is the last address}.
   \end{cases}
 \]
-Then $\ip{w}{c_\star}=\MLE(y_\star)(z_{\mathrm{col}})$.
+Then \(\sum_{b\in\B^n}W(b)c_\star[b]=\MLE(y_\star)(z_{\mathrm{col}})\).
 
 This displayed recurrence is the target binary-field form.  In a general field,
 the adjoint of a prefix-sum map is written with subtraction signs in the
@@ -3220,7 +3233,7 @@ implementation recurrence uses the plus signs shown above.
 
 The backend sumcheck reduces the public inner-product claim
 \[
-  \sum_{b\in\B^n} w[b]c_\star[b]=v_\star
+  \sum_{b\in\B^n} W(b)c_\star[b]=v_\star
 \]
 to one terminal claim about a folded value of $c_\star$.  The implementation
 stores tensors in serialization order, but the sumcheck claim is over Boolean
@@ -3228,11 +3241,11 @@ addresses.
 
 At each round, the prover sends the degree-two round polynomial for the active
 inner product.  The polynomial is degree two because it multiplies the folded
-public weight tensor by the folded $c_\star$ tensor; it is not required to be
+public weight function by the folded $c_\star$ tensor; it is not required to be
 multilinear.  The verifier checks the sum of the polynomial's values at $0$ and
-$1$, samples the fold challenge $\theta_s$, folds the public weight tensor, and
-requires the same challenge to fold the $c_\star$ tensor inside the shared
-augmented matrix.
+$1$, samples the fold challenge $\theta_s$, derives the next folded weight
+function, and requires the same challenge to fold the $c_\star$ tensor inside
+the shared augmented matrix.
 
 At round $s$, the active tensor has order $n-s$.  In last-coordinate notation,
 for each remaining address $a\in\B^{n-s-1}$,
@@ -3247,7 +3260,7 @@ After $n=\log_2 N$ rounds, the evaluation claim has become the scalar equation
 \[
   \mathsf{claimedSum}_{n}
   =
-  w^{(n)}[\emptyset]\,c_\star^{(n)}[\emptyset].
+  W^{(n)}(\emptyset)\,c_\star^{(n)}[\emptyset].
 \]
 The scalar $c_\star^{(n)}[\emptyset]$ is not trusted just because the prover
 publishes it.  The shared BaseFold backend must authenticate that terminal value
@@ -3255,39 +3268,44 @@ back to opened addresses of the externally supplied tensor $c_\star$.
 
 \subsection{The Shared Augmented Matrix}
 
-The target backend gives BaseFold one augmented systematic input matrix.  Each
-row is a tensor over $\B^n$:
+The target backend gives BaseFold \(\mathcal L\) systematic input tensors.  For the RAA
+backend in this section, the lane set is
 \[
-  A^{(0)}
-  =
-  (c_\star,\;u_2,\;u_3,\;u_4,\;R_\eta).
+  \mathcal L=\{0,1,2,3,4\}.
 \]
-The slot meanings are:
+Each lane is a tensor over the power-of-two folding domain \(\B^n\):
 \[
-  0:c_\star,\qquad
-  1:u_2,\qquad
-  2:u_3,\qquad
-  3:u_4,\qquad
-  4:R_\eta.
+  A_q^{(0)}\in\F^{\B^n}
+  \qquad(q\in\mathcal L),
 \]
-Each row has $N=2^n$ Boolean entries, serialized as a flat oracle for the
-implementation.  At each fold round, every row uses the same tensor-coordinate
-challenge.  At round $s$, the active tensor in each row has order $n-s$, so in
+with lane meanings
+\[
+  A_0^{(0)}=c_\star,\qquad
+  A_1^{(0)}=u_2,\qquad
+  A_2^{(0)}=u_3,\qquad
+  A_3^{(0)}=u_4,\qquad
+  A_4^{(0)}=R_\eta.
+\]
+Each lane has $N=2^n$ Boolean entries, serialized as a flat oracle for the
+implementation.  At each fold round, every lane uses the same tensor-coordinate
+challenge.  At round $s$, the active tensor in each lane has order $n-s$, so in
 last-coordinate notation, for each remaining address $a\in\B^{n-s-1}$,
 \[
-  A^{(s+1)}[q,a]
+  A_q^{(s+1)}[a]
   =
-  (1-\theta_s)A^{(s)}[q,(a\mid 0)]
+  (1-\theta_s)A_q^{(s)}[(a\mid 0)]
   +
-  \theta_s A^{(s)}[q,(a\mid 1)].
+  \theta_s A_q^{(s)}[(a\mid 1)]
+  \qquad(q\in\mathcal L).
 \]
 The prover publishes the terminal vector
 \[
-  A^{(n)}
+  T_{\mathcal L}
   =
-  \bigl(A^{(n)}[0,\emptyset],A^{(n)}[1,\emptyset],
-        A^{(n)}[2,\emptyset],A^{(n)}[3,\emptyset],
-        A^{(n)}[4,\emptyset]\bigr).
+  \bigl(A_0^{(n)}[\emptyset],A_1^{(n)}[\emptyset],
+        A_2^{(n)}[\emptyset],A_3^{(n)}[\emptyset],
+        A_4^{(n)}[\emptyset]\bigr)
+  \in\F^{\mathcal L}.
 \]
 
 This terminal vector is not trusted merely because it is published.  It becomes
@@ -3323,10 +3341,10 @@ Thus the terminal checks are:
 \[
   \mathsf{claimedSum}_{n}
   =
-  w^{(n)}[\emptyset]A^{(n)}[0,\emptyset],
+  W_0^{(n)}(\emptyset)A_0^{(n)}[\emptyset],
 \]
 \[
-  A^{(n)}[4,\emptyset]=0.
+  A_4^{(n)}[\emptyset]=0.
 \]
 Both terminal entries are bound by the same shared BaseFold relation.  No fresh
 Merkle commitment to all of $c_\star$ is allowed.  No separate terminal-core
@@ -3402,9 +3420,9 @@ more openings, and the verifier closes the schedule under those obligations:
         $c_\star,u_2,u_3,u_4,R_\eta$ induces the shared fold path for that
         tensor.
   \item Every terminal systematic value used by an acceptance equation must be
-        reached by at least one fold path.  In the target backend this means row
-        $0$ for the eval-binding terminal value and row $4$ for the residual
-        zero terminal value.
+        reached by at least one fold path.  In the target backend this means lane
+        \(q=0\) for the eval-binding terminal value and lane \(q=4\) for the
+        residual zero terminal value.
   \item After closure, the final input set is padded with random input indices,
         if necessary, until it has exactly $Q_{\RAA}$ de-duplicated entries.
         If induced input openings exceed $Q_{\RAA}$, that sampling attempt is
@@ -3430,14 +3448,22 @@ slice.  The evaluation point is
 $z=(z_{\mathrm{row}},z_{\mathrm{col}})\in\F^\ell\times\F^k$, and the claim is
 $\MLE(y)(z)=v$.  The boxes below separate the PCS layer, the virtual compressed
 commitment, and the BaseFold backend.  Each box has one job and passes explicit
-handles to the next box.
+handles to the next box.  Commitment handles have the generic type \(\Handle\).
+The symbols \(k,n,K,N\) in the Blaze and RAA boxes refer to the RAA row code:
+\(K=2^k\) is the row-message size and \(N=2^n\) is the RAA codeword size.  When
+Blaze invokes BaseFold, BaseFold has its own local parameters
+\(K_{\mathrm{BF}}=2^{k_{\mathrm{BF}}}\) and
+\(N_{\mathrm{BF}}=2^{n_{\mathrm{BF}}}\), with \(K_{\mathrm{BF}}=N\) and
+\(k_{\mathrm{BF}}=n\).  Thus Blaze prepares tensors
+\(A_q\in\F^{\B^n}\): these are BaseFold messages, not already BaseFold
+codewords.
 
-\begin{protocolbox}{Protocol: \(\mathsf{Blaze.Commit}\)}{fig:protocol-blaze-commit}
+\begin{protocolbox}{Protocol: \(\mathsf{Blaze}\), PCS Commit And Open}{fig:protocol-blaze}
 \scriptsize\raggedright
-\noindent\(\underline{\mathsf{Blaze.Commit}(\prover:f,\ \verifier:\bot)\to C_f}\)
+\noindent Public parameters: field \(\F\); sizes \(L=2^\ell\), \(K=2^k\), \(N=2^n\); RAA code \(\RAA:\F^{\B^k}\to\F^{\B^n}\) with repetition \(r\) and permutations \(\pi_1,\pi_2:\B^n\to\B^n\); and BaseFold backend parameters.  The prover represents \(f\) as \(y\in\F^{\B^\ell\times\B^k}\).  In the open call, the verifier has \(C_f\), \(z=(z_{\mathrm{row}},z_{\mathrm{col}})\in\F^\ell\times\F^k\), and \(v\in\F\).
 
-\smallskip
-\noindent Public parameters: field \(\F\); sizes \(L=2^\ell\), \(K=2^k\), \(N=2^n\); RAA code \(\RAA:\F^{\B^k}\to\F^{\B^n}\) with repetition \(r\) and permutations \(\pi_1,\pi_2:\B^n\to\B^n\).  The prover represents \(f\) as \(y\in\F^{\B^\ell\times\B^k}\).
+\medskip
+\noindent\(\underline{\mathsf{Blaze.Commit}(\prover:f:\F^{\ell+k}\to\F,\ \verifier:\bot)\to C_f:\Handle}\)
 
 \smallskip
 \begin{enumerate}[leftmargin=0.24in,label=\textbf{C\arabic*.},itemsep=0.08em,topsep=0.1em,parsep=0pt]
@@ -3448,119 +3474,148 @@ handles to the next box.
   \item \(\verifier\): let \(C_f=R_{\mathrm{outer}}\).\\
         \(\verifier\): return \(C_f\).
 \end{enumerate}
-\end{protocolbox}
-
-\begin{protocolbox}{Protocol: \(\Pi_{\mathrm{blazeCommit}}\), A Virtual Commitment Handle}{fig:protocol-blazecommit}
-\scriptsize\raggedright
-\noindent\(\underline{\Pi_{\mathrm{blazeCommit}}.\Com(\prover:R_{\mathrm{outer}},\ \verifier:(R_{\mathrm{outer}},\rho))\to R_\star}\)
 
 \smallskip
-\noindent Public parameters: row domain \(\B^\ell\), codeword domain \(\B^n\), and commitment API \(\mathcal{F}_{\mathrm{Commit}}\).  The handle \(R_{\mathrm{outer}}\) binds \(C_{\mathrm{outer}}\in(\F^{\B^\ell})^{\B^n}\), and \(\rho\in\F^{\B^\ell}\).
-
-\smallskip
-\begin{enumerate}[leftmargin=0.24in,label=\textbf{V\arabic*.},itemsep=0.08em,topsep=0.1em,parsep=0pt]
-  \item \(\prover,\verifier\): \(\Pi_{\mathrm{blazeCommit}}.\Com(R_{\mathrm{outer}},\rho)\) stores \((R_{\mathrm{outer}},\rho)\) and returns \(R_\star\) with logical domain \(\B^n\).
-\end{enumerate}
-
-\smallskip
-\noindent\(\underline{\Pi_{\mathrm{blazeCommit}}.\Open(\prover:R_\star,\ \verifier:(R_\star,b))\to c_\star[b]}\), for \(b\in\B^n\).
-
-\smallskip
-\begin{enumerate}[leftmargin=0.24in,label=\textbf{V\arabic*.},resume,itemsep=0.08em,topsep=0.1em,parsep=0pt]
-  \item \(\prover,\verifier\): let \(\mathsf{col}\gets\mathcal{F}_{\mathrm{Commit}}.\Open(R_{\mathrm{outer}},b)\in\F^{\B^\ell}\).
-  \item \(\verifier\): return \(\mathcal{F}_{\mathrm{Commit}}.\Open(R_\star,b)=\ip{\rho}{\mathsf{col}}\).
-\end{enumerate}
-\end{protocolbox}
-
-\begin{protocolbox}{Protocol: \(\mathsf{BaseFold.Commit}\), Backend Commit Phase}{fig:protocol-basefold-backend-commit}
-\scriptsize\raggedright
-\noindent\(\underline{\mathsf{BaseFold.Commit}(\prover:y_\star,\ \verifier:(R_\star,z_{\mathrm{col}},v_\star))\to\mathsf{B}}\)
-
-\smallskip
-\noindent Public parameters: \(R_\star\), \(z_{\mathrm{col}}\in\F^k\), \(v_\star\in\F\), RAA parameters \((K,N,r,\pi_1,\pi_2)\), product-tree layout, roots \(b_{\mathrm{root},1},b_{\mathrm{root},2}\in\B^n\), and parity maps \((\mathsf{Par}_s,\mathsf{Supp}_s)_{s=0}^{n-1}\).  The prover also holds the backend witness tensors.
-
-\smallskip
-\begin{enumerate}[leftmargin=0.24in,label=\textbf{D\arabic*.},itemsep=0.08em,topsep=0.1em,parsep=0pt]
-  \item \(\prover\): let \(u_1=\mathsf{Rep}\,y_\star\), \(u_2=\Pi_1u_1\), \(u_3=\mathsf{Acc}\,u_2\), \(u_4=\Pi_2u_3\), and \(c_\star^{\mathrm{wit}}=\mathsf{Acc}\,u_4\).
-  \item \(\prover,\verifier\): run \(\mathsf{RAAResidualCommit}(R_\star;u_2,u_3,u_4,c_\star^{\mathrm{wit}})\) from Figure~\ref{fig:protocol-raa-residual-commit}, receiving helper handles, component-residual handles, and challenges \(\alpha,\beta,\gamma,\eta\).
-  \item \(\prover,\verifier\): let \(R_\eta=R_{\mathrm{rep}}+\eta R_{\mathrm{perm}}+\eta^2R_{\mathrm{acc1}}+\eta^3R_{\mathrm{acc2}}\).
-  \item \(\prover,\verifier\): let \(H_0=R_\star\), \(H_1=C_{u_2}\), \(H_2=C_{u_3}\), \(H_3=C_{u_4}\), and \(H_4=\mathsf{CheckResidualAt}\).
-  \item \(\prover,\verifier\): let \(A^{(0)}=(c_\star^{\mathrm{wit}},u_2,u_3,u_4,R_\eta)\in\F^{\{0,1,2,3,4\}\times\B^n}\).
-  \item \(\prover,\verifier\): let \(w^{(0)}=\mathsf{raaCodewordEvalWeights}(\RAA,z_{\mathrm{col}})\in\F^{\B^n}\) and \(S_0=v_\star\).
-  \item \(\prover\): let \(P^{(0)}=\mathsf{Par}_0(A^{(0)})\in\F^{\B^n}\) and \(C_P^{(0)}\gets\mathcal{F}_{\mathrm{Commit}}.\Com(P^{(0)})\).
-  \item \(\prover\to\verifier\): helper handles, component-residual handles, and \(C_P^{(0)}\).
-  \item \(\prover,\verifier\): return \(\mathsf{B}=(H_0,H_1,H_2,H_3,H_4,A^{(0)},w^{(0)},S_0,C_P^{(0)},\alpha,\beta,\gamma,\eta)\).
-\end{enumerate}
-\end{protocolbox}
-
-\begin{protocolbox}{Protocol: \(\mathsf{BaseFold.Open}\), Backend Open Phase}{fig:protocol-basefold-backend-open}
-\scriptsize\raggedright
-\noindent\(\underline{\mathsf{BaseFold.Open}(\prover:\mathsf{B},\ \verifier:(\mathsf{B},R_\star,z_{\mathrm{col}},v_\star))\to\{0,1\}}\)
-
-\smallskip
-\noindent Public parameters: \(R_\star\), \(z_{\mathrm{col}}\in\F^k\), \(v_\star\in\F\), backend state \(\mathsf{B}\), query counts \(Q_{\RAA},Q_{\mathrm{backend}}\), and parity maps \((\mathsf{Par}_s,\mathsf{Supp}_s)_{s=0}^{n-1}\).  The prover holds the folded backend tensors.
+\noindent\(\underline{\mathsf{Blaze.Open}(\prover:f:\F^{\ell+k}\to\F,\ \verifier:(C_f:\Handle,\ z\in\F^\ell\times\F^k,\ v\in\F))\to\{0,1\}}\)
 
 \smallskip
 \begin{enumerate}[leftmargin=0.24in,label=\textbf{O\arabic*.},itemsep=0.08em,topsep=0.1em,parsep=0pt]
-  \item \(\prover,\verifier\): for \(s=0,\ldots,n-1\):
-        \begin{enumerate}[leftmargin=0.22in,label=\textbf{\alph*.},itemsep=0.04em,topsep=0.04em,parsep=0pt]
-          \item \(\prover\): let \(g_s(X)=\sum_{a\in\B^{n-s-1}}((1-X)w^{(s)}[(a\mid0)]+Xw^{(s)}[(a\mid1)])((1-X)A^{(s)}[0,(a\mid0)]+XA^{(s)}[0,(a\mid1)])\).
-          \item \(\prover\to\verifier\): \(g_s(X)\).
-          \item \(\verifier\): check \(\deg(g_s)\le2\) and \(g_s(0)+g_s(1)=S_s\).
-          \item \(\verifier\): sample \(\theta_s\leftarrow\F\).
-          \item \(\prover,\verifier\): let \(S_{s+1}=g_s(\theta_s)\), \(w^{(s+1)}[a]=(1-\theta_s)w^{(s)}[(a\mid0)]+\theta_sw^{(s)}[(a\mid1)]\), and \(A^{(s+1)}[q,a]=(1-\theta_s)A^{(s)}[q,(a\mid0)]+\theta_sA^{(s)}[q,(a\mid1)]\).
-          \item \(\prover\): if \(s+1<n\), commit \(C_A^{(s+1)}\gets\mathcal{F}_{\mathrm{Commit}}.\Com(A^{(s+1)})\) and \(C_P^{(s+1)}\gets\mathcal{F}_{\mathrm{Commit}}.\Com(\mathsf{Par}_{s+1}(A^{(s+1)}))\).
-          \item \(\prover\to\verifier\): if \(s+1<n\), send \(C_A^{(s+1)},C_P^{(s+1)}\).
-        \end{enumerate}
-  \item \(\prover\): let \(T=A^{(n)}\in\F^{\{0,1,2,3,4\}}\).\\
-        \(\prover\to\verifier\): \(T\).
-  \item \(\verifier\): set \(\mathsf{acceptedSchedule}=0\).\\
-        \(\verifier\): while \(\mathsf{acceptedSchedule}=0\):
-        \begin{enumerate}[leftmargin=0.22in,label=\textbf{\alph*.},itemsep=0.04em,topsep=0.04em,parsep=0pt]
-          \item \(\verifier\): sample \(\mathcal{Q}_{\mathrm{path}}^0\subseteq\{0,1,2,3,4\}\times\B^n\), \(\mathcal{Q}_{\mathrm{par}}\subseteq\{(s,p):0\le s<n,\ p\in\B^{n-s}\}\), and \(b_0,b_1\leftarrow\B^n\).
-          \item \(\verifier\): let \(\mathcal{Q}_{\mathrm{path}}=\mathcal{Q}_{\mathrm{path}}^0\cup\{(0,b_0),(4,b_1)\}\), \(\mathcal{Q}_{\mathrm{sys}}=\emptyset\), and \(\mathcal{Q}_{\mathrm{res}}=\emptyset\).
-          \item \(\verifier\): set \(\mathsf{changed}=1\).
-          \item \(\verifier\): while \(\mathsf{changed}=1\):
-                \begin{enumerate}[leftmargin=0.2in,label=\textbf{\roman*.},itemsep=0.03em,topsep=0.03em,parsep=0pt]
-                  \item \(\verifier\): set \(\mathsf{changed}=0\).
-                  \item \(\verifier\): for each unprocessed \((q,b)\in\mathcal{Q}_{\mathrm{path}}\), let \(a=\operatorname{pref}_{n-1}(b)\) and add \((q,(a\mid0)),(q,(a\mid1))\) to \(\mathcal{Q}_{\mathrm{sys}}\); if any item is new, set \(\mathsf{changed}=1\).
-                  \item \(\verifier\): for each unprocessed \((0,p)\in\mathcal{Q}_{\mathrm{par}}\) and \((q,a,\lambda)\in\mathsf{Supp}_0(p)\), add \((q,a)\) to \(\mathcal{Q}_{\mathrm{sys}}\); if new, set \(\mathsf{changed}=1\).
-                  \item \(\verifier\): for each unprocessed \((4,b)\in\mathcal{Q}_{\mathrm{sys}}\), add \(b\) to \(\mathcal{Q}_{\mathrm{res}}\), add the RAA dependencies \((1,\pi_1^{-1}(b)),(1,\pi_1^{-1}(\mathsf{block}(b))),(2,b),(1,b),(3,b),(0,b)\), add predecessor dependencies when \(b\ne b_{\mathrm{first}}\), and add product-tree leaf dependencies required by \(\mathsf{CheckResidualAt}\); if any item is new, set \(\mathsf{changed}=1\).
-                \end{enumerate}
-          \item \(\verifier\): let \(\mathcal{Q}_{\mathrm{input}}=\{b\in\B^n:(0,b)\in\mathcal{Q}_{\mathrm{sys}}\}\).
-          \item \(\verifier\): if \(|\mathcal{Q}_{\mathrm{input}}|\le Q_{\RAA}\), set \(\mathsf{acceptedSchedule}=1\).
-        \end{enumerate}
-  \item \(\verifier\): while \(|\mathcal{Q}_{\mathrm{input}}|<Q_{\RAA}\), sample \(b\leftarrow\B^n\), add \((0,b)\) to \(\mathcal{Q}_{\mathrm{sys}}\), and update \(\mathcal{Q}_{\mathrm{input}}\).
-  \item \(\prover,\verifier\): define \(\mathsf{OpenBase}(q,b)\) by opening \(H_q\) at \(b\) for \(q\in\{0,1,2,3\}\), and by running \(\mathsf{CheckResidualAt}(R,b)\) for each component \(R\) and returning \(R_{\mathrm{rep}}[b]+\eta R_{\mathrm{perm}}[b]+\eta^2R_{\mathrm{acc1}}[b]+\eta^3R_{\mathrm{acc2}}[b]\) for \(q=4\).
-  \item \(\prover,\verifier\): define \(\mathsf{OpenLayer}(q,s,a)=\mathsf{OpenBase}(q,a)\) if \(s=0\), \(\mathsf{OpenLayer}(q,s,a)=\mathcal{F}_{\mathrm{Commit}}.\Open(C_A^{(s)},(q,a))\) if \(1\le s<n\), and \(\mathsf{OpenLayer}(q,n,\emptyset)=T[q]\).
-  \item \(\prover,\verifier\): for every \((q,b)\in\mathcal{Q}_{\mathrm{path}}\) and \(s\in\{0,\ldots,n-1\}\), let \(a=\operatorname{pref}_{n-s-1}(b)\), open \(x_0=\mathsf{OpenLayer}(q,s,(a\mid0))\), \(x_1=\mathsf{OpenLayer}(q,s,(a\mid1))\), and \(x_\star=\mathsf{OpenLayer}(q,s+1,a)\).\\
-        \(\verifier\): check \(x_\star=(1-\theta_s)x_0+\theta_sx_1\).
-  \item \(\prover,\verifier\): for every \((s,p)\in\mathcal{Q}_{\mathrm{par}}\), open \(y_p=\mathcal{F}_{\mathrm{Commit}}.\Open(C_P^{(s)},p)\) and \(x_j=\mathsf{OpenLayer}(q_j,s,a_j)\) for \(\mathsf{Supp}_s(p)=((q_j,a_j,\lambda_j))_{j=1}^{d_p}\).\\
-        \(\verifier\): check \(y_p=\sum_{j=1}^{d_p}\lambda_jx_j\).
-  \item \(\verifier\): check \(S_n=w^{(n)}[\emptyset]T[0]\) and \(T[4]=0\).\\
-        \(\verifier\): return accept iff all checks above accept.
+  \item \(\prover\): for \(h\in\B^\ell\), let \(u[h]=\MLE(y[h,\ast])(z_{\mathrm{col}})\).
+  \item \(\prover\to\verifier\): \(u\in\F^{\B^\ell}\).
+  \item \(\verifier\): if \(v\ne\sum_{h\in\B^\ell}\chi_h(z_{\mathrm{row}})u[h]\), return reject.
+  \item \(\verifier\): sample \(\rho\leftarrow\F^{\B^\ell}\).\\
+        \(\verifier\to\prover\): \(\rho\).
+  \item \(\prover,\verifier\): let \(R_\star\gets\Pi_{\mathrm{rowFoldCommit}}.\mathsf{Commit}(C_f,\rho)\) as in Figure~\ref{fig:protocol-row-fold-commit}.\\
+        \(\prover,\verifier\): let \(v_\star=\ip{\rho}{u}\).
+  \item \(\prover\): for \(a\in\B^k\), let \(y_\star[a]=\sum_{h\in\B^\ell}\rho[h]y[h,a]\).
+  \item \(\prover,\verifier\): let \(c_\star\in\F^{\B^n}\) denote the logical tensor bound by \(R_\star\), so \(\mathcal{F}_{\mathrm{Commit}}.\Open(R_\star,b)=c_\star[b]\) for every accepted opening.
+  \item \(\prover\): let \(u_1=\mathsf{Rep}\,y_\star\), \(u_2=\Pi_1u_1\), \(u_3=\mathsf{Acc}\,u_2\), \(u_4=\Pi_2u_3\), and \(c_\star^{\mathrm{wit}}=\mathsf{Acc}\,u_4\).
+  \item \(\prover,\verifier\): run \(\mathsf{RAAResidualCommit}(u_2,u_3,u_4,c_\star^{\mathrm{wit}};R_\star)\) from Figure~\ref{fig:protocol-raa-residual-commit}, receiving \(C_{\mathrm{raa}}\) and challenges \(\alpha,\beta,\gamma,\eta\).
+  \item \(\prover\): let \(R_\eta\in\F^{\B^n}\) be the hidden tensor defined inside Figure~\ref{fig:protocol-raa-residual-commit}.
+  \item \(\prover\): define tensors \(A_q\in\F^{\B^n}\) for \(q\in\mathcal L\) by \(A_0[b]=c_\star[b]\), \(A_1[b]=u_2[b]\), \(A_2[b]=u_3[b]\), \(A_3[b]=u_4[b]\), and \(A_4[b]=R_\eta[b]\).
+  \item \(\prover\): use \(c_\star^{\mathrm{wit}}\) as the lane-\(0\) witness for \(A_0\) when computing BaseFold extension values; lane-\(0\) openings in \(C_A\) are still authenticated through \(R_\star\).
+  \item \(\prover,\verifier\): let \(C_A\gets\Pi_{\mathrm{backendCommit}}.\mathsf{Commit}(R_\star,C_{\mathrm{raa}})\) as in Figure~\ref{fig:protocol-backend-commit}.
+  \item \(\prover,\verifier\): let \(\widehat W=\mathsf{raaCodewordEvalWeightFunction}(\RAA,z_{\mathrm{col}})\), where \(\widehat W:\B^n\to\F\).
+  \item \(\prover,\verifier\): define \(W_q:\B^n\to\F\) for \(q\in\mathcal L\) by \(W_0(b)=\widehat W(b)\) and \(W_q(b)=0\) for \(q\ne0\); set \(S=v_\star\).
+  \item \(\prover,\verifier\): run \(\mathsf{BaseFold.Commit}((A_q)_{q\in\mathcal L};C_A)\) from Figure~\ref{fig:protocol-basefold}, receiving \(C_{\mathrm{code}}\).
+  \item \(\prover,\verifier\): run \(\mathsf{BaseFold.Open}((A_q)_{q\in\mathcal L};C_{\mathrm{code}},(W_q)_{q\in\mathcal L},S)\) from Figure~\ref{fig:protocol-basefold}.
+  \item \(\verifier\): return the \(\mathsf{BaseFold.Open}\) result.
 \end{enumerate}
 \end{protocolbox}
 
-\begin{protocolbox}{Protocol: \(\mathsf{Blaze.Open}\)}{fig:protocol-blaze-open}
+\begin{protocolbox}{Protocol: \(\Pi_{\mathrm{rowFoldCommit}}\), Row-Fold Virtual Commitment}{fig:protocol-row-fold-commit}
 \scriptsize\raggedright
-\noindent\(\underline{\mathsf{Blaze.Open}(\prover:f,\ \verifier:(C_f,z,v))\to\{0,1\}}\)
+\noindent Public parameters: row domain \(\B^\ell\), RAA codeword domain \(\B^n\), and commitment API \(\mathcal{F}_{\mathrm{Commit}}\).
+
+\medskip
+\noindent\(\underline{\Pi_{\mathrm{rowFoldCommit}}.\mathsf{Commit}(\prover:R_{\mathrm{outer}}:\Handle,\ \verifier:(R_{\mathrm{outer}}:\Handle,\rho\in\F^{\B^\ell}))\to R_\star:\Handle}\)
 
 \smallskip
-\noindent Public parameters: field \(\F\); sizes \(L=2^\ell\), \(K=2^k\), \(N=2^n\); RAA and BaseFold backend parameters.  The prover represents \(f\) as \(y\in\F^{\B^\ell\times\B^k}\), and the verifier has \(C_f=R_{\mathrm{outer}}\), \(z=(z_{\mathrm{row}},z_{\mathrm{col}})\in\F^\ell\times\F^k\), and \(v\in\F\).
+\begin{enumerate}[leftmargin=0.24in,label=\textbf{R\arabic*.},itemsep=0.08em,topsep=0.1em,parsep=0pt]
+  \item \(\prover,\verifier\): return \(R_\star\) with logical domain \(\B^n\), storing \((R_{\mathrm{outer}},\rho)\).
+\end{enumerate}
 
 \smallskip
-\begin{enumerate}[leftmargin=0.24in,label=\textbf{P\arabic*.},itemsep=0.08em,topsep=0.1em,parsep=0pt]
-  \item \(\prover\): for \(h\in\B^\ell\), let \(u[h]=\MLE(y[h,\ast])(z_{\mathrm{col}})\).
-  \item \(\prover\to\verifier\): \(u\in\F^{\B^\ell}\).
-  \item \(\verifier\): check \(v=\sum_{h\in\B^\ell}\chi_h(z_{\mathrm{row}})u[h]\).
-  \item \(\verifier\): sample \(\rho\leftarrow\F^{\B^\ell}\).
-  \item \(\prover,\verifier\): let \(R_\star\gets\Pi_{\mathrm{blazeCommit}}.\Com(C_f,\rho)\) as in Figure~\ref{fig:protocol-blazecommit}.\\
-        \(\prover,\verifier\): let \(v_\star=\ip{\rho}{u}\).
-  \item \(\prover\): for \(a\in\B^k\), let \(y_\star[a]=\sum_{h\in\B^\ell}\rho[h]y[h,a]\).
-  \item \(\prover,\verifier\): run \(\mathsf{BaseFold.Commit}(R_\star,z_{\mathrm{col}},v_\star;y_\star)\) from Figure~\ref{fig:protocol-basefold-backend-commit}, receiving backend state \(\mathsf{B}\).
-  \item \(\prover,\verifier\): run \(\mathsf{BaseFold.Open}(\mathsf{B},R_\star,z_{\mathrm{col}},v_\star)\) from Figure~\ref{fig:protocol-basefold-backend-open}.
-  \item \(\verifier\): return the \(\mathsf{BaseFold.Open}\) result.
+\noindent\(\underline{\Pi_{\mathrm{rowFoldCommit}}.\mathsf{Open}(\prover:R_\star:\Handle,\ \verifier:(R_\star:\Handle,b\in\B^n))\to o_\star\in\F\cup\{\bot\}}\).
+
+\smallskip
+\begin{enumerate}[leftmargin=0.24in,label=\textbf{R\arabic*.},resume,itemsep=0.08em,topsep=0.1em,parsep=0pt]
+  \item \(\prover,\verifier\): \(\mathsf{col}\gets\mathcal{F}_{\mathrm{Commit}}.\Open(R_{\mathrm{outer}},b)\).
+  \item \(\verifier\): if \(\mathsf{col}=\bot\), return \(\bot\).
+  \item \(\verifier\): return \(o_\star=\ip{\rho}{\mathsf{col}}\).
+\end{enumerate}
+\end{protocolbox}
+
+\begin{protocolbox}{Protocol: \(\Pi_{\mathrm{backendCommit}}\), Backend Virtual Commitment}{fig:protocol-backend-commit}
+\scriptsize\raggedright
+\noindent Public parameters: lane set \(\mathcal L=\{0,1,2,3,4\}\), RAA codeword domain \(\B^n\), residual lane \(q_{\mathrm{res}}=4\), and commitment API \(\mathcal{F}_{\mathrm{Commit}}\).
+
+\medskip
+\noindent\begin{minipage}{0.98\linewidth}
+\(\Pi_{\mathrm{backendCommit}}.\mathsf{Commit}(\prover:\bot,\)\\
+\(\verifier:(R_\star:\Handle,C_{\mathrm{raa}}:\Handle))\to C_A:\Handle\)
+\smallskip\hrule
+\end{minipage}
+
+\smallskip
+\begin{enumerate}[leftmargin=0.24in,label=\textbf{A\arabic*.},itemsep=0.08em,topsep=0.1em,parsep=0pt]
+  \item \(\prover,\verifier\): return \(C_A\) with logical domain \(\mathcal L\times\B^n\), storing \(R_\star,C_{\mathrm{raa}}\).
+\end{enumerate}
+
+\smallskip
+\noindent\(\underline{\Pi_{\mathrm{backendCommit}}.\mathsf{Open}(\prover:C_A:\Handle,\ \verifier:(C_A:\Handle,(q,b)\in\mathcal L\times\B^n))\to o\in\F\cup\{\bot\}}\).
+
+\smallskip
+\begin{enumerate}[leftmargin=0.24in,label=\textbf{A\arabic*.},resume,itemsep=0.08em,topsep=0.1em,parsep=0pt]
+  \item \(\prover,\verifier\): if \(q=0\), return \(o=\mathcal{F}_{\mathrm{Commit}}.\Open(R_\star,b)\).
+  \item \(\prover,\verifier\): if \(q\in\{1,2,3,4\}\), return
+        \(o=\Pi_{\mathrm{raaResidual}}.\mathsf{Open}(C_{\mathrm{raa}},(q,b))\).
+\end{enumerate}
+\end{protocolbox}
+
+\begin{protocolbox}{Protocol: \(\mathsf{BaseFold}\), Generic Commit And Open}{fig:protocol-basefold}
+\scriptsize\raggedright
+\noindent Public parameters: for integers \(a\le b\), write \([a,b]=\{a,a+1,\ldots,b\}\) and \([b]=[1,b]\); finite lane set \(\mathcal L\subset\mathbb{N}\); message size \(K=2^k\); code size \(N=2^n\); systematic BaseFold encoders
+\[
+  \Enc_{\mathrm{BF}}^{(s)}:\F^{\B^{k-s}}\to\F^{\B^{n-s}}
+  \qquad(s\in[0,k]),
+\]
+where \(\Enc_{\mathrm{BF}}^{(s)}(A)[0^{n-k}\Vert a]=A[a]\) for every \(A\in\F^{\B^{k-s}}\) and \(a\in\B^{k-s}\); the BaseFold instance folds the last coordinate each round; code-folding rules \(\CodeFold_s\); weight-folding rules \(\mathsf{FoldWeight}_s\); path-check query count \(Q_{\mathrm{path}}\); path-check predicates \(P_{s,\mathrm{path}}:\F^3\to\F\) for \(s\in[0,k-1]\); residual lane \(q_{\mathrm{res}}\in\mathcal L\); residual query count \(Q_{\mathrm{res}}\); and the commitment API.  In the commit call, the verifier has \(C_A:\Handle\) for the message tensors.  In the open call, the verifier has \(C_{\mathrm{code}}:\Handle\), weight functions \(W_q:\B^k\to\F\) for \(q\in\mathcal L\), and \(S\in\F\).
+
+\medskip
+\noindent\(\underline{\mathsf{BaseFold.Commit}(\prover:(A_q\in\F^{\B^k})_{q\in\mathcal L},\ \verifier:C_A:\Handle)\to C_{\mathrm{code}}:\Handle}\)
+
+\smallskip
+\begin{enumerate}[leftmargin=0.24in,label=\textbf{B\arabic*.},itemsep=0.08em,topsep=0.1em,parsep=0pt]
+  \item \(\prover\): for every \(q\in\mathcal L\), compute \(y_q=\Enc_{\mathrm{BF}}^{(0)}(A_q)\in\F^{\B^n}\).
+  \item \(\prover\): let \(y_{\mathrm{ext}}=(y_q[b])_{q\in\mathcal L,\ b\in\B^n\setminus(0^{n-k}\Vert\B^k)}\).
+  \item \(\prover\): let \(C_{\mathrm{ext}}\gets\mathcal{F}_{\mathrm{Commit}}.\Com(y_{\mathrm{ext}})\).
+  \item \(\prover\to\verifier\): \(C_{\mathrm{ext}}\).
+  \item \(\prover,\verifier\): let \(C_{\mathrm{code}}=\mathsf{CompositeCommit}(C_A,C_{\mathrm{ext}})\).
+  \item \(\prover,\verifier\): return \(C_{\mathrm{code}}\).
+\end{enumerate}
+
+\medskip
+\noindent\(\underline{\mathsf{BaseFold.Open}(\prover:(A_q\in\F^{\B^k})_{q\in\mathcal L},\ \verifier:(C_{\mathrm{code}}:\Handle,(W_q:\B^k\to\F)_{q\in\mathcal L},S\in\F))\to\{0,1\}}\)
+
+\smallskip
+\begin{enumerate}[leftmargin=0.24in,label=\textbf{F\arabic*.},itemsep=0.08em,topsep=0.1em,parsep=0pt]
+  \item \(\prover\): set \(y_q^{(0)}=\Enc_{\mathrm{BF}}^{(0)}(A_q)\) for every \(q\in\mathcal L\).\\
+        \(\prover,\verifier\): set \(C_{\mathrm{code}}^{(0)}=C_{\mathrm{code}}\), \(W_q^{(0)}=W_q\) for every \(q\in\mathcal L\), and \(S_0=S\).
+  \item for \(s\in[0,k-1]\):
+        \begin{enumerate}[leftmargin=0.22in,label=\textbf{\alph*.},itemsep=0.04em,topsep=0.04em,parsep=0pt]
+          \item \(\prover\to\verifier\): \(g_s(X)\).
+          \item \(\verifier\): if \(\deg(g_s)>2\) or \(g_s(0)+g_s(1)\ne S_s\), return reject.
+          \item \(\verifier\): \(\theta_s\leftarrow\F\).\\
+                \(\verifier\to\prover\): \(\theta_s\).
+          \item \(\prover,\verifier\): update \(S_{s+1}=g_s(\theta_s)\) and \(W_q^{(s+1)}=\mathsf{FoldWeight}_s(W_q^{(s)},\theta_s)\) for every \(q\in\mathcal L\).
+          \item \(\prover\): set \(y_q^{(s+1)}=\CodeFold_s(y_q^{(s)},\theta_s)\) for every \(q\in\mathcal L\).
+          \item \(\prover\): \(C_{\mathrm{code}}^{(s+1)}\gets\mathcal{F}_{\mathrm{Commit}}.\Com((y_q^{(s+1)})_{q\in\mathcal L})\).
+          \item \(\prover\to\verifier\): \(C_{\mathrm{code}}^{(s+1)}\).
+        \end{enumerate}
+  \item \(\prover\): set \(t_q=y_q^{(k)}\in\F^{\B^{n-k}}\) for every \(q\in\mathcal L\).
+  \item \(\prover\to\verifier\): \(t=(t_q)_{q\in\mathcal L}\in(\F^{\B^{n-k}})^{\mathcal L}\).
+  \item \(\verifier\): sample query addresses:
+        \begin{enumerate}[leftmargin=0.22in,label=\textbf{\alph*.},itemsep=0.04em,topsep=0.04em,parsep=0pt]
+          \item \(\verifier\): for \(i\in[Q_{\mathrm{path}}]\), sample \(b_i\leftarrow\B^n\).
+          \item \(\verifier\): for \(\lambda\in[Q_{\mathrm{res}}]\), sample \(b'_\lambda\leftarrow\B^n\).
+          \item \(\verifier\to\prover\): \((b_i)_{i\in[Q_{\mathrm{path}}]}\) and \((b'_\lambda)_{\lambda\in[Q_{\mathrm{res}}]}\).
+        \end{enumerate}
+  \item for each \(i\in[Q_{\mathrm{path}}]\), \(s\in[0,k-1]\), and \(q\in\mathcal L\):
+        \begin{enumerate}[leftmargin=0.22in,label=\textbf{\alph*.},itemsep=0.04em,topsep=0.04em,parsep=0pt]
+          \item \(\prover,\verifier\): let \(a=\mathsf{prefix}_{n-s-1}(b_i)\).
+          \item \(\prover,\verifier\): let \(x_0=\mathcal{F}_{\mathrm{Commit}}.\Open(C_{\mathrm{code}}^{(s)},(q,a\Vert0))\).
+          \item \(\prover,\verifier\): let \(x_1=\mathcal{F}_{\mathrm{Commit}}.\Open(C_{\mathrm{code}}^{(s)},(q,a\Vert1))\).
+          \item \(\prover,\verifier\): let \(x_\star=\mathcal{F}_{\mathrm{Commit}}.\Open(C_{\mathrm{code}}^{(s+1)},(q,a))\).
+          \item \(\verifier\): if \(x_0=\bot\) or \(x_1=\bot\) or \(x_\star=\bot\) or \(P_{s,\mathrm{path}}(x_0,x_1,x_\star)\ne0\), return reject.
+        \end{enumerate}
+  \item for \(\lambda\in[Q_{\mathrm{res}}]\):
+        \begin{enumerate}[leftmargin=0.22in,label=\textbf{\alph*.},itemsep=0.04em,topsep=0.04em,parsep=0pt]
+          \item \(\prover,\verifier\): let \(r=\mathcal{F}_{\mathrm{Commit}}.\Open(C_{\mathrm{code}},(q_{\mathrm{res}},b'_\lambda))\).
+          \item \(\verifier\): if \(r=\bot\) or \(r\ne0\), return reject.
+        \end{enumerate}
+  \item \(\verifier\): if \(S_k\ne\sum_{q\in\mathcal L}\sum_{a\in\B^{n-k}}W_q^{(k)}(a)t_q[a]\), return reject.
+  \item \(\verifier\): return accept.
 \end{enumerate}
 \end{protocolbox}
 
@@ -3581,31 +3636,30 @@ The order matters.  A condensed version of the target transcript schedule is:
   \item Check the row-weighted aggregation
         $v=\sum_{h\in\B^\ell}\chi_h(z_{\mathrm{row}})u_h$.
   \item Squeeze the random coefficient vector $\rho$, derive
-        $R_\star=\Pi_{\mathrm{blazeCommit}}.\Com(R_{\mathrm{outer}},\rho)$
+        $R_\star=\Pi_{\mathrm{rowFoldCommit}}.\mathsf{Commit}(R_{\mathrm{outer}},\rho)$
         and $v_\star=\ip{\rho}{u}$.  The collapsed value is verifier-derived
         proof state, not independent prover evidence.
-  \item Absorb the backend code spec, query-count spec, backend request
-        $(z_{\mathrm{col}},v_\star)$, and the auxiliary commitment to
-        $(u_2,u_3,u_4)$.
-  \item Squeeze the RAA helper challenges
-        $(\alpha,\beta,\gamma)$.
-  \item Build and absorb the helper commitment.
-  \item Build and absorb the component-residual commitment.
+  \item Absorb the RAA backend request
+        $(R_\star,z_{\mathrm{col}},v_\star)$ and the stage handle
+        \(C_{\mathrm{stage}}\) for \((u_2,u_3,u_4)\).
+  \item Squeeze the RAA challenges \((\alpha,\beta)\).
+  \item Build and absorb the product-tree handle \(C_{\mathrm{tree}}\).
+  \item Squeeze the tree-batching challenge \(\gamma\).
+  \item Build and absorb the component-residual handle \(C_{\mathrm{res}}\).
   \item Squeeze the batching challenge $\eta$ and define the batched residual
         tensor $R_\eta$ from the already committed component residuals.
-  \item Build and absorb the compiler parity commitment for the augmented matrix
-        $(c_\star,u_2,u_3,u_4,R_\eta)$.  This is not a commitment to the
-        systematic codeword $c_\star$ itself; it is the backend-owned parity handle
-        required by the systematic BaseFold compiler code.
-  \item For each shared round $s$, absorb the eval-binding round polynomial,
-        squeeze the shared fold challenge $\theta_s$, then build and absorb the
-        folded-layer oracle commitment produced using $\theta_s$.  If another
-        round remains, the next round polynomial is absorbed only after this
-        folded-layer commitment is bound.  The eval-binding sumcheck, residual
-        terminal check, and augmented BaseFold fold chain use the same
-        $\theta_s$.
-  \item Absorb the final constant eval-binding polynomial, final sumcheck claim,
-        and clear terminal vector.
+  \item Define the lane tensors
+        \(A_0=c_\star\), \(A_1=u_2\), \(A_2=u_3\), \(A_3=u_4\),
+        and \(A_4=R_\eta\), their backend virtual handle \(C_A\), and the normalized
+        linear claim \(\sum_{q\in\mathcal L}\sum_{b\in\B^n}W_q(b)A_q[b]=S\).
+  \item Absorb the BaseFold code spec, the systematic slice
+        \(\mathcal L\times(0^{n-k}\Vert\B^k)\), and the extension
+        commitment \(C_{\mathrm{ext}}\).  Together with \(C_A\), this defines
+        the composite codeword handle \(C_{\mathrm{code}}\).
+  \item For each BaseFold round $s$, absorb the round polynomial, squeeze the
+        fold challenge $\theta_s$, then absorb the next folded-layer handle.
+        The next round polynomial is absorbed only after this handle is fixed.
+  \item Absorb the final claim data and terminal tensor.
   \item Absorb the remaining terminal data and query-count spec; then sample
         the typed query schedule.
 \end{enumerate}
@@ -3626,7 +3680,8 @@ is straightforward:
         residual equations.
   \item Honest residual tensors are zero, so $R_\eta$ is zero.
   \item Honest MLE weights satisfy
-        $\ip{w}{c_\star}=\MLE(y_\star)(z_{\mathrm{col}})$.
+        \(\sum_{q\in\mathcal L}\sum_{b\in\B^n}W_q(b)A_q[b]
+        =S=\MLE(y_\star)(z_{\mathrm{col}})\).
   \item Honest fold paths match the published terminal vector.
   \item Honest commitment openings verify against their handles.
 \end{enumerate}
@@ -3744,7 +3799,7 @@ The verifier's conceptual algorithm is:
         row evaluations.
   \item Recompute all Fiat-Shamir challenges in the correct order.
   \item Derive the virtual handle
-        $R_\star=\Pi_{\mathrm{blazeCommit}}.\Com(R_{\mathrm{outer}},\rho)$.
+        $R_\star=\Pi_{\mathrm{rowFoldCommit}}.\mathsf{Commit}(R_{\mathrm{outer}},\rho)$.
         For every queried compressed coordinate $b$, obtain
         $c_\star[b]$ through $\mathcal{F}_{\mathrm{Commit}}.\Open(R_\star,b)$.
   \item Verify backend openings for auxiliary, helper, residual, parity, and
@@ -3757,14 +3812,15 @@ The verifier's conceptual algorithm is:
         \[
           \mathsf{claimedSum}_n
           =
-          w^{(n)}[\emptyset]A^{(n)}[0,\emptyset],
+          W_0^{(n)}(\emptyset)A_0^{(n)}[\emptyset],
           \qquad
-          A^{(n)}[4,\emptyset]=0.
+          A_4^{(n)}[\emptyset]=0.
         \]
 \end{enumerate}
 
-If all checks pass, the verifier accepts that the committed matrix opens to the
-claimed multilinear value under the stated Blaze/BaseFold protocol.
+If the verifier completes V1--V10 without rejection, it accepts that the
+committed matrix opens to the claimed multilinear value under the stated
+Blaze/BaseFold protocol.
 
 \subsection{A Small Mental Model}
 

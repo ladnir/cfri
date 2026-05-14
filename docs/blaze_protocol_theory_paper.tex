@@ -22,9 +22,22 @@
 \newcommand{\MsgFold}{\mathsf{MsgFold}}
 \newcommand{\CodeFold}{\mathsf{CodeFold}}
 \newcommand{\RAA}{\mathsf{RAA}}
+\newcommand{\PRAA}{\mathsf{PRAA}}
 \newcommand{\MLE}{\mathsf{MLE}}
 \newcommand{\PT}{\mathsf{PT}}
 \newcommand{\Handle}{\mathsf{Handle}}
+\newcommand{\bits}{\mathsf{bits}}
+\newcommand{\Int}{\mathsf{int}}
+\newcommand{\Idx}{\mathsf{idx}}
+\newcommand{\RepView}{\mathsf{RepView}}
+\newcommand{\ValueCheck}{\mathsf{ValueCheck}}
+\newcommand{\PermCheck}{\mathsf{PermCheck}}
+\newcommand{\AccCheck}{\mathsf{AccCheck}}
+\newcommand{\Accumulate}{\mathsf{Accumulate}}
+\newcommand{\Permute}{\mathsf{Permute}}
+\newcommand{\SumReq}{\mathsf{SumReq}}
+\newcommand{\MLEAuth}{\mathsf{MLEAuth}}
+\newcommand{\Pad}{\mathsf{Pad}}
 \newcommand{\prover}{\mathbb{P}}
 \newcommand{\verifier}{\mathbb{V}}
 \newcommand{\ip}[2]{\left\langle #1,#2 \right\rangle}
@@ -54,7 +67,7 @@ commitments, linear codes, sumcheck, and BaseFold.  We then build the RAA
 relation code, the Blaze interleaved commitment, the row-combining trick, the
 evaluation-binding sumcheck, the RAA consistency relations, and the holographic
 systematic backend that authenticates all terminal claims through one shared
-fold spine.  No prior knowledge of polynomial commitments, sumcheck protocols,
+fold spine.  No prior knowledge of tensor commitments, sumcheck protocols,
 BaseFold, Blaze, or MLEs is assumed.
 \end{abstract}
 
@@ -71,13 +84,13 @@ encoding, and BaseFold-style proximity checks.
 This paper builds those pieces bottom-up.  First we define the algebraic objects:
 fields, tensors, multilinear extensions, commitments, codes, sumcheck, and
 folding.  Then we explain Blaze's code-independent compression step: encode many
-row slices, combine their codewords into the compressed codeword $c_\star$, and
-bind $c_\star$ back to the committed matrix.  Only after that do we instantiate
+row slices, combine their committed row words into an openable folded tensor
+$c_\star$, and bind $c_\star$ back to the committed matrix.  Only after that do we instantiate
 the linear code with RAA and explain the correlated checks that make the proof
 sound.
 
 The one high-level idea to keep in mind is this: the protocol does not run code
-checks and polynomial-evaluation checks in isolation.  The opened positions,
+checks and tensor-evaluation checks in isolation.  The opened positions,
 folded terminal values, and multilinear claims must all refer to the same
 committed objects.  Much of the backend exists to maintain that correlation.
 
@@ -113,8 +126,9 @@ The protocol relies heavily on linearity.  If $A$ is a linear map, then
 \[
   A(\alpha x+\beta y)=\alpha A(x)+\beta A(y).
 \]
-This simple equation is the reason Blaze can collapse $t$ codewords into the
-compressed codeword $c_\star$ and ask the backend to prove one RAA relation.
+This simple equation is the reason Blaze can collapse $t$ committed row words
+into one openable tensor $c_\star$ and ask the backend to prove one RAA
+relation about it.
 
 \section{Tensors, Flat Vectors, And Inner Products}
 
@@ -141,9 +155,29 @@ codeword coordinates:
   x=(x[0],x[1],\ldots,x[N-1]).
 \]
 Here $N=2^\ell$.  The serialization is a deterministic address order for the
-Boolean entries, typically the ordinary binary order.  That order matters for
-implementors, because it tells them which memory locations are paired in a fold,
-but it is not the algebraic object being folded.
+Boolean entries.  In this paper it is always the natural binary order.  For
+\(0\le i<2^\ell\), write
+\[
+  \bits_\ell(i)\in\B^\ell
+\]
+for the length-\(\ell\) binary expansion of \(i\), with leading zeros included.
+Then the \(i\)-th serialized entry is the tensor entry
+\[
+  x[\bits_\ell(i)].
+\]
+For an integer interval \([s,t]\subseteq[0,2^\ell-1]\), write
+\[
+  \bits_\ell([s,t])
+  :=
+  \{\bits_\ell(i):s\le i\le t\}\subseteq\B^\ell.
+\]
+This notation is only an implementation shorthand for a set of Boolean
+addresses.  Protocol statements still use the binary address set.  For product
+domains such as \(\B^a\times\B^b\), the natural layout is the lexicographic
+binary layout induced by concatenation \((u,v)\mapsto u\Vert v\in\B^{a+b}\).
+That order matters for implementors, because it tells them which memory
+locations are paired in a fold or adjacent in an accumulator, but it is not the
+algebraic object being folded.
 
 The inner product of two tensors of the same shape is the sum of entrywise
 products:
@@ -338,50 +372,71 @@ of the fold itself.
 \section{The Authenticated Opening Functionality}
 
 The algebraic protocols below need authenticated oracle access.  A commitment
-binds the prover to a logical vector and later lets the verifier authenticate
-selected entries.  We will use this through a generic functionality; a Merkle
-tree is one implementation, but not the only one we will need.
+binds the prover to a logical tensor and later lets the verifier authenticate
+selected entries at named addresses.  We will use this through a generic
+functionality; a Merkle tree is one implementation, but not the only one we will
+need.  The committed object carries its own natural address space.  If that
+address space is \(\B^d\), the Merkle implementation uses the natural binary
+leaf order
+\[
+  \bits_d(0),\bits_d(1),\ldots,\bits_d(2^d-1).
+\]
+If the address space is a product of binary domains, the leaf order is the
+natural binary order after concatenating the address blocks.  Thus the
+commitment API does not hide any indexing convention: the logical address space
+is the layout.
 
 \begin{protocolbox}{Functionality: $\mathcal{F}_{\mathrm{Commit}}$}{fig:func-commit}
-Public parameters: coordinate domain \(D\) and value space \(\mathcal{L}\).
+For a committed tensor \(x\in\mathcal L^D\), the address set \(D\) and value
+space \(\mathcal L\) are the natural ones carried by \(x\).
 
 \smallskip
-\noindent\(\underline{\mathcal{F}_{\mathrm{Commit}}.\Com(\prover:\mathsf{rep},\ \verifier:D)\to R}\)
+\noindent\(\underline{\mathcal{F}_{\mathrm{Commit}}.\Com(\prover:x,\ \verifier:\bot)\to R}\)
 
 \smallskip
 \begin{enumerate}[leftmargin=0.24in,label=\textbf{C\arabic*.},itemsep=0.08em,topsep=0.1em,parsep=0pt]
-  \item \(\prover\): \(\mathsf{rep}\) represents a logical tensor \(x\in\mathcal{L}^D\).
+  \item \(\prover\to\mathcal F_{\mathrm{Commit}}\): \(x\in\mathcal L^D\).
+  \item \(\mathcal F_{\mathrm{Commit}}\): choose a fresh handle \(R\) and store
+        \(x\) under \(R\).  The address set \(D\) and value space
+        \(\mathcal L\) are part of the tensor type of \(x\).
   \item \(\prover\to\verifier\): \(R\).
 \end{enumerate}
 
 \smallskip
-\noindent\(\underline{\mathcal{F}_{\mathrm{Commit}}.\Open(\prover:R,\ \verifier:(R,a))\to o}\), for \(a\in D\).
+\noindent\(\underline{\mathcal{F}_{\mathrm{Commit}}.\Open(\prover:R,\ \verifier:(R,a\in D))\to o\in\mathcal L\cup\{\bot\}}\)
 
 \smallskip
 \begin{enumerate}[leftmargin=0.24in,label=\textbf{O\arabic*.},itemsep=0.08em,topsep=0.1em,parsep=0pt]
   \item \(\prover\to\verifier\): opening data for \((R,a)\).
-  \item \(\verifier\): return \(o\in\mathcal{L}\cup\{\bot\}\).
+  \item \(\verifier\): return \(o=x[a]\) if the opening authenticates against
+        \(R\); otherwise return \(\bot\).
 \end{enumerate}
 \end{protocolbox}
 
-In the codeword commitments below, $\mathcal{L}=\F$.  If
+The commit call does not separately take \(D\) or \(\mathcal L\): these are the
+natural address set and value space of the object being committed.  In the
+codeword commitments below, $\mathcal{L}=\F$.  If
 $\mathcal{F}_{\mathrm{Commit}}.\Open(R,a)\ne\bot$, its value is the unique
 logical value $x[a]$ bound to $R$.  Equivalently, a verifier can check a claimed
 value $v$ by opening $R$ at $a$ and checking that the returned value equals $v$.
 
 In a real Merkle implementation, the handle $R$ is the Merkle root.  To compute
-it, the prover hashes every leaf value, repeatedly hashes neighboring pairs, and
-keeps the final root.  To open entry $i$, the prover sends $v=x[i]$ and the
-sibling hashes along the path from that leaf to the root.  The verifier
-recomputes the path and checks that it ends at $R$.
+it for \(x\in\mathcal L^{\B^d}\), the prover serializes leaves as
+\[
+  x[\bits_d(0)],x[\bits_d(1)],\ldots,x[\bits_d(2^d-1)],
+\]
+hashes neighboring pairs, and keeps the final root.  To open address
+\(a=\bits_d(i)\), the prover sends \(v=x[a]\) and the sibling hashes along the
+path from the \(i\)-th leaf to the root.  The verifier recomputes the path and
+checks that it ends at \(R\).
 
 We will use several implementations of this same API.  The ordinary
-implementation is Merkle: $\Pi_{\mathrm{merkleCommit}}.\Com(x\in\mathcal{L}^D)$
+implementation is Merkle: $\Pi_{\mathrm{merkleCommit}}.\Com(x)$
 stores the logical tensor itself and opens coordinates by Merkle paths.  Blaze
 also uses virtual handles: a virtual handle does not store one flat tensor
 directly, but it still implements the same $\Com/\Open$ behavior.  We use two
 virtual implementations.  The first, \(\Pi_{\mathrm{rowFoldCommit}}\), folds the
-committed row-codeword matrix into the compressed codeword handle \(R_\star\).
+committed row-word matrix into the folded-tensor handle \(R_\star\).
 The second, \(\Pi_{\mathrm{backendCommit}}\), extends \(R_\star\) with the
 auxiliary RAA lanes and exposes the full backend message handle \(C_A\).
 
@@ -407,28 +462,30 @@ existing handles over disjoint coordinate sets; it is not a new cryptographic
 assumption.
 
 \begin{protocolbox}{Functionality: Composite Commitment}{fig:func-composite-commit}
-\noindent Public parameters: a logical domain written as a natural disjoint
-union \(D=D_1\sqcup\cdots\sqcup D_m\).  A coordinate in \(D_i\) has its natural
-local coordinate in the \(i\)-th component.
+\noindent Public parameters: disjoint address sets
+\(E_1,\ldots,E_m\), local value spaces \(\mathcal L_i\), and component handles
+\(R_i\), where \(R_i\) opens a tensor over address set \(E_i\).  The composite
+domain is the disjoint union \(D=E_1\sqcup\cdots\sqcup E_m\).  The address sets
+may be binary address sets, product sets, tagged sets, or any other disjoint
+sets named by the protocol.
 
 \smallskip
-\noindent\(\underline{\mathsf{CompositeCommit}(R_1,\ldots,R_m)\to R}\)
+\noindent\(\underline{\mathsf{CompositeCommit}((R_1,E_1),\ldots,(R_m,E_m))\to R}\)
 
 \smallskip
 \begin{enumerate}[leftmargin=0.24in,label=\textbf{M\arabic*.},itemsep=0.08em,topsep=0.1em,parsep=0pt]
-  \item \(\prover,\verifier\): return the handle \(R\) that opens component
-        \(D_i\) through \(R_i\).
+  \item \(\prover,\verifier\): return the handle \(R\) that stores the routing
+        table \(((R_1,E_1),\ldots,(R_m,E_m))\).
 \end{enumerate}
 
 \smallskip
-\noindent\(\underline{\mathsf{CompositeOpen}(R,a)\to o\in\mathsf{Val}\cup\{\bot\}}\), for \(a\in D\), where \(\mathsf{Val}\) is the value type stored by the selected component handle.
+\noindent\(\underline{\mathsf{CompositeOpen}(R,a\in D)\to o\in\bigcup_i\mathcal L_i\cup\{\bot\}}\)
 
 \smallskip
 \begin{enumerate}[leftmargin=0.24in,label=\textbf{M\arabic*.},resume,itemsep=0.08em,topsep=0.1em,parsep=0pt]
-  \item \(\prover,\verifier\): let \(i\) be the unique index with \(a\in D_i\).
-  \item \(\prover,\verifier\): let \(a_i\) be the natural local coordinate of
-        \(a\) inside \(D_i\).
-  \item \(\prover,\verifier\): return \(o=\mathcal{F}_{\mathrm{Commit}}.\Open(R_i,a_i)\).
+  \item \(\prover,\verifier\): let \(i\) be the unique index with \(a\in E_i\).
+  \item \(\prover,\verifier\): return
+        \(o=\mathcal{F}_{\mathrm{Commit}}.\Open(R_i,a)\).
 \end{enumerate}
 \end{protocolbox}
 
@@ -436,9 +493,24 @@ For the systematic split used by BaseFold, the message addresses are
 \(\mathcal L\times\B^k\).  The codeword addresses are
 \(\mathcal L\times\B^n\).  The systematic address of
 \((q,a)\in\mathcal L\times\B^k\) is \((q,0^{n-k}\Vert a)\).  Thus
-\(\mathsf{CompositeCommit}(C_A,C_{\mathrm{ext}})\) opens systematic codeword
-addresses through \(C_A\), and opens the remaining codeword addresses through
-\(C_{\mathrm{ext}}\).
+\[
+  D_{\mathrm{sys}}
+  =
+  \{(q,0^{n-k}\Vert a):q\in\mathcal L,\ a\in\B^k\},
+  \qquad
+  D_{\mathrm{ext}}
+  =
+  \mathcal L\times\bigl(\B^n\setminus\bits_n([0,2^k-1])\bigr).
+\]
+The composite handle is
+\[
+  \mathsf{CompositeCommit}
+  ((C_A,D_{\mathrm{sys}}),(C_{\mathrm{ext}},D_{\mathrm{ext}})).
+\]
+Here \(C_A\) is viewed as a handle over \(D_{\mathrm{sys}}\): its value at
+\((q,0^{n-k}\Vert a)\) is the message value \(A_q[a]\).  The composite handle
+opens systematic codeword addresses through \(C_A\), and opens the remaining
+codeword addresses through \(C_{\mathrm{ext}}\).
 
 The functionality is binding at the logical-tensor level.  It is not an
 algebraic commitment: it does not by itself prove that the logical tensor is a
@@ -2160,6 +2232,215 @@ symbols it is enforced by the encoder's structured local relation.  The parity
 commitment is what gives the externally authenticated message entries enough
 redundancy for the proximity argument.
 
+\section{A Generic MLE Oracle Authentication Backend}
+
+Before returning to Blaze, separate one more interface.  Blaze is an MLIOP-style
+protocol: during the protocol the prover sends multilinear oracle tensors, and
+the verifier later asks for evaluations of those tensors at field points.  The
+RAA-specific algebra decides which tensors exist and which evaluations are
+needed.  The backend should not know any of that structure.  It should only
+authenticate claims of the form
+\[
+  \MLE(h)(r)=v
+\]
+for committed multilinear tensors \(h\).
+
+This is the object the Blaze paper obtains by compiling an MLIOP to an IOPP
+using a batching protocol and an RMLE IOPP such as BaseFold.  We model it first
+as an ideal functionality and then give the BaseFold-like implementation shape.
+
+\begin{protocolbox}{Functionality: \(\mathcal F_{\mathrm{MLEAuth}}\)}{fig:func-mle-auth}
+\noindent Public parameters: a field \(\F\).  Each committed oracle has a
+Boolean dimension \(d\).  The value of a committed oracle is a tensor
+\(h\in\F^{\B^d}\).
+
+\smallskip
+\noindent\(\underline{\mathcal F_{\mathrm{MLEAuth}}.\mathsf{Commit}(\prover:h\in\F^{\B^d},\ \verifier:d)\to A_h\in\Handle}\)
+
+\smallskip
+\begin{enumerate}[leftmargin=0.24in,label=\textbf{C\arabic*.},itemsep=0.08em,topsep=0.1em,parsep=0pt]
+  \item \(\prover\to\mathcal F_{\mathrm{MLEAuth}}\): \(h\in\F^{\B^d}\).
+  \item \(\mathcal F_{\mathrm{MLEAuth}}\): choose a fresh handle \(A_h\) and
+        store \((d,h)\) under \(A_h\).
+  \item \(\mathcal F_{\mathrm{MLEAuth}}\to\verifier\): \(A_h\).
+\end{enumerate}
+
+\smallskip
+\noindent\(\underline{\mathcal F_{\mathrm{MLEAuth}}.\mathsf{Open}(\verifier:\mathcal E)\to\{0,1\}}\)
+
+\smallskip
+\noindent Here
+\[
+  \mathcal E=\{(A_i,r_i,v_i)\}_{i=1}^t,
+  \qquad
+  r_i\in\F^{d_i},\quad v_i\in\F,
+\]
+and \(A_i\) must be a handle previously returned by
+\(\mathcal F_{\mathrm{MLEAuth}}.\mathsf{Commit}\) for some stored tensor
+\((d_i,h_i)\).
+
+\smallskip
+\begin{enumerate}[leftmargin=0.24in,label=\textbf{O\arabic*.},itemsep=0.08em,topsep=0.1em,parsep=0pt]
+  \item \(\mathcal F_{\mathrm{MLEAuth}}\): for every \((A_i,r_i,v_i)\in\mathcal E\),
+        compute \(\MLE(h_i)(r_i)\) from the stored tensor behind \(A_i\).
+  \item \(\mathcal F_{\mathrm{MLEAuth}}\): return \(1\) iff
+        \(\MLE(h_i)(r_i)=v_i\) for every \(i\in\{1,\ldots,t\}\); otherwise return \(0\).
+\end{enumerate}
+\end{protocolbox}
+
+The functionality deliberately has no RAA words in it.  It does not know about
+accumulators, permutations, product trees, residuals, or row folding.  Those
+relations only produce the list \(\mathcal E\).  The backend only checks that
+the listed field values are the claimed MLE evaluations of the committed
+oracles.
+
+The real protocol also needs coordinate commitments, because the backend cannot
+store all tensors in an ideal box.  A real commitment phase therefore receives
+two pieces for each oracle:
+\[
+  h_i\in\F^{\B^{d_i}}
+  \qquad\text{and}\qquad
+  C_i,
+\]
+where \(C_i\) is a coordinate-opening handle for \(h_i\).  The handle may be an
+ordinary Merkle commitment, a composite commitment, or a virtual commitment.  The
+implementation below treats all handles opaquely.
+
+The implementation uses one single-tensor subroutine.  Its job is not to know
+where the tensor came from.  It only receives a coordinate-opening handle
+\(C_A\) for a tensor \(A\in\F^{\B^M}\), binds \(A\) with a BaseFold-style encoded
+oracle, and later authenticates one claim \(\MLE(A)(r)=v\).
+
+\begin{protocolbox}{Subroutine: BaseFold-Like RMLE Authentication}{fig:protocol-rmle-backend}
+\scriptsize\raggedright
+\noindent Public parameters: dimension \(M\); systematic foldable-code encoders
+\(\Enc_i:\F^{\B^i}\to\F^{\B^{n_i}}\) for \(i\in\{0,\ldots,M\}\), with
+\(\Enc_i(A)[0^{n_i-i}\Vert a]=A[a]\); the BaseFold folding rules from
+Figure~\ref{fig:protocol-basefold-pcs-eval}; query count \(Q_{\mathrm{BF}}\);
+and the coordinate-commitment API \(\mathcal F_{\mathrm{Commit}}\).
+
+\smallskip
+\noindent\(\underline{\Sigma_{\mathrm{RMLE}}.\mathsf{Commit}(\prover:A\in\F^{\B^M},\ \verifier:C_A\in\Handle)\to A_{\mathrm{auth}}\in\Handle}\)
+
+\smallskip
+\begin{enumerate}[leftmargin=0.24in,label=\textbf{R\arabic*.},itemsep=0.06em,topsep=0.06em,parsep=0pt]
+  \item \(\prover\): compute \(\pi_M=\Enc_M(A)\in\F^{\B^{n_M}}\).
+  \item \(\prover\): let \(\pi_{\mathrm{ext}}\) be \(\pi_M\) restricted to
+        \(\B^{n_M}\setminus(0^{n_M-M}\Vert\B^M)\).
+  \item \(\prover\): \(C_{\mathrm{ext}}\gets
+        \mathcal F_{\mathrm{Commit}}.\Com(\pi_{\mathrm{ext}})\).
+  \item \(\prover\to\verifier\): \(C_{\mathrm{ext}}\).
+  \item \(\prover,\verifier\): define \(C_M\) over \(\B^{n_M}\): on
+        \(0^{n_M-M}\Vert a\), open \(C_A\) at \(a\); on
+        \(b\in\B^{n_M}\setminus(0^{n_M-M}\Vert\B^M)\), open
+        \(C_{\mathrm{ext}}\) at \(b\).
+  \item \(\prover,\verifier\): return
+        \(A_{\mathrm{auth}}=(C_M,C_{\mathrm{ext}},M)\).
+\end{enumerate}
+
+\smallskip
+\noindent\(\underline{\Sigma_{\mathrm{RMLE}}.\mathsf{Open}(\prover:A\in\F^{\B^M},\ \verifier:(A_{\mathrm{auth}},r\in\F^M,v\in\F))\to\{0,1\}}\)
+
+\smallskip
+\begin{enumerate}[leftmargin=0.24in,label=\textbf{S\arabic*.},itemsep=0.06em,topsep=0.06em,parsep=0pt]
+  \item \(\prover,\verifier\): run Figure~\ref{fig:protocol-basefold-pcs-eval}
+        in evaluation mode \(\tau=\mathsf{eval}\), using \(A\) as the top
+        message tensor, \(r\) as the evaluation point, \(v\) as the claimed
+        value, and \(C_M\) from \(A_{\mathrm{auth}}\) as the already-bound top
+        codeword handle.
+  \item \(\verifier\): return the result of that BaseFold evaluation protocol.
+\end{enumerate}
+\end{protocolbox}
+
+\begin{protocolbox}{Implementation: \(\MLEAuth\) From Batching And BaseFold/RMLE}{fig:protocol-mle-auth-basefold}
+\scriptsize\raggedright
+\noindent Public parameters: field \(\F\); a maximum backend dimension \(D\);
+an active lane set \(\mathcal L_0\subseteq\B^s\); a coordinate-commitment API
+\(\mathcal F_{\mathrm{Commit}}\); a standard MLE evaluation batching protocol
+\(\Pi_{\mathrm{batch}}\); and the BaseFold-like RMLE subroutine
+\(\Sigma_{\mathrm{RMLE}}\) from Figure~\ref{fig:protocol-rmle-backend}, instantiated
+with \(M=s+D\).
+
+\smallskip
+\noindent For \(h\in\F^{\B^d}\) with \(d\le D\), define the zero-padded tensor
+\(\Pad_{d\to D}(h)\in\F^{\B^D}\) by
+\[
+  \Pad_{d\to D}(h)[a\Vert t]
+  =
+  \begin{cases}
+    h[a], & t=0^{D-d},\\
+    0, & t\ne0^{D-d},
+  \end{cases}
+  \qquad
+  a\in\B^d,\quad t\in\B^{D-d}.
+\]
+Then
+\[
+  \MLE(\Pad_{d\to D}(h))(r\Vert0^{D-d})=\MLE(h)(r).
+\]
+
+\smallskip
+\noindent\(\underline{\MLEAuth.\mathsf{Commit}(\prover:(h_q\in\F^{\B^{d_q}})_{q\in\mathcal L_0},\ \verifier:(d_q,C_q)_{q\in\mathcal L_0})\to A_{\mathrm{auth}}\in\Handle}\)
+
+\smallskip
+\begin{enumerate}[leftmargin=0.24in,label=\textbf{B\arabic*.},itemsep=0.06em,topsep=0.06em,parsep=0pt]
+  \item \(\prover\): for each \(q\in\mathcal L_0\), compute
+        \(\bar h_q\gets\Pad_{d_q\to D}(h_q)\in\F^{\B^D}\).
+  \item \(\prover\): define the packed tensor
+        \(A\in\F^{\B^s\times\B^D}\) by \(A[q,b]=\bar h_q[b]\) for
+        \(q\in\mathcal L_0\), and \(A[q,b]=0\) for padded lanes
+        \(q\in\B^s\setminus\mathcal L_0\).
+  \item \(\prover,\verifier\): construct a packed coordinate handle \(C_A\).
+        For \(q\in\mathcal L_0\) and \(b=a\Vert t\in\B^D\) with
+        \(a\in\B^{d_q}\), opening \(C_A\) at \((q,b)\) routes to
+        \(\mathcal F_{\mathrm{Commit}}.\Open(C_q,a)\) when \(t=0^{D-d_q}\),
+        and returns \(0\) otherwise.  Padded lanes also return \(0\).
+  \item \(\prover,\verifier\): run the commit phase of
+        \(\Sigma_{\mathrm{RMLE}}\) on \((A,C_A)\), receiving backend handle
+        \(A_{\mathrm{auth}}\).
+  \item \(\prover,\verifier\): return \(A_{\mathrm{auth}}\), with \(C_A\) and
+        the public table \((q,d_q,C_q)_{q\in\mathcal L_0}\) attached to it.
+\end{enumerate}
+
+\smallskip
+\noindent\(\underline{\MLEAuth.\mathsf{Open}(\verifier:(A_{\mathrm{auth}},\mathcal E),\ \prover:(h_q)_{q\in\mathcal L_0})\to\{0,1\}}\)
+
+\smallskip
+\noindent Here
+\[
+  \mathcal E=\{(q_i,r_i,v_i)\}_{i=1}^t,
+  \qquad
+  q_i\in\mathcal L_0,\quad r_i\in\F^{d_{q_i}},\quad v_i\in\F.
+\]
+
+\smallskip
+\begin{enumerate}[leftmargin=0.24in,label=\textbf{O\arabic*.},itemsep=0.06em,topsep=0.06em,parsep=0pt]
+  \item \(\prover\): use the packed tensor \(A\) determined by the commit
+        phase from \((h_q)_{q\in\mathcal L_0}\).
+  \item \(\verifier\): translate every request \((q_i,r_i,v_i)\) into the packed
+        request
+        \[
+          \MLE(A)(q_i,r_i\Vert0^{D-d_{q_i}})=v_i .
+        \]
+  \item \(\prover,\verifier\): run \(\Pi_{\mathrm{batch}}\) on the packed
+        requests, reducing them to one RMLE claim
+        \[
+          \MLE(A)(r_{\mathrm{batch}})=v_{\mathrm{batch}}.
+        \]
+  \item \(\prover,\verifier\): run the open/prove phase of
+        \(\Sigma_{\mathrm{RMLE}}\) on
+        \((A_{\mathrm{auth}},C_A,r_{\mathrm{batch}},v_{\mathrm{batch}})\).
+  \item \(\verifier\): return accept iff both
+        \(\Pi_{\mathrm{batch}}\) and \(\Sigma_{\mathrm{RMLE}}\) accept.
+\end{enumerate}
+\end{protocolbox}
+
+This is the paper-faithful abstraction boundary.  Blaze supplies opaque MLIOP
+oracle tensors and later supplies evaluation requests.  The implementation pads
+and packs those oracles so that one BaseFold/RMLE backend instance can bind the
+whole family.  Batching happens before the RMLE opening proof.  No RAA relation
+is injected into BaseFold.
+
 \section{Blaze And Code Switching}
 
 Now return to the PCS goal.  The verifier wants to check a polynomial evaluation
@@ -2175,8 +2456,8 @@ implementation, not part of the claim itself.
 Blaze is a code-switching strategy for making this PCS cheaper.  Instead of
 feeding the full polynomial representation directly into a foldable-code
 backend, Blaze first slices the data, applies a fast linear-time code to each
-slice, and only then switches to the folding backend on the compressed codeword
-later denoted $c_\star$.
+slice, and only then switches to the folding backend on the folded tensor later
+denoted $c_\star$.
 
 For this section, use the Boolean-evaluation representation.  That means the
 prover's representation of $f$ is a tensor whose entries are Boolean-cube
@@ -2228,18 +2509,18 @@ The setup so far gives the prover a Boolean-evaluation matrix
 The verifier's original claim is still the single PCS claim $f(z)=v$, where
 $f=\MLE(y)$ and $z=(z_{\mathrm{row}},z_{\mathrm{col}})$.  Blaze does not want to
 run the expensive foldable-code backend once for every slice $y[h,\ast]$.  The
-goal of this step is to turn the $2^\ell$ codewords $c[h,\ast]$ into the
-randomly compressed codeword $c_\star$, while keeping $c_\star$ tied to the
-original committed matrix $c$.
+goal of this step is to make the prover commit to one folded tensor
+$c_\star$, while keeping every opened value of $c_\star$ tied to the original
+committed matrix $c$.
 
 The move has two parts.  First, each slice $y[h,\ast]$ is encoded by a fast
 linear code $E$ that expands $y[h,\ast]$ into a codeword $c[h,\ast]$ with robust
 local structure.  Second, after the encoded matrix $c$ is committed, the
-verifier samples a random coefficient vector $\rho$, and the protocol collapses
-all codewords $c[h,\ast]$ into the compressed codeword $c_\star$.  So Blaze
-pays the cheap outer encoding cost on all slices $y[h,\ast]$, but it asks the
-foldable-code backend to authenticate $c_\star$ rather than $t$ independent
-codewords.
+verifier samples a random coefficient vector $\rho$, and the protocol defines
+the folded tensor $c_\star$ as the same random linear combination of the
+committed row words $c[h,\ast]$.  So Blaze pays the cheap outer encoding cost
+on all slices $y[h,\ast]$, but it asks the foldable-code backend to authenticate
+one openable tensor $c_\star$ rather than $t$ independent codewords.
 
 Let
 \[
@@ -2300,10 +2581,12 @@ The transcript now defines
   \qquad
   v_\star=\sum_{h\in\B^\ell}\rho_hu_h.
 \]
-The prover may compute $y_\star$ and $c_\star$, but the prover does not send
-either tensor in full.  The verifier computes $v_\star$ as public transcript
-state.  If the backend later needs the symbol $c_\star[b]$, the verifier
-derives $c_\star[b]$ from the opened committed column $c[\ast,b]$:
+The prover may compute \(y_\star\) and a candidate for \(c_\star\), but the
+prover does not send either tensor in full.  The verifier computes \(v_\star\)
+as public transcript state.  The object \(c_\star\) is the virtual tensor bound
+by \(R_{\mathrm{outer}}\) and \(\rho\): if the backend later needs the symbol
+\(c_\star[b]\), the verifier derives it from the opened committed column
+\(c[\ast,b]\):
 \[
   c_\star[b]=\ip{\rho}{c[\ast,b]}.
 \]
@@ -2334,9 +2617,9 @@ objects satisfy the backend equations:
   \qquad
   \MLE(y_\star)(z_{\mathrm{col}})=v_\star.
 \]
-Because $c_\star=E(y_\star)$, the evaluation claim
+Under the same honest-row condition, \(c_\star=E(y_\star)\), so the evaluation claim
 $\MLE(y_\star)(z_{\mathrm{col}})=v_\star$ can also be rewritten as a linear
-claim on the compressed codeword $c_\star$:
+claim on the folded tensor $c_\star$:
 \[
   \sum_{b\in\B^n}W(b)c_\star[b]=v_\star
 \]
@@ -2345,8 +2628,8 @@ the point $z_{\mathrm{col}}$.  The function $W$ is an evaluation procedure, not
 a serialized tensor that the verifier must materialize.  The displayed equation
 is the compressed evaluation claim that the backend must authenticate.
 
-Conceptually, then, Blaze needs to prove two things about the compressed
-codeword $c_\star$:
+Conceptually, then, Blaze needs to prove two things about the openable tensor
+\(c_\star\):
 \begin{enumerate}[label=\textbf{B\arabic*.}]
   \item $c_\star$ is consistent with the fast outer encoding relation
         $c_\star=E(y_\star)$.
@@ -2372,7 +2655,7 @@ Valid codewords have $e_h=0$; invalid codewords have $e_h\ne0$.  The random
 coefficients $\rho_h$ are sampled after the matrix is committed, so the prover
 does not get to choose errors that cancel under this particular linear
 combination.  Except with small probability over $\rho$, the collapsed error
-$\sum_{h\in\B^\ell}\rho_h e_h$ is still nonzero, so the compressed codeword
+$\sum_{h\in\B^\ell}\rho_h e_h$ is still nonzero, so the folded tensor
 $c_\star$ is not a valid encoding of the collapsed closest messages
 $\sum_{h\in\B^\ell}\rho_h y[h,\ast]$.
 
@@ -2391,10 +2674,13 @@ the verifier computes
   c_\star[b]=\ip{\rho}{c[\ast,b]}.
 \]
 Thus the Blaze compression works by combining two facts: the random coefficient
-vector $\rho$ defines the compressed codeword
+vector $\rho$ defines an openable compressed tensor
 $c_\star=\sum_{h\in\B^\ell}\rho_hc[h,\ast]$, and openings of $c[\ast,b]$ let
 the verifier derive every queried symbol $c_\star[b]$ directly from the
-committed matrix $c$.
+committed matrix $c$.  At this point there is no promise that \(c_\star\) is a
+codeword.  It is only a committed, queryable tensor.  The backend relation is
+the mechanism that tests whether this tensor equals \(E(y_\star)\) for the
+folded message \(y_\star\).
 
 This is the useful distributional statement before the backend begins.  The
 matrix $c$ and row-evaluation values $(u_h)_{h\in\B^\ell}$ are fixed before
@@ -2409,7 +2695,7 @@ $e_h=c[h,\ast]-E(y[h,\ast])$ is nonzero, then
 \]
 For fixed nonzero errors $(e_h)_{h\in\B^\ell}$, the probability over the random
 $\rho$ that this collapsed error is exactly zero is small.  Thus a backend proof
-that the compressed codeword $c_\star$ satisfies $c_\star=E(y_\star)$ proves,
+that the already-bound tensor $c_\star$ satisfies $c_\star=E(y_\star)$ proves,
 except for this cancellation probability, that the committed codewords
 $c[h,\ast]$ were valid encodings in the first place.
 
@@ -2421,14 +2707,17 @@ statement being proved.  The public backend request is
   (E,R_\star,z_{\mathrm{col}},v_\star),
 \]
 where $R_\star=\Pi_{\mathrm{rowFoldCommit}}.\mathsf{Commit}(R_{\mathrm{outer}},\rho)$ is
-the virtual commitment handle for the compressed codeword $c_\star$ defined by
+the virtual commitment handle for the folded tensor $c_\star$ defined by
 \[
   c_\star[b]=\ip{\rho}{c[\ast,b]}
   \qquad(b\in\B^n).
 \]
 The prover-held backend witness is the compressed message tensor
-$y_\star\in\F^{\B^k}$.  The mathematical statement is that $c_\star$ is the
-encoding of $y_\star$ under $E$, and that $y_\star$ has the claimed evaluation:
+$y_\star\in\F^{\B^k}$.  The verifier-facing object \(c_\star\) is not assumed to
+be an encoding of anything; it is the tensor opened by \(R_\star\).  The
+mathematical statement to be proved is that this already-bound tensor
+\(c_\star\) is the encoding of \(y_\star\) under \(E\), and that \(y_\star\) has
+the claimed evaluation:
 \[
   c_\star=E(y_\star),
   \qquad
@@ -2444,9 +2733,10 @@ $c[\ast,b]$ committed under $R_{\mathrm{outer}}$:
 \]
 
 This is where the choice of code $E$ begins to matter.  The compression step
-only used linearity of $E$.  The backend also needs concrete ways to check that
-the opened symbols $c_\star[b]$ are consistent with the encoding relation
-$c_\star=E(y_\star)$ and the evaluation relation
+only used linearity of $E$ to define an openable folded tensor.  The backend
+also needs concrete ways to check that the opened symbols \(c_\star[b]\), which
+are fixed by \(R_\star\), are consistent with the encoding relation
+\(c_\star=E(y_\star)\) and the evaluation relation
 $\MLE(y_\star)(z_{\mathrm{col}})=v_\star$.  Blaze chooses RAA for $E$ because
 RAA gives those two relations local algebraic forms: repetition, permutation,
 and accumulator relations for code membership, plus a public linear
@@ -2460,8 +2750,9 @@ slices $y[h,\ast]$.  The concrete Blaze backend instantiates that code with RAA:
 \[
   E=\RAA.
 \]
-This subsection defines one RAA codeword.  Later, the one codeword will be the
-compressed codeword $c_\star$ derived from the outer Blaze commitment.
+This subsection defines the RAA relation for one message.  Later, the tensor
+being tested will be the folded tensor $c_\star$ derived from the outer Blaze
+commitment.
 
 Fix public parameters
 \[
@@ -2519,13 +2810,13 @@ The intermediate tensors are
 \begin{aligned}
   u_1[(a,s)]
     &= y[a],\\
-  u_2[b]
-    &= u_1[\pi_1(b)],\\
+  u_2[\pi_1(b)]
+    &= u_1[b],\\
   u_3[b]
     &= \sum_{q\le b} u_2[q]
      = u_2[b]+u_3[\operatorname{pred}(b)],\\
-  u_4[b]
-    &= u_3[\pi_2(b)],\\
+  u_4[\pi_2(b)]
+    &= u_3[b],\\
   c[b]
     &= \sum_{q\le b} u_4[q]
      = u_4[b]+c[\operatorname{pred}(b)].
@@ -2534,12 +2825,16 @@ The intermediate tensors are
 For the first address, use the boundary convention
 $u_3[\operatorname{pred}(b)]=0$ and $c[\operatorname{pred}(b)]=0$.  The first
 line is the free repetition stage: every message entry appears in one block of
-$r$ binary addresses, one for each suffix $s\in\B^{n-k}$.
+$r$ binary addresses, one for each suffix $s\in\B^{n-k}$.  The permutation
+convention is that \(\pi_i\) sends an input address to its output address:
+equivalently, \(u_2[b]=u_1[\pi_1^{-1}(b)]\) and
+\(u_4[b]=u_3[\pi_2^{-1}(b)]\).
 
 \subsection{The Backend Codeword Question}
 
-The backend does not receive the full compressed codeword $c_\star$.  It only
-receives virtual openings derived from the outer column commitment:
+The backend does not receive a full string and a promise that it is an RAA
+codeword.  It receives a handle for a fixed, queryable tensor \(c_\star\), whose
+openings are derived from the outer column commitment:
 \[
   c_\star[b]=\ip{\rho}{c[\ast,b]}.
 \]
@@ -2554,10 +2849,10 @@ To prove this, the prover supplies backend-owned auxiliary tensors
 \[
   u_2,u_3,u_4\in\F^{\B^n}.
 \]
-The tensor $u_1$ is not committed separately.  It is the implicit unpermutation
-of $u_2$:
+The tensor $u_1$ is not committed separately.  It is recovered virtually from
+the committed \(u_2\) values:
 \[
-  u_1[\pi_1(b)]=u_2[b].
+  u_1[b]=u_2[\pi_1(b)].
 \]
 The intended witness pipeline is
 \[
@@ -2575,9 +2870,9 @@ The following four conditions are exactly what the backend must enforce.
         \]
         Then the condition is
         \[
-          u_2[\pi_1^{-1}(b)]
+          u_2[\pi_1(b)]
           =
-          u_2[\pi_1^{-1}(\mathsf{block}(b))]
+          u_2[\pi_1(\mathsf{block}(b))]
           \qquad(b\in\B^n).
         \]
   \item The tensor $u_3$ is the running sum of $u_2$:
@@ -2587,7 +2882,7 @@ The following four conditions are exactly what the backend must enforce.
         \]
   \item The tensor $u_4$ is the $\pi_2$-permutation of $u_3$:
         \[
-          u_4[b]=u_3[\pi_2(b)]
+          u_4[\pi_2(b)]=u_3[b]
           \qquad(b\in\B^n).
         \]
   \item The tensor $c_\star$ is the running sum of $u_4$:
@@ -2599,7 +2894,7 @@ The following four conditions are exactly what the backend must enforce.
 
 The boundary value for each running-sum equation is zero at the predecessor of
 the first address.  If all four conditions hold, then the values
-$y_\star[a]=u_2[\pi_1^{-1}((a,0^{n-k}))]$ define a tensor
+$y_\star[a]=u_2[\pi_1((a,0^{n-k}))]$ define a tensor
 $y_\star\in\F^{\B^k}$ and the displayed RAA pipeline gives
 $c_\star=\RAA(y_\star)$.
 
@@ -2694,9 +2989,9 @@ The repetition residual is
 \[
   R_{\mathrm{rep}}[b]
   =
-  u_2[\pi_1^{-1}(b)]
+  u_2[\pi_1(b)]
   -
-  u_2[\pi_1^{-1}(\mathsf{block}(b))].
+  u_2[\pi_1(\mathsf{block}(b))].
 \]
 It is zero exactly when the implicit repeated tensor $u_1$ has the same value at
 address $b$ and at the first address of $b$'s repetition block.
@@ -2728,71 +3023,75 @@ one for the zero evaluation.
 \subsubsection{Permutation Product Checks}
 
 The RAA pipeline has two permutation claims.  The first says that $u_2$ is the
-implicit repeated stage $u_1$ read through $\pi_1$:
+implicit repeated stage $u_1$ written at the output address selected by
+\(\pi_1\):
 \[
-  u_1[\pi_1(b)]=u_2[b],
+  u_2[\pi_1(b)]=u_1[b],
 \]
 where $u_1$ is not committed separately.  The second says that $u_4$ is the stage
-$u_3$ read through $\pi_2$:
+\(u_3\) written at the output address selected by \(\pi_2\):
 \[
-  u_4[b]=u_3[\pi_2(b)].
+  u_4[\pi_2(b)]=u_3[b].
 \]
 These are global multiset statements.  The verifier should not sort or scan all
 $N$ addresses.
 
-The standard trick is to attach the index to each value and compress the whole
-indexed multiset into one randomized product.  Suppose two indexed lists over
-$\B^2$ are claimed to be equal after a permutation $\sigma$:
+The standard trick is to attach the output index to each value and compress the
+whole indexed multiset into one randomized product.  Suppose an output tensor
+$y$ is claimed to be an input tensor $x$ permuted by $\sigma$, in the convention
+$y[\sigma(b)]=x[b]$.  Then the two indexed multisets over $\B^2$ are
 \[
-  (x[00],00),(x[01],01),(x[10],10),(x[11],11)
+  (x[00],\sigma(00)),(x[01],\sigma(01)),
+  (x[10],\sigma(10)),(x[11],\sigma(11))
 \]
 and
 \[
-  (y[00],\sigma(00)),(y[01],\sigma(01)),
-  (y[10],\sigma(10)),(y[11],\sigma(11)).
+  (y[00],00),(y[01],01),(y[10],10),(y[11],11).
 \]
-For random challenges $\alpha,\beta\in\F$, and a fixed public embedding
-$\iota:\B^n\to\F$ of binary addresses into the field, compare the products of
+For random challenges $\alpha,\beta\in\F$, and a fixed public address-tag map
+$\Idx:\B^n\to\F$, compare the products of
 the compressed factors
 \[
-  \alpha-(x[b]+\beta\,\iota(b)).
+  \alpha-(x[b]+\beta\,\Idx(\sigma(b)))
+  \qquad\text{and}\qquad
+  \alpha-(y[b]+\beta\,\Idx(b)).
 \]
 If the indexed multisets are equal, the products are equal.  If the indexed
 multisets are different, the two products are different polynomials in
 $\alpha,\beta$, so they agree at random challenges only with small
-Schwartz-Zippel probability.  The $\beta\,\iota(b)$ term is what prevents a
+Schwartz-Zippel probability.  The $\beta\,\Idx(b)$ term is what prevents a
 value from moving to the wrong address without being noticed.
 
 Blaze applies this idea twice:
 \[
-  \{(u_2[b],\pi_1(b))\}_{b\in\B^n}
+  \{(u_1[b],\pi_1(b))\}_{b\in\B^n}
   \stackrel{?}{=}
-  \{(u_1[b],b)\}_{b\in\B^n},
+  \{(u_2[b],b)\}_{b\in\B^n},
 \]
 \[
-  \{(u_4[b],\pi_2(b))\}_{b\in\B^n}
+  \{(u_3[b],\pi_2(b))\}_{b\in\B^n}
   \stackrel{?}{=}
-  \{(u_3[b],b)\}_{b\in\B^n}.
+  \{(u_4[b],b)\}_{b\in\B^n}.
 \]
 The corresponding product leaves are
 \[
-  f_1[b]=\alpha-(u_2[b]+\beta\,\iota(\pi_1(b))),
+  f_1[b]=\alpha-(u_2[\pi_1(b)]+\beta\,\Idx(\pi_1(b))),
 \]
 \[
-  g_1[b]=\alpha-(u_2[\pi_1^{-1}(b)]+\beta\,\iota(b)),
+  g_1[b]=\alpha-(u_2[b]+\beta\,\Idx(b)),
 \]
 \[
-  f_2[b]=\alpha-(u_4[b]+\beta\,\iota(\pi_2(b))),
+  f_2[b]=\alpha-(u_3[b]+\beta\,\Idx(\pi_2(b))),
 \]
 \[
-  g_2[b]=\alpha-(u_3[b]+\beta\,\iota(b)).
+  g_2[b]=\alpha-(u_4[b]+\beta\,\Idx(b)).
 \]
 The $g_1$ formula is the implicit-stage definition
-$u_1[b]=u_2[\pi_1^{-1}(b)]$ written in the form the verifier can open.  There
-is no separate $u_1$ oracle.
+\(u_1[b]=u_2[\pi_1(b)]\) written in the form the verifier can open.  There is
+no separate \(u_1\) oracle.
 
 The verifier still cannot multiply all $N$ leaves directly, so the prover
-commits to product-tree helper oracles for $f_1,g_1,f_2,g_2$.  A product tree
+commits to product-tree helper tensors for $f_1,g_1,f_2,g_2$.  A product tree
 stores the leaves at the bottom, each parent as the product of two children, and
 the final product at the root.  The root equalities are
 \[
@@ -2959,10 +3258,10 @@ component residual and verify the local formula.
   \item \(\prover,\verifier\): if \(\operatorname{role}(b)=\mathsf{leaf}\), set \(a=\operatorname{leaf}(b)\),\\
         \(p\gets\mathcal{F}_{\mathrm{Commit}}.\Open(C_{\mathrm{tree}},(T,\operatorname{leaf}(a)))\).
         \begin{enumerate}[leftmargin=0.22in,label=\textbf{\alph*.},itemsep=0.04em,topsep=0.04em,parsep=0pt]
-          \item \(\prover,\verifier\): if \(T=f_1\), set \(x\gets\mathcal{F}_{\mathrm{Commit}}.\Open(C_{\mathrm{stage}},(2,a))\) and \(v=\alpha-(x+\beta\,\iota(\pi_1(a)))\).
-          \item \(\prover,\verifier\): if \(T=g_1\), set \(x\gets\mathcal{F}_{\mathrm{Commit}}.\Open(C_{\mathrm{stage}},(2,\pi_1^{-1}(a)))\) and \(v=\alpha-(x+\beta\,\iota(a))\).
-          \item \(\prover,\verifier\): if \(T=f_2\), set \(x\gets\mathcal{F}_{\mathrm{Commit}}.\Open(C_{\mathrm{stage}},(4,a))\) and \(v=\alpha-(x+\beta\,\iota(\pi_2(a)))\).
-          \item \(\prover,\verifier\): if \(T=g_2\), set \(x\gets\mathcal{F}_{\mathrm{Commit}}.\Open(C_{\mathrm{stage}},(3,a))\) and \(v=\alpha-(x+\beta\,\iota(a))\).
+          \item \(\prover,\verifier\): if \(T=f_1\), set \(x\gets\mathcal{F}_{\mathrm{Commit}}.\Open(C_{\mathrm{stage}},(2,\pi_1(a)))\) and \(v=\alpha-(x+\beta\,\Idx(\pi_1(a)))\).
+          \item \(\prover,\verifier\): if \(T=g_1\), set \(x\gets\mathcal{F}_{\mathrm{Commit}}.\Open(C_{\mathrm{stage}},(2,a))\) and \(v=\alpha-(x+\beta\,\Idx(a))\).
+          \item \(\prover,\verifier\): if \(T=f_2\), set \(x\gets\mathcal{F}_{\mathrm{Commit}}.\Open(C_{\mathrm{stage}},(3,a))\) and \(v=\alpha-(x+\beta\,\Idx(\pi_2(a)))\).
+          \item \(\prover,\verifier\): if \(T=g_2\), set \(x\gets\mathcal{F}_{\mathrm{Commit}}.\Open(C_{\mathrm{stage}},(4,a))\) and \(v=\alpha-(x+\beta\,\Idx(a))\).
         \end{enumerate}
         \(\verifier\): if \(p=\bot\) or \(x=\bot\), return \(\bot\); otherwise return \(h_T=p-v\).
   \item \(\prover,\verifier\): if \(\operatorname{role}(b)=\mathsf{pad}\), set
@@ -2983,8 +3282,8 @@ component residual and verify the local formula.
   \item \(\prover,\verifier\): \(r_R\gets\mathcal{F}_{\mathrm{Commit}}.\Open(C_{\mathrm{res}},(R,b))\).
   \item \(\verifier\): if \(r_R=\bot\), return \(\bot\).
   \item \(\prover,\verifier\): if \(R=R_{\mathrm{rep}}\), set\\
-        \(x_0\gets\mathcal{F}_{\mathrm{Commit}}.\Open(C_{\mathrm{stage}},(2,\pi_1^{-1}(b)))\),\\
-        \(x_1\gets\mathcal{F}_{\mathrm{Commit}}.\Open(C_{\mathrm{stage}},(2,\pi_1^{-1}(\mathsf{block}(b))))\).\\
+        \(x_0\gets\mathcal{F}_{\mathrm{Commit}}.\Open(C_{\mathrm{stage}},(2,\pi_1(b)))\),\\
+        \(x_1\gets\mathcal{F}_{\mathrm{Commit}}.\Open(C_{\mathrm{stage}},(2,\pi_1(\mathsf{block}(b))))\).\\
         \(\verifier\): if \(x_0=\bot\) or \(x_1=\bot\) or \(r_R\ne x_0-x_1\), return \(\bot\); otherwise return \(r_R\).
   \item \(\prover,\verifier\): if \(R=R_{\mathrm{acc1}}\), set\\
         \(x\gets\mathcal{F}_{\mathrm{Commit}}.\Open(C_{\mathrm{stage}},(3,b))\), \(z\gets\mathcal{F}_{\mathrm{Commit}}.\Open(C_{\mathrm{stage}},(2,b))\),\\
@@ -3015,7 +3314,7 @@ handle opens one RAA lane value.
 
 \begin{protocolbox}{Protocol: RAA Residual Commit Phase}{fig:protocol-raa-residual-commit}
 \scriptsize\raggedright
-\noindent Public parameters: \(K=2^k\), \(N=2^n\), \(N=Kr\), permutations \(\pi_1,\pi_2:\B^n\to\B^n\), embedding \(\iota:\B^n\to\F\), product-tree layout, and \(b_{\mathrm{root},1},b_{\mathrm{root},2}\in\B^n\).
+\noindent Public parameters: \(K=2^k\), \(N=2^n\), \(N=Kr\), permutations \(\pi_1,\pi_2:\B^n\to\B^n\), address-tag map \(\Idx:\B^n\to\F\), product-tree layout, and \(b_{\mathrm{root},1},b_{\mathrm{root},2}\in\B^n\).
 
 \smallskip
 \noindent\(\underline{\mathsf{RAAResidualCommit}(\prover:(u_2,u_3,u_4,c_\star^{\mathrm{wit}}\in\F^{\B^n}),\ \verifier:R_\star:\Handle)\to(C_{\mathrm{raa}}:\Handle,\alpha,\beta,\gamma,\eta)}\)
@@ -3023,18 +3322,18 @@ handle opens one RAA lane value.
 \smallskip
 \begin{enumerate}[leftmargin=0.24in,label=\textbf{C\arabic*.},itemsep=0.06em,topsep=0.06em,parsep=0pt]
   \item \(\prover\): \(C_{\mathrm{stage}}\gets
-        \mathcal{F}_{\mathrm{Commit}}.\Com((u_2,u_3,u_4)\in(\F^{\B^n})^{\{2,3,4\}})\).\\
+        \mathcal{F}_{\mathrm{Commit}}.\Com((u_2,u_3,u_4))\).\\
         \(\prover\to\verifier\): \(C_{\mathrm{stage}}\).
   \item \(\verifier\): \(\alpha,\beta\leftarrow\F\).\\
         \(\verifier\to\prover\): \(\alpha,\beta\).
   \item \(\prover\): for \(b\in\B^n\),
         \[
-          f_1[b]\gets\alpha-(u_2[b]+\beta\,\iota(\pi_1(b))),\quad
-          g_1[b]\gets\alpha-(u_2[\pi_1^{-1}(b)]+\beta\,\iota(b)),
+          f_1[b]\gets\alpha-(u_2[\pi_1(b)]+\beta\,\Idx(\pi_1(b))),\quad
+          g_1[b]\gets\alpha-(u_2[b]+\beta\,\Idx(b)),
         \]
         \[
-          f_2[b]\gets\alpha-(u_4[b]+\beta\,\iota(\pi_2(b))),\quad
-          g_2[b]\gets\alpha-(u_3[b]+\beta\,\iota(b)).
+          f_2[b]\gets\alpha-(u_3[b]+\beta\,\Idx(\pi_2(b))),\quad
+          g_2[b]\gets\alpha-(u_4[b]+\beta\,\Idx(b)).
         \]
   \item \(\prover\): \(C_{\mathrm{tree}}\gets
         \mathcal{F}_{\mathrm{Commit}}.\Com((\PT(f_1),\PT(g_1),\PT(f_2),\PT(g_2)))\).\\
@@ -3057,7 +3356,7 @@ handle opens one RAA lane value.
         \]
   \item \(\prover\): for \(b\in\B^n\),
         \[
-          R_{\mathrm{rep}}[b]\gets u_2[\pi_1^{-1}(b)]-u_2[\pi_1^{-1}(\mathsf{block}(b))],
+          R_{\mathrm{rep}}[b]\gets u_2[\pi_1(b)]-u_2[\pi_1(\mathsf{block}(b))],
         \]
         \[
           R_{\mathrm{acc1}}[b]\gets u_3[b]-u_3^{-}[b]-u_2[b],\quad
@@ -3198,7 +3497,7 @@ repetition block:
   =
   \begin{cases}
     \mu_{z_{\mathrm{col}}}[a],
-      &\text{if }\pi_1(b)=(a,s)\text{ and }b\text{ is the first such address},\\
+      &\text{if }b=\pi_1((a,0^{n-k})),\\
     0,&\text{otherwise,}
   \end{cases}
 \]
@@ -3207,27 +3506,25 @@ the codeword side:
 \[
   w^{(3)}[b]=w^{(2)}[b]+
   \begin{cases}
-    w^{(2)}[\operatorname{succ}(b)],&\text{if }b\text{ is not the last address},\\
+    -\,w^{(2)}[\operatorname{succ}(b)],&\text{if }b\text{ is not the last address},\\
     0,&\text{if }b\text{ is the last address},
   \end{cases}
 \]
 \[
-  w^{(4)}[b]=w^{(3)}[\pi_2(b)],
+  w^{(4)}[\pi_2(b)]=w^{(3)}[b],
 \]
 \[
   W(b)=w^{(4)}[b]+
   \begin{cases}
-    w^{(4)}[\operatorname{succ}(b)],&\text{if }b\text{ is not the last address},\\
+    -\,w^{(4)}[\operatorname{succ}(b)],&\text{if }b\text{ is not the last address},\\
     0,&\text{if }b\text{ is the last address}.
   \end{cases}
 \]
 Then \(\sum_{b\in\B^n}W(b)c_\star[b]=\MLE(y_\star)(z_{\mathrm{col}})\).
 
-This displayed recurrence is the target binary-field form.  In a general field,
-the adjoint of a prefix-sum map is written with subtraction signs in the
-corresponding finite-difference steps.  Since the target suite has
-characteristic two, subtraction and addition are the same operation, so the
-implementation recurrence uses the plus signs shown above.
+This displayed recurrence is the general-field form: the inverse of the
+prefix-sum adjoint is a finite difference, hence the subtraction signs.  In
+characteristic two, these subtractions are additions in the implementation.
 
 \subsection{The Backend Sumcheck}
 
@@ -3435,14 +3732,14 @@ openings.
 
 \subsection{The Full Blaze Protocol}
 
-Blaze is the polynomial commitment scheme.  In this interactive presentation the
-public API has two calls:
+Blaze is the PCS layer for MLE claims over committed tensors.  In this
+interactive presentation the public API has two calls:
 \[
-  C_f\gets\mathsf{Blaze.Commit}(f),
+  C_y\gets\mathsf{Blaze.Commit}(y),
   \qquad
-  \mathsf{Blaze.Open}(f;C_f,z,v)\in\{0,1\}.
+  \mathsf{Blaze.Open}(y;C_y,z,v)\in\{0,1\}.
 \]
-The committed polynomial is represented by a tensor
+The committed object is a tensor
 $y\in\F^{\B^\ell\times\B^k}$ with $L=2^\ell$ row slices and $K=2^k$ entries per
 slice.  The evaluation point is
 $z=(z_{\mathrm{row}},z_{\mathrm{col}})\in\F^\ell\times\F^k$, and the claim is
@@ -3460,23 +3757,23 @@ codewords.
 
 \begin{protocolbox}{Protocol: \(\mathsf{Blaze}\), PCS Commit And Open}{fig:protocol-blaze}
 \scriptsize\raggedright
-\noindent Public parameters: field \(\F\); sizes \(L=2^\ell\), \(K=2^k\), \(N=2^n\); RAA code \(\RAA:\F^{\B^k}\to\F^{\B^n}\) with repetition \(r\) and permutations \(\pi_1,\pi_2:\B^n\to\B^n\); and BaseFold backend parameters.  The prover represents \(f\) as \(y\in\F^{\B^\ell\times\B^k}\).  In the open call, the verifier has \(C_f\), \(z=(z_{\mathrm{row}},z_{\mathrm{col}})\in\F^\ell\times\F^k\), and \(v\in\F\).
+\noindent Public parameters: field \(\F\); sizes \(L=2^\ell\), \(K=2^k\), \(N=2^n\); RAA code \(\RAA:\F^{\B^k}\to\F^{\B^n}\) with repetition \(r\) and permutations \(\pi_1,\pi_2:\B^n\to\B^n\); and BaseFold backend parameters.  The prover holds \(y\in\F^{\B^\ell\times\B^k}\).  In the open call, the verifier has \(C_y\), \(z=(z_{\mathrm{row}},z_{\mathrm{col}})\in\F^\ell\times\F^k\), and \(v\in\F\).
 
 \medskip
-\noindent\(\underline{\mathsf{Blaze.Commit}(\prover:f:\F^{\ell+k}\to\F,\ \verifier:\bot)\to C_f:\Handle}\)
+\noindent\(\underline{\mathsf{Blaze.Commit}(\prover:y\in\F^{\B^\ell\times\B^k},\ \verifier:\bot)\to C_y:\Handle}\)
 
 \smallskip
 \begin{enumerate}[leftmargin=0.24in,label=\textbf{C\arabic*.},itemsep=0.08em,topsep=0.1em,parsep=0pt]
   \item \(\prover\): for \(h\in\B^\ell\), let \(c[h,\ast]=\RAA(y[h,\ast])\in\F^{\B^n}\).
   \item \(\prover\): for \(b\in\B^n\), let \(C_{\mathrm{outer}}[b]=c[\ast,b]\in\F^{\B^\ell}\).
-  \item \(\prover\): let \(R_{\mathrm{outer}}\gets\mathcal{F}_{\mathrm{Commit}}.\Com(C_{\mathrm{outer}}\in(\F^{\B^\ell})^{\B^n})\).
+  \item \(\prover\): let \(R_{\mathrm{outer}}\gets\mathcal{F}_{\mathrm{Commit}}.\Com(C_{\mathrm{outer}})\).
   \item \(\prover\to\verifier\): \(R_{\mathrm{outer}}\).
-  \item \(\verifier\): let \(C_f=R_{\mathrm{outer}}\).\\
-        \(\verifier\): return \(C_f\).
+  \item \(\verifier\): let \(C_y=R_{\mathrm{outer}}\).\\
+        \(\verifier\): return \(C_y\).
 \end{enumerate}
 
 \smallskip
-\noindent\(\underline{\mathsf{Blaze.Open}(\prover:f:\F^{\ell+k}\to\F,\ \verifier:(C_f:\Handle,\ z\in\F^\ell\times\F^k,\ v\in\F))\to\{0,1\}}\)
+\noindent\(\underline{\mathsf{Blaze.Open}(\prover:y\in\F^{\B^\ell\times\B^k},\ \verifier:(C_y:\Handle,\ z\in\F^\ell\times\F^k,\ v\in\F))\to\{0,1\}}\)
 
 \smallskip
 \begin{enumerate}[leftmargin=0.24in,label=\textbf{O\arabic*.},itemsep=0.08em,topsep=0.1em,parsep=0pt]
@@ -3485,7 +3782,7 @@ codewords.
   \item \(\verifier\): if \(v\ne\sum_{h\in\B^\ell}\chi_h(z_{\mathrm{row}})u[h]\), return reject.
   \item \(\verifier\): sample \(\rho\leftarrow\F^{\B^\ell}\).\\
         \(\verifier\to\prover\): \(\rho\).
-  \item \(\prover,\verifier\): let \(R_\star\gets\Pi_{\mathrm{rowFoldCommit}}.\mathsf{Commit}(C_f,\rho)\) as in Figure~\ref{fig:protocol-row-fold-commit}.\\
+  \item \(\prover,\verifier\): let \(R_\star\gets\Pi_{\mathrm{rowFoldCommit}}.\mathsf{Commit}(C_y,\rho)\) as in Figure~\ref{fig:protocol-row-fold-commit}.\\
         \(\prover,\verifier\): let \(v_\star=\ip{\rho}{u}\).
   \item \(\prover\): for \(a\in\B^k\), let \(y_\star[a]=\sum_{h\in\B^\ell}\rho[h]y[h,a]\).
   \item \(\prover,\verifier\): let \(c_\star\in\F^{\B^n}\) denote the logical tensor bound by \(R_\star\), so \(\mathcal{F}_{\mathrm{Commit}}.\Open(R_\star,b)=c_\star[b]\) for every accepted opening.
@@ -3560,7 +3857,7 @@ codewords.
   \Enc_{\mathrm{BF}}^{(s)}:\F^{\B^{k-s}}\to\F^{\B^{n-s}}
   \qquad(s\in[0,k]),
 \]
-where \(\Enc_{\mathrm{BF}}^{(s)}(A)[0^{n-k}\Vert a]=A[a]\) for every \(A\in\F^{\B^{k-s}}\) and \(a\in\B^{k-s}\); the BaseFold instance folds the last coordinate each round; code-folding rules \(\CodeFold_s\); weight-folding rules \(\mathsf{FoldWeight}_s\); path-check query count \(Q_{\mathrm{path}}\); path-check predicates \(P_{s,\mathrm{path}}:\F^3\to\F\) for \(s\in[0,k-1]\); residual lane \(q_{\mathrm{res}}\in\mathcal L\); residual query count \(Q_{\mathrm{res}}\); and the commitment API.  In the commit call, the verifier has \(C_A:\Handle\) for the message tensors.  In the open call, the verifier has \(C_{\mathrm{code}}:\Handle\), weight functions \(W_q:\B^k\to\F\) for \(q\in\mathcal L\), and \(S\in\F\).
+where \(\Enc_{\mathrm{BF}}^{(s)}(A)[0^{n-k}\Vert a]=A[a]\) for every \(A\in\F^{\B^{k-s}}\) and \(a\in\B^{k-s}\); the BaseFold instance folds the last coordinate each round; code-folding rules \(\CodeFold_s\); weight-folding rules \(\mathsf{FoldWeight}_s\); path-check query count \(Q_{\mathrm{path}}\); path-check predicates \(P_{s,\mathrm{path}}:\F^3\to\F\) for \(s\in[0,k-1]\); residual lane \(q_{\mathrm{res}}\in\mathcal L\); residual query count \(Q_{\mathrm{res}}\); and the commitment API.  In the commit call, the verifier has \(C_A:\Handle\) exposing the message tensors on the systematic address set \(\{(q,0^{n-k}\Vert a):q\in\mathcal L,\ a\in\B^k\}\), with value \(A_q[a]\) at address \((q,0^{n-k}\Vert a)\).  In the open call, the verifier has \(C_{\mathrm{code}}:\Handle\), weight functions \(W_q:\B^k\to\F\) for \(q\in\mathcal L\), and \(S\in\F\).
 
 \medskip
 \noindent\(\underline{\mathsf{BaseFold.Commit}(\prover:(A_q\in\F^{\B^k})_{q\in\mathcal L},\ \verifier:C_A:\Handle)\to C_{\mathrm{code}}:\Handle}\)
@@ -3571,7 +3868,13 @@ where \(\Enc_{\mathrm{BF}}^{(s)}(A)[0^{n-k}\Vert a]=A[a]\) for every \(A\in\F^{\
   \item \(\prover\): let \(y_{\mathrm{ext}}=(y_q[b])_{q\in\mathcal L,\ b\in\B^n\setminus(0^{n-k}\Vert\B^k)}\).
   \item \(\prover\): let \(C_{\mathrm{ext}}\gets\mathcal{F}_{\mathrm{Commit}}.\Com(y_{\mathrm{ext}})\).
   \item \(\prover\to\verifier\): \(C_{\mathrm{ext}}\).
-  \item \(\prover,\verifier\): let \(C_{\mathrm{code}}=\mathsf{CompositeCommit}(C_A,C_{\mathrm{ext}})\).
+  \item \(\prover,\verifier\): let
+        \(D_{\mathrm{sys}}=\{(q,0^{n-k}\Vert a):q\in\mathcal L,\ a\in\B^k\}\)
+        and
+        \(D_{\mathrm{ext}}=\mathcal L\times(\B^n\setminus\bits_n([0,2^k-1]))\).
+  \item \(\prover,\verifier\): let
+        \(C_{\mathrm{code}}=\mathsf{CompositeCommit}
+        ((C_A,D_{\mathrm{sys}}),(C_{\mathrm{ext}},D_{\mathrm{ext}}))\).
   \item \(\prover,\verifier\): return \(C_{\mathrm{code}}\).
 \end{enumerate}
 
@@ -3831,12 +4134,11 @@ It is helpful to think of the protocol as five layers stacked together:
   \item \textbf{Encoding layer.}  RAA turns each row into a longer
         codeword with useful local checks.
   \item \textbf{Commitment layer.}  Blaze commits to interleaved columns so a
-        compressed codeword $c_\star$ can be opened one column at a time.
+        folded tensor $c_\star$ can be opened one column at a time.
   \item \textbf{Algebraic-check layer.}  Sumcheck, residuals, and product trees
         turn global correctness into random low-degree and local equations.
-  \item \textbf{Authentication layer.}  Holographic systematic BaseFold binds
-        terminal claims to externally authenticated input values and backend
-        proof oracles through one shared fold spine.
+  \item \textbf{Authentication layer.}  BaseFold binds terminal claims to
+        authenticated tensor openings through one shared fold spine.
 \end{enumerate}
 
 The protocol is efficient because each layer is careful about ownership.  The
@@ -3845,10 +4147,1239 @@ commitment.  The backend owns auxiliary and proof oracles.  The shared fold
 spine owns the terminal binding.  No layer pays again for an object already
 authenticated by another layer.
 
+\section{Blaze: Paper-Faithful Reconstruction}
+
+This section gives the Blaze paper's MLIOP for the row-code relation
+\(\mathrm{RMLE}[\RAA]\), compiled into authenticated oracle access.  The boxes
+below follow the requirements in
+\texttt{docs/blaze\_protocol\_box\_requirements.md}: public parameters are fixed
+before the run, each runtime object appears in a signature, each verifier
+challenge is sent before use, and each oracle evaluation becomes an explicit
+authenticated request.
+
+\subsection{What RAA Is Doing}
+
+RAA is the fast row code used by Blaze.  Fix \(n>k\), let
+\(K=2^k\), \(N=2^n\), and let \(r=N/K=2^{n-k}\).  The public code also fixes
+two permutations
+\[
+  \pi_1,\pi_2:\B^n\to\B^n.
+\]
+With these parameters, RAA is a linear map
+\[
+  \RAA:\F^{\B^k}\to\F^{\B^n},
+  \qquad K<N.
+\]
+Given a row message \(m\in\F^{\B^k}\), write an address in \(\B^n\) as
+\((a,s)\in\B^k\times\B^{n-k}\).  The codeword
+\(\RAA(m)\in\F^{\B^n}\) is the final tensor \(u_5\) produced by the following
+five stage tensors:
+\[
+  \begin{aligned}
+    u_1[a,s] &:= m[a],
+      && a\in\B^k,\ s\in\B^{n-k},\\
+    u_2[\pi_1(b)] &:= u_1[b],
+      && b\in\B^n,\\
+    u_3[b] &:= \sum_{x\le b}u_2[x],
+      && b\in\B^n,\\
+    u_4[\pi_2(b)] &:= u_3[b],
+      && b\in\B^n,\\
+    u_5[b] &:= \sum_{x\le b}u_4[x],
+      && b\in\B^n.
+  \end{aligned}
+\]
+Here \(x\le b\) means the natural binary serialization order on \(\B^n\).  The
+second and fourth lines define the permutation convention used below:
+equivalently, \(u_2[b]=u_1[\pi_1^{-1}(b)]\) and
+\(u_4[b]=u_3[\pi_2^{-1}(b)]\).  Finally,
+\[
+  \RAA(m):=u_5.
+\]
+Thus RAA is exactly repeat, permute, accumulate, permute, accumulate.  The
+repetition step copies each message coordinate \(r\) times, a permutation step
+only reorders coordinates, and an accumulation step replaces a tensor by its
+running prefix sums in the natural binary order.
+
+This stage view is the reason RAA is useful in the proof.  The verifier will not
+recompute all of \(\RAA(m)\).  Instead, the prover names the intermediate
+tensors \(u_1,u_2,u_3,u_4\), and the protocol checks that the adjacent stages
+fit together.  If the stages fit together, then the final tensor is an RAA
+encoding of the message.  The rest of this section explains how Blaze turns
+those large stage relations into a small number of authenticated evaluation
+claims.
+
+\subsection{Claims, Invariants, And Extraction}
+
+The easiest way to read this construction is claim-first.  At every point we
+should know the claim currently being proved, what invariant the protocol has
+established, and what remains for the next layer.
+
+The starting PCS claim is
+\[
+  \MLE(m)(z_{\mathrm{row}},z_{\mathrm{col}})=v,
+  \qquad
+  m\in\F^{\B^\ell\times\B^k}.
+\]
+Here \(m\) is the prover-held witness tensor.  The verifier knows the
+commitment handle \(C_m\), the point
+\(z=(z_{\mathrm{row}},z_{\mathrm{col}})\), and the target value \(v\).  The
+first goal is to reduce this two-block claim to one claim about one folded row.
+
+The prover sends row values
+\[
+  u[h]=\MLE(m[h,\ast])(z_{\mathrm{col}})
+  \qquad(h\in\B^\ell).
+\]
+The verifier checks
+\[
+  v=\sum_{h\in\B^\ell}\chi_h(z_{\mathrm{row}})u[h].
+\]
+This check says: if the row values \(u[h]\) are correct, then the original
+claim is correct.  What remains is to prove that the row values really came from
+row messages that are consistent with the committed row encodings.
+
+The verifier then samples \(\rho\in\F^{\B^\ell}\).  This defines
+\[
+  m_\star=\sum_{h\in\B^\ell}\rho[h]m[h,\ast],
+  \qquad
+  v_\star=\sum_{h\in\B^\ell}\rho[h]u[h],
+\]
+so the row-value claims collapse to
+\[
+  \MLE(m_\star)(z_{\mathrm{col}})=v_\star.
+\]
+The same \(\rho\) also folds the committed row words into a virtual tensor
+\[
+  c_\star=\sum_{h\in\B^\ell}\rho[h]c[h,\ast].
+\]
+The invariant after this step is:
+\[
+  \text{if every row satisfies }c[h,\ast]=\RAA(m[h,\ast]),
+  \text{ then }c_\star=\RAA(m_\star).
+\]
+Thus the remaining backend claim is
+\[
+  c_\star=\RAA(m_\star)
+  \qquad\text{and}\qquad
+  \MLE(m_\star)(z_{\mathrm{col}})=v_\star.
+\]
+This is the ideal relation the backend tries to enforce, not a promise about
+the committed tensor.  After the row fold, the verifier has made the prover
+commit to the tensor \(c_\star\) through the virtual handle \(R_\star\), and the
+verifier may ask for \(c_\star[b]\) at any backend coordinate \(b\in\B^n\).  The
+soundness statement still has proximity slack: an accepting transcript extracts
+a nearby tensor that satisfies the RAA relation, rather than proving that the
+verifier-facing \(c_\star\) equals \(\RAA(m_\star)\) at every coordinate.
+This is the core compression move.  We do not want to prove one RAA statement
+per row.  The random row fold gives one representative RAA statement.  If the
+prover tries to hide inconsistent rows, the random linear combination carries
+that inconsistency into the folded object except with small probability over
+\(\rho\).
+
+The RAA target relation is still too large to check directly.  The MLIOP layer
+expands the target relation \(c_\star=\RAA(m_\star)\) into the stage tensors
+\[
+  u_1,u_2,u_3,u_4,u_5\in\F^{\B^n},
+  \qquad u_5=c_\star,
+\]
+and then processes each component relation separately.  The accumulator relation
+\(u_3=\mathsf{Acc}(u_2)\), for example, becomes one Boolean-sum identity whose
+terms mention MLE values of \(u_2\) and \(u_3\).  The second accumulator relation
+\(c_\star=\mathsf{Acc}(u_4)\) becomes the same kind of Boolean-sum identity,
+but now one of the mentioned tensors is the virtual tensor \(c_\star\).  The
+permutation relations \(u_2=\Pi_1u_1\) and \(u_4=\Pi_2u_3\) first become
+grand-product statements, and the product-tree tensors
+\(f_1,g_1,f_2,g_2\) turn those products into local parent-child equations.
+
+Each of these component checks still starts life as a large identity over
+\(\B^n\).  Sumcheck compresses such an identity to a random endpoint: instead
+of checking every Boolean address, the verifier is left with a small collection
+of claimed MLE values at points chosen during the protocol.  These claims are
+not new algebraic objects; they are requests to authenticate already named
+tensors.  Concretely, after the MLIOP and sumcheck steps, the compiler sees a
+list of triples
+\[
+  (H,r_H,v_H)
+\]
+meaning ``the tensor named \(H\) should satisfy \(\MLE(H)(r_H)=v_H\).''  The
+tensor \(H\) may be physically committed by the backend, such as \(u_2\) or
+\(f_1\), or virtually committed, such as \(c_\star\).  The possible tensor names
+are
+\[
+  H\in\{m_\star,u_2,u_3,u_4,c_\star,f_1,g_1,f_2,g_2\}.
+\]
+
+We will first describe the unoptimized version, because it is easier to audit:
+authenticate each request in this list separately.  In that presentation, Blaze
+asks the BaseFold backend to authenticate one evaluation task for each request:
+\[
+  (C_H,H,r_H,v_H)
+\]
+Here \(C_H\) is the commitment/opening handle for the tensor named \(H\).  The
+handle may have many forms.  Some handles are physical commitments to auxiliary
+tensors introduced by the RAA/MLIOP layer, such as \(u_2\) or \(f_1\).  Other
+handles are virtual.  For \(c_\star\), openings route to the row-fold handle
+\(R_\star\), which derives \(c_\star[b]\) from the committed outer column
+\(c[\ast,b]\).  BaseFold does not need to know which kind of handle it received;
+it only uses \(C_H\) to authenticate claimed values of \(H\).
+
+The optimized Blaze protocol then reuses the same random linear folding
+operation that formed \(c_\star\).  After all requested tensors are bound, the
+verifier samples fresh coefficients and folds the whole list of triples
+\((H,r_H,v_H)\) into one BaseFold evaluation claim over a virtual committed
+tensor.  This is the same operation: commit first, randomize second, and make
+errors survive the random linear combination except with small probability.  In
+the optimized protocol there is therefore one BaseFold claim and one BaseFold
+IOPP execution, although opening the virtual committed tensor may fan out to
+openings of the underlying tensors \(H\).
+
+The proximity and minimum-distance story is easiest to read in the unbatched
+view.  A few opened values do not by themselves prove that a committed word is a
+valid encoding.  BaseFold's folding/proximity analysis says that, if the prover
+passes, then the committed encoded oracle for each requested tensor \(H\) is
+close to a valid compiler-codeword, except with the protocol's soundness error.
+Minimum distance is what makes this useful: within the relevant radius, a nearby
+valid codeword determines a well-defined underlying tensor \(H\), or at least a
+small controlled list of candidates in the list-decoding regime.  The extracted
+tensor is the message whose compiler encoding is that nearby valid codeword.
+This does not mean the received word itself is error-free.  The optimized
+version preserves the same logic after randomly folding the requests into one
+virtual backend claim.
+
+In the ideal commitment model used by this explainer, the extractor can inspect
+the committed oracle strings.  Its job after an accepting transcript is:
+\[
+  \text{committed encoded word}
+  \;\longmapsto\;
+  \text{nearby valid compiler-codeword}
+  \;\longmapsto\;
+  \text{message tensor }H.
+\]
+For \(c_\star\), the extractor also sees the outer committed matrix \(c\) and
+the row-fold challenge \(\rho\).  The virtual folded word is
+\[
+  c_\star[b]=\sum_{h\in\B^\ell}\rho[h]c[h,b].
+\]
+BaseFold's role is to make the committed compiler-codeword close to an encoding
+whose message tensor is close to this virtual folded word, while the opening
+handle \(R_\star\) authenticates the queried values of \(c_\star\).
+
+Once the tensors are extracted, the rest of the argument is algebraic.  The
+authenticated evaluation claims make the checks in the MLIOP meaningful.
+Sumcheck soundness says the checked Boolean-sum identities hold for the
+extracted tensors, except with small probability.  If
+\(c_\star^{\mathrm{ext}}\) denotes the tensor extracted for the \(c_\star\)
+handle, then the RAA algebra gives
+\[
+  c_\star^{\mathrm{ext}}=\RAA(m_\star)
+  \qquad\text{and}\qquad
+  \MLE(m_\star)(z_{\mathrm{col}})=v_\star.
+\]
+The verifier-facing virtual tensor \(c_\star\) is only guaranteed to be close to
+this extracted tensor, with the queried values authenticated through
+\(R_\star\).  Finally, the row-folding step links the extracted folded statement
+back to the original claim \(\MLE(m)(z_{\mathrm{row}},z_{\mathrm{col}})=v\),
+up to the same proximity and batching soundness errors.
+
+\subsection{How Tensor Checks Compose}
+
+Before instantiating the RAA stages, it is useful to isolate the generic shape
+of the checks.  The protocol repeatedly starts with a relation between large
+tensors and turns it into a small list of authenticated MLE evaluations.  The
+specific relation changes from stage to stage, but the checking pattern is the
+same.
+
+Suppose the protocol has named tensors
+\[
+  H_j\in\F^{\B^{d_j}}
+  \qquad(j\in J),
+\]
+each with some commitment/opening handle.  A large relation is expressed by a
+residual tensor
+\[
+  R\in\F^{\B^s}.
+\]
+The relation is true when
+\[
+  R[a]=0
+  \qquad(a\in\B^s).
+\]
+Each residual coordinate is a public low-degree expression in MLE evaluations
+of the named tensors.  Abstractly, for \(a\in\B^s\),
+\[
+  R[a]
+  =
+  \Phi_a\Bigl(
+    \MLE(H_{j_1})(\psi_1(a)),
+    \ldots,
+    \MLE(H_{j_m})(\psi_m(a))
+  \Bigr),
+\]
+where the address maps
+\[
+  \psi_t:\B^s\to\F^{d_{j_t}}
+\]
+and the expression \(\Phi_a\) are public.  The expression
+\(\Phi_a:\F^m\to\F\) is low degree in its \(m\) input values.  The subscript
+\(a\) means that its coefficients may depend on the residual coordinate, but
+that dependence is also public.
+
+For sumcheck, the Boolean description must come with low-degree extensions.
+For each address map we write
+\[
+  \widehat\psi_t:\F^s\to\F^{d_{j_t}},
+  \qquad
+  \widehat\psi_t(a)=\psi_t(a)\quad(a\in\B^s).
+\]
+Likewise, the family \((\Phi_a)_{a\in\B^s}\) must be represented by a public
+low-degree expression \(\widehat\Phi_X\) in both the field point \(X\in\F^s\)
+and the \(m\) tensor values, with
+\(\widehat\Phi_a=\Phi_a\) on Boolean \(a\).  Then the sumcheck polynomial is the
+low-degree extension of the residual:
+\[
+  \widehat R(X)
+  =
+  \widehat\Phi_X\Bigl(
+    \MLE(H_{j_1})(\widehat\psi_1(X)),
+    \ldots,
+    \MLE(H_{j_m})(\widehat\psi_m(X))
+  \Bigr).
+\]
+This is only a template: it says what information a check is allowed to use,
+and what low-degree structure it must expose, not which RAA stage is being
+checked.
+
+The verifier does not read all of \(R\).  Instead it samples a point
+\(r\in\F^s\) and projects the zero claim to one scalar equation:
+\[
+  \sum_{a\in\B^s}\chi_a(r)R[a]=0.
+\]
+If \(R\) is not the zero tensor, then this projected equation fails with high
+probability over \(r\).  When the projected sum is still too large to evaluate
+directly, the prover and verifier run sumcheck on this scalar claim.  Sumcheck
+does not authenticate any tensor by itself; it only reduces the projected
+identity to endpoint claims of the form
+\[
+  \MLE(H_j)(r_j)=v_j.
+\]
+
+Those endpoint claims are the handoff to BaseFold.  The algebraic check has
+identified which tensor values must be true; BaseFold authenticates those values
+against the corresponding handles.  Thus the general pipeline is
+\[
+  \begin{aligned}
+    \text{tensor relation}
+    &\longrightarrow
+    \text{residual zero claim}
+    \longrightarrow
+    \text{random projection} \\
+    &\longrightarrow
+    \text{sumcheck endpoints}
+    \longrightarrow
+    \text{BaseFold authentication}.
+  \end{aligned}
+\]
+
+A useful toy example is a pointwise product relation.  Suppose the named tensors
+are
+\[
+  A,B,C\in\F^{\B^s},
+\]
+and the intended relation is
+\[
+  C[a]=A[a]B[a]
+  \qquad(a\in\B^s).
+\]
+The residual tensor is
+\[
+  R[a]=C[a]-A[a]B[a].
+\]
+This exactly fits the template.  The three address maps are all the identity
+map:
+\[
+  \psi_C(a)=\psi_A(a)=\psi_B(a)=a,
+  \qquad
+  \widehat\psi_C(X)=\widehat\psi_A(X)=\widehat\psi_B(X)=X.
+\]
+The low-degree expression is independent of \(a\):
+\[
+  \Phi(X_C,X_A,X_B)=X_C-X_AX_B,
+  \qquad
+  \widehat\Phi_X=\Phi.
+\]
+Thus
+\[
+  \widehat R(X)
+  =
+  \MLE(C)(X)-\MLE(A)(X)\MLE(B)(X).
+\]
+The verifier samples \(r\in\F^s\) and asks for the projected zero claim
+\[
+  \sum_{a\in\B^s}\chi_a(r)\bigl(C[a]-A[a]B[a]\bigr)=0.
+\]
+The residual values \(R[a]\) were fixed before \(r\) was sampled; only the
+weights \(\chi_a(r)\) depend on \(r\).
+
+Now suppose a cheating prover has made the tensors inconsistent at some
+coordinate \(a_0\), so
+\[
+  e:=C[a_0]-A[a_0]B[a_0]\ne0.
+\]
+If this is the only bad coordinate, then the projected sum is
+\[
+  e\,\chi_{a_0}(r),
+\]
+where
+\[
+  \chi_{a_0}(r)
+  =
+  \prod_{j:a_{0,j}=0}(1-r_j)
+  \prod_{j:a_{0,j}=1}r_j.
+\]
+This value is zero exactly when at least one factor is zero, namely when
+\(r_j=1\) for some coordinate with \(a_{0,j}=0\), or \(r_j=0\) for some
+coordinate with \(a_{0,j}=1\).  For uniformly sampled \(r\in\F^s\), this
+happens with probability at most \(s/|\F|\).  More generally, if the prover
+cheats at many coordinates, the projected sum is \(\MLE(R)(r)\).  As long as
+\(R\) is not the zero tensor, this is a nonzero multilinear polynomial of total
+degree at most \(s\), so by Schwartz--Zippel a random \(r\) misses the
+inconsistency with probability at most \(s/|\F|\).  Sumcheck is what lets the
+verifier test this projected claim without reading all of \(A,B,C\); BaseFold
+is what authenticates the endpoint values that sumcheck asks for.
+
+The next subsections instantiate this template for the stages needed by RAA.
+
+\subsection{Typed Objects}
+
+Fix \(\ell,k,n\in\mathbb N\), \(L=2^\ell\), \(K=2^k\),
+\(N=2^n\), and \(r=N/K\in\mathbb N\).
+The original PCS witness is represented as a tensor
+\(m\in\F^{\B^\ell\times\B^k}\).  The first coordinate \(h\in\B^\ell\) selects a
+row and the second coordinate \(a\in\B^k\) selects a coordinate inside that row.
+The original claim point is
+\[
+  z=(z_{\mathrm{row}},z_{\mathrm{col}})
+  \in\F^\ell\times\F^k,
+  \qquad v\in\F.
+\]
+The Blaze paper calls this row code packed RAA, or PRAA, because the protocol
+uses many row encodings in parallel.  In this writeup the tensor
+\(m\in\F^{\B^\ell\times\B^k}\) already makes the parallelism explicit, so the
+row code itself is just
+\[
+  \RAA:\F^{\B^k}\to\F^{\B^n}.
+\]
+For each row \(h\in\B^\ell\),
+\[
+  c[h,\ast]=\RAA(m[h,\ast])\in\F^{\B^n}.
+\]
+The outer commitment handle \(R_{\mathrm{outer}}\) opens columns:
+\[
+  \mathcal F_{\mathrm{Commit}}.\Open(R_{\mathrm{outer}},b)=c[\ast,b]
+  \in\F^{\B^\ell}
+  \qquad(b\in\B^n).
+\]
+
+After the verifier samples \(\rho\in\F^{\B^\ell}\), the folded message and
+virtual folded tensor are
+\[
+  m_\star[a]=\sum_{h\in\B^\ell}\rho[h]m[h,a]
+  \quad(a\in\B^k),
+  \qquad
+  c_\star[b]=\sum_{h\in\B^\ell}\rho[h]c[h,b]
+  \quad(b\in\B^n).
+\]
+Linearity gives \(c_\star=\RAA(m_\star)\) for an honest prover.  For an
+arbitrary prover, no such relation is assumed.  The verifier does not receive
+\(c_\star\) as a new string.  It receives a virtual handle \(R_\star\) whose
+openings are computed from \(R_{\mathrm{outer}}\) and \(\rho\).  Thus
+\(R_\star\) fixes the values of \(c_\star\); the later backend checks are what
+test whether those fixed values form \(\RAA(m_\star)\).
+
+\begin{protocolbox}{Protocol: \(\Pi_{\mathrm{rowFoldCommit}}\), Paper-Faithful Row Fold}{fig:protocol-paper-row-fold}
+\scriptsize\raggedright
+\noindent Public parameters: row domain \(\B^\ell\), codeword domain \(\B^n\), commitment functionality \(\mathcal F_{\mathrm{Commit}}\).
+
+\smallskip
+\noindent\(\underline{\Pi_{\mathrm{rowFoldCommit}}.\mathsf{Commit}(\verifier:(R_{\mathrm{outer}},\rho\in\F^{\B^\ell}),\ \prover:(R_{\mathrm{outer}},\rho\in\F^{\B^\ell}))\to R_\star}\)
+
+\smallskip
+\begin{enumerate}[leftmargin=0.24in,label=\textbf{C\arabic*.},itemsep=0.06em,topsep=0.06em,parsep=0pt]
+  \item \(\prover,\verifier\): \(R_\star\gets(R_{\mathrm{outer}},\rho)\).
+  \item \(\prover,\verifier\): return \(R_\star\).
+\end{enumerate}
+
+\smallskip
+\noindent\(\underline{\Pi_{\mathrm{rowFoldCommit}}.\mathsf{Open}(\verifier:(R_\star,b\in\B^n),\ \prover:(R_\star,b\in\B^n))\to o_\star\in\F\cup\{\bot\}}\)
+
+\smallskip
+\begin{enumerate}[leftmargin=0.24in,label=\textbf{O\arabic*.},itemsep=0.06em,topsep=0.06em,parsep=0pt]
+  \item \(\prover,\verifier\): parse \(R_\star=(R_{\mathrm{outer}},\rho)\).
+  \item \(\prover,\verifier\): \(\gamma_b\gets\mathcal F_{\mathrm{Commit}}.\Open(R_{\mathrm{outer}},b)\in\F^{\B^\ell}\cup\{\bot\}\).
+  \item \(\verifier\): if \(\gamma_b=\bot\), return \(\bot\).
+  \item \(\verifier\): \(o_\star\gets\sum_{h\in\B^\ell}\rho[h]\gamma_b[h]\).
+  \item \(\verifier\): return \(o_\star\).
+\end{enumerate}
+\end{protocolbox}
+
+The row-fold handle is deliberately boring.  It is not a new algebraic
+commitment and it does not prove that \(c_\star\) is a valid RAA codeword.  It
+only gives the backend a way to ask for coordinates of the folded tensor.  If
+the backend asks for \(c_\star[b]\), the handle opens the already committed
+outer column \(c[\ast,b]\) and computes the inner product with \(\rho\).  All
+later algebraic work treats \(R_\star\) as the commitment handle for the tensor
+\(c_\star\), but its implementation is still this column-opening procedure.
+
+\subsection{RAA Objects And Evaluation Requests}
+
+This is a roadmap for the objects used by the RAA checks.  The next subsection
+explains the checks themselves.
+
+Fix \(K=2^k\), \(N=2^n\), and \(r=N/K\).  The public RAA data are
+\[
+  \pi_1,\pi_2:\B^n\to\B^n,\qquad
+  \mathsf{Rep}:\F^{\B^k}\to\F^{\B^n},\qquad
+  \Pi_1,\Pi_2,\mathsf{Acc}:\F^{\B^n}\to\F^{\B^n}.
+\]
+The permutation convention is the same one used in the RAA definition above:
+\[
+  (\Pi_i h)[\pi_i(b)]=h[b]
+  \qquad(i\in\{1,2\},\ b\in\B^n).
+\]
+The accumulator convention is
+\[
+  (\mathsf{Acc}\,h)[b]=\sum_{x\le b}h[x],
+\]
+where \(\le\) is the natural binary order.
+For \(m_\star\in\F^{\B^k}\), the honest pipeline is
+\[
+  m_\star
+  \xrightarrow{\mathsf{Rep}}
+  u_1
+  \xrightarrow{\Pi_1}
+  u_2
+  \xrightarrow{\mathsf{Acc}}
+  u_3
+  \xrightarrow{\Pi_2}
+  u_4
+  \xrightarrow{\mathsf{Acc}}
+  u_5.
+\]
+The target relation is
+\[
+  u_5=c_\star,
+  \qquad
+  \MLE(m_\star)(z_{\mathrm{col}})=v_\star.
+\]
+
+The committed or externally opened tensors used by the checks are:
+\[
+  \begin{array}{c|c|c|c}
+    \text{label }H & \text{tensor domain} & \text{MLE notation} & \text{handle} \\
+    \hline
+    m_\star & \B^k & \widehat m_\star:=\MLE(m_\star):\F^k\to\F & C_{m_\star} \\
+    u_2,u_3,u_4 & \B^n & \widehat u_i:=\MLE(u_i):\F^n\to\F & C_{u_i} \\
+    c_\star & \B^n & \widehat c_\star:=\MLE(c_\star):\F^n\to\F & C_{c_\star} \\
+    f_1,g_1,f_2,g_2 & \B^{n+1} &
+      \widehat f_i,\widehat g_i:\F^{n+1}\to\F &
+      C_{f_i},C_{g_i}
+  \end{array}
+\]
+The tensor \(u_1\) is virtual.  With
+\[
+  \mathsf{msg}:\F^n\to\F^k
+\]
+the projection to the message coordinate,
+\[
+  \widehat u_1(r'):=\widehat m_\star(\mathsf{msg}(r')).
+\]
+
+The public maps and kernels used later are:
+\[
+  \widehat A:\F^n\times\F^n\to\F,
+  \qquad
+  \Idx,\widehat\pi_1,\widehat\pi_2:\F^n\to\F,
+\]
+\[
+  \mathsf{root}\in\F^{n+1},
+  \qquad
+  \mathsf{leaf},\mathsf{parent},\mathsf{left},\mathsf{right}:\F^n\to\F^{n+1},
+\]
+and
+\[
+  \chi_r(X):=\prod_{j=1}^n\bigl((1-r_j)(1-X_j)+r_jX_j\bigr).
+\]
+Here \(\widehat A\) is the MLE kernel for the accumulator matrix,
+\(\Idx\) is the low-degree extension of the public address-tag map on
+\(\B^n\), and \(\widehat\pi_i\) is the MLE of the Boolean function
+\(b\mapsto\Idx(\pi_i(b))\).
+
+An evaluation request is a named MLE claim together with the coordinate handle
+that is supposed to bind the tensor:
+\[
+  (H,C_H,r_H,v_H)\in\mathsf{EvalReq},
+  \qquad
+  H\in\mathcal H_{\RAA},
+\]
+where
+\[
+  \mathcal H_{\RAA}
+  =
+  \{H_{m_\star},H_{u_1},H_{u_2},H_{u_3},H_{u_4},H_{c_\star},
+    H_{f_1},H_{g_1},H_{f_2},H_{g_2}\}
+\]
+is a set of public labels.  A label such as \(H_{u_3}\) names the tensor whose
+values are being claimed; it is not the tensor itself.  When these labels are
+passed to \(\MLEAuth\), they are identified with distinct active lanes in the
+packed backend domain.  The dimensions are
+\[
+  r_H\in\F^{d_H},
+  \qquad
+  d_{H_{m_\star}}=k,\quad
+  d_{H_{u_1}}=d_{H_{u_2}}=d_{H_{u_3}}=d_{H_{u_4}}=d_{H_{c_\star}}=n,\quad
+  d_{H_{f_1}}=d_{H_{g_1}}=d_{H_{f_2}}=d_{H_{g_2}}=n+1.
+\]
+It means: authenticate the claim that the MLE of the tensor named by \(H\)
+evaluates to \(v_H\) at \(r_H\), against the handle \(C_H\).  The handle
+\(C_H\) is an opening interface for Boolean coordinates of the named tensor; it
+may be an ordinary Merkle handle, a composite handle, or a virtual handle.  The
+MLE claim is stronger than a coordinate opening, so it is authenticated by a
+backend PCS step rather than by \(\mathcal F_{\mathrm{Commit}}\) alone.
+
+Owned tensors are first bound through the same generic commitment API used
+everywhere else:
+\[
+  \mathcal F_{\mathrm{Commit}}.\Com(h)\to C_H.
+\]
+Externally supplied or virtual tensors already come with handles implementing
+that API.  The backend authentication layer is the generic
+\(\MLEAuth\) interface from Figure~\ref{fig:func-mle-auth}.  Its
+BaseFold/RMLE implementation in Figure~\ref{fig:protocol-mle-auth-basefold}
+pads and packs these opaque oracle tensors, batches all later evaluation
+requests, and invokes the RMLE backend on the resulting batched claim.  No RAA
+relation is passed into \(\MLEAuth\); RAA only determines which evaluation
+requests are produced.
+
+\subsection{RAA MLIOP Checks}
+
+Now focus on the algebraic heart of the construction.  At this point the
+target relation for the extracted tensors is
+\[
+  c_\star=\RAA(m_\star)
+  \qquad\text{and}\qquad
+  \MLE(m_\star)(z_{\mathrm{col}})=v_\star.
+\]
+As above, this is target-relation notation: the verifier-facing \(c_\star\)
+may have proximity slack, and the soundness statement is about the tensor
+extracted from the authenticated \(c_\star\) handle.
+The value claim is already a normal MLE evaluation claim about \(m_\star\).  The
+hard part is the RAA relation.  Expanding the RAA pipeline, the prover wants the
+verifier to believe that there exist stage tensors
+\[
+  u_1,u_2,u_3,u_4,u_5\in\F^{\B^n}
+\]
+such that
+\[
+  u_1=\mathsf{Rep}(m_\star),\quad
+  u_2=\Pi_1u_1,\quad
+  u_3=\mathsf{Acc}(u_2),\quad
+  u_4=\Pi_2u_3,\quad
+  u_5=\mathsf{Acc}(u_4),\quad
+  u_5=c_\star.
+\]
+The MLIOP checks this pipeline by turning each edge into the residual template
+from the previous subsection.  Sometimes this is direct.  Sometimes there is a
+preprocessing step that introduces helper tensors before the residual is
+defined.  The point of the preprocessing is not to change the target relation;
+it is to rewrite the target relation in a form whose residual has low degree and
+whose endpoint values can be authenticated.
+
+\paragraph{Repetition.}
+The first edge is
+\[
+  u_1=\mathsf{Rep}(m_\star).
+\]
+If \(u_1\) were a committed tensor, the residual would be
+\[
+  R_{\mathrm{rep}}[a,s]
+  =
+  u_1[a,s]-m_\star[a],
+  \qquad
+  (a,s)\in\B^k\times\B^{n-k}.
+\]
+Blaze does not commit to \(u_1\) at all.  Instead, it uses this residual as a
+rewrite rule.  The address map is the projection
+\[
+  \mathsf{msg}:\F^n\to\F^k,
+\]
+and every requested value of the virtual tensor \(u_1\) is rewritten as
+\[
+  \widehat u_1(r')=\MLE(m_\star)(\mathsf{msg}(r')).
+\]
+So repetition fits the template, but after the rewrite there is no separate
+residual to sumcheck and no separate \(u_1\) handle to authenticate.
+
+\paragraph{Accumulator Edges.}
+Now consider a generic accumulator edge
+\[
+  u_{\mathrm{out}}=\mathsf{Acc}(u_{\mathrm{in}}).
+\]
+The coordinate relation is
+\[
+  u_{\mathrm{out}}[b]=\sum_{x\le b}u_{\mathrm{in}}[x],
+  \qquad b\in\B^n.
+\]
+Checking this relation at every \(b\) is too expensive.  The preprocessing step
+is that the verifier samples
+\[
+  r_{\mathrm{chk}}\in\F^n
+\]
+and asks for the relation at the MLE point \(r_{\mathrm{chk}}\).  Using the
+public accumulator kernel, the scalar residual is
+\[
+  \widehat u_{\mathrm{out}}(r_{\mathrm{chk}})
+  -
+  \sum_{x\in\B^n}
+    \widehat A(r_{\mathrm{chk}},x)\,u_{\mathrm{in}}[x].
+\]
+Equivalently, sumcheck is run on the Boolean-sum claim with target
+\(\widehat u_{\mathrm{out}}(r_{\mathrm{chk}})\) and summand
+\[
+  G_{\mathrm{acc}}(x)
+  =
+  \widehat A(r_{\mathrm{chk}},x)\,u_{\mathrm{in}}[x],
+  \qquad x\in\B^n.
+\]
+This is the residual template with one named tensor \(u_{\mathrm{in}}\), address
+map \(\psi(x)=x\), low-degree extension \(\widehat\psi(X)=X\), and public
+expression
+\[
+  \Phi_x(X_{\mathrm{in}})
+  =
+  \widehat A(r_{\mathrm{chk}},x)\,X_{\mathrm{in}}.
+\]
+The output value \(\widehat u_{\mathrm{out}}(r_{\mathrm{chk}})\) is not trusted
+for free; it is recorded as an evaluation request and later authenticated.
+
+There are two accumulator instantiations:
+\[
+  u_3=\mathsf{Acc}(u_2),
+  \qquad
+  c_\star=u_5=\mathsf{Acc}(u_4).
+\]
+They give the two sumcheck targets
+\[
+  \widehat u_3(r_{\mathrm{chk}})
+  =
+  \sum_{x\in\B^n}
+    \widehat A(r_{\mathrm{chk}},x)\,u_2[x],
+\]
+\[
+  \widehat c_\star(r_{\mathrm{chk}})
+  =
+  \sum_{x\in\B^n}
+    \widehat A(r_{\mathrm{chk}},x)\,u_4[x].
+\]
+The first output value is authenticated against the \(u_3\) handle.  The second
+is authenticated against the \(c_\star\) handle, whose openings are virtual and
+ultimately route through \(R_\star\).
+
+\paragraph{Permutation Checks Through Product Trees.}
+The permutation edge
+\[
+  u_2=\Pi_1u_1
+\]
+is the claim that the output tensor \(u_2\) is obtained by permuting the
+addresses of the input tensor \(u_1\).  Directly checking this large address
+relation is awkward.  Instead, after the handles answering \(u_1\) and \(u_2\)
+queries are fixed, the protocol introduces two randomized helper tensors
+\(f_1\) and \(g_1\).  Here \(u_2\) has its own handle, while \(u_1\) is a
+virtual tensor: an opening of \(u_1\) at \(b\in\B^n\) is implemented by opening
+\(m_\star\) at \(\mathsf{msg}(b)\).  Logically, the single claim \(u_1\to u_2\)
+is decomposed into three
+claims:
+\[
+  u_1\to f_1,\qquad f_1\leftrightarrow g_1,\qquad g_1\leftarrow u_2.
+\]
+The arrows do not mean that these tensors are public computations.  They mean
+that the committed objects must satisfy three relations: \(f_1\)'s leaves are
+loaded from \(u_1\), \(g_1\)'s leaves are loaded from \(u_2\), and the two helper
+tensors certify the same product.
+
+After the relevant handles are fixed, the verifier samples
+\[
+  \alpha,\beta\leftarrow\F.
+\]
+These challenges attach a random address tag to each value.  The reason this
+helps is that a permutation claim can be written as a product identity over its
+index set.  If \(u_2=\Pi_1u_1\), then \(u_2[\pi_1(b)]=u_1[b]\) for every
+\(b\in\B^n\).  Therefore
+\[
+  \begin{aligned}
+  \prod_{b\in\B^n}
+    \left(\alpha-\bigl(u_1[b]+\beta\,\Idx(\pi_1(b))\bigr)\right)
+  &=
+  \prod_{b\in\B^n}
+    \left(\alpha-\bigl(u_2[\pi_1(b)]+\beta\,\Idx(\pi_1(b))\bigr)\right)\\
+  &=
+  \prod_{a\in\B^n}
+    \left(\alpha-\bigl(u_2[a]+\beta\,\Idx(a)\bigr)\right),
+  \end{aligned}
+\]
+where the last equality only renames the product index using the fact that
+\(\pi_1:\B^n\to\B^n\) is a bijection.
+The two products range over the same address set.  The left product writes each
+input value with its permuted address; the right product writes the output value
+at that address.
+
+The helper tensors \(f_1,g_1\in\F^{\B^{n+1}}\) are product trees for these two
+products.  A product tree has one leaf for each address \(b\in\B^n\), and its
+higher layers repeatedly multiply pairs until one root value remains.  Since the
+whole tree is stored as a tensor over \(\B^{n+1}\), public coordinate maps name
+where the logical tree nodes live.
+
+Here is the concrete layout.  Blaze's paper writes the same product-tree test
+with a different coordinate convention: leaves are addressed as \((0,r)\), the
+root as \((1^n,0)\), and the parent-child residual as
+\(f(1,x)-f(x,0)f(x,1)\).  We use an equivalent heap relabeling because it makes
+the binary addresses explicit.  Identify \(\B^{n+1}\) with the natural heap
+order: the root has heap index \(1\), heap index \(0\) is padding, and the
+children of heap index \(j\) have heap indices \(2j\) and \(2j+1\).  In
+binary-coordinate notation this is simply
+\[
+  \mathsf{root}=\bits_{n+1}(1),
+  \qquad
+  \mathsf{leaf}(b)=1\|b.
+\]
+For an internal address \(x\in\B^n\setminus\{\bits_n(0)\}\), set
+\[
+  \mathsf{parent}(x)=0\|x,\qquad
+  \mathsf{left}(x)=x\|0,\qquad
+  \mathsf{right}(x)=x\|1.
+\]
+For example, if \(x=\bits_n(j)\), then \(x\|0=\bits_{n+1}(2j)\) and
+\(x\|1=\bits_{n+1}(2j+1)\).
+The coordinate \(\bits_{n+1}(0)\), and the internal address \(\bits_n(0)\), are
+padding.  We set
+\[
+  \mathsf{parent}(\bits_n(0))
+  =
+  \mathsf{left}(\bits_n(0))
+  =
+  \mathsf{right}(\bits_n(0))
+  =
+  \bits_{n+1}(0),
+\]
+and fix the tree value at \(\bits_{n+1}(0)\) to be \(0\).  Then the padding
+residual is \(0-0\cdot 0=0\), so it does not affect the Boolean-sum checks.
+The low-degree extensions of these public maps are what we evaluate later at
+field points.
+
+Concretely, for a tensor \(h\in\F^{\B^n}\) and a permutation
+\(\sigma:\B^n\to\B^n\), let
+\(\mathsf{TaggedTree}(h,\sigma;\alpha,\beta)\in\F^{\B^{n+1}}\) denote the
+tensor \(T\) generated as follows.  First fill the leaves:
+\[
+  T[\mathsf{leaf}(b)]
+  =
+  \alpha-\bigl(h[b]+\beta\,\Idx(\sigma(b))\bigr)
+  \qquad(b\in\B^n).
+\]
+Then fill the internal nodes bottom-up:
+\[
+  T[\mathsf{parent}(x)]
+  =
+  T[\mathsf{left}(x)]\,T[\mathsf{right}(x)]
+  \qquad(\Int(x)\in[1,2^n-1]).
+\]
+Finally set \(T[\bits_{n+1}(0)]=0\).
+Thus \(T[\mathsf{root}]\) is the product of all leaf factors.  The only tensor
+coordinate not used by the logical tree is the padding coordinate
+\(\bits_{n+1}(0)\).
+The honest prover computes
+\[
+  f_1=\mathsf{TaggedTree}(u_1,\pi_1;\alpha,\beta),
+\]
+and computes \(g_1\) by the same tree procedure with leaf values
+\[
+  g_1[\mathsf{leaf}(b)]
+  =
+  \alpha-\bigl(u_2[b]+\beta\,\Idx(b)\bigr)
+  \qquad(b\in\B^n).
+\]
+
+The first invariant is the leaf-loading relation \(u_1\to f_1\).  For every
+Boolean address \(b\in\B^n\),
+\[
+  \MLE(f_1)(\mathsf{leaf}(b))
+  =
+  \alpha-\bigl(u_1[b]+\beta\,\Idx(\pi_1(b))\bigr),
+\]
+so the leaves of \(f_1\) are exactly the left product factors.  The second
+invariant is the leaf-loading relation \(g_1\leftarrow u_2\):
+\[
+  \MLE(g_1)(\mathsf{leaf}(b))
+  =
+  \alpha-\bigl(u_2[b]+\beta\,\Idx(b)\bigr).
+\]
+The leaves of \(g_1\) are exactly the right product factors.
+
+The third invariant is \(f_1\leftrightarrow g_1\).  Each helper tensor must be a
+valid product tree, and their roots must agree:
+\[
+  \MLE(f_1)(\mathsf{root})=\MLE(g_1)(\mathsf{root}).
+\]
+If the leaf-loading relations hold and both trees are valid, this root equality
+is precisely the tagged-product identity above.  If the tagged multisets differ,
+their products agree only with small probability over \(\alpha,\beta\).
+
+Now we translate these invariants into the MLE checks used by the protocol.
+For the \(u_1\to f_1\) leaf invariant, the implementation will route \(u_1\)
+queries through the committed repeated-message handle.  Using
+\(u_1[b]=m_\star[\mathsf{msg}(b)]\), the equality checked at a field point
+\(r'\in\F^n\) is
+\[
+  \MLE(f_1)(\mathsf{leaf}(r'))
+  =
+  \alpha-\bigl(\MLE(m_\star)(\mathsf{msg}(r'))
+    +\beta\,\widehat\pi_1(r')\bigr).
+\]
+For the \(g_1\leftarrow u_2\) leaf invariant, the equality checked at \(r'\) is
+\[
+  \MLE(g_1)(\mathsf{leaf}(r'))
+  =
+  \alpha-\bigl(\widehat u_2(r')+\beta\,\Idx(r')\bigr).
+\]
+Each leaf formula is a residual of the abstract kind.  For \(f_1\), the
+named tensors are \(f_1\) and \(m_\star\), the address maps are
+\(\mathsf{leaf}(b)\) and \(\mathsf{msg}(b)\), and the low-degree expression is
+\[
+  \Phi^{f_1}_b(X_f,X_m)
+  =
+  X_f-\alpha+\bigl(X_m+\beta\,\Idx(\pi_1(b))\bigr).
+\]
+The low-degree extension replaces \(b\) by \(X\), \(\mathsf{leaf}(b)\) by
+\(\mathsf{leaf}(X)\), \(\mathsf{msg}(b)\) by \(\mathsf{msg}(X)\), and
+\(\Idx(\pi_1(b))\) by \(\widehat\pi_1(X)\).  The protocol checks the projected
+leaf residual at the random point \(r_{\mathrm{chk}}\) by recording the equality
+shown above.  The \(g_1\) leaf residual is identical except that its named
+tensors are \(g_1\) and \(u_2\), and its tag is \(\Idx(b)\).
+
+The second permutation edge
+\[
+  u_4=\Pi_2u_3
+\]
+uses helper tensors \(f_2,g_2\) with the analogous leaf formulas
+\[
+  \MLE(f_2)(\mathsf{leaf}(r'))
+  =
+  \alpha-\bigl(\widehat u_3(r')+\beta\,\widehat\pi_2(r')\bigr),
+\]
+\[
+  \MLE(g_2)(\mathsf{leaf}(r'))
+  =
+  \alpha-\bigl(\widehat u_4(r')+\beta\,\Idx(r')\bigr).
+\]
+
+\paragraph{Checking Product Trees.}
+The leaf checks above only authenticate the bottom layer of each helper tensor.
+The verifier must also authenticate that the higher layers were filled by the
+product-tree rule.  For a helper tensor \(T\in\F^{\B^{n+1}}\), define the
+parent residual
+\[
+  R_T[x]
+  =
+  \MLE(T)(\mathsf{parent}(x))
+  -
+  \MLE(T)(\mathsf{left}(x))\MLE(T)(\mathsf{right}(x))
+  \qquad(x\in\B^n).
+\]
+For every real internal node \(x\in\B^n\setminus\{\bits_n(0)\}\), the condition
+\(R_T[x]=0\) is exactly
+\[
+  T[0\|x]=T[x\|0]\,T[x\|1].
+\]
+At the padding address \(x=\bits_n(0)\), the same residual is zero because
+\(\mathsf{parent}(x)=\mathsf{left}(x)=\mathsf{right}(x)=\bits_{n+1}(0)\) and
+the padding coordinate is fixed to \(0\).
+
+This is a direct residual-template instance.  The address maps are
+\[
+  \psi_0=\mathsf{parent},\qquad
+  \psi_1=\mathsf{left},\qquad
+  \psi_2=\mathsf{right},
+\]
+and the low-degree expression is
+\[
+  \Phi(X_0,X_1,X_2)=X_0-X_1X_2.
+\]
+The projected zero claim at \(r_{\mathrm{chk}}\) is
+\[
+  0=
+  \sum_{x\in\B^n}
+    \chi_{r_{\mathrm{chk}}}(x)
+    R_T[x].
+\]
+This is one sumcheck-shaped identity for each
+\[
+  T\in\{f_1,g_1,f_2,g_2\}.
+\]
+If all parent residuals vanish, then the root value of \(T\) is the product of
+the leaf layer defined earlier by \(\mathsf{TaggedTree}\).  The permutation
+check therefore finishes with the root
+equalities
+\[
+  \MLE(f_1)(\mathsf{root})=\MLE(g_1)(\mathsf{root}),
+  \qquad
+  \MLE(f_2)(\mathsf{root})=\MLE(g_2)(\mathsf{root}).
+\]
+
+\paragraph{What Gets Batched.}
+The six Boolean-sum claims are the two accumulator claims and the four
+product-tree residual claims.  These are batched in
+Figure~\ref{fig:protocol-paper-praa-six-sumcheck}.  The leaf-formula residuals
+and the two root equalities are checked at sampled points and stored as explicit
+equalities in \(\mathcal T\).  The endpoint values that appear in these
+equalities and in the batched sumcheck are not trusted until the compiler
+authenticates the corresponding evaluation requests.
+
+For the permutation checks, these pieces should be read as one correlated
+test.  The leaf equations alone do not prove that a permutation was applied.
+The root equalities alone only compare two claimed products.  The product-tree
+sumchecks alone only say that the helper tensors are locally tree-shaped.  The
+Blaze argument uses the same \(\alpha,\beta\) and the same sampled point
+\(r_{\mathrm{chk}}\) across these checks, so a prover that changes the
+permutation relation must either break a leaf equation, break a product-tree
+equation, or make two different tagged multisets have the same random product.
+
+It is useful to separate what each block has achieved from what it has not
+achieved yet.  The repetition rule removes the need to commit to \(u_1\):
+queries to \(u_1\) become queries to \(m_\star\).  The accumulator equations
+turn two prefix-sum claims into two Boolean sums.  The permutation tags turn two
+permutation claims into two product-equality claims.  The product trees turn
+those global products into local parent-child constraints, again expressible as
+Boolean sums.  Sumcheck then compresses the six Boolean sums to a small list of
+evaluation requests.  None of this by itself proves that the requested values
+came from the committed tensors.  That last job is exactly the evaluation
+authentication step, which is implemented by the BaseFold backend.
+
+One notation point matters here.  In the boxes below, the label \(c_\star\) in
+an evaluation request names the verifier-facing tensor opened through
+\(C_{c_\star}\).  The prover may use a witness candidate
+\(c_\star^{\mathrm{wit}}\) to compute claimed values, but those values are
+accepted only if authentication against \(C_{c_\star}\) succeeds.
+
+\begin{protocolbox}{Protocol: Accumulate And Permute Reductions}{fig:protocol-paper-raa-reductions}
+\scriptsize\raggedright
+\noindent Public parameters: \(N=2^n\), \(\widehat A:\F^n\times\F^n\to\F\), permutations \(\sigma:\B^n\to\B^n\), \(\widehat\sigma,\Idx:\F^n\to\F\), \(\mathsf{root}\in\F^{n+1}\), \(\mathsf{leaf},\mathsf{parent},\mathsf{left},\mathsf{right}:\F^n\to\F^{n+1}\), \(\mathcal F_{\mathrm{Commit}}\), and \(\mathsf{TaggedTree}\).
+
+\smallskip
+\noindent\(\underline{\Accumulate.\mathsf{Reduce}(\verifier:(H_x,C_x,H_y,C_y,r\in\F^n),\ \prover:(x,y\in\F^{\B^n}))\to(\mathcal E,\Gamma,s)}\)
+\begin{enumerate}[leftmargin=0.24in,label=\textbf{A\arabic*.},itemsep=0.06em,topsep=0.06em,parsep=0pt]
+  \item \(\prover\to\verifier\): \(s\in\F\), intended to equal \(\MLE(y)(r)\).
+  \item \(\verifier\): \(\mathcal E\gets\{(H_y,C_y,r,s)\}\).
+  \item \(\verifier\): \(\Gamma\gets(s,\;H_x,\;C_x,\;G(X)=\widehat A(r,X)\,\widehat H_x(X))\in\SumReq\).
+  \item \(\verifier\): return \((\mathcal E,\Gamma,s)\).
+\end{enumerate}
+
+\smallskip
+\noindent\(\underline{\Permute.\mathsf{Commit}(\verifier:(C_x,C_y,\sigma,\widehat\sigma,\alpha,\beta),\ \prover:(x,y,\sigma,\widehat\sigma,\alpha,\beta))\to(\verifier:(C_f,C_g),\prover:(C_f,C_g,f,g))}\)
+\begin{enumerate}[leftmargin=0.24in,label=\textbf{P\arabic*.},itemsep=0.06em,topsep=0.06em,parsep=0pt]
+  \item \(\prover\): \(f\gets\mathsf{TaggedTree}(x,\sigma;\alpha,\beta)\).
+  \item \(\prover\): compute \(g\in\F^{\B^{n+1}}\) by the same tree rule with leaves \(g[\mathsf{leaf}(b)]=\alpha-(y[b]+\beta\,\Idx(b))\).
+  \item \(\prover,\verifier\): \(C_f\gets\mathcal F_{\mathrm{Commit}}.\Com(\prover:f,\verifier:\bot)\).
+  \item \(\prover,\verifier\): \(C_g\gets\mathcal F_{\mathrm{Commit}}.\Com(\prover:g,\verifier:\bot)\).
+  \item \(\prover,\verifier\): return \((C_f,C_g)\).
+  \item \(\prover\): retain \(f,g\).
+\end{enumerate}
+
+\smallskip
+\noindent\(\underline{\Permute.\mathsf{Reduce}(\verifier:(H_x,C_x,H_y,C_y,H_f,C_f,H_g,C_g,\widehat\sigma,\alpha,\beta,r\in\F^n),\ \prover:(x,y,f,g))\to(\mathcal E,\mathcal T,\Gamma_f,\Gamma_g)}\)
+\begin{enumerate}[leftmargin=0.24in,label=\textbf{L\arabic*.},itemsep=0.06em,topsep=0.06em,parsep=0pt]
+  \item \(\prover\to\verifier\): \(v_{f,r},v_{g,r},v_{x,1},v_{y,1},v_{f,1},v_{g,1}\in\F\).
+  \item \(\verifier\): \(\mathcal E\gets\{(H_f,C_f,\mathsf{root},v_{f,r}),(H_g,C_g,\mathsf{root},v_{g,r})\}\).
+  \item \(\verifier\): append \((H_x,C_x,r,v_{x,1})\), \((H_y,C_y,r,v_{y,1})\), \((H_f,C_f,\mathsf{leaf}(r),v_{f,1})\), and \((H_g,C_g,\mathsf{leaf}(r),v_{g,1})\) to \(\mathcal E\).
+  \item \(\verifier\): apply the \(\RepView\) rewrite to any request whose label is \(H_{u_1}\).
+  \item \(\verifier\): \(\mathcal T\gets\{v_{f,r}=v_{g,r},\ v_{f,1}=\alpha-(v_{x,1}+\beta\,\widehat\sigma(r)),\ v_{g,1}=\alpha-(v_{y,1}+\beta\,\Idx(r))\}\).
+  \item \(\verifier\): \(\Gamma_f\gets(0,\;H_f,\;C_f,\;G_f(X)=\chi_r(X)(\widehat H_f(\mathsf{parent}(X))-\widehat H_f(\mathsf{left}(X))\widehat H_f(\mathsf{right}(X))))\in\SumReq\).
+  \item \(\verifier\): \(\Gamma_g\gets(0,\;H_g,\;C_g,\;G_g(X)=\chi_r(X)(\widehat H_g(\mathsf{parent}(X))-\widehat H_g(\mathsf{left}(X))\widehat H_g(\mathsf{right}(X))))\in\SumReq\).
+  \item \(\verifier\): return \((\mathcal E,\mathcal T,\Gamma_f,\Gamma_g)\).
+\end{enumerate}
+\end{protocolbox}
+
+\begin{protocolbox}{Protocol: Compiled RAA Relation Checks}{fig:protocol-paper-praa-checks}
+\scriptsize\raggedright
+\noindent Public parameters: \(K=2^k\), \(N=2^n\), \(\widehat A:\F^n\times\F^n\to\F\), \(\mathsf{msg}:\F^n\to\F^k\), \(\widehat\pi_1,\widehat\pi_2,\Idx:\F^n\to\F\), \(\mathcal F_{\mathrm{Commit}}\), \(\MLEAuth\), and the reductions in Figure~\ref{fig:protocol-paper-raa-reductions}.
+
+\smallskip
+\noindent\(\underline{\mathsf{RAA.Checks}(\verifier:(C_{m_\star},C_{u_2},C_{u_3},C_{u_4},C_{c_\star},z_{\mathrm{col}},v_\star),\ \prover:(m_\star,u_2,u_3,u_4,c_\star^{\mathrm{wit}}))\to\{0,1\}}\)
+
+\smallskip
+\begin{enumerate}[leftmargin=0.24in,label=\textbf{C\arabic*.},itemsep=0.06em,topsep=0.06em,parsep=0pt]
+  \item \(\prover,\verifier\): define \(C_{u_1}\) by \(\mathsf{Open}(C_{u_1},b)=\mathsf{Open}(C_{m_\star},\mathsf{msg}(b))\), and rewrite \((H_{u_1},C_{u_1},r,v)\) as \((H_{m_\star},C_{m_\star},\mathsf{msg}(r),v)\).
+  \item \(\verifier\): sample \(\alpha,\beta\leftarrow\F\).
+  \item \(\verifier\to\prover\): \((\alpha,\beta)\).
+  \item \(\prover\): \(u_1[b]\gets m_\star[\mathsf{msg}(b)]\) for each \(b\in\B^n\).
+  \item \(\prover,\verifier\): \((C_{f_1},C_{g_1})\gets\Permute.\mathsf{Commit}(\verifier:(C_{u_1},C_{u_2},\pi_1,\widehat\pi_1,\alpha,\beta),\prover:(u_1,u_2,\pi_1,\widehat\pi_1,\alpha,\beta))\).
+  \item \(\prover\): retain \(f_1,g_1\) from the previous call.
+  \item \(\prover,\verifier\): \((C_{f_2},C_{g_2})\gets\Permute.\mathsf{Commit}(\verifier:(C_{u_3},C_{u_4},\pi_2,\widehat\pi_2,\alpha,\beta),\prover:(u_3,u_4,\pi_2,\widehat\pi_2,\alpha,\beta))\).
+  \item \(\prover\): retain \(f_2,g_2\) from the previous call.
+  \item \(\prover\): define the authenticated oracle witnesses \(h_{H_{m_\star}}=m_\star\), \(h_{H_{u_i}}=u_i\) for \(i\in\{2,3,4\}\), \(h_{H_{c_\star}}=c_\star^{\mathrm{wit}}\), and \(h_{H_T}=T\) for \(T\in\{f_1,g_1,f_2,g_2\}\).
+  \item \(\verifier\): define the handle table \(C_{H_{m_\star}}=C_{m_\star}\), \(C_{H_{u_i}}=C_{u_i}\) for \(i\in\{2,3,4\}\), \(C_{H_{c_\star}}=C_{c_\star}\), and \(C_{H_T}=C_T\) for \(T\in\{f_1,g_1,f_2,g_2\}\).
+  \item \(\prover,\verifier\): \(A_{\mathrm{auth}}\gets\MLEAuth.\mathsf{Commit}(\prover:(h_H)_{H\in\mathcal H_{\RAA}\setminus\{H_{u_1}\}},\verifier:(d_H,C_H)_{H\in\mathcal H_{\RAA}\setminus\{H_{u_1}\}})\).
+  \item \(\prover\to\verifier\): \(v_{m,z}\in\F\).
+  \item \(\verifier\): \(\mathcal E_{\mathrm{val}}\gets\{(H_{m_\star},C_{m_\star},z_{\mathrm{col}},v_{m,z})\}\) and \(\mathcal T_{\mathrm{val}}\gets\{v_{m,z}=v_\star\}\).
+  \item \(\verifier\): sample \(r_{\mathrm{chk}}\leftarrow\F^n\).
+  \item \(\verifier\to\prover\): \(r_{\mathrm{chk}}\).
+  \item \(\prover,\verifier\): \((\mathcal E_{\mathrm{acc},1},\Gamma_{\mathrm{acc},1},s_1)\gets\Accumulate.\mathsf{Reduce}(\verifier:(H_{u_2},C_{u_2},H_{u_3},C_{u_3},r_{\mathrm{chk}}),\prover:(u_2,u_3))\).
+  \item \(\prover,\verifier\): \((\mathcal E_{\mathrm{acc},2},\Gamma_{\mathrm{acc},2},s_2)\gets\Accumulate.\mathsf{Reduce}(\verifier:(H_{u_4},C_{u_4},H_{c_\star},C_{c_\star},r_{\mathrm{chk}}),\prover:(u_4,c_\star^{\mathrm{wit}}))\).
+  \item \(\prover,\verifier\): \((\mathcal E_{\mathrm{perm},1},\mathcal T_{\mathrm{perm},1},\Gamma_{f_1},\Gamma_{g_1})\gets\Permute.\mathsf{Reduce}(\verifier:(H_{u_1},C_{u_1},H_{u_2},C_{u_2},H_{f_1},C_{f_1},H_{g_1},C_{g_1},\widehat\pi_1,\alpha,\beta,r_{\mathrm{chk}}),\prover:(u_1,u_2,f_1,g_1))\).
+  \item \(\prover,\verifier\): \((\mathcal E_{\mathrm{perm},2},\mathcal T_{\mathrm{perm},2},\Gamma_{f_2},\Gamma_{g_2})\gets\Permute.\mathsf{Reduce}(\verifier:(H_{u_3},C_{u_3},H_{u_4},C_{u_4},H_{f_2},C_{f_2},H_{g_2},C_{g_2},\widehat\pi_2,\alpha,\beta,r_{\mathrm{chk}}),\prover:(u_3,u_4,f_2,g_2))\).
+  \item \(\verifier\): \(\mathcal G\gets(\Gamma_{\mathrm{acc},1},\Gamma_{\mathrm{acc},2},\Gamma_{f_1},\Gamma_{g_1},\Gamma_{f_2},\Gamma_{g_2})\).
+  \item \(\prover,\verifier\): \((a_{\mathrm{sc}},\mathcal E_{\mathrm{sc}})\gets\mathsf{RAA.SixSumcheck}(\verifier:\mathcal G,\prover:(u_2,u_4,f_1,g_1,f_2,g_2))\).
+  \item \(\verifier\): \(\mathcal E\gets\mathcal E_{\mathrm{val}}\cup\mathcal E_{\mathrm{acc},1}\cup\mathcal E_{\mathrm{acc},2}\cup\mathcal E_{\mathrm{perm},1}\cup\mathcal E_{\mathrm{perm},2}\cup\mathcal E_{\mathrm{sc}}\).
+  \item \(\verifier\): \(\mathcal T\gets\mathcal T_{\mathrm{val}}\cup\mathcal T_{\mathrm{perm},1}\cup\mathcal T_{\mathrm{perm},2}\).
+  \item \(\verifier\): \(\mathcal E_{\mathrm{auth}}\gets\{(H,r_H,v_H):(H,C_H,r_H,v_H)\in\mathcal E\}\).
+  \item \(\prover,\verifier\): \(a_{\mathrm{auth}}\gets\MLEAuth.\mathsf{Open}(\verifier:(A_{\mathrm{auth}},\mathcal E_{\mathrm{auth}}),\prover:(h_H)_{H\in\mathcal H_{\RAA}\setminus\{H_{u_1}\}})\).
+  \item \(\verifier\): if \(a_{\mathrm{sc}}a_{\mathrm{auth}}=0\), return reject.
+  \item \(\verifier\): if any equality in \(\mathcal T\) is false, return reject.
+  \item \(\verifier\): return accept.
+\end{enumerate}
+\end{protocolbox}
+
+The first two equations inside the next box are the accumulator equations.  For
+example, \(u_3=\mathsf{Acc}(u_2)\) implies
+\[
+  \widehat u_3(r_{\mathrm{chk}})
+  =
+  \sum_{x\in\B^n}\widehat A(r_{\mathrm{chk}},x)u_2[x].
+\]
+The second equation is the same statement for
+\(c_\star=u_5=\mathsf{Acc}(u_4)\).  The last four equations say that each helper
+tensor is a valid product tree: every parent value in the helper tensor's MLE
+equals the product of its two child values.  The factor
+\(\chi_{r_{\mathrm{chk}}}(X)\) projects this product-tree claim to the random
+location selected by \(r_{\mathrm{chk}}\).
+
+Instead of running six separate sumchecks, the verifier samples
+\(\lambda_1,\ldots,\lambda_6\) and checks one random linear combination.  This
+is a batching trick: if any one of the six identities is false, then the random
+linear combination is false except with small probability over \(\lambda\).
+The final sumcheck point \(r_{\mathrm{sc}}\) creates more evaluation requests,
+because computing \(G_\lambda(r_{\mathrm{sc}})\) requires values of
+\(u_2,u_4,f_1,g_1,f_2,g_2\) at the points shown in the box.
+
+\begin{protocolbox}{Protocol: Batched Six-Equation RAA Sumcheck}{fig:protocol-paper-praa-six-sumcheck}
+\scriptsize\raggedright
+\noindent Public parameters: \(n\), \(\widehat A:\F^n\times\F^n\to\F\), \(\chi_r(X)\) for \(r,X\in\F^n\), \(\mathsf{parent},\mathsf{left},\mathsf{right}:\F^n\to\F^{n+1}\), and standard sumcheck \(\mathsf{SC}_n(\verifier:S_\lambda,\prover:G_\lambda)\to(a_{\mathrm{round}},r_{\mathrm{sc}},T_{\mathrm{sc}})\).
+
+\smallskip
+\noindent\(\underline{\mathsf{RAA.SixSumcheck}(\verifier:\mathcal G=(\Gamma_{\mathrm{acc},1},\Gamma_{\mathrm{acc},2},\Gamma_{f_1},\Gamma_{g_1},\Gamma_{f_2},\Gamma_{g_2}),\ \prover:(u_2,u_4\in\F^{\B^n},f_1,g_1,f_2,g_2\in\F^{\B^{n+1}}))\to(a_{\mathrm{sc}}\in\{0,1\},\mathcal E_{\mathrm{sc}}\subset\mathsf{EvalReq})}\)
+
+\smallskip
+\begin{enumerate}[leftmargin=0.24in,label=\textbf{S\arabic*.},itemsep=0.06em,topsep=0.06em,parsep=0pt]
+  \item \(\verifier\): unpack \(\mathcal G\) to obtain \(r_{\mathrm{chk}}\), \(s_1\), \(s_2\), and the handles \(C_{u_2},C_{u_4},C_{f_1},C_{g_1},C_{f_2},C_{g_2}\).
+  \item \(\prover\): \(\widehat u_2\gets\MLE(u_2)\) and \(\widehat u_4\gets\MLE(u_4)\).
+  \item \(\prover\): \(\widehat f_i\gets\MLE(f_i)\) and \(\widehat g_i\gets\MLE(g_i)\) for \(i\in\{1,2\}\).
+  \item \(\verifier\): \(\mathcal E_{\mathrm{sc}}\gets\emptyset\).
+  \item \(\verifier\): sample \(\lambda=(\lambda_1,\ldots,\lambda_6)\leftarrow\F^6\).
+  \item \(\verifier\to\prover\): \(\lambda\).
+  \item \(\verifier\): \(s_3=s_4=s_5=s_6\gets0\).
+  \item \(\verifier\): \(S_\lambda\gets\sum_{j=1}^6\lambda_js_j\).
+  \item \(\prover\): \(G_1(X)=\widehat u_2(X)\widehat A(r_{\mathrm{chk}},X)\).
+  \item \(\prover\): \(G_2(X)=\widehat u_4(X)\widehat A(r_{\mathrm{chk}},X)\).
+  \item \(\prover\): \(G_3(X)=\chi_{r_{\mathrm{chk}}}(X)(\widehat f_1(\mathsf{parent}(X))-\widehat f_1(\mathsf{left}(X))\widehat f_1(\mathsf{right}(X)))\).
+  \item \(\prover\): \(G_4(X)=\chi_{r_{\mathrm{chk}}}(X)(\widehat g_1(\mathsf{parent}(X))-\widehat g_1(\mathsf{left}(X))\widehat g_1(\mathsf{right}(X)))\).
+  \item \(\prover\): \(G_5(X)=\chi_{r_{\mathrm{chk}}}(X)(\widehat f_2(\mathsf{parent}(X))-\widehat f_2(\mathsf{left}(X))\widehat f_2(\mathsf{right}(X)))\).
+  \item \(\prover\): \(G_6(X)=\chi_{r_{\mathrm{chk}}}(X)(\widehat g_2(\mathsf{parent}(X))-\widehat g_2(\mathsf{left}(X))\widehat g_2(\mathsf{right}(X)))\).
+  \item \(\prover\): \(G_\lambda(X)\gets\sum_{j=1}^6\lambda_jG_j(X)\).
+  \item \(\prover,\verifier\): \((a_{\mathrm{round}},r_{\mathrm{sc}},T_{\mathrm{sc}})\gets\mathsf{SC}_n(\verifier:S_\lambda,\prover:G_\lambda)\).
+  \item \(\verifier\): if \(a_{\mathrm{round}}=0\), return \((0,\mathcal E_{\mathrm{sc}})\).
+  \item \(\prover\to\verifier\): \(v_{u_2,2},v_{u_4,2},v_{f_1,p},v_{f_1,l},v_{f_1,r},v_{g_1,p},v_{g_1,l},v_{g_1,r},v_{f_2,p},v_{f_2,l},v_{f_2,r},v_{g_2,p},v_{g_2,l},v_{g_2,r}\in\F\).
+  \item \(\verifier\): append \((H_{u_2},C_{u_2},r_{\mathrm{sc}},v_{u_2,2})\) and \((H_{u_4},C_{u_4},r_{\mathrm{sc}},v_{u_4,2})\) to \(\mathcal E_{\mathrm{sc}}\).
+  \item \(\verifier\): append \((H_{f_1},C_{f_1},\mathsf{parent}(r_{\mathrm{sc}}),v_{f_1,p})\), \((H_{f_1},C_{f_1},\mathsf{left}(r_{\mathrm{sc}}),v_{f_1,l})\), and \((H_{f_1},C_{f_1},\mathsf{right}(r_{\mathrm{sc}}),v_{f_1,r})\) to \(\mathcal E_{\mathrm{sc}}\).
+  \item \(\verifier\): append \((H_{g_1},C_{g_1},\mathsf{parent}(r_{\mathrm{sc}}),v_{g_1,p})\), \((H_{g_1},C_{g_1},\mathsf{left}(r_{\mathrm{sc}}),v_{g_1,l})\), and \((H_{g_1},C_{g_1},\mathsf{right}(r_{\mathrm{sc}}),v_{g_1,r})\) to \(\mathcal E_{\mathrm{sc}}\).
+  \item \(\verifier\): append \((H_{f_2},C_{f_2},\mathsf{parent}(r_{\mathrm{sc}}),v_{f_2,p})\), \((H_{f_2},C_{f_2},\mathsf{left}(r_{\mathrm{sc}}),v_{f_2,l})\), and \((H_{f_2},C_{f_2},\mathsf{right}(r_{\mathrm{sc}}),v_{f_2,r})\) to \(\mathcal E_{\mathrm{sc}}\).
+  \item \(\verifier\): append \((H_{g_2},C_{g_2},\mathsf{parent}(r_{\mathrm{sc}}),v_{g_2,p})\), \((H_{g_2},C_{g_2},\mathsf{left}(r_{\mathrm{sc}}),v_{g_2,l})\), and \((H_{g_2},C_{g_2},\mathsf{right}(r_{\mathrm{sc}}),v_{g_2,r})\) to \(\mathcal E_{\mathrm{sc}}\).
+  \item \(\verifier\): \(A_{\mathrm{sc}}\gets\widehat A(r_{\mathrm{chk}},r_{\mathrm{sc}})\) and \(X_{\mathrm{sc}}\gets\chi_{r_{\mathrm{chk}}}(r_{\mathrm{sc}})\).
+  \item \(\verifier\): \(T_{\mathrm{eval}}\gets\lambda_1v_{u_2,2}A_{\mathrm{sc}}+\lambda_2v_{u_4,2}A_{\mathrm{sc}}+\lambda_3X_{\mathrm{sc}}(v_{f_1,p}-v_{f_1,l}v_{f_1,r})+\lambda_4X_{\mathrm{sc}}(v_{g_1,p}-v_{g_1,l}v_{g_1,r})+\lambda_5X_{\mathrm{sc}}(v_{f_2,p}-v_{f_2,l}v_{f_2,r})+\lambda_6X_{\mathrm{sc}}(v_{g_2,p}-v_{g_2,l}v_{g_2,r})\).
+  \item \(\verifier\): if \(T_{\mathrm{sc}}\ne T_{\mathrm{eval}}\), return \((0,\mathcal E_{\mathrm{sc}})\).
+  \item \(\verifier\): return \((1,\mathcal E_{\mathrm{sc}})\).
+\end{enumerate}
+\end{protocolbox}
+
+\subsection{The Paper-Faithful Blaze PCS}
+
+The Blaze PCS is now just the row fold plus the compiled RAA relation.  The
+row fold gives the verifier an openable virtual tensor \(c_\star\).  It does
+not promise that \(c_\star\) is a valid RAA codeword.  The BaseFold-backed
+compiler is what turns this into a proximity statement: if the prover accepts,
+then the transcript extracts a tensor close to the already-bound \(c_\star\)
+that satisfies the RAA relation for the folded message \(m_\star\), and
+\(\MLE(m_\star)(z_{\mathrm{col}})=v_\star\).
+
+The top-level protocol has one commitment phase and one opening phase.  During
+commit, the prover encodes every row \(m[h,\ast]\) with RAA and commits to the
+columns of the resulting matrix.  During open, the prover first reduces the
+original claim \(\MLE(m)(z)=v\) to row claims at \(z_{\mathrm{col}}\).  The verifier
+then samples \(\rho\), which compresses all rows into one folded message
+\(m_\star\) and one openable virtual tensor \(c_\star\).  The rest of the work
+is delegated to the compiled RAA relation: extract a tensor close to the one
+opened through \(R_\star\), prove that the extracted tensor is the RAA encoding
+of \(m_\star\), and prove that \(\MLE(m_\star)(z_{\mathrm{col}})=v_\star\).
+
+\begin{protocolbox}{Protocol: Paper-Faithful Blaze PCS}{fig:protocol-paper-blaze-pcs}
+\scriptsize\raggedright
+\noindent Public parameters: \(\ell,k,n\), \(L=2^\ell\), \(K=2^k\), \(N=2^n\), \(\RAA:\F^{\B^k}\to\F^{\B^n}\), \(\Pi_{\mathrm{rowFoldCommit}}\), \(\mathcal F_{\mathrm{Commit}}\), \(\MLEAuth\), and \(\mathsf{RAA.Checks}\).
+
+\smallskip
+\noindent\(\underline{\mathsf{BlazePF.Commit}(\verifier:\bot,\ \prover:m\in\F^{\B^\ell\times\B^k})\to C_m\in\Handle}\)
+
+\smallskip
+\begin{enumerate}[leftmargin=0.24in,label=\textbf{C\arabic*.},itemsep=0.06em,topsep=0.06em,parsep=0pt]
+  \item \(\prover\): for each \(h\in\B^\ell\), compute \(c[h,\ast]\gets\RAA(m[h,\ast])\in\F^{\B^n}\).
+  \item \(\prover\): define \(C[b]\gets c[\ast,b]\in\F^{\B^\ell}\) for each \(b\in\B^n\).
+  \item \(\prover,\verifier\): \(R_{\mathrm{outer}}\gets\mathcal F_{\mathrm{Commit}}.\Com(C)\).
+  \item \(\prover,\verifier\): \(C_m\gets R_{\mathrm{outer}}\).
+  \item \(\prover,\verifier\): return \(C_m\).
+\end{enumerate}
+
+\smallskip
+\noindent\(\underline{\mathsf{BlazePF.Open}(\verifier:(C_m\in\Handle,z=(z_{\mathrm{row}},z_{\mathrm{col}})\in\F^\ell\times\F^k,v\in\F),\ \prover:(m\in\F^{\B^\ell\times\B^k},C_m\in\Handle,z\in\F^\ell\times\F^k,v\in\F))\to\{0,1\}}\)
+
+\smallskip
+\begin{enumerate}[leftmargin=0.24in,label=\textbf{O\arabic*.},itemsep=0.06em,topsep=0.06em,parsep=0pt]
+  \item \(\prover\): for each \(h\in\B^\ell\), compute \(u[h]\gets\MLE(m[h,\ast])(z_{\mathrm{col}})\in\F\).
+  \item \(\prover\to\verifier\): \(u\in\F^{\B^\ell}\).
+  \item \(\verifier\): if \(v\ne\sum_{h\in\B^\ell}\chi_h(z_{\mathrm{row}})u[h]\), return reject.
+  \item \(\verifier\): sample \(\rho\leftarrow\F^{\B^\ell}\).
+  \item \(\verifier\to\prover\): \(\rho\).
+  \item \(\prover,\verifier\): \(R_\star\gets\Pi_{\mathrm{rowFoldCommit}}.\mathsf{Commit}(\verifier:(C_m,\rho),\prover:(C_m,\rho))\).
+  \item \(\prover\): compute \(m_\star[a]\gets\sum_{h\in\B^\ell}\rho[h]m[h,a]\) for each \(a\in\B^k\).
+  \item \(\verifier\): compute \(v_\star\gets\sum_{h\in\B^\ell}\rho[h]u[h]\).
+  \item \(\prover\): compute \(u_1,u_2,u_3,u_4,u_5\in\F^{\B^n}\) from the RAA pipeline on \(m_\star\).
+  \item \(\prover\): compute a witness candidate \(c_\star^{\mathrm{wit}}\in\F^{\B^n}\) by \(c_\star^{\mathrm{wit}}[b]\gets\sum_{h\in\B^\ell}\rho[h]c[h,b]\) for each \(b\in\B^n\).
+  \item \(\prover\): for an honest witness, \(c_\star^{\mathrm{wit}}=u_5\); verifier-facing openings of \(c_\star\) still come from \(R_\star\).
+  \item \(\prover,\verifier\): \(C_{c_\star}\gets R_\star\).
+  \item \(\prover,\verifier\): \(C_{m_\star}\gets\mathcal F_{\mathrm{Commit}}.\Com(\prover:m_\star,\verifier:\bot)\).
+  \item \(\prover,\verifier\): \(C_{u_i}\gets\mathcal F_{\mathrm{Commit}}.\Com(\prover:u_i,\verifier:\bot)\) for each \(i\in\{2,3,4\}\).
+  \item \(\prover,\verifier\): \(a\gets\mathsf{RAA.Checks}(\verifier:(C_{m_\star},C_{u_2},C_{u_3},C_{u_4},C_{c_\star},z_{\mathrm{col}},v_\star),\prover:(m_\star,u_2,u_3,u_4,c_\star^{\mathrm{wit}}))\).
+  \item \(\verifier\): return \(a\).
+\end{enumerate}
+\end{protocolbox}
+
+This version batches evaluation requests by dimension before invoking
+BaseFold.  The Blaze paper also presents more aggressive packing choices, but
+the mathematical boundary is the same: relation checks produce evaluation
+claims, and the backend authenticates those claims against the committed
+coordinate handles.  The box presents the row-folded \(t=L\) view directly; the
+paper's interleaving theorem tracks the larger-alphabet view used to state
+distance and proximity cleanly.
+
 \section{Research Direction: Succinct Virtual Column Openings}
 
-The Blaze compression step above uses a virtual commitment to the compressed
-codeword $c_\star$.  Once the verifier has sampled the coefficient vector
+The Blaze compression step above uses a virtual commitment to the folded tensor
+$c_\star$.  Once the verifier has sampled the coefficient vector
 $\rho\in\F^{\B^\ell}$, the value at backend coordinate $b\in\B^n$ is
 \[
   c_\star[b]=\sum_{h\in\B^\ell}\rho_h c[h,b].

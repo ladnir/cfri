@@ -1,0 +1,91 @@
+\section{Glossary}
+
+\begin{description}[leftmargin=0.3in,style=nextline]
+  \item[Finite field.]
+        A finite set with addition, subtraction, multiplication, and division by
+        nonzero elements.
+  \item[MLE.]
+        Multilinear extension: the unique multilinear polynomial extending a
+        Boolean tensor to all field points.
+  \item[RAA/PRAA.]
+        The packed repeat-accumulate-accumulate code used by Blaze to encode
+        each message row.
+  \item[Merkle commitment.]
+        A hash-tree commitment that lets the prover open selected flat-vector
+        entries with short authentication paths.
+  \item[IOP.]
+        Interactive oracle proof: an interactive proof template where the prover
+        fixes strings behind message-oracle handles and the
+        verifier later opens selected coordinates through the handle
+        interface.  Its soundness promise is exact membership in a relation.
+  \item[IOPP.]
+        Interactive oracle proof of proximity: a protocol realization of
+        \(\mathcal F_{\mathrm{Prox}}^{L,\delta}\) for some language
+        \(L\subseteq\Sigma^D\).  The verifier receives a handle to a large
+        implicit input, opens selected coordinates through that handle, and
+        rejects inputs farther than \(\delta\) from \(L\).  Close-but-invalid
+        inputs inside the radius are in the proximity gap.
+  \item[Holographic IOP.]
+        An IOP for an indexed relation \(R(i,x,w)\) where the verifier receives
+        a handle to preprocessed public relation data instead of reading all of
+        \(i\).  Its soundness promise is exact membership for the selected
+        relation, not proximity of the index handle.
+  \item[MLIOP.]
+        Multilinear polynomial interactive oracle proof: a polynomial-oracle
+        proof template where the prover registers Boolean tensors with an ideal
+        evaluation functionality that answers MLE evaluations.
+  \item[Sumcheck.]
+        A protocol that reduces a large hypercube sum claim to one random
+        terminal check.
+  \item[BaseFold.]
+        A fold-and-query proof architecture whose concrete protocol realizes
+        proximity for committed codeword oracles.  When superimposed with
+        sumcheck, it helps authenticate terminal \(\mathsf{Eval}\) claims using
+        coordinate \(\mathsf{Open}\) handles.
+  \item[Holographic row.]
+        A row used by the backend but authenticated by an external handle;
+        here, $c_\star$ is authenticated by outer Blaze columns.
+  \item[Residual.]
+        A row whose entries are zero when a local relation is satisfied.
+  \item[Terminal vector.]
+        The five final folded values of
+        $(c_\star,u_2,u_3,u_4,R_\eta)$ after all shared folds.
+\end{description}
+
+\section{References}
+
+\begin{itemize}
+  \item[\textbf{[Blaze24]}] Brehm, Chen, Fisch, Resch, Rothblum, and Zeilberger,
+        ``Blaze: Fast SNARKs from Interleaved RAA Codes,''
+        IACR ePrint 2024/1609.
+        \url{https://eprint.iacr.org/2024/1609}
+  \item[\textbf{[BaseFold23]}] Zeilberger, Chen, and Fisch,
+        ``BaseFold: Efficient Field-Agnostic Polynomial Commitment Schemes from
+        Foldable Codes,'' IACR ePrint 2023/1705.
+        \url{https://eprint.iacr.org/2023/1705}
+  \item[\textbf{[BCS16]}] Ben-Sasson, Chiesa, and Spooner,
+        ``Interactive Oracle Proofs,''
+        Theory of Cryptography Conference 2016.
+  \item[\textbf{[RVW13]}] Rothblum, Vadhan, and Wigderson,
+        ``Interactive Proofs of Proximity: Delegating Computation in
+        Sublinear Time,'' STOC 2013.
+  \item[\textbf{[COS20]}] Chiesa, Ojha, and Spooner,
+        ``Fractal: Post-Quantum and Transparent Recursive Proofs from
+        Holography,'' EUROCRYPT 2020.
+  \item[\textbf{[CBBZ23]}] Chen, Bunz, Boneh, and Zhang,
+        ``HyperPlonk: Plonk with Linear-Time Prover and High-Degree Custom
+        Gates,'' IACR ePrint 2022/1355.
+  \item[\textbf{[LFKN92]}] Lund, Fortnow, Karloff, and Nisan,
+        ``Algebraic Methods for Interactive Proof Systems,'' JACM 1992.
+  \item[\textbf{[CCH19]}] Canetti, Holmgren, Jain, Richelson, and Vaikuntanathan,
+        ``Fiat-Shamir: From Practice to Theory,'' STOC 2019.
+  \item[\textbf{[CMS19]}] Chiesa, Manohar, and Spooner,
+        ``Succinct Arguments in the Quantum Random Oracle Model,''
+        TCC 2019.
+  \item[\textbf{[RZR21]}] Ron-Zewi and Rothblum,
+        ``Local Proofs Approaching the Witness Length,'' January 2021.
+        This is the local code-switching source document in the docs
+        directory.
+  \item[\textbf{[Walkthrough]}] Local source document:
+        the full Blaze protocol walkthrough in the docs directory.
+\end{itemize}

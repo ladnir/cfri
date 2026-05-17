@@ -1,0 +1,294 @@
+\section{Authenticating Native MLE Requests}
+
+The ideal authentication interface \(\mathcal F_{\mathrm{MLEAuth}}\) was defined
+in Figure~\ref{fig:func-mle-auth}.  This section explains the implementation
+shape used later by Blaze.  The native RAA compiler decides which tensors exist
+and which evaluations are needed.  The authentication backend should not know
+that RAA structure.  It should only authenticate claims of the form
+\[
+  \MLE(h)(r)=v
+\]
+for committed multilinear tensors \(h\).
+
+Blaze implements this by batching the field-point claims and then using an RMLE
+protocol that realizes the appropriate language-proximity functionality, with
+BaseFold as the concrete example~[Blaze24,BaseFold23].  The batching step
+follows the HyperPlonk-style MLE evaluation batching used by
+Blaze~[CBBZ23,Blaze24].
+
+The batching step is itself just sumcheck.  Suppose the verifier has already
+fixed one committed tensor \(A\in\F^{\B^M}\), and wants to authenticate \(t\)
+claims, where \([t]=\{1,\ldots,t\}\):
+\[
+  \MLE(A)(x_i)=v_i,
+  \qquad x_i\in\F^M,\quad v_i\in\F,\quad i\in[t].
+\]
+For every point \(x\in\F^M\), the MLE identity says
+\[
+  \MLE(A)(x)=\sum_{b\in\B^M}A[b]\chi_b(x).
+\]
+After the verifier samples a batching challenge \(\gamma\), the \(t\) claims
+are folded into the single Boolean-sum claim
+\[
+  \sum_{b\in\B^M}\MLE(A)(b)W_\gamma(b)
+  =
+  \sum_{i=1}^t\gamma^{i-1}v_i,
+  \qquad
+  W_\gamma(X)=\sum_{i=1}^t\gamma^{i-1}\chi_X(x_i).
+\]
+Here \(W_\gamma:\F^M\to\F\) is public once the request list and \(\gamma\) are
+known.  If all \(t\) requested claims are true, then this Boolean-sum claim is
+true exactly.  If at least one requested claim is false, then the folded claim
+can still be true only when
+\[
+  \sum_{i=1}^t \gamma^{i-1}\bigl(\MLE(A)(x_i)-v_i\bigr)=0.
+\]
+For a fixed committed tensor \(A\) and fixed false request list, this is a
+nonzero polynomial in \(\gamma\) of degree at most \(t-1\).  That is the
+random-linear-combination loss, bounded by \((t-1)/|\F|\) by
+Schwartz--Zippel.
+
+Conditioned on the folded Boolean-sum claim being false, ordinary sumcheck
+soundness is the next barrier.  Sumcheck on the product
+\(\MLE(A)(X)W_\gamma(X)\) reduces the Boolean sum to one endpoint equation
+\[
+  \MLE(A)(r_{\mathrm{batch}})W_\gamma(r_{\mathrm{batch}})
+  =
+  T_{\mathrm{batch}}.
+\]
+The prover then supplies \(v_{\mathrm{batch}}\), the claimed value of
+\(\MLE(A)(r_{\mathrm{batch}})\), and the backend authenticates that one MLE
+claim.
+The endpoint factor \(W_\gamma(r_{\mathrm{batch}})\) deserves a small warning.
+When it is nonzero, the terminal equation pins down the required backend value.
+When it is zero, the terminal equation no longer determines
+\(v_{\mathrm{batch}}\); the transcript is then handled by the preceding
+random-combination and sumcheck soundness analysis rather than by the final
+backend opening.  One can conservatively count this as an endpoint degeneracy
+event in the batching reduction.  When \(W_\gamma\) is not the zero polynomial,
+Schwartz--Zippel bounds this event by \(M/|\F|\) over
+\(r_{\mathrm{batch}}\).  It is not a separate commitment assumption.
+The notation \(\chi_X(x_i)\) means the same equality polynomial as
+\(\chi_b(x_i)\), but with the Boolean address \(b\) replaced by the field
+variable \(X\).  Thus \(W_\gamma\) is a public multilinear polynomial in \(X\).
+
+The real protocol also needs coordinate commitments, because the backend cannot
+store all tensors in an ideal box.  These coordinate handles still use an
+\(\mathsf{Open}\) API for Boolean-indexed entries, while MLE field-point claims
+use \(\mathsf{Eval}\).  A real commitment phase therefore receives two pieces
+for each oracle:
+\[
+  h_i\in\F^{\B^{d_i}}
+  \qquad\text{and}\qquad
+  C_i,
+\]
+where \(C_i\) is a coordinate-opening handle for \(h_i\).  The handle may be an
+ordinary Merkle message-oracle handle, a composite message-oracle handle, or a
+virtual message-oracle handle.  The implementation below treats all handles
+opaquely.
+
+The implementation uses one single-tensor backend subroutine.  Its job is not
+to know where the tensor came from.  It receives a tensor
+\(A\in\F^{\B^M}\) together with a coordinate-opening handle \(C_A\) for
+Boolean entries of \(A\), returns an opaque backend handle, and later
+authenticates one claim \(\MLE(A)(r)=v\).  The Blaze-facing API is therefore
+\[
+  \BackendRMLE.\mathsf{Commit}(A,C_A)\to A_{\mathrm{auth}},
+  \qquad
+  \BackendRMLE.\mathsf{Eval}(A_{\mathrm{auth}},r,v)\to\{0,1\}.
+\]
+The backend may internally compute an encoded word
+\(\pi_M=\Enc_M(A)\), commit only to its non-systematic part, and route
+systematic coordinates through \(C_A\).  That internal codeword is not an
+object that the Blaze compiler inspects; it exists to define the RMLE relation
+and the proximity check.
+
+The backend handle \(A_{\mathrm{auth}}\) is therefore the boundary.  It stores
+whatever commitment state the backend needs: the systematic coordinate handle
+\(C_A\), any backend-owned parity commitments, routing data, dimensions, and
+the public code parameters.  The evaluation phase uses that state to run the
+backend's ordinary RMLE evaluation proof.  We do not expose a separate
+``precommitted BaseFold'' API to Blaze.
+
+This proximity check is doing real work.  A few authenticated coordinate
+openings do not, by themselves, prove that a received word is a valid backend
+encoding.  The foldable-code distance and proximity analysis are what let the
+backend treat an accepting transcript as close to some valid encoded tensor.
+Inside the unique-decoding radius this nearby codeword determines the tensor;
+outside that radius one must reason with the stated list-decoding soundness
+loss.  In either case, the received word itself is not promised to be error-free.
+This is also the reason the Blaze compiler should see \(\BackendRMLE\) only as
+an authentication boundary.  It submits tensors and coordinate handles, then
+receives accept/reject answers for MLE claims.  It does not inspect the backend
+codeword, choose backend proximity queries, or assume that verifier-facing
+handles are literally error-free.
+
+\begin{protocolbox}{Subroutine: \(\BackendRMLE\) Authentication}{fig:protocol-rmle-backend}
+\scriptsize\raggedright
+\noindent Public parameters: dimension \(M\); systematic foldable-code encoders
+\(\Enc_i:\F^{\B^i}\to\F^{\B^{n_i}}\) for \(i\in\{0,\ldots,M\}\), with
+\(\Enc_i(A)[0^{n_i-i}\Vert a]=A[a]\); the BaseFold folding rules from
+Figure~\ref{fig:protocol-basefold-pcs-eval}; query count \(Q_{\mathrm{BF}}\);
+and the coordinate-opening API \(\mathcal F_{\mathrm{MsgOracle}}\).
+
+\smallskip
+\noindent\(\underline{\BackendRMLE.\mathsf{Commit}(\prover:A\in\F^{\B^M},\ \verifier:C_A\in\Handle)\to A_{\mathrm{auth}}\in\Handle}\)
+
+\smallskip
+\begin{enumerate}[leftmargin=0.24in,label=\textbf{R\arabic*.},itemsep=0.06em,topsep=0.06em,parsep=0pt]
+  \item \(\prover\): compute \(\pi_M=\Enc_M(A)\in\F^{\B^{n_M}}\).
+  \item \(\prover\): let \(\pi_{\mathrm{ext}}\) be \(\pi_M\) restricted to
+        \(\B^{n_M}\setminus(0^{n_M-M}\Vert\B^M)\).
+  \item \(\prover\): \(C_{\mathrm{ext}}\gets
+        \mathcal F_{\mathrm{MsgOracle}}.\mathsf{Submit}(\pi_{\mathrm{ext}})\).
+  \item \(\prover\to\verifier\): \(C_{\mathrm{ext}}\).
+  \item \(\prover,\verifier\): define \(C_M\) over \(\B^{n_M}\): on
+        \(0^{n_M-M}\Vert a\), open \(C_A\) at \(a\); on
+        \(b\in\B^{n_M}\setminus(0^{n_M-M}\Vert\B^M)\), open
+        \(C_{\mathrm{ext}}\) at \(b\).
+  \item \(\BackendRMLE\): return
+        \(A_{\mathrm{auth}}=(C_M,C_{\mathrm{ext}},C_A,M)\), where \(C_M\) is the
+        backend's top coordinate handle.
+\end{enumerate}
+
+\smallskip
+\noindent\(\underline{\BackendRMLE.\mathsf{Eval}(\verifier:(A_{\mathrm{auth}},r\in\F^M,v\in\F),\ \prover:A\in\F^{\B^M})\to(\verifier:b\in\{0,1\})}\)
+
+\smallskip
+\begin{enumerate}[leftmargin=0.24in,label=\textbf{S\arabic*.},itemsep=0.06em,topsep=0.06em,parsep=0pt]
+  \item \(\prover,\verifier\): run the backend RMLE evaluation proof for the
+        claim \(\MLE(A)(r)=v\), using the commitment state in
+        \(A_{\mathrm{auth}}\).
+  \item \(\BackendRMLE\): internally, this proof may be instantiated by the
+        BaseFold PCS evaluation protocol from
+        Figure~\ref{fig:protocol-basefold-pcs-eval}, or by another IOPP/RMLE
+        backend with the same authentication guarantee.
+  \item \(\BackendRMLE\): return \((\verifier:b)\), where \(b\) is
+        the result of that RMLE evaluation proof.
+\end{enumerate}
+\end{protocolbox}
+
+\begin{protocolbox}{Subroutine: MLE Evaluation Batching}{fig:protocol-mle-eval-batch}
+\scriptsize\raggedright
+\noindent Public parameters: dimension \(M\), equality basis \(\chi\), and
+degree-two \(M\)-variate sumcheck \(\mathsf{SC}_M\).
+
+\smallskip
+\noindent\(\underline{\mathsf{MLEBatch}(\verifier:(x_i\in\F^M,v_i\in\F)_{i\in[t]},\ \prover:A\in\F^{\B^M})\to(a\in\{0,1\},r_{\mathrm{batch}}\in\F^M,v_{\mathrm{batch}}\in\F)}\)
+
+\smallskip
+\begin{enumerate}[leftmargin=0.24in,label=\textbf{M\arabic*.},itemsep=0.06em,topsep=0.06em,parsep=0pt]
+  \item \(\verifier\): sample \(\gamma\leftarrow\F\), then send
+        \(\gamma\) to \(\prover\).
+  \item \(\verifier\): for \(i\in[t]\), set \(\gamma_i\gets\gamma^{i-1}\).
+  \item \(\verifier\): define
+        \(W_\gamma(X)\gets\sum_{i\in[t]}\gamma_i\chi_X(x_i)\).
+  \item \(\verifier\): set
+        \(S_\gamma\gets\sum_{i\in[t]}\gamma_i v_i\).
+  \item \(\prover\): set
+        \(G_\gamma(X)\gets\MLE(A)(X)W_\gamma(X)\).
+  \item \(\prover,\verifier\):
+        \((a_{\mathrm{sc}},r_{\mathrm{batch}},T_{\mathrm{batch}})
+        \gets\mathsf{SC}_M(\verifier:S_\gamma,\prover:G_\gamma)\).
+  \item \(\verifier\): if \(a_{\mathrm{sc}}=0\), return
+        \((0,0^M,0)\).
+  \item \(\prover\to\verifier\): \(v_{\mathrm{batch}}\in\F\).
+  \item \(\verifier\): if
+        \(T_{\mathrm{batch}}\ne v_{\mathrm{batch}}W_\gamma(r_{\mathrm{batch}})\),
+        return \((0,r_{\mathrm{batch}},v_{\mathrm{batch}})\).
+  \item \(\verifier\): return \((1,r_{\mathrm{batch}},v_{\mathrm{batch}})\).
+\end{enumerate}
+\end{protocolbox}
+
+\begin{protocolbox}{Implementation: \(\MLEAuth\) From Batching And BaseFold/RMLE}{fig:protocol-mle-auth-basefold}
+\scriptsize\raggedright
+\noindent Public parameters: field \(\F\); a maximum backend dimension \(D\);
+an active lane set \(\mathcal L_0\subseteq\B^s\); a coordinate-opening API
+\(\mathcal F_{\mathrm{MsgOracle}}\); the MLE batching subroutine from
+Figure~\ref{fig:protocol-mle-eval-batch}; and the BaseFold-like RMLE subroutine
+\(\BackendRMLE\) from Figure~\ref{fig:protocol-rmle-backend}, instantiated
+with \(M=s+D\).
+
+\smallskip
+\noindent For \(h\in\F^{\B^d}\) with \(d\le D\), define the zero-padded tensor
+\(\Pad_{d\to D}(h)\in\F^{\B^D}\) by
+\[
+  \Pad_{d\to D}(h)[a\Vert t]
+  =
+  \begin{cases}
+    h[a], & t=0^{D-d},\\
+    0, & t\ne0^{D-d},
+  \end{cases}
+  \qquad
+  a\in\B^d,\quad t\in\B^{D-d}.
+\]
+Then
+\[
+  \MLE(\Pad_{d\to D}(h))(r\Vert0^{D-d})=\MLE(h)(r).
+\]
+
+\smallskip
+\noindent\(\underline{\MLEAuth.\mathsf{Commit}(\prover:(h_q\in\F^{\B^{d_q}})_{q\in\mathcal L_0},\ \verifier:(d_q,C_q)_{q\in\mathcal L_0})\to A_{\mathrm{auth}}\in\Handle}\)
+
+\smallskip
+\begin{enumerate}[leftmargin=0.24in,label=\textbf{B\arabic*.},itemsep=0.06em,topsep=0.06em,parsep=0pt]
+  \item \(\prover\): for each \(q\in\mathcal L_0\), compute
+        \(\bar h_q\gets\Pad_{d_q\to D}(h_q)\in\F^{\B^D}\).
+  \item \(\prover\): define the packed tensor
+        \(A\in\F^{\B^s\times\B^D}\) by \(A[q,b]=\bar h_q[b]\) for
+        \(q\in\mathcal L_0\), and \(A[q,b]=0\) for padded lanes
+        \(q\in\B^s\setminus\mathcal L_0\).
+  \item \(\prover,\verifier\): construct a packed coordinate handle \(C_A\).
+        For \(q\in\mathcal L_0\) and \(b=a\Vert t\in\B^D\) with
+        \(a\in\B^{d_q}\), opening \(C_A\) at \((q,b)\) routes to
+        \(\mathcal F_{\mathrm{MsgOracle}}.\mathsf{Open}(C_q,a)\) when \(t=0^{D-d_q}\),
+        and returns \(0\) otherwise.  Padded lanes also return \(0\).
+  \item \(\prover,\verifier\): run the commit phase of
+        \(\BackendRMLE\) on \((A,C_A)\), receiving backend handle
+        \(A_{\mathrm{auth}}\).
+  \item \(\MLEAuth\): return \(A_{\mathrm{auth}}\), with \(C_A\) and
+        the public table \((q,d_q,C_q)_{q\in\mathcal L_0}\) attached to it.
+\end{enumerate}
+
+\smallskip
+\noindent\(\underline{\MLEAuth.\mathsf{Eval}(\verifier:(A_{\mathrm{auth}},\mathcal E),\ \prover:(h_q)_{q\in\mathcal L_0})\to(\verifier:b\in\{0,1\})}\)
+
+\smallskip
+\noindent Here
+\[
+  \mathcal E=\{(q_i,r_i,v_i)\}_{i=1}^t,
+  \qquad
+  q_i\in\mathcal L_0,\quad r_i\in\F^{d_{q_i}},\quad v_i\in\F.
+\]
+
+\smallskip
+\begin{enumerate}[leftmargin=0.24in,label=\textbf{O\arabic*.},itemsep=0.06em,topsep=0.06em,parsep=0pt]
+  \item \(\prover\): use the packed tensor \(A\) determined by the commit
+        phase from \((h_q)_{q\in\mathcal L_0}\).
+  \item \(\verifier\): for \(i\in[t]\), set
+        \(x_i\gets q_i\Vert r_i\Vert0^{D-d_{q_i}}\in\F^{s+D}\).
+  \item \(\prover,\verifier\):
+        \((a_{\mathrm{batch}},r_{\mathrm{batch}},v_{\mathrm{batch}})
+        \gets\mathsf{MLEBatch}
+        (\verifier:(x_i,v_i)_{i\in[t]},\prover:A)\).
+  \item \(\verifier\): if \(a_{\mathrm{batch}}=0\), return
+        \((\verifier:0)\).
+  \item \(\prover,\verifier\): run the evaluation proof phase of
+        \(\BackendRMLE\) on
+        \((A_{\mathrm{auth}},r_{\mathrm{batch}},v_{\mathrm{batch}})\).
+  \item \(\MLEAuth\): set \(b\gets1\) iff \(\BackendRMLE\) accepts;
+        otherwise set \(b\gets0\).
+  \item \(\MLEAuth\): return \((\verifier:b)\).
+\end{enumerate}
+\end{protocolbox}
+
+This is our implementation model for the Blaze compiler boundary.  Blaze
+supplies opaque MLIOP oracle tensors and later supplies evaluation requests.
+The implementation pads and packs those oracles so that one BaseFold/RMLE
+backend instance can bind the whole family.  Batching happens before the RMLE
+\(\mathsf{Eval}\) proof:
+handles are fixed first, then verifier randomness forms the batched claim.  A
+batched virtual handle may still fan out to several underlying coordinate
+openings when the backend queries it.  No RAA relation is injected into
+BaseFold; the backend authenticates the packed tensor, while the RAA algebra is
+carried entirely by the request list and the scalar checks that produced it.

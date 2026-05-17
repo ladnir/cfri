@@ -1,0 +1,36 @@
+\section{Finite Fields From First Principles}
+
+A field is a set in which one can add, subtract, multiply, and divide by any
+nonzero element, with the usual algebraic rules.  Familiar examples include the
+rational numbers and real numbers.  Cryptographic proof systems usually use
+finite fields: fields with only finitely many elements.
+
+The target implementation uses a binary field with $2^{128}$ elements,
+\[
+  \F_{2^{128}}
+  =
+  \F_2[X]/(X^{128}+X^7+X^3+X+1).
+\]
+This means an element is a polynomial of degree at most $127$ with coefficients
+in $\{0,1\}$, and multiplication is reduced modulo the irreducible polynomial
+$X^{128}+X^7+X^3+X+1$.  Addition is coefficient-wise addition modulo two, which
+is bitwise XOR in the usual machine representation.
+
+For the theory, the exact field is less important than three properties:
+
+\begin{enumerate}[label=\textbf{F\arabic*.}]
+  \item We can perform field arithmetic exactly.
+  \item The field is large enough that random field challenges make cheating
+        unlikely.
+  \item Linear equations and low-degree polynomial identities can be tested by
+        evaluating them at random points.
+\end{enumerate}
+
+The protocol relies heavily on linearity.  If $A$ is a linear map, then
+\[
+  A(\alpha x+\beta y)=\alpha A(x)+\beta A(y).
+\]
+This simple equation is the reason Blaze can collapse $t$ committed row words
+into one openable tensor $c_\star$ and ask the backend to prove one RAA
+relation about it.
+

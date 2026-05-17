@@ -1,0 +1,506 @@
+\section{The Blaze PCS}
+
+We can now assemble the pieces.  The PCS witness is a multilinear polynomial
+represented by its Boolean evaluation tensor
+\[
+  m\in\F^{\B^\ell\times\B^k}.
+\]
+The first coordinate \(h\in\B^\ell\) selects one slice, and the second
+coordinate \(a\in\B^k\) selects a coordinate inside that slice.  The verifier's
+opening claim is
+\[
+  z=(z_{\mathrm{slice}},z_{\mathrm{in}})\in\F^\ell\times\F^k,
+  \qquad
+  v\in\F,
+  \qquad
+  \MLE(m)(z)=v.
+\]
+
+Blaze does not authenticate this whole tensor by running a foldable-code PCS on
+all \(2^{\ell+k}\) entries.  It first encodes each slice with the fast RAA code
+\[
+  \RAA:\F^{\B^k}\to\F^{\B^n},
+  \qquad K=2^k,\quad N=2^n,\quad k<n,
+\]
+and commits to the encoded matrix
+\[
+  c\in\F^{\B^\ell\times\B^n},
+  \qquad
+  c[h,b]=\RAA(m[h,\ast])[b].
+\]
+This gives the verifier coordinate access to encoded columns \(c[\ast,b]\).
+The row-fold step then compresses all slices into one virtual codeword.  The
+key word is virtual: after the fold, the verifier has an openable tensor
+\(c_\star\), but \(c_\star\) is not promised to be an RAA codeword.  The later
+native RAA checks and \(\MLEAuth\) backend are what authenticate the claim that
+the folded object is close to an honest RAA encoding of a folded message.
+
+\subsection{The Row-Fold Virtual Handle}
+
+The row-fold handle implements the message-oracle interface from
+Figure~\ref{fig:func-msg-oracle}.  It does not store a new vector.  It stores an
+existing handle for the committed encoded matrix and the verifier's fold vector
+\(\rho\in\F^{\B^\ell}\).  When a backend asks for \(c_\star[b]\), the handle
+opens the already-committed column \(c[\ast,b]\) and returns its inner product
+with \(\rho\).
+
+% DO NOT MODIFY: Frozen semantic anchor for the Blaze PCS.
+% This figure defines the only row-fold commitment topology used by Figure~\ref{fig:protocol-blaze-pcs}.
+\begin{protocolbox}{Virtual Handle: Row Fold}{fig:protocol-row-fold-handle}
+\scriptsize\raggedright
+\noindent\textbf{DO NOT MODIFY.} Frozen semantic anchor for the Blaze PCS.
+
+\smallskip
+\noindent Public parameters: slice domain \(\B^\ell\), codeword domain
+\(\B^n\), and the message-oracle functionality
+\(\mathcal F_{\mathrm{MsgOracle}}\).
+
+\smallskip
+\noindent\(\underline{\mathsf{RowFold.Commit}(\verifier:(R_c,\rho\in\F^{\B^\ell}),\ \prover:(R_c,\rho))\to R_\star\in\Handle}\)
+
+\smallskip
+\noindent Here \(R_c\) is a message-oracle handle for a tensor
+\(C\in(\F^{\B^\ell})^{\B^n}\).
+
+\smallskip
+\begin{enumerate}[leftmargin=0.24in,label=\textbf{F\arabic*.},itemsep=0.06em,topsep=0.06em,parsep=0pt]
+  \item \(\mathsf{RowFold}\): create a fresh handle \(R_\star\).
+  \item \(\mathsf{RowFold}\): store \((R_c,\rho)\) under \(R_\star\).
+  \item \(\mathsf{RowFold}\): return \(R_\star\).
+\end{enumerate}
+
+\smallskip
+\noindent\(\underline{\mathsf{RowFold.Open}(\verifier:(R_\star,b\in\B^n))\to(\verifier:o\in\F\cup\{\bot\})}\)
+
+\smallskip
+\begin{enumerate}[leftmargin=0.24in,label=\textbf{G\arabic*.},itemsep=0.06em,topsep=0.06em,parsep=0pt]
+  \item \(\mathsf{RowFold}\): read \((R_c,\rho)\) stored under \(R_\star\).
+  \item \(\mathsf{RowFold}\): call
+        \(\mathcal F_{\mathrm{MsgOracle}}.\mathsf{Open}(\verifier:(R_c,b))\),
+        receiving \(w\in\F^{\B^\ell}\cup\{\bot\}\).
+  \item \(\mathsf{RowFold}\): if \(w=\bot\), return \(\bot\).
+  \item \(\mathsf{RowFold}\): return
+        \((\verifier:o=\sum_{h\in\B^\ell}\rho[h]w[h])\).
+\end{enumerate}
+\end{protocolbox}
+
+The tensor opened by \(R_\star\) is therefore
+\[
+  c_\star[b]=\sum_{h\in\B^\ell}\rho[h]c[h,b],
+  \qquad b\in\B^n.
+\]
+This definition is binding because \(R_c\) was already fixed before
+\(\rho\) was sampled.
+
+\subsection{Compiled RAA Adapter}
+
+The native RAA flow in Figure~\ref{fig:native-blaze-fmliop-hybrid} is written in the
+MLIOP model, where a native oracle handle \(O_H\) is a source of MLE values.  A
+real compiled protocol has coordinate-opening handles \(C_H\) instead.  The
+adapter below is the bridge: it follows the same algebra and timing as the
+native RAA compiler, but every native evaluation request is later authenticated
+through \(\MLEAuth\).
+
+Equivalently, the adapter turns native requests into RMLE-style authentication
+tasks.  For one tensor \(H\in\F^{\B^d}\), an RMLE task consists of a
+coordinate-opening handle \(C_H\) for the Boolean entries of \(H\) together
+with an MLE claim
+\[
+  \MLE(H)(r)=v,\qquad r\in\F^d.
+\]
+The backend may encode \(H\), prove proximity to that encoded object, and
+answer the MLE claim through BaseFold/RMLE.  The RAA algebra does not inspect
+that backend encoding; it only supplies the list of claims to authenticate.
+
+We first name the compiled versions of the two reducers.  These are not new
+algebraic checks.  They are the same accumulator and permutation reductions
+from Figures~\ref{fig:native-accumulate-reduce} and
+\ref{fig:native-permute-reduce}, but the handle component in every request is a
+coordinate-opening handle \(C_H\), not a native MLIOP handle \(O_H\).  The
+resulting \(\EvalReqs\) are therefore ready to be translated into \(\MLEAuth\)
+lanes.
+The compiled \(u_1\) coordinate handle is virtual in the same sense as
+Figure~\ref{fig:def-virtual-oracle-opening}: the box gives its opening rule
+directly.
+
+% DO NOT MODIFY: Frozen semantic anchor for the Blaze PCS.
+% These reducers are helper figures for Figure~\ref{fig:protocol-compiled-raa-check}.
+\begin{protocolbox}{Subroutine: Compiled RAA Reducers}{fig:protocol-compiled-raa-reducers}
+\scriptsize\raggedright
+\noindent\textbf{DO NOT MODIFY.} Frozen semantic anchor for the Blaze PCS.
+
+\smallskip
+\noindent Public parameters: \(n\), \(\widehat A:\F^n\times\F^n\to\F\),
+\(\Idx,\widehat\pi:\F^n\to\F\), and product-tree maps
+\(\mathsf{root},\mathsf{leaf},\mathsf{parent},\mathsf{left},\mathsf{right}\).
+
+\smallskip
+\noindent\(\underline{\mathsf{CompiledAccumulate.Reduce}(\verifier:(H_x,C_x,H_y,C_y,r\in\F^n),\ \prover:(x,y\in\F^{\B^n}))\to(\EvalReqs,\SumClaims)}\)
+
+\smallskip
+\begin{enumerate}[leftmargin=0.24in,label=\textbf{CA\arabic*.},itemsep=0.06em,topsep=0.06em,parsep=0pt]
+  \item \(\prover\to\verifier\): \(s\in\F\).
+  \item \(\verifier\): \(\EvalReqs\gets\{(H_y,C_y,r,s)\}\).
+  \item \(\verifier\): \(\SumClaims\gets\bigl((s,H_x,C_x,G(X)=\widehat A(r,X)\widehat H_x(X))\bigr)\).
+  \item \(\verifier\): return \((\EvalReqs,\SumClaims)\).
+\end{enumerate}
+
+\smallskip
+\noindent\(\underline{\mathsf{CompiledPermute.Reduce}(\verifier:(H_x,C_x,H_y,C_y,H_f,C_f,H_g,C_g,\widehat\pi,\alpha,\beta,r\in\F^n),\ \prover:(x,y,f,g))\to(\EvalReqs,\mathcal T,\SumClaims)}\)
+
+\smallskip
+\begin{enumerate}[leftmargin=0.24in,label=\textbf{CP\arabic*.},itemsep=0.06em,topsep=0.06em,parsep=0pt]
+  \item \(\prover\to\verifier\): \(v_{f,\mathrm{root}},v_{g,\mathrm{root}},
+        v_x,v_y,v_f,v_g\in\F\).
+  \item \(\verifier\): \(\EvalReqs\gets
+        \{(H_f,C_f,\mathsf{root},v_{f,\mathrm{root}}),
+        (H_g,C_g,\mathsf{root},v_{g,\mathrm{root}})\}\).
+  \item \(\verifier\): \(\EvalReqs\gets\EvalReqs\cup
+        \{(H_x,C_x,r,v_x),(H_y,C_y,r,v_y),
+        (H_f,C_f,\mathsf{leaf}(r),v_f),(H_g,C_g,\mathsf{leaf}(r),v_g)\}\).
+  \item \(\verifier\): \(\mathcal T\gets
+        \{v_{f,\mathrm{root}}=v_{g,\mathrm{root}},
+        v_f=\alpha-(v_x+\beta\,\widehat\pi(r)),
+        v_g=\alpha-(v_y+\beta\,\Idx(r))\}\).
+  \item \(\verifier\): \(\SumClaims\gets\bigl((0,H_f,C_f,G_f(X)=\chi_r(X)\mathsf{TreeRes}(H_f,X)),(0,H_g,C_g,G_g(X)=\chi_r(X)\mathsf{TreeRes}(H_g,X))\bigr)\).
+  \item \(\verifier\): return \((\EvalReqs,\mathcal T,\SumClaims)\).
+\end{enumerate}
+\end{protocolbox}
+
+% DO NOT MODIFY: Frozen semantic anchor for the Blaze PCS.
+% This figure is the compiled RAA adapter called by Figure~\ref{fig:protocol-blaze-pcs}.
+\begin{protocolbox}{Subroutine: Compiled RAA Check}{fig:protocol-compiled-raa-check}
+\scriptsize\raggedright
+\noindent\textbf{DO NOT MODIFY.} Frozen semantic anchor for the Blaze PCS.
+
+\smallskip
+\noindent Public parameters: \(k,n\), the RAA stage maps, the compiled reducers
+from Figure~\ref{fig:protocol-compiled-raa-reducers}, the handle-parametric six-sumcheck
+from Figure~\ref{fig:native-six-sumcheck}, the \(\MLEAuth\) implementation
+from Figure~\ref{fig:protocol-mle-auth-basefold},
+\(\mathcal F_{\mathrm{MsgOracle}}\), the repetition projection
+\(\mathsf{msg}:\F^n\to\F^k\), \(\mathcal H_{\RAA}=\{m_\star,u_1,u_2,u_3,u_4,c_\star,f_1,g_1,f_2,g_2\}\), injective \(q_{\RAA}:\mathcal H_{\RAA}\to\mathcal L_{\RAA}\subseteq\B^4\), and \(\MLEAuth\) dimension \(D=n+1\).
+
+\smallskip
+\noindent\(\underline{\mathsf{CompiledRAA.Check}(\verifier:(C_{c_\star},z_{\mathrm{in}}\in\F^k,v_\star\in\F),\ \prover:(C_{c_\star},m_\star\in\F^{\B^k},c_\star^{\mathrm{wit}}\in\F^{\B^n}))\to(\verifier:a\in\{0,1\})}\)
+
+\smallskip
+\begin{enumerate}[leftmargin=0.24in,label=\textbf{A\arabic*.},itemsep=0.06em,topsep=0.06em,parsep=0pt]
+  \item \(\prover\): choose \(u_2,u_3,u_4\in\F^{\B^n}\).
+  \item \(\prover\): set \(h_{m_\star}=m_\star\), \(h_{u_i}=u_i\) for
+        \(i\in\{2,3,4\}\), and \(h_{c_\star}=c_\star^{\mathrm{wit}}\).
+  \item \(\prover,\verifier\): for
+        \(H\in\{m_\star,u_2,u_3,u_4\}\), set
+        \(C_H\gets\mathcal F_{\mathrm{MsgOracle}}.\mathsf{Submit}
+        (\prover:h_H,\verifier:\bot)\).
+  \item \(\prover,\verifier\): set \(C_{c_\star}\) to the handle supplied in
+        the verifier input.
+  \item \(\verifier\): sample \(\alpha,\beta\leftarrow\F\), then send
+        \((\alpha,\beta)\) to \(\prover\).
+  \item \(\prover\): define the repetition tensor
+        \(u_1=F_{\mathrm{rep}}(m_\star)\in\F^{\B^n}\).
+  \item \(\prover\): set \(h_{u_1}=u_1\).
+  \item \(\prover,\verifier\): create virtual message-oracle handle \(C_{u_1}\).
+  \item \(\prover,\verifier\): set \(\mathsf{Open}(C_{u_1},b):=\mathsf{Open}(C_{m_\star},\mathsf{msg}(b))\) for \(b\in\B^n\).
+  \item \(\prover\): construct \(f_1,g_1\in\F^{\B^{n+1}}\) by
+        Steps P1--P5 of Figure~\ref{fig:native-permute-reduce}, with
+        \((x,y,\widehat\pi)=(u_1,u_2,\widehat\pi_1)\).
+  \item \(\prover\): construct \(f_2,g_2\in\F^{\B^{n+1}}\) by
+        Steps P1--P5 of Figure~\ref{fig:native-permute-reduce}, with
+        \((x,y,\widehat\pi)=(u_3,u_4,\widehat\pi_2)\).
+  \item \(\prover\): set \(h_T=T\) for
+        \(T\in\{f_1,g_1,f_2,g_2\}\).
+  \item \(\prover,\verifier\): for
+        \(T\in\{f_1,g_1,f_2,g_2\}\), set
+        \(C_T\gets\mathcal F_{\mathrm{MsgOracle}}.\mathsf{Submit}
+        (\prover:T,\verifier:\bot)\).
+  \item \(\prover,\verifier\): for each \(H\in\mathcal H_{\RAA}\), define
+        \(h_{q_{\RAA}(H)}=h_H\), \(C_{q_{\RAA}(H)}=C_H\), with dimensions
+        \(d_{q_{\RAA}(m_\star)}=k\),
+        \(d_{q_{\RAA}(u_i)}=d_{q_{\RAA}(c_\star)}=n\) for
+        \(i\in\{1,2,3,4\}\), and
+        \(d_{q_{\RAA}(f_i)}=d_{q_{\RAA}(g_i)}=n+1\) for \(i\in\{1,2\}\).
+  \item \(\prover,\verifier\): \(A_{\RAA}\gets
+        \MLEAuth.\mathsf{Commit}
+        (\prover:(h_q)_{q\in\mathcal L_{\RAA}},
+        \verifier:(d_q,C_q)_{q\in\mathcal L_{\RAA}})\).
+  \item \(\verifier\): sample \(r_{\mathrm{chk}}\leftarrow\F^n\), then send
+        \(r_{\mathrm{chk}}\) to \(\prover\).
+  \item \(\prover\to\verifier\): \(v_m\in\F\).
+  \item \(\verifier\): \(\EvalReqs_{\mathrm{val}}\gets
+        \{(m_\star,C_{m_\star},z_{\mathrm{in}},v_m)\}\) and
+        \(\mathcal T_{\mathrm{val}}\gets\{v_m=v_\star\}\).
+  \item \(\prover,\verifier\):
+        \((\EvalReqs_{\mathrm{acc},1},\SumClaims_{\mathrm{acc},1})\gets
+        \mathsf{CompiledAccumulate.Reduce}
+        (\verifier:(H_{u_2},C_{u_2},H_{u_3},C_{u_3},r_{\mathrm{chk}}),
+        \prover:(u_2,u_3))\).
+  \item \(\prover,\verifier\):
+        \((\EvalReqs_{\mathrm{acc},2},\SumClaims_{\mathrm{acc},2})\gets
+        \mathsf{CompiledAccumulate.Reduce}
+        (\verifier:(H_{u_4},C_{u_4},H_{c_\star},C_{c_\star},r_{\mathrm{chk}}),
+        \prover:(u_4,c_\star^{\mathrm{wit}}))\).
+  \item \(\prover,\verifier\):
+        \((\EvalReqs_{\mathrm{perm},1},\mathcal T_{\mathrm{perm},1},
+        \SumClaims_{\mathrm{perm},1})\gets
+        \mathsf{CompiledPermute.Reduce}
+        (\verifier:(H_{u_1},C_{u_1},H_{u_2},C_{u_2},H_{f_1},C_{f_1},H_{g_1},C_{g_1},
+        \widehat\pi_1,\alpha,\beta,r_{\mathrm{chk}}),
+        \prover:(u_1,u_2,f_1,g_1))\).
+  \item \(\prover,\verifier\):
+        \((\EvalReqs_{\mathrm{perm},2},\mathcal T_{\mathrm{perm},2},
+        \SumClaims_{\mathrm{perm},2})\gets
+        \mathsf{CompiledPermute.Reduce}
+        (\verifier:(H_{u_3},C_{u_3},H_{u_4},C_{u_4},H_{f_2},C_{f_2},H_{g_2},C_{g_2},
+        \widehat\pi_2,\alpha,\beta,r_{\mathrm{chk}}),
+        \prover:(u_3,u_4,f_2,g_2))\).
+  \item \(\verifier\): \(\EvalReqs_{\mathrm{red}}\gets
+        \EvalReqs_{\mathrm{acc},1}\cup\EvalReqs_{\mathrm{acc},2}\cup
+        \EvalReqs_{\mathrm{perm},1}\cup\EvalReqs_{\mathrm{perm},2}\).
+  \item \(\verifier\): let \(B_1\gets\SumClaims_{\mathrm{acc},1}[1]\), \(B_2\gets\SumClaims_{\mathrm{acc},2}[1]\), \(B_3\gets\SumClaims_{\mathrm{perm},1}[1]\), \(B_4\gets\SumClaims_{\mathrm{perm},1}[2]\), \(B_5\gets\SumClaims_{\mathrm{perm},2}[1]\), \(B_6\gets\SumClaims_{\mathrm{perm},2}[2]\).
+  \item \(\verifier\): \(\SumClaims_{\RAA}\gets(B_1,B_2,B_3,B_4,B_5,B_6)\).
+  \item \(\verifier\): \(\mathcal T_{\mathrm{red}}\gets
+        \mathcal T_{\mathrm{perm},1}\cup\mathcal T_{\mathrm{perm},2}\).
+  \item \(\prover,\verifier\): run Figure~\ref{fig:native-six-sumcheck} on
+        \((\SumClaims_{\RAA},r_{\mathrm{chk}})\), obtaining
+        \((a_{\mathrm{sc}},\EvalReqs_{\mathrm{sc}})\).
+  \item \(\verifier\): if \(a_{\mathrm{sc}}=0\), return \((\verifier:0)\).
+  \item \(\verifier\): if any equality in
+        \(\mathcal T_{\mathrm{val}}\cup\mathcal T_{\mathrm{red}}\) is false,
+        return \((\verifier:0)\).
+  \item \(\verifier\): \(\EvalReqs_{\mathrm{auth}}\gets
+        \EvalReqs_{\mathrm{val}}\cup\EvalReqs_{\mathrm{red}}\cup
+        \EvalReqs_{\mathrm{sc}}\).
+  \item \(\verifier\): translate every
+        \((H,C_H,r,v_H)\in\EvalReqs_{\mathrm{auth}}\) into
+        \((q_{\RAA}(H),r,v_H)\in\mathcal E_{\RAA}\).
+  \item \(\prover,\verifier\): \(a_{\mathrm{auth}}\gets
+        \MLEAuth.\mathsf{Eval}
+        (\verifier:(A_{\RAA},\mathcal E_{\RAA}),
+        \prover:(h_q)_{q\in\mathcal L_{\RAA}})\).
+  \item \(\verifier\): return \((\verifier:a_{\mathrm{auth}})\).
+\end{enumerate}
+\end{protocolbox}
+
+Before we discuss batching these claims, it is useful to spell out exactly what
+the compiled RAA check has produced.  Every authentication request has the form
+\[
+  (H,C_H,r,v_H),
+  \qquad
+  H\in\mathcal H_{\RAA},\quad r\in\F^{d_H},\quad
+  \MLE(H)(r)=v_H,
+\]
+where \(C_H\) is the coordinate-opening handle for the Boolean tensor \(H\).
+The final translation in Step A30 replaces \(H\) by the lane index
+\(q_{\RAA}(H)\), but the logical requests are easier to read before that
+packing step.
+
+\begin{description}[leftmargin=0.25in,itemsep=0.08em,topsep=0.1em,parsep=0pt]
+  \item[Value request.]
+    \((m_\star,C_{m_\star},z_{\mathrm{in}},v_m)\), with
+    \(m_\star\in\F^{\B^k}\).  The verifier also checks the scalar equality
+    \(v_m=v_\star\).
+  \item[Accumulator endpoint requests.]
+    \((u_3,C_{u_3},r_{\mathrm{chk}},s_1)\) and
+    \((c_\star,C_{c_\star},r_{\mathrm{chk}},s_2)\), with
+    \(u_3,c_\star\in\F^{\B^n}\).  These are the output-side MLE claims of the
+    two accumulator reductions.
+  \item[Permutation root requests.]
+    The first permutation contributes
+    \[
+      (f_1,C_{f_1},\mathsf{root},v_{f_1,\mathrm{root}}),
+      \qquad
+      (g_1,C_{g_1},\mathsf{root},v_{g_1,\mathrm{root}}).
+    \]
+    The second permutation contributes the analogous requests for \(f_2\) and
+    \(g_2\).  The tensors \(f_i,g_i\) live in \(\F^{\B^{n+1}}\).  The verifier
+    checks the two scalar root equalities
+    \(v_{f_i,\mathrm{root}}=v_{g_i,\mathrm{root}}\).
+  \item[Permutation leaf requests.]
+    For the first permutation:
+    \[
+      (u_1,C_{u_1},r_{\mathrm{chk}},v_{u_1}),\quad
+      (u_2,C_{u_2},r_{\mathrm{chk}},v_{u_2}),\quad
+      (f_1,C_{f_1},\mathsf{leaf}(r_{\mathrm{chk}}),v_{f_1}),\quad
+      (g_1,C_{g_1},\mathsf{leaf}(r_{\mathrm{chk}}),v_{g_1}).
+    \]
+    The second permutation contributes the analogous four requests with
+    \((u_3,u_4,f_2,g_2,\widehat\pi_2)\).  The verifier checks the scalar leaf
+    equations from Step CP4.
+  \item[Six-sumcheck terminal requests.]
+    The terminal point \(r_{\mathrm{sc}}\in\F^n\) contributes
+    \((u_2,C_{u_2},r_{\mathrm{sc}},v_1)\) and
+    \((u_4,C_{u_4},r_{\mathrm{sc}},v_2)\).  For each
+    \(T\in\{f_1,g_1,f_2,g_2\}\), it also contributes
+    \[
+      (T,C_T,\mathsf{parent}(r_{\mathrm{sc}}),v_{T,p}),\quad
+      (T,C_T,\mathsf{left}(r_{\mathrm{sc}}),v_{T,l}),\quad
+      (T,C_T,\mathsf{right}(r_{\mathrm{sc}}),v_{T,r}).
+    \]
+\end{description}
+
+The public factors \(\widehat A(r_{\mathrm{chk}},r_{\mathrm{sc}})\),
+\(\chi_{r_{\mathrm{chk}}}(r_{\mathrm{sc}})\),
+\(\widehat\pi_i(r_{\mathrm{chk}})\), \(\Idx(r_{\mathrm{chk}})\), and the powers
+of the batching scalar \(\lambda\) are not authentication requests.  They are
+known field elements used in scalar checks after the requested MLE values have
+been authenticated.
+
+For the first permutation, let \(v_{f_1}\) denote the claimed value of
+\(\MLE(f_1)(\mathsf{leaf}(r_{\mathrm{chk}}))\).  The virtual \(u_1\) handle
+means that the leaf equation is concretely
+\[
+  v_{f_1}
+  =
+  \alpha-\bigl(\MLE(m_\star)(\mathsf{msg}(r_{\mathrm{chk}}))
+  +\beta\,\widehat\pi_1(r_{\mathrm{chk}})\bigr).
+\]
+The value \(\MLE(m_\star)(\mathsf{msg}(r_{\mathrm{chk}}))\) is not read by the
+verifier.  It is one of the MLE claims authenticated through
+\(\MLEAuth\), using the virtual coordinate handle \(C_{u_1}\).
+
+\subsection{Top-Level Protocol}
+
+The PCS has one commitment phase and one opening phase.  The commitment phase
+binds the encoded matrix.  The opening phase first checks the original claimed
+evaluation using slice values, then folds those slice claims into one RAA claim,
+and finally invokes the compiled RAA adapter to authenticate the resulting MLE
+evaluation requests.
+
+% DO NOT MODIFY: Frozen semantic anchor.
+% This top-level PCS protocol is the current source of truth for Blaze protocol semantics.
+\begin{protocolbox}{Protocol: Blaze PCS}{fig:protocol-blaze-pcs}
+\scriptsize\raggedright
+\noindent\textbf{DO NOT MODIFY.} Frozen semantic anchor; this figure is the
+current source of truth for Blaze protocol semantics.
+
+\smallskip
+\noindent Public parameters: \(\ell,k,n\), \(L=2^\ell\), \(K=2^k\),
+\(N=2^n\), the RAA map
+\(\RAA:\F^{\B^k}\to\F^{\B^n}\), \(\mathsf{RowFold}\) from
+Figure~\ref{fig:protocol-row-fold-handle}, the compiled RAA check from
+Figure~\ref{fig:protocol-compiled-raa-check}, and
+\(\mathcal F_{\mathrm{MsgOracle}}\).
+
+\smallskip
+\noindent\(\underline{\mathsf{Blaze.Commit}(\verifier:\bot,\ \prover:m\in\F^{\B^\ell\times\B^k})\to C_m\in\Handle}\)
+
+\smallskip
+\begin{enumerate}[leftmargin=0.24in,label=\textbf{C\arabic*.},itemsep=0.06em,topsep=0.06em,parsep=0pt]
+  \item \(\prover\): for each \(h\in\B^\ell\), compute
+        \(c[h,\ast]\gets\RAA(m[h,\ast])\in\F^{\B^n}\).
+  \item \(\prover\): define the column tensor \(C\in(\F^{\B^\ell})^{\B^n}\)
+        by \(C[b]=c[\ast,b]\) for \(b\in\B^n\).
+  \item \(\prover,\verifier\): \(R_c\gets
+        \mathcal F_{\mathrm{MsgOracle}}.\mathsf{Submit}(\prover:C,\verifier:\bot)\).
+  \item \(\mathsf{Blaze}\): return \(C_m=R_c\).
+\end{enumerate}
+
+\smallskip
+\noindent\(\underline{\mathsf{Blaze.Open}(\verifier:(C_m,z=(z_{\mathrm{slice}},z_{\mathrm{in}}),v),\ \prover:(m,C_m,z,v))\to(\verifier:a\in\{0,1\})}\)
+
+\smallskip
+\begin{enumerate}[leftmargin=0.24in,label=\textbf{O\arabic*.},itemsep=0.06em,topsep=0.06em,parsep=0pt]
+  \item \(\prover\): for each \(h\in\B^\ell\), compute
+        \(u[h]\gets\MLE(m[h,\ast])(z_{\mathrm{in}})\).
+  \item \(\prover\to\verifier\): \(u\in\F^{\B^\ell}\).
+  \item \(\verifier\): if
+        \(v\ne\sum_{h\in\B^\ell}\chi_h(z_{\mathrm{slice}})u[h]\), return
+        \((\verifier:0)\).
+  \item \(\verifier\): sample \(\rho\leftarrow\F^{\B^\ell}\).
+  \item \(\verifier\to\prover\): \(\rho\).
+  \item \(\prover,\verifier\): \(R_\star\gets
+        \mathsf{RowFold.Commit}(\verifier:(C_m,\rho),\prover:(C_m,\rho))\).
+  \item \(\prover\): compute \(m_\star\in\F^{\B^k}\) by
+        \(m_\star[a]\gets\sum_{h\in\B^\ell}\rho[h]m[h,a]\).
+  \item \(\verifier\): compute
+        \(v_\star\gets\sum_{h\in\B^\ell}\rho[h]u[h]\).
+  \item \(\prover\): choose \(c_\star^{\mathrm{wit}}\in\F^{\B^n}\).
+  \item \(\prover,\verifier\): \(a_{\RAA}\gets
+        \mathsf{CompiledRAA.Check}
+        (\verifier:(R_\star,z_{\mathrm{in}},v_\star),
+        \prover:(R_\star,m_\star,c_\star^{\mathrm{wit}}))\).
+  \item \(\verifier\): return \((\verifier:a_{\RAA})\).
+\end{enumerate}
+\end{protocolbox}
+
+The tensor \(h_{c_\star}=c_\star^{\mathrm{wit}}\) is only the prover's witness
+candidate for the virtual folded word.  Its authenticated coordinate handle is
+\(R_\star\), so backend openings of \(c_\star\) are checked against the
+previously committed matrix \(c\) through Figure~\ref{fig:protocol-row-fold-handle}.
+There is not a second commitment to \(c_\star^{\mathrm{wit}}\).  The witness
+tensor supplies prover-side values for algebraic computation; the verifier-side
+coordinate source for \(c_\star\) is the virtual row-fold handle \(R_\star\).
+
+\subsection{What Soundness Uses}
+
+The top-level slice check says that the original claim follows from the slice
+values \(u[h]\).  The random vector \(\rho\) then turns many slice claims into
+one folded claim
+\[
+  \MLE(m_\star)(z_{\mathrm{in}})=v_\star.
+\]
+At the same time, the row-fold handle turns the committed encoded matrix into
+one openable virtual tensor \(c_\star\).  If all committed slices were honest,
+then \(c_\star=\RAA(m_\star)\).  If not, the random fold makes the disagreement
+survive in the folded object except with the usual small probability over
+\(\rho\).  This is the interleaving trick in its most concrete form: a query to
+the folded word \(c_\star[b]\) is emulated by opening the committed column
+\(c[\ast,b]\) and taking the verifier's random linear combination.
+Before the backend proximity theorem is applied, this statement is only about
+the verifier's openable virtual word.  It should not be read as saying that the
+virtual word is already known to be a valid RAA codeword.
+
+The native RAA compiler does not prove proximity.  It produces algebraic
+evaluation requests whose truth would imply the RAA stage relations for the
+folded statement.  The \(\MLEAuth\) layer authenticates those requests against
+the coordinate-opening handles, using the BaseFold/RMLE backend described in
+Figure~\ref{fig:protocol-mle-auth-basefold}.  Few coordinate openings do not by
+themselves prove that an opened word is a valid encoding; the backend proximity
+argument and the code distance are what make the authenticated MLE claims mean
+one nearby tensor rather than unrelated sampled answers.
+
+In an accepting transcript, the backend extractor should be read as extracting
+a nearby valid backend object for each authenticated handle.  For the folded
+message and codeword handles, write the extracted tensors as
+\(m_\star^{\mathrm{ext}}\) and \(c_\star^{\mathrm{ext}}\).  The algebraic RAA
+checks prove the relation for the extracted objects:
+\[
+  c_\star^{\mathrm{ext}}=\RAA(m_\star^{\mathrm{ext}}),
+  \qquad
+  \MLE(m_\star^{\mathrm{ext}})(z_{\mathrm{in}})=v_\star.
+\]
+This does not say that the verifier-facing virtual tensor \(c_\star\) is
+literally equal to \(\RAA(m_\star^{\mathrm{ext}})\) at every coordinate.  It says that
+\(c_\star\) is bound by \(R_\star\), authenticated at queried coordinates, and
+forced close enough to the extracted code-consistent tensor for the backend
+soundness theorem to apply.
+
+The soundness case split is therefore explicit.  First, if the packed tensor
+submitted to \(\MLEAuth\) is far from the backend language, the BaseFold/RMLE
+proximity check is supposed to reject except with its proximity error.  Second,
+if the packed tensor is close enough to an extracted tensor but some request
+\((q_i,r_i,v_i)\in\mathcal E_{\RAA}\) is false for that extracted tensor, then
+the batching challenge in Figure~\ref{fig:protocol-mle-eval-batch} must either
+accidentally cancel the false requests or produce a false Boolean-sum claim.
+Third, if the batched Boolean-sum claim is false, sumcheck must be fooled.  At
+the terminal point, the final backend proof authenticates the one remaining
+claim
+\[
+  \MLE(A)(r_{\mathrm{batch}})=v_{\mathrm{batch}},
+\]
+except in the endpoint-degenerate case where the public weight
+\(W_\gamma(r_{\mathrm{batch}})\) vanishes and the terminal equation no longer
+uses that value.  That degeneracy is part of the batching soundness accounting,
+not a new RAA condition.  The Blaze algebra supplies the requests; the backend
+supplies the meaning of those requests against one bound nearby tensor.
+
+Thus the final proof is a composition:
+\[
+  \begin{aligned}
+  &\text{slice evaluation}
+  +\text{ random row fold}\\
+  &\quad+\text{ native RAA algebra}
+  +\text{ authenticated MLE requests}.
+  \end{aligned}
+\]

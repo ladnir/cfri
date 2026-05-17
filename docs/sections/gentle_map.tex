@@ -1,0 +1,23 @@
+\section{A Gentle Map Of The Destination}
+
+Blaze is a protocol for proving evaluations of large committed tensors while
+reading only a small number of symbols.  The final construction uses several
+pieces at once: finite-field arithmetic, multilinear extensions, commitments,
+linear error-correcting codes, sumcheck, row compression, interleaving, RAA
+encoding, and BaseFold-style proximity checks.
+
+This paper builds those pieces bottom-up.  First we separate the proof models
+and oracle interfaces, so words like ``oracle,'' ``implicit input,'' and
+``commitment'' have precise meanings before Blaze starts composing them.  Then
+we define the algebraic objects: fields, tensors, multilinear extensions,
+commitments, codes, sumcheck, and folding.  After that we explain Blaze's
+code-independent compression step: encode many row slices, combine their
+committed row words into an openable folded tensor $c_\star$, and bind
+$c_\star$ back to the committed matrix.  Only after that do we instantiate the
+linear code with RAA and explain the correlated checks that make the proof
+sound.
+
+The one high-level idea to keep in mind is this: the protocol does not run code
+checks and tensor-evaluation checks in isolation.  The opened positions,
+folded terminal values, and multilinear claims must all refer to the same
+committed objects.  Much of the backend exists to maintain that correlation.

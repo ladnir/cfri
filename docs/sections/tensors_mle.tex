@@ -1,0 +1,242 @@
+\section{Tensors, Flat Vectors, And Inner Products}
+
+A tensor is a multi-dimensional array.  In this paper the most common tensor is
+an order-$\ell$ tensor of shape $2\times\cdots\times2$, meaning it has one field
+value for every Boolean address $b=(b_0,\ldots,b_{\ell-1})\in\B^\ell$.  We write
+that entry as $x[b]$.
+
+The tensor-first convention is this paper's notation, but the multilinear
+extension object is the same one used by HyperPlonk and Blaze: a Boolean table
+has a unique multilinear extension to field points~[CBBZ23,Blaze24].
+
+Formally, such a tensor is a function
+\[
+  x:\B^\ell\to\F.
+\]
+We write the vector space of all such tensors as
+\[
+  \F^{\B^\ell}.
+\]
+Thus saying $x\in\F^{\B^\ell}$ means exactly that $x$ assigns one field element
+to each Boolean address in $\B^\ell$.
+
+This tensor notation is the mathematical object.  Implementations eventually
+serialize the same entries into a flat vector for memory, Merkle leaves, and
+codeword coordinates:
+\[
+  x=(x[0],x[1],\ldots,x[N-1]).
+\]
+Here $N=2^\ell$.  The serialization is a deterministic address order for the
+Boolean entries.  In this paper it is always the natural binary order.  For
+\(0\le i<2^\ell\), write
+\[
+  \bits_\ell(i)\in\B^\ell
+\]
+for the length-\(\ell\) binary expansion of \(i\), with leading zeros included.
+Then the \(i\)-th serialized entry is the tensor entry
+\[
+  x[\bits_\ell(i)].
+\]
+For an integer interval \([s,t]\subseteq[0,2^\ell-1]\), write
+\[
+  \bits_\ell([s,t])
+  :=
+  \{\bits_\ell(i):s\le i\le t\}\subseteq\B^\ell.
+\]
+This notation is only an implementation shorthand for a set of Boolean
+addresses.  Protocol statements still use the binary address set.  For product
+domains such as \(\B^a\times\B^b\), the natural layout is the lexicographic
+binary layout induced by concatenation \((u,v)\mapsto u\Vert v\in\B^{a+b}\).
+That order matters for implementors, because it tells them which memory
+locations are paired in a fold or adjacent in an accumulator, but it is not the
+algebraic object being folded.
+
+The inner product of two tensors of the same shape is the sum of entrywise
+products:
+\[
+  \ip{x}{y}=\sum_{b\in\B^\ell} x[b]y[b].
+\]
+After serializing both tensors with the same address order, this is implemented
+as the usual inner product of two length-$N$ flat vectors:
+\[
+  \ip{x}{y}=\sum_{i=0}^{N-1} x[i]y[i].
+\]
+Many claims in this protocol reduce to inner products.  In particular, the
+evaluation of a multilinear extension can be written as an inner product between
+the original tensor and a tensor of public evaluation weights.  The protocol
+uses both views constantly: the tensor view is the algebraic view for Boolean
+addresses and MLEs, while the flat-vector view is the implementation view for
+storage, commitments, and linear-algebra kernels.
+
+\section{The Multilinear Extension}
+
+In this paper, MLE means \emph{multilinear extension}, not maximum likelihood
+estimation.  It is one of the central objects in modern polynomial-commitment
+and sumcheck protocols.
+
+\begin{definition}[Multilinear polynomial]
+A polynomial $P(X_0,\ldots,X_{d-1})$ is multilinear if every variable has degree
+at most one.  For example,
+\[
+  3+5X_0+7X_1+11X_0X_1
+\]
+is multilinear in $X_0,X_1$, but $X_0^2+X_1$ is not.
+\end{definition}
+
+\begin{definition}[Multilinear extension]
+Let $f\in\F^{\B^d}$ be an order-$d$ tensor.  Its multilinear extension
+$\MLE(f):\F^d\to\F$ is the unique multilinear polynomial
+that agrees with $f$ on the Boolean hypercube:
+\[
+  \MLE(f)(b)=f(b)
+  \qquad
+  \text{for every }b\in\B^d.
+\]
+\end{definition}
+
+The explicit formula is
+\[
+  \MLE(f)(z)
+  =
+  \sum_{b\in\B^d}
+    f(b)\chi_b(z),
+\]
+where
+\[
+  \chi_b(z)
+  =
+  \prod_{h=0}^{d-1}
+  \bigl((1-b_h)(1-z_h)+b_hz_h\bigr).
+\]
+The polynomial $\chi_b$ is an indicator polynomial.  It equals $1$ at Boolean
+point $b$ and equals $0$ at every other Boolean point.
+
+If an implementation receives the entries as a flat vector of length $2^d$, the
+algebraic object is still a tensor $m\in\F^{\B^d}$ obtained by deserializing
+those entries into Boolean addresses.  Then
+\[
+  \MLE(m)(z)
+  =
+  \sum_{b\in\B^d} m[b]\mu_z[b],
+\]
+where $\mu_z[b]=\chi_b(z)$ is the public evaluation weight for Boolean address
+$b$.  Thus an MLE evaluation is an inner product:
+\[
+  \MLE(m)(z)=\ip{\mu_z}{m}.
+\]
+
+\subsection{A Two-Variable Example}
+
+Suppose $m\in\F^{\B^2}$, with entries
+$m[0,0]=m_{00}$, $m[0,1]=m_{01}$, $m[1,0]=m_{10}$, and
+$m[1,1]=m_{11}$.  Its MLE is
+\[
+\begin{aligned}
+  \MLE(m)(X_0,X_1)
+  &=
+  m_{00}(1-X_0)(1-X_1)
+  + m_{01}(1-X_0)X_1\\
+  &\quad
+  + m_{10}X_0(1-X_1)
+  + m_{11}X_0X_1.
+\end{aligned}
+\]
+At $(0,0)$ this equals $m_{00}$; at $(0,1)$ it equals $m_{01}$; and so on.
+At a non-Boolean point, it is an interpolation of the tensor entries.
+
+\begin{figure}[h]
+\centering
+\begin{tikzpicture}[
+  x={(1.55cm,0cm)},
+  y={(0.75cm,0.38cm)},
+  z={(0cm,1.05cm)},
+  >=Latex,
+  line cap=round,
+  line join=round,
+  font=\small
+]
+  \def\hzerozero{0.25}
+  \def\honezero{1.45}
+  \def\hzeroone{0.85}
+  \def\honeone{0.30}
+
+  \draw[gray!45] (0,0,0) -- (1,0,0) -- (1,1,0) -- (0,1,0) -- cycle;
+  \draw[-Latex,gray!70] (0,0,0) -- (1.18,0,0) node[below] {$x$};
+  \draw[-Latex,gray!70] (0,0,0) -- (0,1.18,0) node[left] {$y$};
+  \draw[-Latex,gray!70] (0,0,0) -- (0,0,1.65) node[left] {value};
+
+  \foreach \x/\y/\h in {
+    0/0/\hzerozero,
+    1/0/\honezero,
+    0/1/\hzeroone,
+    1/1/\honeone
+  } {
+    \draw[gray!55,dashed] (\x,\y,0) -- (\x,\y,\h);
+    \fill[black] (\x,\y,0) circle (0.9pt);
+    \fill[red!75!black] (\x,\y,\h) circle (1.3pt);
+  }
+  \node[below left] at (0,0,\hzerozero) {$m_{00}$};
+  \node[below right] at (1,0,\honezero) {$m_{10}$};
+  \node[above left] at (0,1,\hzeroone) {$m_{01}$};
+  \node[above right] at (1,1,\honeone) {$m_{11}$};
+
+  \foreach \x in {0,0.25,0.5,0.75,1} {
+    \draw[blue!55]
+      plot[variable=\y,domain=0:1,samples=25]
+      ({\x},{\y},{(1-\x)*(1-\y)*\hzerozero + \x*(1-\y)*\honezero
+        + (1-\x)*\y*\hzeroone + \x*\y*\honeone});
+  }
+  \foreach \y in {0,0.25,0.5,0.75,1} {
+    \draw[blue!55]
+      plot[variable=\x,domain=0:1,samples=25]
+      ({\x},{\y},{(1-\x)*(1-\y)*\hzerozero + \x*(1-\y)*\honezero
+        + (1-\x)*\y*\hzeroone + \x*\y*\honeone});
+  }
+\end{tikzpicture}
+\caption{A two-variable multilinear extension as a bilinear interpolating surface.  The tensor $m$ gives values at Boolean corners; $\MLE(m)$ fills in the unique surface linear in each coordinate.}
+\label{fig:two-variable-mle}
+\end{figure}
+
+\subsection{Folding Is MLE Evaluation One Variable At A Time}
+
+Folding is most naturally expressed on the tensor itself.  Throughout this
+paper, when we write a fold formula, we use the convention that the folded
+coordinate is the last tensor coordinate.  More general coordinate folds are the
+same operation after reordering coordinates.
+
+Let $x\in\F^{\B^d}$.  For $a\in\B^{d-1}$ and $b\in\B$,
+write $(a\mid b)\in\B^d$ for the concatenation of the length-$(d-1)$ address
+$a$ and the final bit $b$.
+
+For example, if $d=3$ and $a=(1,0)$, then
+\[
+  (a\mid 0)=(1,0,0),
+  \qquad
+  (a\mid 1)=(1,0,1).
+\]
+Folding the last coordinate at a field element $\lambda$ produces a tensor
+$x^\star\in\F^{\B^{d-1}}$:
+\[
+  x^\star[a]
+  =
+  (1-\lambda)x[(a\mid 0)]
+  +
+  \lambda x[(a\mid 1)].
+\]
+This operation evaluates one MLE variable at $\lambda$ and removes that tensor
+coordinate.  If we fold all coordinates, using one challenge for each coordinate
+in the order those coordinates are removed, the final scalar is
+\[
+  \MLE(x)(\lambda_0,\ldots,\lambda_{d-1}).
+\]
+
+For implementors, the same fold becomes pairwise interpolation in the serialized
+array.  If the chosen coordinate is laid out so that entries with that bit equal
+$0$ occupy the first half and entries with that bit equal $1$ occupy the second
+half, then the coordinate fold is implemented by
+\[
+  x'[i]=(1-\lambda)x[i]+\lambda x[i+L],
+  \qquad 0\le i<L.
+\]
+That flat formula is a storage layout for the tensor fold, not the definition
+of the fold itself.

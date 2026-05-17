@@ -1,0 +1,342 @@
+\section{Sumcheck As Claim Randomization}
+
+Our target is the PCS functionality from Figure~\ref{fig:func-pcs}.  After the
+prover is bound to a multilinear polynomial $f:\F^d\to\F$, the verifier should
+be able to check evaluation claims of the form
+\[
+  (C,z,v)\longmapsto 1
+  \qquad\text{iff}\qquad
+  f(z)=v,
+\]
+where $C$ is the commitment handle.  Sumcheck does not implement this
+functionality by itself.  Instead, it transforms one evaluation claim about the
+committed polynomial into another evaluation claim about the same committed
+polynomial:
+\[
+  (C,z,v)\quad\rightsquigarrow\quad(C,r,u).
+\]
+This does not remove the need to verify the new claim $(C,r,u)$.  From a pure
+API viewpoint, it is a PCS claim $(C,z,v)$ transformed into another PCS claim
+$(C,r,u)$.  The improvement is in the distribution of the point.  The original
+point $z$ may be known before the prover commits; the new point $r$ in
+$(C,r,u)$ is sampled by the verifier after the prover is bound to the
+commitment and to the sumcheck messages.  As protocol designers, that
+randomization is valuable.
+
+The underlying sumcheck protocol is the classical one from LFKN92~[LFKN92].
+This section emphasizes the multilinear-evaluation and batching viewpoint used
+by HyperPlonk, BaseFold, and Blaze~[CBBZ23,BaseFold23,Blaze24].
+
+The first step is to express the claim $f(z)=v$ as a claim about the Boolean
+cube.  A multilinear polynomial is determined by its values on $\B^d$.  For
+$b\in\B^d$, define the Boolean interpolation weight
+\[
+  \chi_b(z)
+  =
+  \prod_{i=0}^{d-1}\bigl(b_i z_i+(1-b_i)(1-z_i)\bigr).
+\]
+These weights project the arbitrary point $z$ back onto the Boolean cube:
+\[
+  f(z)
+  =
+  \sum_{b\in\B^d} f(b)\chi_b(z).
+\]
+This identity is not an optimization.  It only rewrites the arbitrary-point
+claim as a weighted Boolean-cube sum.
+
+For fixed $z$, it is convenient to put the weights into a polynomial whose
+variable is the Boolean-cube point being summed over:
+\[
+  \chi_z(Y)
+  =
+  \prod_{i=0}^{d-1}\bigl((1-Y_i)(1-z_i)+Y_i z_i\bigr).
+\]
+At a Boolean point $b$, this gives $\chi_z(b)=\chi_b(z)$.  Therefore, if
+\[
+  H(Y)=f(Y)\chi_z(Y),
+\]
+then the PCS claim is equivalent to
+\[
+  f(z)=v
+  \qquad\Longleftrightarrow\qquad
+  \sum_{b\in\B^d}H(b)=v.
+\]
+Even though $f$ and $\chi_z$ are multilinear, their product $H$ is generally
+not multilinear: a variable can have degree two.  This is fine.  Sumcheck does
+not require multilinearity.  It requires a known bound on the individual degree
+of $H$ in each variable, because that bound controls the degree of each
+univariate round polynomial.
+The verifier could check this by reading all Boolean values of $f$, but that is
+the trivial PCS of Figure~\ref{fig:protocol-trivial-pcs} again.  Sumcheck keeps
+the Boolean-sum meaning while replacing the endpoint by a random point.
+
+\paragraph{Evaluation and coefficient views.}
+The discussion above used the Boolean values
+\[
+  b\longmapsto f(b),
+  \qquad b\in\B^d,
+\]
+because that is the cleanest way to see why the interpolation weights
+$\chi_b(z)$ recover $f(z)$.  This is an \emph{evaluation view}: the tensor is
+the table of values of $f$ on the Boolean cube.
+
+The same multilinear polynomial can also be represented by a coefficient tensor
+$y\in\F^{\B^d}$:
+\[
+  f(X_0,\ldots,X_{d-1})
+  =
+  \sum_{b\in\B^d} y[b]\prod_{i=0}^{d-1}X_i^{b_i}.
+\]
+This is a different basis for the same object, not a different polynomial.  For
+example, when $d=1$,
+\[
+  f(X)=y[0]+y[1]X,
+  \qquad
+  (f(0),f(1))=(y[0],y[0]+y[1]).
+\]
+Either representation determines the other by a linear change of basis.
+
+Sumcheck is easiest to motivate in the evaluation view because it starts with a
+Boolean-cube sum.  The concrete BaseFold construction is easiest to fold in the
+coefficient view.  For an $(i+1)$-variate multilinear polynomial, splitting the
+coefficient tensor along the last Boolean coordinate writes
+\[
+  f(X_0,\ldots,X_i)
+  =
+  f_L(X_0,\ldots,X_{i-1})
+  +
+  X_i f_R(X_0,\ldots,X_{i-1}),
+\]
+and a challenge $\theta\in\F$ specializes that variable:
+\[
+  f(X_0,\ldots,X_{i-1},\theta)
+  =
+  f_L(X_0,\ldots,X_{i-1})
+  +
+  \theta f_R(X_0,\ldots,X_{i-1}).
+\]
+This is the coefficient-side version of a fold.  Later, when BaseFold commits to
+a coefficient tensor, sumcheck is still talking about the same polynomial
+function $f$; only the committed representation has changed.
+
+\subsection{The Two-Variable Case}
+
+Take $d=2$.  The verifier wants to check
+\[
+  H(0,0)+H(1,0)+H(0,1)+H(1,1)=v.
+\]
+The prover first sends a univariate polynomial
+\[
+  g_1(X)=H(0,X)+H(1,X).
+\]
+The verifier can check the claimed total without evaluating $H$:
+\[
+  g_1(0)+g_1(1)=v.
+\]
+If this passes, the verifier samples $r_1\leftarrow\F$, sends it to the prover,
+and changes the claim to
+\[
+  H(0,r_1)+H(1,r_1)=g_1(r_1).
+\]
+One Boolean coordinate has disappeared.  The prover then sends
+\[
+  g_0(X)=H(X,r_1).
+\]
+The verifier checks
+\[
+  g_0(0)+g_0(1)=g_1(r_1),
+\]
+samples $r_0\leftarrow\F$, sends it to the prover, and changes the claim to
+\[
+  H(r_0,r_1)=g_0(r_0).
+\]
+Now there is no Boolean sum left.  Since $H(Y)=f(Y)\chi_z(Y)$, the last claim is
+\[
+  f(r_0,r_1)\chi_z(r_0,r_1)=g_0(r_0).
+\]
+The verifier can compute $\chi_z(r_0,r_1)$ locally.  It only needs one
+remaining value of the committed polynomial $f$ at the random point
+$(r_0,r_1)$.
+
+The order matters.  The prover sends each $g_i$ before seeing the corresponding
+random challenge $r_i$.  A false polynomial identity can agree at a random
+field point only with small probability, bounded by its degree over $|\F|$.
+
+\begin{protocolbox}{Protocol: Sumcheck Randomizes A PCS Evaluation Claim}{fig:protocol-sumcheck-randomizes-pcs}
+\noindent Public input: \(C\), \(z\in\F^d\), \(v\in\F\).
+
+\smallskip
+\begin{enumerate}[leftmargin=0.24in,label=\textbf{S\arabic*.},itemsep=0.08em,topsep=0.1em,parsep=0pt]
+  \item \(\verifier\): \(s_d\gets v\).
+  \item For \(i=d-1,d-2,\ldots,0\):
+        \begin{enumerate}[leftmargin=0.28in,label=\textbf{S\arabic*.\alph*.},itemsep=0.05em,topsep=0.05em,parsep=0pt]
+          \item \(\prover\to\verifier\): \(g_i\in\F[X]\).
+          \item \(\verifier\): if \(\deg(g_i)>2\), return reject.
+          \item \(\verifier\): if \(g_i(0)+g_i(1)\ne s_{i+1}\), return reject.
+          \item \(\verifier\): \(r_i\leftarrow\F\).
+          \item \(\verifier\to\prover\): \(r_i\).
+          \item \(\verifier\): \(s_i\gets g_i(r_i)\).
+        \end{enumerate}
+  \item \(\verifier\): \(r\gets(r_0,\ldots,r_{d-1})\).
+  \item \(\verifier\): if \(\chi_z(r)=0\), return reject.
+  \item \(\verifier\): \(u\gets s_0/\chi_z(r)\).
+  \item \(\verifier\): \(b\gets\mathcal{F}_{\mathrm{PCS}}.\mathsf{Eval}(C,r,u)\).
+  \item \(\verifier\): if \(b=0\), return reject.
+  \item \(\verifier\): return \((1,C,r,u)\).
+\end{enumerate}
+\end{protocolbox}
+
+\begin{protocolbox}{Subroutine: SumCheck With Terminal Output}{fig:subroutine-sumcheck-terminal}
+\noindent Public parameters: dimension \(d\) and individual degree bound
+\(\delta\).  In Step C2.a, empty coordinate blocks are omitted.
+
+\smallskip
+\noindent\(\underline{\SumCheck_d(\verifier:S\in\F,\ \prover:G:\F^d\to\F)\to(a\in\{0,1\},r\in\F^d,T\in\F)}\)
+\begin{enumerate}[leftmargin=0.24in,label=\textbf{C\arabic*.},itemsep=0.08em,topsep=0.1em,parsep=0pt]
+  \item \(\verifier\): \(s_d\gets S\).
+  \item For \(i=d-1,d-2,\ldots,0\):
+        \begin{enumerate}[leftmargin=0.28in,label=\textbf{C\arabic*.\alph*.},itemsep=0.05em,topsep=0.05em,parsep=0pt]
+          \item \(\prover\): \(g_i(X)\gets
+                \sum_{b\in\B^i}G(b_0,\ldots,b_{i-1},X,r_{i+1},\ldots,r_{d-1})\).
+          \item \(\prover\to\verifier\): \(g_i\in\F[X]\).
+          \item \(\verifier\): if \(\deg(g_i)>\delta\), return
+                \((0,0^d,0)\).
+          \item \(\verifier\): if \(g_i(0)+g_i(1)\ne s_{i+1}\), return
+                \((0,0^d,0)\).
+          \item \(\verifier\): \(r_i\leftarrow\F\).
+          \item \(\verifier\to\prover\): \(r_i\).
+          \item \(\verifier\): \(s_i\gets g_i(r_i)\).
+        \end{enumerate}
+  \item \(\verifier\): \(r\gets(r_0,\ldots,r_{d-1})\).
+  \item \(\verifier\): \(T\gets s_0\).
+  \item \(\verifier\): return \((1,r,T)\).
+\end{enumerate}
+\end{protocolbox}
+
+Figure~\ref{fig:subroutine-sumcheck-terminal} is the reusable form of the same
+interaction.  It checks all round equations and returns the terminal claim
+\(G(r)=T\).  The subroutine does not authenticate that terminal value by
+itself.  In this paper, every nontrivial use of \(\SumCheck_d\) must immediately
+tie \(T\) back to already committed MLE handles.
+
+Concretely, suppose the caller has hatted MLE handles
+\[
+  J_t:\F^{d_t}\to\F\qquad(t\in\{1,\ldots,m\}),
+\]
+public maps \(\psi_t:\F^d\to\F^{d_t}\), and a public expression
+\[
+  \Phi:\F^d\times\F^m\to\F
+\]
+such that the sumcheck polynomial is meant to satisfy
+\[
+  G(X)=
+  \Phi\bigl(X,J_1(\psi_1(X)),\ldots,J_m(\psi_m(X))\bigr).
+\]
+After \(\SumCheck_d\) returns \((a,r,T)\), the honest prover sends
+\[
+  w_t\gets J_t(\psi_t(r))\qquad(t\in\{1,\ldots,m\}).
+\]
+The verifier records the evaluation requests
+\[
+  \EvalReqs_{\mathrm{term}}
+  =
+  \{(J_t,\psi_t(r),w_t):t\in\{1,\ldots,m\}\}
+\]
+and checks
+\[
+  T=\Phi(r,w_1,\ldots,w_m).
+\]
+Only after these endpoint requests are authenticated by the existing
+\(\mathcal F_{\mathrm{MLIOP}}\), \(\mathcal F_{\mathrm{MLEAuth}}\), or PCS
+interface does the sumcheck terminal claim become meaningful.
+
+The protocol in Figure~\ref{fig:protocol-sumcheck-randomizes-pcs} is
+deliberately circular if the endpoint is the ideal PCS functionality from
+Figure~\ref{fig:func-pcs}: we have transformed one PCS evaluation into another
+PCS evaluation.  The reason to keep the transformation is that the new point
+$r$ is verifier-random and transcript-bound.  BaseFold removes the circularity
+by implementing this random endpoint from a commitment to an encoded oracle.  In
+short, sumcheck randomizes the polynomial claim; BaseFold folds the
+committed codeword along the same challenges.
+
+\subsection{Inner-Product Sumcheck}
+
+The same randomization idea also explains the inner-product checks used later by
+Blaze.  Let
+\[
+  w,x\in\F^{\B^\ell}.
+\]
+For this subsection, both tensors are Boolean-evaluation tensors.  The verifier
+knows $w$ and can compute with all of it.  The prover is bound to $x$ by some
+commitment handle $C_x$, but the verifier should not have to read all of $x$.
+The claim is
+\[
+  \sum_{b\in\B^\ell} w[b]x[b]=S.
+\]
+The objective is to move this full inner product to one claim about the
+committed tensor $x$ at a verifier-random point.
+
+Define the polynomial
+\[
+  H(Y)=\MLE(w)(Y)\MLE(x)(Y).
+\]
+On Boolean inputs, $H(b)=w[b]x[b]$.  Therefore the inner-product claim is
+exactly the Boolean-sum claim
+\[
+  \sum_{b\in\B^\ell}H(b)=S.
+\]
+This $H$ is not generally multilinear, because it is a product of two
+multilinear polynomials.  Its individual degree is at most two, and that is the
+degree bound sumcheck needs.  Therefore the round polynomials are degree two.
+
+Trace one round.  Suppose the active tensors are still indexed by $\B^d$ and
+the current claim is their inner product:
+\[
+  \sum_{a\in\B^d} w[a]x[a]=s_d.
+\]
+To eliminate the last coordinate, write each address as $(a\mid b)$ with
+$a\in\B^{d-1}$ and $b\in\B$.  For each $a\in\B^{d-1}$ define the two line
+interpolants
+\[
+  w_a(X)=(1-X)w[(a\mid0)]+Xw[(a\mid1)],
+\]
+\[
+  x_a(X)=(1-X)x[(a\mid0)]+Xx[(a\mid1)].
+\]
+The honest round polynomial is
+\[
+  p(X)=\sum_{a\in\B^{d-1}}w_a(X)x_a(X).
+\]
+This polynomial has a clear job:
+\[
+  p(0)+p(1)=s_d.
+\]
+After checking this equation, the verifier samples $r_{d-1}\leftarrow\F$, sends
+it to the prover, and
+the new claim becomes
+\[
+  \sum_{a\in\B^{d-1}} w_a(r_{d-1})x_a(r_{d-1})=s_{d-1},
+  \qquad s_{d-1}=p(r_{d-1}).
+\]
+So one round folds both tensors by the same verifier challenge and replaces the
+old inner product by a smaller inner product.
+
+The verifier can perform the fold of $w$ locally, because $w$ is public.  It
+cannot locally fold every entry of $x$, because $x$ is committed.  That is the
+point of the randomization: after $\ell$ rounds, the verifier has folded $w$
+down to the public scalar $\MLE(w)(r)$, and the sumcheck transcript has
+produced a random point $r=(r_0,\ldots,r_{\ell-1})$ and a final scalar $s_0$.
+Assuming $\MLE(w)(r)\ne0$ in this simplified presentation, the verifier sets
+\[
+  u=s_0/\MLE(w)(r).
+\]
+Thus the input inner-product claim has been transformed into the ordinary
+committed-evaluation claim
+\[
+  (C_x,r,u).
+\]
+Here $(C_x,r,u)$ means that the tensor bound to $C_x$ should satisfy
+$\MLE(x)(r)=u$.  This output claim is useful because it asks for one random
+evaluation of the committed tensor $x$, not for all of $x$.  BaseFold is the
+mechanism that later binds that value $u$ to the committed encoding of $x$ with
+only a few openings.

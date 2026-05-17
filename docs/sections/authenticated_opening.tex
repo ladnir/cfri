@@ -1,0 +1,152 @@
+\section{Authenticated Message-Oracle Implementations}
+
+The algebraic protocols below need authenticated access to fixed tensors.  The
+ideal interface is not a second ideal service; it is the message
+oracle from Figure~\ref{fig:func-msg-oracle}.  A prover, an indexer, a Merkle
+tree, or a virtual construction fixes a logical tensor and later answers
+\(\mathcal F_{\mathrm{MsgOracle}}.\mathsf{Open}\) queries at named addresses.
+
+The submitted object carries its own natural address space.  If that address
+space is \(\B^d\), the Merkle implementation uses the natural binary leaf order
+\[
+  \bits_d(0),\bits_d(1),\ldots,\bits_d(2^d-1).
+\]
+If the address space is a product of binary domains, the leaf order is the
+natural binary order after concatenating the address blocks.  Thus the
+message-oracle API does not hide any indexing convention: the logical address
+space is the layout.  In the codeword handles below, the value space is \(\F\).
+If \(\mathcal F_{\mathrm{MsgOracle}}.\mathsf{Open}(R,a)\ne\bot\), its value is
+the unique logical value bound to \(R\) at address \(a\).  Equivalently, a
+verifier can check a claimed value \(v\) by opening \(R\) at \(a\) and checking
+that the returned value equals \(v\).
+
+The ordinary implementation is a Merkle tree.  The box below is not a new ideal
+functionality; it is one concrete way to implement the
+\(\mathcal F_{\mathrm{MsgOracle}}.\mathsf{Open}\) interface.  For simplicity it
+is written for address space \(\B^d\).  Product address spaces are first
+serialized in the natural binary order described above.
+
+\begin{protocolbox}{Implementation: Merkle Message Oracle}{fig:impl-merkle-msg-oracle}
+\noindent Public parameters: a collision-resistant hash function
+\(\mathsf{Hash}\) and a value encoder into hash inputs.
+
+\smallskip
+\noindent\(\underline{\Pi_{\mathrm{MerkleMsgOracle}}.\mathsf{Submit}(\prover:x\in\mathcal L^{\B^d},\ \verifier:\bot)\to R}\)
+
+\smallskip
+\begin{enumerate}[leftmargin=0.24in,label=\textbf{M\arabic*.},itemsep=0.08em,topsep=0.1em,parsep=0pt]
+  \item \(\prover\): for \(i\in\{0,\ldots,2^d-1\}\), set
+        \(T_0[i]\gets\mathsf{Hash}(x[\bits_d(i)])\).
+  \item \(\prover\): for \(\ell\in\{0,\ldots,d-1\}\) and
+        \(j\in\{0,\ldots,2^{d-\ell-1}-1\}\), set
+        \[
+          T_{\ell+1}[j]
+          \gets
+          \mathsf{Hash}(T_\ell[2j]\Vert T_\ell[2j+1]).
+        \]
+  \item \(\prover\): set \(R\gets T_d[0]\).
+  \item \(\prover\to\verifier\): \(R\).
+  \item \(\prover,\verifier\): return \(R\).
+\end{enumerate}
+
+\smallskip
+\noindent\(\underline{\Pi_{\mathrm{MerkleMsgOracle}}.\mathsf{Open}(\verifier:(R,a=\bits_d(i)),\ \prover:(x,a))\to(\verifier:o\in\mathcal L\cup\{\bot\})}\)
+
+\smallskip
+\begin{enumerate}[leftmargin=0.24in,label=\textbf{O\arabic*.},itemsep=0.08em,topsep=0.1em,parsep=0pt]
+  \item \(\prover\): send \(v\gets x[a]\).
+  \item \(\prover\): set \(j_0\gets i\).  For each
+        \(\ell\in\{0,\ldots,d-1\}\), send the sibling
+        \(s_\ell\gets T_\ell[j_\ell\oplus1]\) and set
+        \(j_{\ell+1}\gets\lfloor j_\ell/2\rfloor\).
+  \item \(\verifier\): set \(h_0\gets\mathsf{Hash}(v)\) and \(j_0\gets i\).
+  \item \(\verifier\): for each \(\ell\in\{0,\ldots,d-1\}\), compute
+        \[
+          h_{\ell+1}\gets
+          \begin{cases}
+            \mathsf{Hash}(h_\ell\Vert s_\ell), & j_\ell\equiv0\pmod 2,\\
+            \mathsf{Hash}(s_\ell\Vert h_\ell), & j_\ell\equiv1\pmod 2,
+          \end{cases}
+        \]
+        and set \(j_{\ell+1}\gets\lfloor j_\ell/2\rfloor\).
+  \item \(\verifier\): if \(h_d=R\), return \(v\); otherwise return \(\bot\).
+\end{enumerate}
+\end{protocolbox}
+
+We will use several implementations of this same API.  The ordinary
+implementation is Merkle: it stores the logical tensor itself and opens
+coordinates by Merkle paths.  Blaze also uses virtual handles: a virtual handle
+does not store one flat tensor directly, but it still implements
+\(\mathcal F_{\mathrm{MsgOracle}}.\mathsf{Open}\).  The names
+\(\Pi_{\mathrm{rowFoldCommit}}\) and \(\mathsf{CompositeCommit}\) use
+\(\mathsf{Commit}\) in this constructor sense: they create a handle.  They do
+not introduce a second coordinate-opening API.  After the handle exists, the
+only coordinate operation is \(\mathsf{Open}\).
+
+The main virtual implementation used by Blaze is
+\(\Pi_{\mathrm{rowFoldCommit}}\), which folds the committed row-word matrix into
+the folded-tensor handle \(R_\star\).  The later \(\MLEAuth\) implementation
+also constructs packed coordinate handles by routing lane openings to ordinary
+or virtual message-oracle handles.
+
+For example, if $R_c$ is a handle to a column tensor
+$C\in(\F^{\B^\ell})^{\B^n}$ and $\rho\in\F^{\B^\ell}$, then a compressed
+\(\Pi_{\mathrm{rowFoldCommit}}.\mathsf{Commit}(R_c,\rho)\) returns a virtual
+handle \(R_\star\) implementing
+\(\mathcal F_{\mathrm{MsgOracle}}.\mathsf{Open}\).  Its logical domain is \(\B^n\) and
+its logical tensor is
+\[
+  c_\star[b]=\ip{\rho}{C[b]}.
+\]
+Opening $R_\star$ at $b$ is the existing Open interface: it opens $R_c$ at
+$b$, receives the already-bound column value \(w=C[b]\in\F^{\B^\ell}\), and
+returns \(\sum_{h\in\B^\ell}\rho[h]w[h]\).  The backend sees only the handle
+$R_\star$ and the operation
+\(\mathcal F_{\mathrm{MsgOracle}}.\mathsf{Open}(R_\star,b)\).
+
+The packed \(\MLEAuth\) handle is virtual in the same sense.  It is a handle
+over a lane domain \(\mathcal L\times\B^D\).  Opening a lane routes to the
+coordinate handle supplied for that lane, which may itself be ordinary,
+composite, or virtual.  The backend sees only the packed handle, not the
+machinery behind each lane.
+
+We will also use composite virtual handles.  This is implementation notation
+for \(\mathcal F_{\mathrm{MsgOracle}}.\mathsf{Open}\), not a new ideal
+functionality or cryptographic assumption.  A composite handle stores a public
+routing table between existing handles over disjoint coordinate sets.  If
+\(E_1,\ldots,E_m\) are disjoint address sets and component handles \(R_i\)
+open tensors over \(E_i\), then
+\[
+  R=\mathsf{CompositeCommit}((R_1,E_1),\ldots,(R_m,E_m))
+\]
+denotes the virtual handle over \(D=E_1\sqcup\cdots\sqcup E_m\).  Opening
+\(R\) at \(a\in D\) finds the unique \(i\) with \(a\in E_i\) and returns
+\(\mathcal F_{\mathrm{MsgOracle}}.\mathsf{Open}(R_i,a)\).
+
+For the systematic split used by BaseFold, the message addresses are
+\(\mathcal L\times\B^k\).  The codeword addresses are
+\(\mathcal L\times\B^n\).  The systematic address of
+\((q,a)\in\mathcal L\times\B^k\) is \((q,0^{n-k}\Vert a)\).  Thus
+\[
+  D_{\mathrm{sys}}
+  =
+  \{(q,0^{n-k}\Vert a):q\in\mathcal L,\ a\in\B^k\},
+  \qquad
+  D_{\mathrm{ext}}
+  =
+  \mathcal L\times\bigl(\B^n\setminus\bits_n([0,2^k-1])\bigr).
+\]
+The composite handle is
+\[
+  \mathsf{CompositeCommit}
+  ((C_A,D_{\mathrm{sys}}),(C_{\mathrm{ext}},D_{\mathrm{ext}})).
+\]
+Here \(C_A\) is viewed as a handle over \(D_{\mathrm{sys}}\): its value at
+\((q,0^{n-k}\Vert a)\) is the message value \(A_q[a]\).  The composite handle
+opens systematic codeword addresses through \(C_A\), and opens the remaining
+codeword addresses through \(C_{\mathrm{ext}}\).
+
+The handle is binding at the logical-tensor level.  It is not an algebraic
+proof: it does not by itself prove that the logical tensor is a codeword or
+that it satisfies any relation.  The algebraic proof comes from random queries
+and low-degree/folding checks layered on top of these authenticated openings.

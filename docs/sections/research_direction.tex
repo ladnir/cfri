@@ -1,0 +1,111 @@
+\section{Research Direction: Succinct Virtual Column Openings}
+
+The Blaze compression step above uses a virtual message-oracle handle for the
+folded tensor $c_\star$.  Once the verifier has sampled the coefficient vector
+$\rho\in\F^{\B^\ell}$, the value at backend coordinate $b\in\B^n$ is
+\[
+  c_\star[b]=\sum_{h\in\B^\ell}\rho_h c[h,b].
+\]
+The simple implementation opens the whole committed column $c[\ast,b]$ and lets
+the verifier compute this inner product.  This saves a separate commitment to
+$c_\star$, but it still costs $2^\ell$ field elements for each queried backend
+coordinate.
+
+A natural research question is whether these virtual openings can be made
+succinct.  Instead of sampling an arbitrary vector $\rho$, sample a row point
+$r_{\mathrm{row}}\in\F^\ell$ and set
+\[
+  \rho_h=\chi_h(r_{\mathrm{row}})
+  \qquad\text{for each }h\in\B^\ell.
+\]
+Then a virtual opening becomes an ordinary multilinear evaluation claim for the
+opened column:
+\[
+  c_\star[b]
+  =
+  \sum_{h\in\B^\ell}\chi_h(r_{\mathrm{row}})c[h,b]
+  =
+  \MLE(c[\ast,b])(r_{\mathrm{row}}).
+\]
+So the verifier would not need to receive the whole column $c[\ast,b]$.  The
+prover could instead prove the column-direction claim
+\[
+  \MLE(c[\ast,b])(r_{\mathrm{row}})=c_\star[b].
+\]
+
+If the backend queries coordinates $b_1,\ldots,b_q\in\B^n$, these column claims
+can also be batched.  After the queried coordinates are fixed, the verifier can
+sample batching weights $\eta_1,\ldots,\eta_q\in\F$ and ask for one aggregate
+claim:
+\[
+  \MLE\left(
+    h\mapsto \sum_{j=1}^q \eta_j c[h,b_j]
+  \right)(r_{\mathrm{row}})
+  =
+  \sum_{j=1}^q \eta_j c_\star[b_j].
+\]
+This would replace $q$ full column openings by one proof about a
+row-direction aggregate.  Combined with the usual linear-combination trick that
+avoids sending all row evaluation claims $u_h$ separately, this could allow
+larger values of $\ell$: the protocol would compress more rows before entering
+the backend without paying $q2^\ell$ field elements in virtual openings.
+
+The main danger is circularity.  The new column-opening proof must itself be
+cheaper than opening the columns directly, and its commitment interface must be
+compatible with the outer Blaze commitment.  Otherwise the protocol merely moves
+the same cost into another PCS.  The soundness analysis would also need to
+account for the structured choice
+$\rho_h=\chi_h(r_{\mathrm{row}})$ rather than a fully arbitrary coefficient
+vector.  Conceptually, though, this is the right lever: the current bottleneck is
+not only the row-evaluation vector $(u_h)$, but the repeated transmission of
+large committed columns used to open $c_\star$.
+
+\subsection{Research Direction: Dimension-\(n\) Product-Tree Helpers}
+
+The native RAA permutation check currently introduces product-tree helper
+tensors
+\[
+  f,g\in\F^{\B^{n+1}}.
+\]
+The extra variable is not accidental.  The single-tensor presentation stores
+both the \(2^n\) leaf factors and the \(2^n\) product-tree/internal slots in one
+Boolean-addressed tensor, so the local residual has the compact form
+\[
+  T(1,X)-T(X,0)T(X,1).
+\]
+This is clean, but it forces the \(\MLEAuth\) batch that contains these helpers
+to use backend dimension \(n+1\).
+
+A possible optimization is to split the helper into two \(n\)-variate tensors:
+one tensor for the leaf factors and one tensor for the internal product-tree
+state.  For example, write
+\[
+  \ell\in\F^{\B^n},
+  \qquad
+  p\in\F^{\B^n},
+\]
+where \(\ell[b]\) stores the tagged leaf factor and \(p\) stores the product
+tree layers, with one padding coordinate if needed.  The permutation check would
+then need explicit relations of the form
+\[
+  p[\text{first internal address}]
+  =
+  \ell[\text{left leaf}]\,\ell[\text{right leaf}],
+\]
+plus the usual parent-child product relations inside \(p\), and finally the
+root equality between the two product trees.
+
+This does not reduce the total amount of helper data: two \(n\)-variate tensors
+still contain \(2^{n+1}\) field elements.  The possible win is different.  If
+all RAA helper objects can be expressed as \(n\)-variate tensors, then the
+compiled authentication batch might avoid raising the backend dimension from
+\(n\) to \(n+1\).  That would remove one backend folding layer and improve the
+constant factors in the BaseFold/RMLE authentication step.
+
+The danger is that the saved variable may reappear as relation complexity.  The
+split representation would need more cases: leaf-to-first-product constraints,
+internal product constraints, padding/root conventions, and terminal evaluation
+requests for each relation.  The right question is therefore not whether the
+same product tree can be stored in two tensors; it can.  The question is whether
+the resulting relations can still be batched and authenticated without
+reintroducing an \(n+1\)-variate object through the back door.

@@ -1,0 +1,819 @@
+\section{The Native RAA Relation Compiler}
+
+We now restart Blaze at the model where the Blaze paper first lives: the native
+multilinear IOP layer.  This is deliberately before Merkle trees, BaseFold,
+systematic encodings, or concrete coordinate-opening implementations.  At this layer the prover
+and verifier can name committed Boolean oracle handles \(R_h:\B^d\to\F\),
+commit them to MLE oracle handles \(\widehat O_h:\F^d\to\F\), and ask for
+field-point MLE evaluations of those hatted handles.
+
+The goal of the native layer is not to prove proximity to a codeword.  Its goal
+is to compile one algebraic statement into a small set of MLE evaluation
+requests and Boolean-sum claims.  The later authentication layer will then make
+those requests cryptographic.
+
+\[
+  \begin{aligned}
+  \text{RAA relation}
+  &\Longrightarrow
+  (\EvalReqs,\SumClaims) \\
+  &\Longrightarrow
+  \text{batched sumcheck}
+  \Longrightarrow
+  \text{more }\EvalReqs .
+  \end{aligned}
+\]
+
+\subsection{Native Relation}
+
+Fix a field \(\F\).  Let \(K=2^k\) be the message length and \(N=2^n\) be the
+RAA codeword length.  The base native relation is \(\RMLE[\PRAA]\).  The public
+evaluation claim is
+\[
+  z\in\F^k,\qquad v\in\F,
+\]
+and the implicit input is an alleged codeword
+\[
+  y\in\F^{\B^n}.
+\]
+The prover witness is a message tensor
+\[
+  m\in\F^{\B^k}.
+\]
+The claim is that
+\[
+  y=\PRAA(m)
+  \qquad\text{and}\qquad
+  \MLE(m)(z)=v.
+\]
+
+The RAA map is public and has the stage form
+\[
+  \PRAA(m)
+  =
+  \Acc\circ M_{\pi_2}\circ\Acc\circ M_{\pi_1}\circ F_{\mathrm{rep}}(m),
+\]
+where \(F_{\mathrm{rep}}:\F^{\B^k}\to\F^{\B^n}\) repeats message entries,
+\(M_{\pi_i}\) is the permutation operator for a public permutation
+\(\pi_i:\B^n\to\B^n\), and \(\Acc\) is the prefix-sum map over
+\(\B^n\).  We use the push-forward convention
+\[
+  (M_\pi x)[\pi(b)]=x[b]
+  \qquad(b\in\B^n).
+\]
+Equivalently, \((M_\pi x)[a]=x[\pi^{-1}(a)]\).  This convention is chosen so
+that the tagged-product permutation check below compares the pairs
+\((x[b],\pi(b))\) with \((y[a],a)\).  The Blaze text states the permutation
+test with the same tagged leaves but writes the relation in pullback form
+\(y[b]=x[\pi(b)]\)~[Blaze24].  In this explainer we fix the convention that
+makes the product argument literal; if one instead uses the pullback
+convention, the same checker should be read with \(\pi^{-1}\) in place of
+\(\pi\).
+
+Thus an honest prover's stage tensors satisfy
+\[
+  \begin{aligned}
+  u_0&=m,&
+  u_1&=F_{\mathrm{rep}}(u_0),&
+  u_2&=M_{\pi_1}u_1,&
+  u_3&=\Acc(u_2),\\
+  u_4&=M_{\pi_2}u_3,&
+  u_5&=\Acc(u_4)=y.
+  \end{aligned}
+\]
+
+The prover provides Boolean oracle handles for
+\[
+  u_0=m\in\F^{\B^k},
+  \qquad
+  u_2,u_3,u_4\in\F^{\B^n},
+  \qquad
+  f_1,g_1,f_2,g_2\in\F^{\B^{n+1}}.
+\]
+The native MLIOP functionality commits those Boolean handles into hatted MLE
+handles before the verifier asks field-point evaluation questions.
+The prover does not send \(u_1\) or \(u_5\) as separate native messages.
+Queries to \(u_1\) are emulated from \(u_0\) using the repetition layout:
+we write
+\[
+  \widehat O_{u_1}:=\RepView(\widehat O_{u_0}),
+  \qquad
+  \widehat O_{u_1}(r):=\widehat O_{u_0}(\mathsf{msg}(r)).
+\]
+This is a derived view, not a fresh call to
+\(\mathcal F_{\mathrm{MLIOP}}.\mathsf{Commit}\).  The final stage \(u_5\) is
+the input codeword handle supplied to the checker.
+
+\subsection{Request And Claim Sets}
+
+A native evaluation request is a tuple
+\[
+  (J,r,v)\in\EvalReq,
+\]
+where \(J\) is a handle that can later authenticate MLE values, \(r\in\F^d\)
+has the handle's dimension, and \(v\in\F\).  In the native MLIOP section \(J\)
+is a hatted MLE handle \(\widehat O:\F^d\to\F\).  In the compiled Blaze section
+the same slot is a coordinate-opening handle \(C\).  The request means that the
+later verifier check needs
+\[
+  J(r)=v.
+\]
+For example, \((\widehat O_{u_3},r,s)\) means that the value \(s\) must be the
+MLE evaluation of the tensor \(u_3\) at \(r\).
+
+A Boolean-sum claim is stored in \(\SumClaims\).  Its logical content is
+\[
+  (s,G)\in\SumClaims
+  \quad\Longleftrightarrow\quad
+  \sum_{X\in\B^d}G(X)=s.
+\]
+In protocol boxes below, the reducers do not return an opaque polynomial name.
+They return a small record that says which public residual form is being used,
+which MLE handle it touches, which projection point was sampled, and what the
+Boolean-sum target is.  The batched sumcheck then expands those records
+explicitly.
+
+The native layer uses two kinds of outputs:
+\[
+  \EvalReqs,\qquad \SumClaims.
+\]
+\(\EvalReqs\) are MLE claims to authenticate later.  \(\SumClaims\) are
+Boolean sums to feed into sumcheck.  Some apparent scalar equalities, such as
+the permutation root equality, are encoded by reusing or deriving values inside
+\(\EvalReqs\) instead of carrying a separate equality set.
+
+\subsection{How Native Tensor Checks Compose}
+
+The same pattern appears in every RAA stage.  Start with a large relation
+between named tensors.  Rewrite that relation as a residual tensor
+\[
+  R\in\F^{\B^s}
+\]
+that should be zero at every Boolean coordinate:
+\[
+  R[a]=0
+  \qquad(a\in\B^s).
+\]
+Each residual value is a public low-degree expression in MLE evaluations of the
+named tensors.  Abstractly,
+\[
+  R[a]
+  =
+  \Phi_a\Bigl(
+    \MLE(t_{j_1})(\psi_1(a)),
+    \ldots,
+    \MLE(t_{j_q})(\psi_q(a))
+  \Bigr),
+\]
+where \(t_{j_1},\ldots,t_{j_q}\) are the participating tensors, the address
+maps \(\psi_t:\B^s\to\F^{d_{j_t}}\) and the expression \(\Phi_a:\F^q\to\F\)
+are public.  The subscript \(a\) only means that the coefficients of the
+expression may depend on the residual coordinate.
+To use sumcheck, the Boolean-coordinate formula must come with a low-degree
+field extension: the maps \(\psi_t\) and the expression \(\Phi_a\) are extended
+to field points in the way specified by the concrete check.  This is not an
+extra commitment.  It is part of the algebraic description of the residual
+identity being checked.
+
+The verifier does not read all of \(R\).  It samples a field point
+\[
+  r\in\F^s
+\]
+and projects the zero claim to one scalar equation:
+\[
+  \sum_{a\in\B^s}\chi_a(r)R[a]=0.
+\]
+If \(R\) is not the zero tensor, this random projection fails with high
+probability over \(r\).  When the projected sum is still too large to compute
+directly, the prover and verifier run sumcheck on the projected identity.
+Sumcheck does not authenticate any tensor value by itself; it only reduces the
+identity to endpoint claims of the form
+\[
+  \MLE(H_j)(r_j)=v_j.
+\]
+Those endpoint claims become \(\EvalReqs\).  The native layer records them; the
+later authentication layer checks them.
+
+A small example is the pointwise product relation
+\[
+  C[a]=A[a]B[a]\qquad(a\in\B^s).
+\]
+The residual is
+\[
+  R[a]=C[a]-A[a]B[a].
+\]
+The projected zero claim is
+\[
+  \sum_{a\in\B^s}\chi_a(r)\bigl(C[a]-A[a]B[a]\bigr)=0.
+\]
+If the prover cheats at one coordinate \(a_0\), the bad contribution is weighted
+by \(\chi_{a_0}(r)\).  The point is not that the verifier checks the coordinate
+\(a_0\) directly.  The point is that a random linear projection turns a large
+coordinate-wise relation into one low-degree scalar identity, and sumcheck then
+turns that identity into a few MLE endpoint requests.
+
+\subsection{Accumulator Reducer}
+
+The accumulator relation has the form
+\[
+  y=\Acc(x),
+  \qquad
+  x,y\in\F^{\B^n}.
+\]
+Let
+\[
+  \widehat A:\F^n\times\F^n\to\F
+\]
+be the multilinear extension of the accumulator matrix, where the Boolean
+matrix has entry \(A[b,a]=1\) exactly when \(\Int(b)\ge \Int(a)\) in the
+natural binary order.  In ordinary coordinate language,
+\[
+  y[b]=\sum_{a\le b}x[a].
+\]
+This matrix is conceptually \(N\times N\), but the verifier never materializes
+it.  For fixed \(r\in\F^n\), the weights
+\((\widehat A(r,X))_{X\in\B^n}\) can be generated in one linear pass over the
+Boolean domain, and a single field-point value
+\(\widehat A(r,s)\) can be computed by the usual recursive comparison formula
+for the predicate \(\Int(b)\ge\Int(a)\).  Thus the reducer uses the
+accumulator matrix as a compact algebraic kernel, not as a dense table.
+
+The verifier cannot check this equation for every \(b\).  Instead it samples a
+field point \(r\in\F^n\) and asks for the same linear relation at that MLE
+point.  For an honest accumulator,
+\[
+  \MLE(y)(r)
+  =
+  \sum_{X\in\B^n}\widehat A(r,X)\,x[X]
+  \qquad
+  \text{for every }r\in\F^n.
+\]
+The value \(\MLE(y)(r)\) is not trusted for free.  The prover sends it as a
+scalar \(s\), the reducer records \((\widehat O_y,r,s)\) as an evaluation request,
+and the Boolean-sum claim says that the accumulator input \(x\) must sum to the
+same scalar \(s\).
+
+\begin{protocolbox}{Subroutine: Native Accumulator Reduction}{fig:native-accumulate-reduce}
+\scriptsize\raggedright
+\noindent Public parameters: \(n\), \(\widehat A:\F^n\times\F^n\to\F\).
+
+\smallskip
+\noindent\(\underline{\AccReduce(\verifier:(\widehat O_x:\F^n\to\F,\ \widehat O_y:\F^n\to\F,\ r\in\F^n),\ \prover:(x,y\in\F^{\B^n}))\to(\EvalReqs,B_{\mathrm{acc}})}\)
+\begin{enumerate}[leftmargin=0.24in,label=\textbf{A\arabic*.},itemsep=0.06em,topsep=0.06em,parsep=0pt]
+  \item \(\prover\): \(s_y\gets \MLE(y)(r)\).
+  \item \(\prover\to\verifier\): \(s_y\in\F\).
+  \item \(\verifier\): \(\EvalReqs\gets\{(\widehat O_y,r,s_y)\}\).
+  \item \(\verifier\): \(B_{\mathrm{acc}}\gets(\mathsf{acc},s_y,\widehat O_x,r)\).
+  \item \(\verifier\): return \((\EvalReqs,B_{\mathrm{acc}})\).
+\end{enumerate}
+\end{protocolbox}
+
+The record \(B_{\mathrm{acc}}=(\mathsf{acc},s_y,\widehat O_x,r)\) means
+\[
+  \sum_{X\in\B^n}\widehat A(r,X)\MLE(x)(X)=s_y,
+\]
+where \(\widehat O_x\) is the handle that will later authenticate endpoint
+values of \(\MLE(x)\).  The scalar \(s_y\) is local to the reducer.  It is not a
+separate output because it is already stored in the evaluation request and in
+the Boolean-sum target.
+In the RAA relation, this reducer is used twice:
+\[
+  (u_2,u_3)
+  \qquad\text{and}\qquad
+  (u_4,y).
+\]
+
+\subsection{Permutation Reducer}
+
+The permutation relation has the form
+\[
+  y=M_\pi x,
+  \qquad
+  y[\pi(b)]=x[b]\quad\text{for every }b\in\B^n.
+\]
+The verifier samples \(\alpha,\beta\in\F\).  The prover then constructs two
+product-tree tensors \(f,g\in\F^{\B^{n+1}}\).  The leaves are intended to be
+\[
+  f[\mathsf{leaf}(b)]
+  =
+  \alpha-\bigl(x[b]+\beta\,\Idx(\pi(b))\bigr),
+\]
+\[
+  g[\mathsf{leaf}(b)]
+  =
+  \alpha-\bigl(y[b]+\beta\,\Idx(b)\bigr).
+\]
+If \(y[\pi(b)]=x[b]\) and \(\pi\) is a bijection, these two leaf multisets have
+the same product.  The product trees make this global product comparison
+locally checkable.
+
+Here is the intuition.  The left product writes each input value together with
+the address where it is supposed to land:
+\[
+  \prod_{b\in\B^n}
+    \left(\alpha-\bigl(x[b]+\beta\,\Idx(\pi(b))\bigr)\right).
+\]
+The right product writes each output value together with its actual address:
+\[
+  \prod_{a\in\B^n}
+    \left(\alpha-\bigl(y[a]+\beta\,\Idx(a)\bigr)\right).
+\]
+If \(y[\pi(b)]=x[b]\), then renaming the right product by \(a=\pi(b)\) gives
+\[
+  y[a]=y[\pi(b)]=x[b],
+  \qquad
+  \Idx(a)=\Idx(\pi(b)),
+\]
+so the two products are term-by-term equal after reindexing.  If the tagged
+multisets differ, the two products agree only with small probability over the
+random \(\alpha,\beta\).  The address tag \(\beta\,\Idx(\cdot)\) matters: it
+prevents the prover from merely preserving the multiset of values while moving
+them to the wrong addresses.
+
+We use the source product-tree coordinate convention
+\[
+  \mathsf{root}=(1^n,0),\qquad
+  \mathsf{leaf}(b)=(0,b),
+\]
+\[
+  \mathsf{parent}(X)=(1,X),\qquad
+  \mathsf{left}(X)=(X,0),\qquad
+  \mathsf{right}(X)=(X,1).
+\]
+The same symbols are also the low-degree field maps used in the sumcheck
+formulas:
+\[
+  \mathsf{leaf}(r)=(0,r),\quad
+  \mathsf{parent}(r)=(1,r),\quad
+  \mathsf{left}(r)=(r,0),\quad
+  \mathsf{right}(r)=(r,1)
+  \qquad(r\in\F^n).
+\]
+For \(T\in\F^{\B^{n+1}}\), define
+\[
+  \mathsf{TreeRes}(T,X)
+  =
+  \widehat T(\mathsf{parent}(X))
+  -
+  \widehat T(\mathsf{left}(X))\,\widehat T(\mathsf{right}(X)).
+\]
+On Boolean \(X\), the equation \(\mathsf{TreeRes}(T,X)=0\) says that the node
+named by \(\mathsf{parent}(X)\) is the product of the two children named by
+\(\mathsf{left}(X)\) and \(\mathsf{right}(X)\).  Therefore a valid product tree
+has a root equal to the product of all its leaves.  The coordinate
+\(1^{n+1}\) is the padding point above the root; the honest construction sets
+it to \(0\), so the residual at \(X=1^n\) also vanishes.  In protocol boxes,
+\(\mathsf{TreeRes}(H_T,X)\) means this same expression with tensor label
+\(H_T\); the prover instantiates the polynomial during sumcheck, and the
+verifier records the required endpoint evaluations.
+For a non-Boolean sumcheck endpoint \(q\in\F^n\), this is a formal-extension
+evaluation, not a coordinate opening of \(T\).  Concretely, evaluating
+\(\mathsf{TreeRes}(T,q)\) requires the three MLE values
+\[
+  \widehat T(\mathsf{parent}(q)),\qquad
+  \widehat T(\mathsf{left}(q)),\qquad
+  \widehat T(\mathsf{right}(q)).
+\]
+The Blaze prose later says that this contributes two queries per product-tree
+tensor.  With the residual written above, the scalar-tensor realization needs
+three formal-extension values.  We therefore treat the two-query line as a typo
+or as accounting for a virtual/packed object not specified there.  In this
+paper all three evaluation claims are made explicit.
+
+\begin{protocolbox}{Subroutine: Native Permutation Reduction}{fig:native-permute-reduce}
+\scriptsize\raggedright
+\noindent Public parameters: \(n\), \(\Idx,\widehat\pi:\F^n\to\F\), product-tree maps \(\mathsf{root},\mathsf{leaf},\mathsf{parent},\mathsf{left},\mathsf{right}\), \(\mathcal F_{\mathrm{MsgOracle}}\), and \(\mathcal F_{\mathrm{MLIOP}}\).
+
+\smallskip
+\noindent\(\underline{\PermuteCommit(\verifier:(\widehat O_x,\widehat O_y,\alpha,\beta),\ \prover:(x,y))\to(\verifier:(\widehat O_f,\widehat O_g),\prover:(\widehat O_f,\widehat O_g,f,g))}\)
+\begin{enumerate}[leftmargin=0.24in,label=\textbf{P\arabic*.},itemsep=0.06em,topsep=0.06em,parsep=0pt]
+  \item \(\prover\): for every \(b\in\B^n\), let
+        \(f[0\Vert b]\gets\alpha-(x[b]+\beta\,\widehat\pi(b))\).
+  \item \(\prover\): for every \(b\in\B^n\), let
+        \(g[0\Vert b]\gets\alpha-(y[b]+\beta\,\Idx(b))\).
+  \item \(\prover\): for \(s\in\{1,\ldots,n\}\) and
+        \(a\in\B^{n-s}\), let
+        \(f[1^s\Vert0\Vert a]\gets
+        f[1^{s-1}\Vert0\Vert a\Vert0]\,
+        f[1^{s-1}\Vert0\Vert a\Vert1]\).
+  \item \(\prover\): for \(s\in\{1,\ldots,n\}\) and
+        \(a\in\B^{n-s}\), let
+        \(g[1^s\Vert0\Vert a]\gets
+        g[1^{s-1}\Vert0\Vert a\Vert0]\,
+        g[1^{s-1}\Vert0\Vert a\Vert1]\).
+  \item \(\prover\): let \(f[1^{n+1}]\gets0\) and
+        \(g[1^{n+1}]\gets0\).
+  \item \(\prover,\verifier\): \(R_f\gets
+        \mathcal F_{\mathrm{MsgOracle}}.\mathsf{Submit}(\prover:f,\verifier:\bot)\).
+  \item \(\prover,\verifier\): \(R_g\gets
+        \mathcal F_{\mathrm{MsgOracle}}.\mathsf{Submit}(\prover:g,\verifier:\bot)\).
+  \item \(\prover,\verifier\): \(\widehat O_f\gets
+        \mathcal F_{\mathrm{MLIOP}}.\mathsf{Commit}(\prover,\verifier:R_f)\).
+  \item \(\prover,\verifier\): \(\widehat O_g\gets
+        \mathcal F_{\mathrm{MLIOP}}.\mathsf{Commit}(\prover,\verifier:R_g)\).
+  \item \(\prover,\verifier\): return \((\verifier:(\widehat O_f,\widehat O_g),\prover:(\widehat O_f,\widehat O_g,f,g))\).
+\end{enumerate}
+
+\smallskip
+\noindent Types: \(\widehat O_x,\widehat O_y,\widehat\pi,\Idx:\F^n\to\F\);
+\(\widehat O_f,\widehat O_g:\F^{n+1}\to\F\);
+\(x,y\in\F^{\B^n}\); \(f,g\in\F^{\B^{n+1}}\);
+\(\alpha,\beta\in\F\); \(r\in\F^n\).
+
+\smallskip
+\noindent\(\underline{\PermuteReduce(\verifier:(\widehat O_x,\widehat O_y,\widehat O_f,\widehat O_g,\widehat\pi,\alpha,\beta,r),\ \prover:(x,y,f,g))\to(\EvalReqs,B_f,B_g)}\)
+\begin{enumerate}[leftmargin=0.24in,label=\textbf{R\arabic*.},itemsep=0.06em,topsep=0.06em,parsep=0pt]
+  \item \(\prover\): \(v_{\mathrm{root}}\gets \MLE(f)(\mathsf{root})\).
+  \item \(\prover\): \(v_x\gets \MLE(x)(r)\) and \(v_y\gets \MLE(y)(r)\).
+  \item \(\prover\to\verifier\): \(v_{\mathrm{root}},v_x,v_y\in\F\).
+  \item \(\verifier\): \(v_f\gets\alpha-(v_x+\beta\,\widehat\pi(r))\) and
+        \(v_g\gets\alpha-(v_y+\beta\,\Idx(r))\).
+  \item \(\verifier\): \(\EvalReqs\gets
+        \{(\widehat O_f,\mathsf{root},v_{\mathrm{root}}),
+        (\widehat O_g,\mathsf{root},v_{\mathrm{root}}),
+        (\widehat O_x,r,v_x),(\widehat O_y,r,v_y),
+        (\widehat O_f,\mathsf{leaf}(r),v_f),
+        (\widehat O_g,\mathsf{leaf}(r),v_g)\}\).
+  \item \(\verifier\): \(B_f\gets(\mathsf{tree},0,\widehat O_f,r)\).
+  \item \(\verifier\): \(B_g\gets(\mathsf{tree},0,\widehat O_g,r)\).
+  \item \(\verifier\): return \((\EvalReqs,B_f,B_g)\).
+\end{enumerate}
+\end{protocolbox}
+
+The records \(B_f=(\mathsf{tree},0,\widehat O_f,r)\) and
+\(B_g=(\mathsf{tree},0,\widehat O_g,r)\) mean
+\[
+  \sum_{X\in\B^n}\chi_r(X)\mathsf{TreeRes}(f,X)=0,
+  \qquad
+  \sum_{X\in\B^n}\chi_r(X)\mathsf{TreeRes}(g,X)=0.
+\]
+The handle stored in each record tells the later endpoint checks which
+committed product-tree tensor the values must come from.
+
+The RAA relation uses this reducer twice:
+\[
+  (u_1,u_2,\pi_1)
+  \qquad\text{and}\qquad
+  (u_3,u_4,\pi_2).
+\]
+Therefore it introduces four product-tree tensors
+\[
+  f_1,g_1,f_2,g_2\in\F^{\B^{n+1}}.
+\]
+Each tree has \(2^{n+1}=2N\) entries.
+
+For each permutation edge, read the checks as one correlated argument:
+the derived leaf values load the claimed products from \(x\) and \(y\), the
+parent-child \(\SumClaims\) force \(f\) and \(g\) to be product trees, and the
+shared root value compares the two products.  No single one of these checks
+proves a permutation by itself.
+
+The top-level Blaze box below performs the native RAA orchestration directly.
+It creates the stage handles, calls the two reducers, gathers their returned
+requests, and runs one batched sumcheck over the six Boolean-sum claims in a
+fixed order.  The \(u_1\) handle is virtual, but not opaque: its evaluation
+rule is written where it is created.
+
+\subsection{The Batched Six-Sumcheck}
+
+The two accumulator reducers contribute two Boolean-sum claims \(B_{u2}\) and
+\(B_{u4}\).  The two permutation reducers contribute four product-tree
+Boolean-sum claims \(B_{f1},B_{g1},B_{f2},B_{g2}\).  Blaze batches these six
+named claims into
+one sumcheck by sampling one scalar
+\[
+  \lambda\leftarrow\F
+\]
+and using the powers \(1,\lambda,\lambda^2,\ldots,\lambda^5\) as batching
+weights.
+This is only native batching of Boolean-sum claims.  It is not the later
+compiler-level batching of arbitrary MLE evaluation requests.  If any one of
+the six Boolean-sum identities is false, then the vector of six errors defines
+a nonzero polynomial in \(\lambda\) of degree at most \(5\).  The batching step
+can hide that error with probability at most \(5/|\F|\).  Conditioned on the
+batched claim being false, ordinary sumcheck soundness applies.  This is the
+same scalar-power batching pattern used in Blaze's Remark~2.3.
+
+Only the Boolean-sum identities are batched here.  The permutation leaf
+equations and root equality have already been encoded as evaluation requests by
+deriving leaf values and reusing one root value.  The endpoint values produced
+by this sumcheck are still not trusted; they are appended to \(\EvalReqs\) and
+authenticated later by \(\MLEAuth\).
+This is exactly the endpoint discipline from
+Figure~\ref{fig:subroutine-sumcheck-terminal}: \(\SumCheck_n\) produces one
+terminal scalar \(T_{\mathrm{sc}}\), and the surrounding RAA flow expands that scalar
+into MLE requests against the existing handles \(\widehat O_{u_2}\),
+\(\widehat O_{u_4}\), \(\widehat O_{f_1}\), \(\widehat O_{g_1}\),
+\(\widehat O_{f_2}\), and \(\widehat O_{g_2}\).
+
+\begin{protocolbox}{Subroutine: Native Six-Sumcheck}{fig:native-six-sumcheck}
+\scriptsize\raggedright
+\noindent Public parameters: \(n\), \(\widehat A\), \(\chi_r\), \(\mathsf{TreeRes}\), and \(\SumCheck_n\) from Figure~\ref{fig:subroutine-sumcheck-terminal} with individual degree bound \(2\).
+
+\smallskip
+\noindent\(\underline{\RAASixSumcheck(\verifier:(B_{u2},B_{u4},B_{f1},B_{g1},B_{f2},B_{g2}),\ \prover:(u_2,u_4\in\F^{\B^n}, f_1,g_1,f_2,g_2\in\F^{\B^{n+1}}))\to(a_{\mathrm{sc}}\in\{0,1\},\EvalReqs_{\mathrm{sc}})}\)
+
+\smallskip
+\begin{enumerate}[leftmargin=0.24in,label=\textbf{S\arabic*.},itemsep=0.06em,topsep=0.06em,parsep=0pt]
+  \item \(\verifier\): let
+        \(B_{u2}=(\mathsf{acc},s_{u2},\widehat O_{u_2},r_{u2})\) and
+        \(B_{u4}=(\mathsf{acc},s_{u4},\widehat O_{u_4},r_{u4})\).
+  \item \(\verifier\): let
+        \(B_{f1}=(\mathsf{tree},0,\widehat O_{f_1},r_{f1})\),
+        \(B_{g1}=(\mathsf{tree},0,\widehat O_{g_1},r_{g1})\),
+        \(B_{f2}=(\mathsf{tree},0,\widehat O_{f_2},r_{f2})\), and
+        \(B_{g2}=(\mathsf{tree},0,\widehat O_{g_2},r_{g2})\).
+  \item \(\verifier\): sample \(\lambda\leftarrow\F\), then send
+        \(\lambda\) to \(\prover\).
+  \item \(\verifier\): \(S_\lambda\gets
+        s_{u2}+\lambda s_{u4}\).
+  \item \(\prover\): \(G_\lambda(X)\gets
+        \widehat A(r_{u2},X)\MLE(u_2)(X)
+        +\lambda\,\widehat A(r_{u4},X)\MLE(u_4)(X)
+        +\lambda^2\chi_{r_{f1}}(X)\mathsf{TreeRes}(f_1,X)
+        +\lambda^3\chi_{r_{g1}}(X)\mathsf{TreeRes}(g_1,X)
+        +\lambda^4\chi_{r_{f2}}(X)\mathsf{TreeRes}(f_2,X)
+        +\lambda^5\chi_{r_{g2}}(X)\mathsf{TreeRes}(g_2,X)\).
+  \item \(\prover,\verifier\):
+        \((a_{\mathrm{round}},r_{\mathrm{sc}},T_{\mathrm{sc}})
+        \gets\SumCheck_n(\verifier:S_\lambda,\prover:G_\lambda)\).
+  \item \(\verifier\): if \(a_{\mathrm{round}}=0\), return \((0,\emptyset)\).
+  \item \(\prover\): let  \(w_{u2}\gets\MLE(u_2)(r_{\mathrm{sc}})\) and
+        \(w_{u4}\gets\MLE(u_4)(r_{\mathrm{sc}}),\)\\
+        \(\qquad w_{f1,p}\gets\MLE(f_1)(\mathsf{parent}(r_{\mathrm{sc}}))\),
+        \(w_{f1,l}\gets\MLE(f_1)(\mathsf{left}(r_{\mathrm{sc}}))\),
+        \(w_{f1,r}\gets\MLE(f_1)(\mathsf{right}(r_{\mathrm{sc}}))\),\\
+        \(\qquad w_{g1,p}\gets\MLE(g_1)(\mathsf{parent}(r_{\mathrm{sc}}))\),
+        \(w_{g1,l}\gets\MLE(g_1)(\mathsf{left}(r_{\mathrm{sc}}))\),
+        \(w_{g1,r}\gets\MLE(g_1)(\mathsf{right}(r_{\mathrm{sc}}))\),\\
+        \(\qquad w_{f2,p}\gets\MLE(f_2)(\mathsf{parent}(r_{\mathrm{sc}}))\),
+        \(w_{f2,l}\gets\MLE(f_2)(\mathsf{left}(r_{\mathrm{sc}}))\),
+        \(w_{f2,r}\gets\MLE(f_2)(\mathsf{right}(r_{\mathrm{sc}}))\),\\
+        \(\qquad w_{g2,p}\gets\MLE(g_2)(\mathsf{parent}(r_{\mathrm{sc}}))\),
+        \(w_{g2,l}\gets\MLE(g_2)(\mathsf{left}(r_{\mathrm{sc}}))\),
+        \(w_{g2,r}\gets\MLE(g_2)(\mathsf{right}(r_{\mathrm{sc}}))\).
+  \item \(\prover\to\verifier\): send \(w_{u2},w_{u4},\)\\
+        \(\qquad w_{f1,p},w_{f1,l},w_{f1,r},w_{g1,p},w_{g1,l},w_{g1,r},\)\\
+        \(\qquad w_{f2,p},w_{f2,l},w_{f2,r},w_{g2,p},w_{g2,l},w_{g2,r}\in\F\).  
+  \item \(\verifier\): \(T_{\mathrm{endpoint}}\gets
+        \widehat A(r_{u2},r_{\mathrm{sc}})
+        w_{u2}
+        +\lambda\,\widehat A(r_{u4},r_{\mathrm{sc}})
+        w_{u4}
+        +\lambda^2\chi_{r_{f1}}(r_{\mathrm{sc}})
+        (w_{f1,p}-w_{f1,l}w_{f1,r})
+        +\lambda^3\chi_{r_{g1}}(r_{\mathrm{sc}})
+        (w_{g1,p}-w_{g1,l}w_{g1,r})
+        +\lambda^4\chi_{r_{f2}}(r_{\mathrm{sc}})
+        (w_{f2,p}-w_{f2,l}w_{f2,r})
+        +\lambda^5\chi_{r_{g2}}(r_{\mathrm{sc}})
+        (w_{g2,p}-w_{g2,l}w_{g2,r})\).
+  \item \(\verifier\): if \(T_{\mathrm{sc}}\ne T_{\mathrm{endpoint}}\), return \((0,\emptyset)\).
+  \item \(\verifier\): \(\EvalReqs_{\mathrm{sc}}\gets
+        \{(\widehat O_{u_2},r_{\mathrm{sc}},w_{u2}),
+        (\widehat O_{u_4},r_{\mathrm{sc}},w_{u4}),\)\\
+        \(\qquad(\widehat O_{f_1},\mathsf{parent}(r_{\mathrm{sc}}),w_{f1,p})\),
+        \((\widehat O_{f_1},\mathsf{left}(r_{\mathrm{sc}}),w_{f1,l})\),
+        \((\widehat O_{f_1},\mathsf{right}(r_{\mathrm{sc}}),w_{f1,r})\),\\
+        \(\qquad(\widehat O_{g_1},\mathsf{parent}(r_{\mathrm{sc}}),w_{g1,p})\),
+        \((\widehat O_{g_1},\mathsf{left}(r_{\mathrm{sc}}),w_{g1,l})\),
+        \((\widehat O_{g_1},\mathsf{right}(r_{\mathrm{sc}}),w_{g1,r})\),\\
+        \(\qquad(\widehat O_{f_2},\mathsf{parent}(r_{\mathrm{sc}}),w_{f2,p})\),
+        \((\widehat O_{f_2},\mathsf{left}(r_{\mathrm{sc}}),w_{f2,l})\),
+        \((\widehat O_{f_2},\mathsf{right}(r_{\mathrm{sc}}),w_{f2,r})\),\\
+        \(\qquad(\widehat O_{g_2},\mathsf{parent}(r_{\mathrm{sc}}),w_{g2,p})\),
+        \((\widehat O_{g_2},\mathsf{left}(r_{\mathrm{sc}}),w_{g2,l})\),
+        \((\widehat O_{g_2},\mathsf{right}(r_{\mathrm{sc}}),w_{g2,r})\}\)
+
+  \item \(\verifier\): return \((1,\EvalReqs_{\mathrm{sc}})\).
+\end{enumerate}
+\end{protocolbox}
+
+The terminal request set is explicit in Steps S14--S16: those are the values
+that the later authentication layer must bind to the committed tensors.  The
+first two requests are ordinary MLE endpoint claims for the accumulator inputs.
+Each product-tree residual contributes three formal-extension endpoint claims:
+parent, left child, and right child at the terminal sumcheck point
+\(r_{\mathrm{sc}}\).  The third entry of each \(B\)-tuple is the handle used in
+the endpoint request.  In the inlined Blaze protocol below, those entries are
+hatted MLE handles such as \(\widehat O_{u_2}\) and \(\widehat O_{f_1}\).
+The public factors \(\widehat A(r_{u2},r_{\mathrm{sc}})\),
+\(\widehat A(r_{u4},r_{\mathrm{sc}})\), \(\chi_{r_{f1}}(r_{\mathrm{sc}})\),
+\(\chi_{r_{g1}}(r_{\mathrm{sc}})\), \(\chi_{r_{f2}}(r_{\mathrm{sc}})\),
+\(\chi_{r_{g2}}(r_{\mathrm{sc}})\), and the powers of \(\lambda\) are not oracle
+requests.
+
+\subsection{Blaze In The \(\mathcal F_{\mathrm{MLIOP}}\)-Hybrid}
+
+We can now state the top-level Blaze flow as a hybrid protocol.  In this
+subsection, \(\mathcal F_{\mathrm{MLIOP}}\) is the ideal multilinear-oracle
+functionality from Figure~\ref{fig:func-mliop-oracle}.  This functionality is
+the only oracle power Blaze needs at the native layer: the prover and verifier
+name committed Boolean oracle handles, the functionality commits those handles
+into MLE oracle handles, and the verifier later obtains MLE evaluations at
+field points.
+
+Figure~\ref{fig:native-blaze-fmliop-hybrid} is therefore not an incomplete
+protocol and not merely a list of constraints.  It is Blaze in the
+\(\mathcal F_{\mathrm{MLIOP}}\)-hybrid model.  The inlined RAA flow produces
+evaluation requests of the form \(J(r)=v\), and the top-level protocol
+immediately discharges those requests by calling
+\(\mathcal F_{\mathrm{MLIOP}}.\mathsf{Eval}\).  Give this protocol real
+implementations of the coordinate-oracle layer and of
+\(\mathcal F_{\mathrm{MLIOP}}\), and the composition is a concrete Blaze
+implementation.  Those implementations may use coordinate commitments,
+batching, BaseFold, Merkle trees, or something else; the Blaze algebra below
+only sees the hybrid functionality.
+
+The important topology is the same one frozen in
+Figure~\ref{fig:protocol-blaze-pcs}.  The encoded matrix is committed once as a
+coordinate oracle; its rows are not separately committed to the MLIOP layer.
+Only after the verifier samples \(\rho\) do the parties form the virtual folded
+handle
+\[
+  R_\star(b)
+  =
+  \sum_{h\in\B^\ell}\rho[h]\,R_c(b)[h],
+  \qquad b\in\B^n.
+\]
+This is the first outer encoded object passed to the inlined RAA flow.  The
+protocol commits \(R_\star\) together with the other RAA-stage handles before
+it asks any MLE-evaluation questions.
+The folded tensor is
+\[
+  c_\star[b]=\sum_{h\in\B^\ell}\rho[h]c[h,b],
+  \qquad b\in\B^n.
+\]
+
+\begin{protocolbox}{Protocol: Blaze In The \(\mathcal F_{\mathrm{MLIOP}}\)-Hybrid}{fig:native-blaze-fmliop-hybrid}
+\scriptsize\raggedright
+\noindent Public parameters: \(\ell,k,n\), the RAA map
+\(\RAA:\F^{\B^k}\to\F^{\B^n}\), \(\pi_1,\pi_2:\B^n\to\B^n\),
+\(\widehat\pi_1,\widehat\pi_2,\Idx:\F^n\to\F\),
+\(\widehat A:\F^n\times\F^n\to\F\), \(F_{\mathrm{rep}}\),
+\(\mathsf{msg}:\F^n\to\F^k\), \(\mathsf{RowFold}\),
+\(\AccReduce\), \(\PermuteCommit\), \(\PermuteReduce\), \(\RAASixSumcheck\),
+\(\mathcal F_{\mathrm{MsgOracle}}\), and \(\mathcal F_{\mathrm{MLIOP}}\).
+
+\smallskip
+\noindent\(\underline{\mathsf{Blaze}^{\mathcal F_{\mathrm{MLIOP}}}.\mathsf{Commit}(\verifier:\bot,\ \prover:m\in\F^{\B^\ell\times\B^k})\to C_m\in\Handle}\)
+
+\smallskip
+\begin{enumerate}[leftmargin=0.24in,label=\textbf{C\arabic*.},itemsep=0.06em,topsep=0.06em,parsep=0pt]
+  \item \(\prover\): for each \(h\in\B^\ell\), compute
+        \(c[h,\ast]\gets\RAA(m[h,\ast])\in\F^{\B^n}\).
+  \item \(\prover\): define \(C\in(\F^{\B^\ell})^{\B^n}\) by
+        \(C[b]=c[\ast,b]\) for \(b\in\B^n\).
+  \item \(\prover,\verifier\): \(R_c\gets
+        \mathcal F_{\mathrm{MsgOracle}}.\mathsf{Submit}
+        (\prover:C,\verifier:\bot)\).
+  \item \(\mathsf{Blaze}^{\mathcal F_{\mathrm{MLIOP}}}\): return
+        \(C_m=R_c\).
+\end{enumerate}
+
+\smallskip
+\noindent\(\underline{\mathsf{Blaze}^{\mathcal F_{\mathrm{MLIOP}}}.\mathsf{Open}(\verifier:(C_m,z_{\mathrm{slice}}\in\F^\ell,z_{\mathrm{in}}\in\F^k,v\in\F),\ \prover:(m,C_m,z_{\mathrm{slice}},z_{\mathrm{in}},v))\to a\in\{0,1\}}\)
+
+\smallskip
+\begin{enumerate}[leftmargin=0.24in,label=\textbf{O\arabic*.},itemsep=0.06em,topsep=0.06em,parsep=0pt]
+  \item \(\prover\): for each \(h\in\B^\ell\), compute
+        \(u[h]\gets\MLE(m[h,\ast])(z_{\mathrm{in}})\).
+  \item \(\prover\to\verifier\): \(u\in\F^{\B^\ell}\).
+  \item \(\verifier\): if
+        \(v\ne\sum_{h\in\B^\ell}\chi_h(z_{\mathrm{slice}})u[h]\), return
+        \(0\).
+  \item \(\verifier\): sample \(\rho\leftarrow\F^{\B^\ell}\), then send
+        \(\rho\) to \(\prover\).
+  \item \(\prover\): compute
+        \(m_\star[a]\gets\sum_{h\in\B^\ell}\rho[h]m[h,a]\) for
+        \(a\in\B^k\).
+  \item \(\verifier\): let
+        \(v_\star\gets\sum_{h\in\B^\ell}\rho[h]u[h]\).
+  \item \(\prover,\verifier\): \(R_\star\gets
+        \mathsf{RowFold.Commit}(\verifier:(C_m,\rho),\prover:(C_m,\rho))\).
+  \item \(\prover\): let \(u_0\gets m_\star\),
+        \(u_1\gets F_{\mathrm{rep}}(u_0)\),
+        \(u_2\gets M_{\pi_1}u_1\),
+        \(u_3\gets\Acc(u_2)\),
+        \(u_4\gets M_{\pi_2}u_3\),
+        \(c_\star^{\mathrm{wit}}\gets\Acc(u_4)\), and
+        \(u_5\gets c_\star^{\mathrm{wit}}\).
+  \item \(\prover,\verifier\): let \(R_{u_5}\gets R_\star\).
+  \item \(\prover,\verifier\): for each \(i\in\{0,2,3,4\}\), let
+        \(R_{u_i}\gets
+        \mathcal F_{\mathrm{MsgOracle}}.\mathsf{Submit}(\prover:u_i,\verifier:\bot)\).
+  \item \(\prover,\verifier\): for each \(i\in\{0,2,3,4,5\}\), let
+        \(\widehat O_{u_i}\gets
+        \mathcal F_{\mathrm{MLIOP}}.\mathsf{Commit}(\prover,\verifier:R_{u_i})\).
+  \item \(\prover,\verifier\): let
+        \(\widehat O_{u_1}\gets\RepView(\widehat O_{u_0})\).
+  \item \(\verifier\): sample \(\alpha,\beta\leftarrow\F\), then send
+        \((\alpha,\beta)\) to \(\prover\).
+  \item \(\prover,\verifier\):
+        \((\widehat O_{f_1},\widehat O_{g_1};f_1,g_1)\gets
+        \PermuteCommit(\verifier:(\widehat O_{u_1},
+        \widehat O_{u_2},\alpha,\beta),\prover:(u_1,u_2))\).
+  \item \(\prover,\verifier\):
+        \((\widehat O_{f_2},\widehat O_{g_2};f_2,g_2)\gets
+        \PermuteCommit(\verifier:(\widehat O_{u_3},
+        \widehat O_{u_4},\alpha,\beta),\prover:(u_3,u_4))\).
+  \item \(\verifier\): sample \(r_{\mathrm{chk}}\leftarrow\F^n\), then send
+        \(r_{\mathrm{chk}}\) to \(\prover\).
+  \item \(\prover,\verifier\):
+        \((\EvalReqs_{u3},B_{u2})\gets
+        \AccReduce(\verifier:(\widehat O_{u_2},
+        \widehat O_{u_3},r_{\mathrm{chk}}),\prover:(u_2,u_3))\).
+  \item \(\prover,\verifier\):
+        \((\EvalReqs_{y},B_{u4})\gets
+        \AccReduce(\verifier:(\widehat O_{u_4},
+        \widehat O_{u_5},r_{\mathrm{chk}}),\prover:(u_4,u_5))\).
+  \item \(\prover,\verifier\):
+        \((\EvalReqs_{f1,g1},B_{f1},B_{g1})\gets
+        \PermuteReduce(\verifier:(\widehat O_{u_1},
+        \widehat O_{u_2},\widehat O_{f_1},\widehat O_{g_1},
+        \widehat\pi_1,\alpha,\beta,r_{\mathrm{chk}}),
+        \prover:(u_1,u_2,f_1,g_1))\).
+  \item \(\prover,\verifier\):
+        \((\EvalReqs_{f2,g2},B_{f2},B_{g2})\gets
+        \PermuteReduce(\verifier:(\widehat O_{u_3},
+        \widehat O_{u_4},\widehat O_{f_2},\widehat O_{g_2},
+        \widehat\pi_2,\alpha,\beta,r_{\mathrm{chk}}),
+        \prover:(u_3,u_4,f_2,g_2))\).
+  \item \(\prover,\verifier\): \((a_{\mathrm{sc}},\EvalReqs_{\mathrm{sc}})\gets
+        \RAASixSumcheck(\verifier:(B_{u2},B_{u4},
+        B_{f1},B_{g1},B_{f2},B_{g2}),
+        \prover:(u_2,u_4,f_1,g_1,f_2,g_2))\).
+        \item \(\verifier\): \(\EvalReqs_{\RAA}\gets
+        \{(\widehat O_{u_0},z_{\mathrm{in}},v_\star)\}
+        \cup\EvalReqs_{u3}\cup\EvalReqs_y
+        \cup\EvalReqs_{f1,g1}\cup\EvalReqs_{f2,g2}
+        \cup\EvalReqs_{\mathrm{sc}}\).
+        \item \(\verifier\): for each \((J,r,w)\in\EvalReqs_{\RAA}\): \(\verifier\): if \( \mathcal F_{\mathrm{MLIOP}}.\mathsf{Eval}
+          (\verifier:(J,r))\ne w\), return \(0\).
+        
+        \item \(\verifier\): if \(a_{\mathrm{sc}}=0\), return \(0\).
+  \item \(\verifier\): return \(1\).
+\end{enumerate}
+\end{protocolbox}
+
+Figure~\ref{fig:native-blaze-fmliop-hybrid} is the promised Blaze protocol in
+the hybrid model.  It uses coordinate handles, but not Merkle trees or BaseFold
+query paths.  Those are possible ways to realize the two ideal layers:
+\(\mathcal F_{\mathrm{MsgOracle}}\) for coordinate access and
+\(\mathcal F_{\mathrm{MLIOP}}\) for MLE evaluation access.  The next layer is
+therefore not a second RAA protocol.  It is an implementation of the ideal
+calls used by this figure.
+
+The Blaze paper uses a different presentation style.  It first constructs an
+MLIOP for \(\RMLE[\PRAA]\), then describes an MLIOP-to-IOPP transformation using
+encoded oracle strings, batching, and an IOPP for \(\RMLE[C]\)~[Blaze24,
+Section~4.1].  In the language of this explainer, that transformation is a
+realization of \(\mathcal F_{\mathrm{MLIOP}}\).  The following dictionary is the
+translation:
+\[
+\begin{array}{c|c}
+\text{this explainer} & \text{Blaze paper} \\
+\hline
+\mathcal F_{\mathrm{MLIOP}}\text{-hybrid} &
+\text{MLIOP model} \\
+\widehat O &
+\text{multilinear oracle } \widehat H \\
+\mathcal F_{\mathrm{MLIOP}}.\mathsf{Commit}(R) &
+\text{ideal wrapper for authenticated access to }\widehat H \\
+\left(\widehat O,r,v\right)\in\EvalReqs &
+\text{verifier evaluation query } \widehat H(r)=v \\
+\text{realize }\mathcal F_{\mathrm{MLIOP}} &
+\text{encoded-oracle/RMLE realization via the MLIOP-to-IOPP transformation} \\
+\MLEAuth &
+\Pi_{\mathrm{batch}}\text{ plus an IOPP for }\RMLE[C] \\
+\text{virtual handle} &
+\text{virtual multilinear polynomial/oracle}
+\end{array}
+\]
+
+\subsection{Boundary To The Compiled Protocol}
+
+The native section stops at
+Figure~\ref{fig:native-blaze-fmliop-hybrid}.  It has checked the native
+sumcheck transcript and all requested MLE evaluations inside the
+\(\mathcal F_{\mathrm{MLIOP}}\)-hybrid model.  A concrete protocol replaces the
+hybrid functionality by a real implementation.  The implementation described
+later realizes the needed Boolean-handle commits and MLE-evaluation calls using
+\(\MLEAuth\), \(\BackendRMLE\), BaseFold-style proximity, and coordinate
+openings.
+
+This is why \(\EvalReqs\) remain the right internal boundary object for the RAA
+algebra.  A native MLIOP request says only, ``the verifier needs
+\(J(r)=v\).''  In the hybrid protocol, the final evaluation loop checks that
+request by calling \(\mathcal F_{\mathrm{MLIOP}}\).  In a concrete implementation, the
+realization of \(\mathcal F_{\mathrm{MLIOP}}\) adds coordinate-opening handles,
+batches such requests, and uses an RMLE backend to authenticate the batched MLE
+claim.  The RAA algebra does not need to know whether that handle is
+ordinary, composite, or virtual.
+
+This separation is the main invariant to preserve:
+\[
+  \text{RAA algebra creates evaluation requests;}
+  \qquad
+  \text{the backend authenticates them.}
+\]

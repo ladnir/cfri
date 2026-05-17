@@ -1,0 +1,771 @@
+\section{Proof Templates, Oracles, And Handles}
+
+Before we define fields, tensors, or codes, we need to fix one vocabulary point.
+The word ``oracle'' is used in several nearby but different proof templates.  In
+one place it means an ideal proof string that the verifier may open by address.
+In another place it means a large input that the verifier may open by address.
+In a multilinear protocol it means an object that evaluates a multilinear
+polynomial at field points.  After cryptographic compilation it may mean a
+Merkle message-oracle handle that authenticates coordinate openings.
+
+Those are not the same interface.  This section gives each one a name.  Later
+sections may say that an object is virtual, committed, encoded, or holographic,
+but it must still implement one of the interfaces below.  This is the discipline
+that keeps the Blaze compiler stack from becoming a soup of unnamed oracles.
+
+In the idealized proof templates in this section, an oracle is best viewed as a
+trusted functionality, or an extra abstract party.  The prover, indexer, or
+environment submits a fixed object to that functionality.  The functionality
+returns a handle.  Later, the verifier uses the handle to ask the functionality
+for selected information.  The functionality is trusted to answer consistently
+from the submitted object, but it is not trusted to make that object correct.
+Correctness is still enforced only by the verifier's checks.  In a real
+protocol, these ideal functionalities are instantiated by concrete mechanisms
+such as Merkle commitments, polynomial commitments, or transcript-bound virtual
+opening rules.
+
+The source path is: IOPs from BCS16~[BCS16], IOPPs from RVW13~[RVW13],
+holographic IOPs from Fractal~[COS20], multilinear IOPs and the RMLE compiler
+from Blaze~[Blaze24], polynomial-oracle terminology and batching from
+HyperPlonk~[CBBZ23], and Fiat--Shamir/RBR soundness from
+CMS19/CCH19~[CMS19,CCH19].
+
+\subsection{Relations And Roles}
+
+The basic object proved by a proof system is a relation.  Following the
+relation/language convention used in BCS16~[BCS16], let
+\[
+  R\subseteq \mathcal X\times\mathcal W
+\]
+be a set of valid instance-witness pairs.  Its language is
+\[
+  L(R)
+  =
+  \{x\in\mathcal X:\exists w\in\mathcal W\text{ such that }(x,w)\in R\}.
+\]
+The verifier receives an instance \(x\).  The honest prover additionally knows
+a witness \(w\).  Completeness says that valid pairs are accepted.  Soundness
+says that if \(x\notin L(R)\), no malicious prover should make the verifier
+accept except with small probability.
+
+Some protocols also have a large public object that is fixed before the online
+proof.  Following the holographic-IOP convention used by Fractal~[COS20], an
+indexed relation has triples
+\[
+  R\subseteq \mathcal I\times\mathcal X\times\mathcal W.
+\]
+Here \(i\in\mathcal I\) is the index, \(x\in\mathcal X\) is the online
+instance, and \(w\in\mathcal W\) is the witness.  The index may be too large for
+the verifier to read directly, so a holographic protocol gives the verifier
+opening access to an encoding of \(i\).
+
+Blaze uses a second split: an online input may have a short explicit part and a
+long implicit part~[Blaze24].  We will use the following roles throughout.
+
+\begin{description}[leftmargin=0.32in,style=nextline]
+  \item[Index.]
+        A structured public parameter \(i\).  In a holographic template, the
+        verifier may open coordinates of an encoding of \(i\) through an encoded-index
+        functionality.
+  \item[Explicit input.]
+        The verifier-held online input \(x\).  It is short enough to read
+        directly.
+  \item[Implicit input.]
+        A long online input \(y\).  The verifier does not read \(y\) in full.
+        The current proof template specifies which ideal functionality stores
+        \(y\) and how the verifier opens selected coordinates of it.
+  \item[Witness.]
+        A prover-held value \(w\) proving that the index, explicit input, and
+        implicit input satisfy the relation.
+\end{description}
+
+For the recurring relation \(\RMLE[C]\), this split is concrete.  The index
+specifies a code \(C_i\).  The explicit input is an evaluation claim \((z,v)\).
+The implicit input is an alleged codeword \(y\).  The witness is a tensor
+\(m\) such that
+\[
+  y=C_i(m)
+  \qquad\text{and}\qquad
+  \MLE(m)(z)=v.
+\]
+
+\subsection{From IPs To IOPs}
+
+An interactive proof (IP) is ordinary interaction, as recalled in BCS16's route
+to IOPs~[BCS16].  The verifier sends and receives messages, reads every
+received message in full, and eventually outputs accept or reject.  In a
+public-coin IP, every verifier message is sampled from a declared public
+randomness domain.
+
+A probabilistically checkable proof (PCP) changes the access pattern~[BCS16].
+The proof is a fixed string, and the verifier opens only selected coordinates of
+that string.  There is no later prover adaptation.
+
+An interactive oracle proof (IOP), introduced by BCS16~[BCS16], combines those
+two ideas.  The prover fixes message strings across rounds, and the verifier
+later opens selected coordinates.  We model this access through the ideal
+message-oracle functionality in Figure~\ref{fig:func-msg-oracle}.  Operationally,
+the functionality binds a fixed string and answers coordinate openings.  BaseFold
+and Blaze use the public-coin, prover-first shape: the prover first fixes a
+string, the verifier samples public challenges, and the prover fixes more
+strings~[BaseFold23,Blaze24].
+
+\begin{protocolbox}{Functionality: Message Oracle}{fig:func-msg-oracle}
+Let \(\Sigma\) be an alphabet and \(D\) a finite address set.
+
+\smallskip
+\noindent\(\underline{\mathcal F_{\mathrm{MsgOracle}}.\mathsf{Submit}(\mathsf{source}:\pi\in\Sigma^D,\ \verifier:\bot)\to O_\pi}\)
+
+\smallskip
+\begin{enumerate}[leftmargin=0.24in,label=\textbf{M\arabic*.},itemsep=0.08em,topsep=0.1em,parsep=0pt]
+  \item \(\mathcal F_{\mathrm{MsgOracle}}\): store the input \(\pi\)
+        under a fresh handle \(O_\pi\).
+  \item \(\mathcal F_{\mathrm{MsgOracle}}\): return \(O_\pi\).
+\end{enumerate}
+
+\smallskip
+\noindent\(\underline{\mathcal F_{\mathrm{MsgOracle}}.\mathsf{Open}(\verifier:(O_\pi,a\in D))\to(\verifier:o\in\Sigma\cup\{\bot\})}\)
+
+\smallskip
+\begin{enumerate}[leftmargin=0.24in,label=\textbf{O\arabic*.},itemsep=0.08em,topsep=0.1em,parsep=0pt]
+  \item \(\mathcal F_{\mathrm{MsgOracle}}\): if \(O_\pi\) is a stored handle
+        for \(\pi\in\Sigma^D\), set \(o\gets\pi[a]\); otherwise set
+        \(o\gets\bot\).
+  \item \(\mathcal F_{\mathrm{MsgOracle}}\): return \((\verifier:o)\).
+\end{enumerate}
+\end{protocolbox}
+
+\begin{protocolbox}{Template: Public-Coin IOP}{fig:template-public-coin-iop}
+Let \(R\subseteq\mathcal X\times\mathcal W\) and let
+\(\varepsilon\in[0,1]\) be the declared soundness error.  There is no external
+openable input object in this template; every message-oracle handle below is
+created by the prover during the protocol.
+
+\smallskip
+\noindent\(\underline{\mathsf{PublicCoinIOP}[R,\varepsilon](\verifier:x\in\mathcal X,\ \prover:(x,w))\to\{0,1\}}\)
+
+\smallskip
+\begin{enumerate}[leftmargin=0.24in,label=\textbf{I\arabic*.},itemsep=0.08em,topsep=0.1em,parsep=0pt]
+  \item \(\prover\): compute
+        \(\pi_0=f_0(x,w)\in\Sigma_0^{D_0}\).
+  \item \(\prover,\verifier,\mathcal F_{\mathrm{MsgOracle}}\): run
+        \(\mathcal F_{\mathrm{MsgOracle}}.\mathsf{Submit}(\pi_0)\),
+        producing \(O_0\).
+  \item For each round \(j\in[T]\):
+        \begin{enumerate}[leftmargin=0.2in,label=\textbf{I\arabic{enumi}.\arabic*.},itemsep=0.05em,topsep=0.05em,parsep=0pt]
+          \item \(\verifier\): sample public challenge \(\alpha_j\) from its
+                declared challenge domain.
+          \item \(\prover\): compute
+                \(\pi_j=f_j(x,w,\alpha_1,\ldots,\alpha_j)\in\Sigma_j^{D_j}\).
+          \item \(\prover,\verifier,\mathcal F_{\mathrm{MsgOracle}}\): run
+                \(\mathcal F_{\mathrm{MsgOracle}}.\mathsf{Submit}(\pi_j)\),
+                producing \(O_j\).
+        \end{enumerate}
+  \item \(\verifier\): choose finite opening sets \(Q_j\subseteq D_j\) for
+        \(j\in\{0,\ldots,T\}\).
+  \item \(\verifier\): for each \(j\in\{0,\ldots,T\}\) and each
+        \(a\in Q_j\), call
+        \(\mathcal F_{\mathrm{MsgOracle}}.\mathsf{Open}(O_j,a)\).
+  \item \(\verifier\): output \(0\) or \(1\) from the transcript, public
+        challenges, and opened values.
+  \item \(\mathsf{Completeness}\): if \((x,w)\in R\), the honest prover is
+        accepted.
+  \item \(\mathsf{Soundness}\): if there is no \(w\in\mathcal W\) such that
+        \((x,w)\in R\), every malicious prover is accepted with probability at
+        most \(\varepsilon\).
+\end{enumerate}
+\end{protocolbox}
+
+Figure~\ref{fig:func-msg-oracle} is an ideal message oracle for a fixed
+openable string.  The submitting source may be the prover, an indexer, the
+environment, or a prior protocol.  Operationally, the functionality is
+commitment-like: it stores the whole string and later answers coordinate
+openings.
+The protocol using a handle must specify when the handle is fixed.  The same
+open interface can also be implemented by a Merkle message-oracle handle, an
+indexer-provided handle, or a virtual handle.
+
+The base IOP template in Figure~\ref{fig:template-public-coin-iop} is an exact
+membership template: the verifier is trying to decide whether the explicit input
+\(x\) has some witness \(w\) in the relation \(R\).  The next two templates add
+external handles, but they use those handles for different semantic jobs.
+
+\subsection{IOPPs And Proximity}
+
+An interactive oracle proof of proximity (IOPP) adds one more openable object:
+the verifier has oracle access to a large input string and wants to know whether
+that string is close to the valid set.  This is the proximity setting of
+RVW13~[RVW13] and the codeword-proximity setting used by BaseFold~[BaseFold23].
+The IOPP template takes this large input as an external message-oracle handle
+\(O_y\).  The handle must implement the open interface of
+Figure~\ref{fig:func-msg-oracle}; the template does not care whether it was
+produced by \(\mathcal F_{\mathrm{MsgOracle}}.\mathsf{Submit}\), by an indexer,
+by a Merkle message-oracle handle, or by a virtual construction.
+
+The semantic difference from an ordinary IOP is that \(y\) itself is the object
+being tested.  The verifier is not promised exact validity or exact invalidity.
+Instead, the template has a gap: valid \(y\)'s should accept, far \(y\)'s should
+reject, and close-but-invalid \(y\)'s are outside the promise.
+
+For two strings \(y,y'\in\Sigma^D\), their relative Hamming distance is
+\[
+  \Delta(y,y')
+  =
+  \frac{|\{a\in D:y[a]\ne y'[a]\}|}{|D|}.
+\]
+For a set \(S\subseteq\Sigma^D\), define
+\[
+  \Delta(y,S)=\min_{s\in S}\Delta(y,s).
+\]
+
+\begin{protocolbox}{Ideal Functionality: Proximity To A Language}{fig:func-prox-language}
+\noindent Public parameters: a finite domain \(D\), an alphabet \(\Sigma\), a
+language \(L\subseteq\Sigma^D\), and a proximity threshold
+\(\delta\in[0,1]\).
+
+\smallskip
+\noindent\(\underline{\mathcal F_{\mathrm{Prox}}^{L,\delta}.\mathsf{Submit}(\mathsf{source}:y\in\Sigma^D,\ \verifier:\bot)\to I}\)
+
+\smallskip
+\begin{enumerate}[leftmargin=0.24in,label=\textbf{S\arabic*.},itemsep=0.08em,topsep=0.1em,parsep=0pt]
+  \item \(\mathcal F_{\mathrm{Prox}}^{L,\delta}\): choose a fresh handle \(I\).
+  \item \(\mathcal F_{\mathrm{Prox}}^{L,\delta}\): store the submitted string
+        \(y\in\Sigma^D\) under \(I\).
+  \item \(\mathcal F_{\mathrm{Prox}}^{L,\delta}\): return \(I\).
+\end{enumerate}
+
+\smallskip
+\noindent\(\underline{\mathcal F_{\mathrm{Prox}}^{L,\delta}.\mathsf{Check}(\verifier:I)\to(\verifier:b\in\{0,1\})}\)
+
+\smallskip
+\begin{enumerate}[leftmargin=0.24in,label=\textbf{C\arabic*.},itemsep=0.08em,topsep=0.1em,parsep=0pt]
+  \item \(\mathcal F_{\mathrm{Prox}}^{L,\delta}\): retrieve \(y\) stored under \(I\).
+  \item \(\mathcal F_{\mathrm{Prox}}^{L,\delta}\): set
+        \(\Delta_y\gets\Delta(y,L)\).
+  \item \(\mathcal F_{\mathrm{Prox}}^{L,\delta}\): if \(\Delta_y=0\), set
+        \(b\gets1\).
+  \item \(\mathcal F_{\mathrm{Prox}}^{L,\delta}\): if \(\Delta_y>\delta\), set
+        \(b\gets0\).
+  \item \(\mathcal F_{\mathrm{Prox}}^{L,\delta}\): if
+        \(0<\Delta_y\le\delta\), let the corrupt source, or equivalently the
+        simulator for that source, choose \(b\in\{0,1\}\).
+  \item \(\mathcal F_{\mathrm{Prox}}^{L,\delta}\): return \((\verifier:b)\).
+\end{enumerate}
+\end{protocolbox}
+
+Figure~\ref{fig:func-prox-language} is the functionality view of proximity.
+An IOPP is a protocol realization of this functionality for a chosen language
+\(L\), threshold \(\delta\), and soundness error \(\varepsilon\), using only
+sublinear oracle openings of the submitted string.  In applications \(L\) may
+depend on the public input \(x\); then the instantiated language is
+\(L_x=S_{\mathrm{valid}}(x)\).
+
+\begin{protocolbox}{Template: IOPP}{fig:template-iopp}
+Let \(S_{\mathrm{valid}}(x)\subseteq\Sigma^D\) be the valid implicit-input set
+for explicit input \(x\), let \(\delta\in[0,1]\) be the proximity radius, and
+let \(\varepsilon\in[0,1]\) be the declared soundness error.  The handle
+\(O_y\) opens a fixed string \(y\in\Sigma^D\).
+
+\smallskip
+\noindent\(\underline{\mathsf{IOPP}[S_{\mathrm{valid}},\delta,\varepsilon](\verifier:(x,O_y),\ \prover:(x,w))\to\{0,1\}}\)
+
+\smallskip
+\begin{enumerate}[leftmargin=0.24in,label=\textbf{P\arabic*.},itemsep=0.08em,topsep=0.1em,parsep=0pt]
+  \item \(O_y\): fixed message-oracle handle implementing
+        \(\mathcal F_{\mathrm{MsgOracle}}.\mathsf{Open}\).
+  \item \(\prover\): compute
+        \(\pi_0=f_0(x,w)\in\Sigma_0^{D_0}\).
+  \item \(\prover,\verifier,\mathcal F_{\mathrm{MsgOracle}}\): run
+        \(\mathcal F_{\mathrm{MsgOracle}}.\mathsf{Submit}(\pi_0)\),
+        producing \(O_0\).
+  \item For each round \(j\in[T]\):
+        \begin{enumerate}[leftmargin=0.2in,label=\textbf{P\arabic{enumi}.\arabic*.},itemsep=0.05em,topsep=0.05em,parsep=0pt]
+          \item \(\verifier\): sample public challenge \(\alpha_j\) from its
+                declared challenge domain.
+          \item \(\prover\): compute
+                \(\pi_j=f_j(x,w,\alpha_1,\ldots,\alpha_j)\in\Sigma_j^{D_j}\).
+          \item \(\prover,\verifier,\mathcal F_{\mathrm{MsgOracle}}\): run
+                \(\mathcal F_{\mathrm{MsgOracle}}.\mathsf{Submit}(\pi_j)\),
+                producing \(O_j\).
+        \end{enumerate}
+  \item \(\verifier\): choose a finite input-opening set \(Q_y\subseteq D\) and
+        finite prover-message opening sets \(Q_j\subseteq D_j\) for
+        \(j\in\{0,\ldots,T\}\).
+  \item \(\verifier\): for each \(a\in Q_y\), call
+        \(\mathcal F_{\mathrm{MsgOracle}}.\mathsf{Open}(O_y,a)\).
+  \item \(\verifier\): for each \(j\in\{0,\ldots,T\}\) and each
+        \(a\in Q_j\), call
+        \(\mathcal F_{\mathrm{MsgOracle}}.\mathsf{Open}(O_j,a)\).
+  \item \(\verifier\): output \(0\) or \(1\) from \(x\), the transcript,
+        public challenges, and opened values.
+  \item \(\mathsf{Completeness}\): if \(y\in S_{\mathrm{valid}}(x)\), the
+        honest prover is accepted.
+  \item \(\mathsf{Proximity\ soundness}\): if
+        \(\Delta(y,S_{\mathrm{valid}}(x))>\delta\), every malicious prover is
+        accepted with probability at most \(\varepsilon\).
+  \item \(\mathsf{Gap}\): if \(0<\Delta(y,S_{\mathrm{valid}}(x))\le\delta\),
+        the template makes no accept/reject promise.
+\end{enumerate}
+\end{protocolbox}
+
+The important negative statement is as useful as the positive one: an IOPP does
+not usually prove that the input string is exactly valid.  It proves that a
+string far from the valid set is rejected.  For code-based protocols this means
+``close to a codeword,'' not ``equal to a codeword.''
+
+\subsection{Holographic IOPs}
+
+A holographic IOP is an IOP for an indexed family of relations~[COS20].  The
+symbol \(i\) is not a coordinate index; it is the large public description that
+selects one relation from the family.  For example, \(i\) might be a circuit,
+constraint system, fixed table, or wiring description.  The relation can be
+written either as \(R(i,x,w)\) or as \(R_i(x,w)\).
+
+The holographic move is that the verifier does not read all of \(i\).  An
+indexer preprocesses \(i\) into an openable string
+\(\mathsf{idx}(i)\in\Gamma^{D_{\mathrm{idx}}}\), fixes that string behind a
+message-oracle handle \(O_i\), and gives the handle to the verifier.  There is
+no separate index-oracle API: \(O_i\) is just a handle implementing
+\(\mathcal F_{\mathrm{MsgOracle}}.\mathsf{Open}\).
+
+This is not the IOPP promise.  The external handle \(O_i\) represents public
+relation data, not the object being proximity-tested.  Holographic soundness is
+ordinary exact soundness for the indexed relation \(R(i,x,w)\), assuming
+\(O_i\) is the fixed handle for the declared preprocessing \(\mathsf{idx}(i)\).
+
+\begin{protocolbox}{Template: Holographic IOP}{fig:template-holographic-iop}
+Let \(R\subseteq\mathcal I\times\mathcal X\times\mathcal W\), let
+\(\mathsf{idx}:\mathcal I\to\Gamma^{D_{\mathrm{idx}}}\) be the indexer's
+preprocessing map, and let \(\varepsilon\in[0,1]\) be the declared soundness
+error.  The handle \(O_i\) opens the fixed string \(\mathsf{idx}(i)\).
+
+\smallskip
+\noindent\(\underline{\mathsf{HolographicIOP}[R,\mathsf{idx},\varepsilon](\verifier:(x,O_i),\ \prover:(i,x,w))\to\{0,1\}}\)
+
+\smallskip
+\begin{enumerate}[leftmargin=0.24in,label=\textbf{G\arabic*.},itemsep=0.08em,topsep=0.1em,parsep=0pt]
+  \item \(O_i\): fixed message-oracle handle implementing
+        \(\mathcal F_{\mathrm{MsgOracle}}.\mathsf{Open}\).
+  \item \(\prover\): compute
+        \(\pi_0=f_0(i,x,w)\in\Sigma_0^{D_0}\).
+  \item \(\prover,\verifier,\mathcal F_{\mathrm{MsgOracle}}\): run
+        \(\mathcal F_{\mathrm{MsgOracle}}.\mathsf{Submit}(\pi_0)\),
+        producing \(O_0\).
+  \item For each round \(j\in[T]\):
+        \begin{enumerate}[leftmargin=0.2in,label=\textbf{G\arabic{enumi}.\arabic*.},itemsep=0.05em,topsep=0.05em,parsep=0pt]
+          \item \(\verifier\): sample public challenge \(\alpha_j\) from its
+                declared challenge domain.
+          \item \(\prover\): compute
+                \(\pi_j=f_j(i,x,w,\alpha_1,\ldots,\alpha_j)\in\Sigma_j^{D_j}\).
+          \item \(\prover,\verifier,\mathcal F_{\mathrm{MsgOracle}}\): run
+                \(\mathcal F_{\mathrm{MsgOracle}}.\mathsf{Submit}(\pi_j)\),
+                producing \(O_j\).
+        \end{enumerate}
+  \item \(\verifier\): choose a finite index-opening set
+        \(Q_i\subseteq D_{\mathrm{idx}}\) and finite prover-message opening sets
+        \(Q_j\subseteq D_j\) for \(j\in\{0,\ldots,T\}\).
+  \item \(\verifier\): for each \(a\in Q_i\), call
+        \(\mathcal F_{\mathrm{MsgOracle}}.\mathsf{Open}(O_i,a)\).
+  \item \(\verifier\): for each \(j\in\{0,\ldots,T\}\) and each
+        \(a\in Q_j\), call
+        \(\mathcal F_{\mathrm{MsgOracle}}.\mathsf{Open}(O_j,a)\).
+  \item \(\verifier\): output \(0\) or \(1\) from \(x\), the transcript,
+        public challenges, and opened values.
+  \item \(\mathsf{Completeness}\): if \((i,x,w)\in R\), the honest prover is
+        accepted.
+  \item \(\mathsf{Soundness}\): if there is no \(w\in\mathcal W\) such that
+        \((i,x,w)\in R\), every malicious prover is accepted with probability
+        at most \(\varepsilon\).
+\end{enumerate}
+\end{protocolbox}
+
+The contrast is the point.  All three templates use the same
+\(\mathcal F_{\mathrm{MsgOracle}}\) plumbing for fixed openable strings, but
+the handle means a different thing in each template.  In an IOP there is no
+external openable object: the prover's oracle messages are just proof messages.
+In an IOPP, the external handle opens the object being tested for proximity.
+In a holographic IOP, the external handle opens preprocessed public relation
+data; it helps the verifier open the relation sublinearly, but it is not itself
+the input whose validity is being proximity-tested.
+
+\begin{center}
+\small
+\begin{tabular}{p{0.17\linewidth}|p{0.18\linewidth}|p{0.29\linewidth}|p{0.25\linewidth}}
+\(\mathsf{Template}\) & \(\mathsf{Verifier\ input}\) & \(\mathsf{External\ handle}\) & \(\mathsf{Soundness\ promise}\) \\
+\hline
+IOP & \(x\) & none & membership in \(R\) \\
+IOPP & \((x,O_y)\) & \(y\in\Sigma^D\), the tested object & proximity gap for \(S_{\mathrm{valid}}(x)\) \\
+Holographic IOP & \((x,O_i)\) & \(\mathsf{idx}(i)\), preprocessed public relation data & membership in \(R(i,\cdot,\cdot)\)
+\end{tabular}
+\end{center}
+
+Equivalently, an IOP asks whether the verifier's explicit input is in a
+language; an IOPP asks whether an openable string is far from a valid set; and a
+holographic IOP asks the ordinary language question while letting the verifier
+open selected coordinates of the large public relation description through a
+handle.
+
+In Blaze, large structured objects such as permutations may be viewed this way
+when they are not read directly by the verifier.  If a section instead treats
+those objects as ordinary public parameters, it must say so locally.
+
+\subsection{MLIOPs}
+
+The protocols in Blaze are multilinear-polynomial IOPs before they are compiled
+to proximity proofs and commitments~[Blaze24].  In this template, the prover does
+not merely send field elements as messages.  The prover and verifier name any
+handle implementing the Boolean-coordinate oracle API, and an ideal
+multilinear-oracle functionality physically authenticates that handle as a
+field-evaluation oracle.  The input handle may itself be backed by an ordinary
+message oracle or by a virtual coordinate view; the commit call is the
+authentication step that produces a new MLE-evaluation handle.  The verifier
+may then ask the functionality for values of the corresponding multilinear
+extension at field points.
+
+We use tensor notation for the state of such an oracle.  A tensor
+\(h\in\F^{\B^d}\) determines one multilinear extension
+\[
+  \MLE(h):\F^d\to\F.
+\]
+The committed Boolean oracle handle is typed
+\[
+  R_h:\B^d\to\F,
+\]
+meaning that its underlying coordinate tensor is \(h\).  The MLE oracle handle
+returned by the functionality is typed
+\[
+  \widehat O_h:\F^d\to\F,
+  \qquad
+  \widehat O_h(r)=\MLE(h)(r).
+\]
+The hat is part of the notation: \(R_h\) is coordinate access, while
+\(\widehat O_h\) is MLE-evaluation access.
+
+\begin{protocolbox}{Functionality: \(\mathcal F_{\mathrm{MLIOP}}\) Oracle}{fig:func-mliop-oracle}
+Let \(d\ge 0\).
+
+\smallskip
+\noindent\(\underline{\mathcal F_{\mathrm{MLIOP}}.\mathsf{Commit}(\prover,\verifier:R_h:\B^d\to\F)\to \widehat O_h:\F^d\to\F}\)
+
+\smallskip
+\begin{enumerate}[leftmargin=0.24in,label=\textbf{L\arabic*.},itemsep=0.08em,topsep=0.1em,parsep=0pt]
+  \item \(\mathcal F_{\mathrm{MLIOP}}\): bind the request to the committed
+        Boolean oracle handle \(R_h\).
+  \item \(\mathcal F_{\mathrm{MLIOP}}\): define
+        \[
+          \widehat O_h(r)
+          :=
+          \sum_{b\in\B^d} R_h(b)\,\chi_b(r)
+          \qquad(r\in\F^d).
+        \]
+  \item \(\mathcal F_{\mathrm{MLIOP}}\): return \(\widehat O_h\).
+\end{enumerate}
+
+\smallskip
+\noindent\(\underline{\mathcal F_{\mathrm{MLIOP}}.\mathsf{Eval}(\verifier:(\widehat O_h:\F^d\to\F,\ r\in\F^d))\to(\verifier:\widehat O_h(r)\in\F)}\)
+
+\smallskip
+\begin{enumerate}[leftmargin=0.24in,label=\textbf{E\arabic*.},itemsep=0.08em,topsep=0.1em,parsep=0pt]
+  \item \(\mathcal F_{\mathrm{MLIOP}}\): return
+        \((\verifier:\widehat O_h(r))\).
+\end{enumerate}
+\end{protocolbox}
+
+This is not a coordinate-opening interface.  The input \(R_h\) is a committed Boolean
+oracle, but the output \(\widehat O_h\) is a field-evaluation oracle.  If
+\(r\in\B^d\), then \(\widehat O_h(r)=R_h(r)=h[r]\), so a Boolean evaluation
+happens to return a tensor entry.  But for general \(r\in\F^d\), the
+functionality returns an interpolated MLE value.  This distinction is exactly
+why an MLIOP is not already a Merkle-based PCS.
+
+\begin{protocolbox}{Template: MLIOP}{fig:template-mliop}
+Let \(R\subseteq\mathcal I\times\mathcal X\times\mathcal Y\times\mathcal W\),
+where \(x\in\mathcal X\) is explicit and \(y\in\mathcal Y\) is implicit.
+
+\smallskip
+\noindent\(\underline{\mathsf{MLIOP}[R](\verifier:(i,x,O_y),\ \prover:(i,x,y,w))\to\{0,1\}}\)
+
+\smallskip
+\begin{enumerate}[leftmargin=0.24in,label=\textbf{A\arabic*.},itemsep=0.08em,topsep=0.1em,parsep=0pt]
+  \item \(R_y\): implements the declared implicit-input coordinate interface.
+  \item \(\prover,\verifier,\mathcal F_{\mathrm{MLIOP}}\): commit one
+        or more Boolean oracle handles with \(\mathcal F_{\mathrm{MLIOP}}\),
+        producing MLE handles
+        \(\widehat O_{h_1},\ldots,\widehat O_{h_s}\).
+  \item \(\verifier\): sample public challenges.
+  \item \(\prover,\verifier\): repeat MLIOP rounds as specified by the
+        protocol.
+  \item \(\verifier\): evaluate MLIOP handles through
+        \(\mathcal F_{\mathrm{MLIOP}}.\mathsf{Eval}\) at specified field
+        points.
+  \item \(\verifier\): accept or reject from the transcript, challenges, and
+        evaluated values.
+\end{enumerate}
+\end{protocolbox}
+
+The word PIOP is the more general phrase ``polynomial interactive oracle
+proof,'' as in HyperPlonk~[CBBZ23].  An MLIOP is the multilinear specialization
+used by Blaze~[Blaze24]: every prover polynomial oracle is implemented by an
+ideal functionality committing a Boolean oracle handle for
+\(h\in\F^{\B^d}\) and answering evaluations of \(\MLE(h)\).  Equivalently, it
+idealizes the map
+\[
+  R_h:\B^d\to\F
+  \quad\leadsto\quad
+  \widehat O_h:\F^d\to\F.
+\]
+
+\subsection{Authenticated MLE Evaluation Requests}
+
+The native MLIOP oracle above is an ideal source of MLE values.  A compiled
+protocol needs a different object: it must bind a tensor first and later
+authenticate one or more claimed MLE evaluations of that bound tensor.  We use
+\(\mathcal F_{\mathrm{MLEAuth}}\) for this evaluation-authentication interface.
+
+\begin{protocolbox}{Functionality: \(\mathcal F_{\mathrm{MLEAuth}}\)}{fig:func-mle-auth}
+\noindent Public parameters: a field \(\F\), a lane set \(\mathcal L\), and
+Boolean dimensions \((d_q)_{q\in\mathcal L}\).  Lane \(q\) stores a tensor
+\(h_q\in\F^{\B^{d_q}}\).
+
+\smallskip
+\noindent\(\underline{\mathcal F_{\mathrm{MLEAuth}}.\mathsf{Commit}(\prover:(h_q\in\F^{\B^{d_q}})_{q\in\mathcal L},\ \verifier:(d_q)_{q\in\mathcal L})\to A\in\Handle}\)
+
+\smallskip
+\begin{enumerate}[leftmargin=0.24in,label=\textbf{C\arabic*.},itemsep=0.08em,topsep=0.1em,parsep=0pt]
+  \item \(\mathcal F_{\mathrm{MLEAuth}}\): choose a fresh handle \(A\) and
+        store the family \((q,d_q,h_q)_{q\in\mathcal L}\) under \(A\).
+  \item \(\mathcal F_{\mathrm{MLEAuth}}\): return \(A\).
+\end{enumerate}
+
+\smallskip
+\noindent\(\underline{\mathcal F_{\mathrm{MLEAuth}}.\mathsf{Eval}(\verifier:(A,\mathcal E))\to(\verifier:b\in\{0,1\})}\)
+
+\smallskip
+\noindent Here
+\[
+  \mathcal E=\{(q_i,r_i,v_i)\}_{i=1}^t,
+  \qquad
+  q_i\in\mathcal L,
+  \qquad
+  r_i\in\F^{d_{q_i}},\quad v_i\in\F,
+\]
+and \(A\) must be a handle previously returned by
+\(\mathcal F_{\mathrm{MLEAuth}}.\mathsf{Commit}\).
+
+\smallskip
+\begin{enumerate}[leftmargin=0.24in,label=\textbf{O\arabic*.},itemsep=0.08em,topsep=0.1em,parsep=0pt]
+  \item \(\mathcal F_{\mathrm{MLEAuth}}\): read the stored family
+        \((q,d_q,h_q)_{q\in\mathcal L}\) behind \(A\).
+  \item \(\mathcal F_{\mathrm{MLEAuth}}\): for every
+        \((q_i,r_i,v_i)\in\mathcal E\), compute \(\MLE(h_{q_i})(r_i)\).
+  \item \(\mathcal F_{\mathrm{MLEAuth}}\): set \(b\gets1\) iff
+        \(\MLE(h_{q_i})(r_i)=v_i\) for every \(i\in\{1,\ldots,t\}\);
+        otherwise set \(b\gets0\).
+  \item \(\mathcal F_{\mathrm{MLEAuth}}\): return \((\verifier:b)\).
+\end{enumerate}
+\end{protocolbox}
+
+The functionality deliberately has no RAA words in it.  It does not know about
+accumulators, permutations, product trees, residuals, row folding, or BaseFold.
+Those relations produce the request list \(\mathcal E\).  The authentication
+functionality only checks that the listed field values are the claimed MLE
+evaluations of the committed tensors.
+
+\subsection{The Ideal Polynomial Commitment Functionality}
+
+A polynomial commitment scheme, or PCS, is the object we ultimately want.  It
+binds the prover to one polynomial before the verifier chooses evaluation
+questions.  The clean ideal functionality is representation-free.
+
+\begin{protocolbox}{Ideal Functionality: $\mathcal{F}_{\mathrm{PCS}}$}{fig:func-pcs}
+Public parameter: number of variables \(d\).
+
+\smallskip
+\noindent\(\underline{\mathcal{F}_{\mathrm{PCS}}.\mathsf{Commit}(\prover:f,\ \verifier:\bot)\to C}\), for \(f:\F^d\to\F\).
+
+\smallskip
+\begin{enumerate}[leftmargin=0.24in,label=\textbf{P\arabic*.},itemsep=0.08em,topsep=0.1em,parsep=0pt]
+  \item \(\mathcal{F}_{\mathrm{PCS}}\): choose a fresh handle \(C\).
+  \item \(\mathcal{F}_{\mathrm{PCS}}\): store the input polynomial \(f\) under
+        \(C\).
+  \item \(\mathcal{F}_{\mathrm{PCS}}\): return \(C\).
+\end{enumerate}
+
+\smallskip
+\noindent\(\underline{\mathcal{F}_{\mathrm{PCS}}.\mathsf{Eval}(\prover:\bot,\ \verifier:(C,z,v))\to(\verifier:b)}\), for \(z\in\F^d\), \(v\in\F\), and \(b\in\{0,1\}\).
+
+\smallskip
+\begin{enumerate}[leftmargin=0.24in,label=\textbf{E\arabic*.},itemsep=0.08em,topsep=0.1em,parsep=0pt]
+  \item \(\mathcal{F}_{\mathrm{PCS}}\): retrieve \(f\) stored under \(C\).
+  \item \(\mathcal{F}_{\mathrm{PCS}}\): if \(f(z)=v\), set \(b\gets1\); otherwise set \(b\gets0\).
+  \item \(\mathcal{F}_{\mathrm{PCS}}\): return \((\verifier:b)\).
+\end{enumerate}
+\end{protocolbox}
+
+The functionality in Figure~\ref{fig:func-pcs} deliberately commits to the
+polynomial \(f\), not to a particular array representation of \(f\).  A concrete
+protocol must choose such a representation.  In this paper, the tensor symbol
+\(y\) will mean whichever representation is being used at that point, and we
+will say what it represents before using an evaluation formula.
+
+\subsection{Message-Oracle Handles}
+
+The oracle functionalities above are the ideal parties used by these templates.
+They give the verifier opening or evaluation access to submitted objects.
+A compiled protocol replaces those ideal functionalities with cryptographic
+commitments and openings, as in the Merkle/Fiat--Shamir compilations used by
+BaseFold, Blaze, and Fractal~[BaseFold23,Blaze24,COS20].  In this paper, the
+compiled coordinate-opening interface is still the message-oracle interface from
+Figure~\ref{fig:func-msg-oracle}.
+
+For clarity, we will call any implementation handle for that interface a
+\(\mathsf{MsgOracleHandle}\).  It implements coordinate openings:
+\[
+  \mathsf{Open}(C_x,a)\to x[a]\quad\text{or}\quad\bot.
+\]
+It does not implement arbitrary MLE evaluation.  If a later protocol needs to
+authenticate
+\[
+  \MLE(h)(r)=v,
+\]
+it must reduce that claim to coordinate openings and algebraic checks, or call
+a previously defined authentication backend.
+
+The following table is the boundary discipline used in the rest of the paper.
+Each row names the interface, not an implementation detail.
+
+\begin{center}
+\small
+\begin{tabular}{p{0.19\linewidth}p{0.27\linewidth}p{0.42\linewidth}}
+\textbf{Handle} & \textbf{Operation} & \textbf{Meaning} \\
+\hline
+\(\mathsf{MsgOracleHandle}\) &
+\(\mathsf{Open}(C,a)\to x[a]\) or \(\bot\) &
+Coordinate access to a fixed tensor/string.  Merkle, composite, and virtual
+handles all implement this same interface. \\
+\(\mathcal F_{\mathrm{MLIOP}}\) handle &
+\(\mathsf{Commit}(R_h)\to\widehat O_h\), then
+\(\mathsf{Eval}(\widehat O_h,r)\to\widehat O_h(r)\) &
+Ideal commit from coordinate access \(R_h:\B^d\to\F\) to field-point MLE access
+\(\widehat O_h:\F^d\to\F\).  This exists only in the native model before
+compilation. \\
+\(\mathcal F_{\mathrm{MLEAuth}}\) handle &
+\(\mathsf{Eval}(A,\{(q,r,v)\})\to\{0,1\}\) &
+Authentication of one or more claimed MLE evaluations against committed
+coordinate handles. \\
+\(\BackendRMLE\) handle &
+\(\mathsf{Eval}(A_{\mathrm{auth}},r,v)\to\{0,1\}\) &
+Single packed-tensor RMLE authentication, implemented using a proximity backend
+such as BaseFold. \\
+PCS handle &
+\(\mathsf{Eval}(C,z,v)\to\{0,1\}\) &
+The final user-facing polynomial-commitment claim for \(f(z)=v\). \\
+\end{tabular}
+\end{center}
+
+We will keep the verbs separated.  The message-oracle functionality has
+\(\mathsf{Submit}\) and \(\mathsf{Open}\): a source submits a full string and
+the functionality returns a handle.  A concrete protocol may instead expose a
+method named \(\mathsf{Commit}\), such as
+\(\Pi_{\mathrm{rowFoldCommit}}.\mathsf{Commit}\).  In this paper that
+\(\mathsf{Commit}\) method is only a constructor for a
+\(\mathsf{MsgOracleHandle}\).  After construction, the coordinate interface is
+still exactly \(\mathsf{Open}(C,a)\to x[a]\) or \(\bot\).
+
+\subsection{Virtual Handles}
+
+A handle can be virtual without changing its interface.  Virtual means that the
+answer at an address is computed from other handles instead of being stored as
+one literal tensor.  There is no new proof model or new trusted functionality
+here.  A virtual handle is just an implementation of an existing open interface.
+
+We use one verb for this interface: \(\mathsf{Open}(O,a)\).  For an ideal
+message-oracle handle \(O\), this means
+\(\mathcal F_{\mathrm{MsgOracle}}.\mathsf{Open}(O,a)\).  For a compiled Merkle
+or virtual handle, it means the authenticated opening operation.  In either
+case the return type is a value or \(\bot\).
+
+\begin{protocolbox}{Definition: Virtual Oracle Opening}{fig:def-virtual-oracle-opening}
+Let \(O_{\mathrm{virt}}\) be a virtual handle with address set \(D\) and value
+space \(\Sigma\).  Its implementation is fixed by backend handles
+\(O_1,\ldots,O_m\).  For each \(a\in D\), it specifies a finite opening plan
+\[
+  Q(a)=((O^{(1)},a_1),\ldots,(O^{(s)},a_s)),
+\]
+where each \(O^{(\nu)}\in\{O_1,\ldots,O_m\}\) and \(a_\nu\) is an address for
+that backend handle.  It also specifies a deterministic transformation
+\[
+  \Phi_a:\Sigma_1'\times\cdots\times\Sigma_s'\to\Sigma,
+\]
+where \(\Sigma_\nu'\) is the value space of \(O^{(\nu)}\).
+
+\smallskip
+\noindent\(\underline{\mathsf{VirtualOracle.Open}(O_{\mathrm{virt}},a\in D)\to\Sigma\cup\{\bot\}}\)
+
+\smallskip
+\begin{enumerate}[leftmargin=0.24in,label=\textbf{V\arabic*.},itemsep=0.08em,topsep=0.1em,parsep=0pt]
+  \item Let \(Q(a)=((O^{(1)},a_1),\ldots,(O^{(s)},a_s))\).
+  \item For each \(\nu\in\{1,\ldots,s\}\), set
+        \(v_\nu\gets\mathsf{Open}(O^{(\nu)},a_\nu)\).
+  \item If any \(v_\nu=\bot\), return \(\bot\).
+  \item Return \(\Phi_a(v_1,\ldots,v_s)\).
+\end{enumerate}
+\end{protocolbox}
+
+The canonical Blaze example is a row combination.  Suppose
+\[
+  c\in\F^{\B^\ell\times\B^n}
+  \qquad\text{and}\qquad
+  \rho\in\F^{\B^\ell}.
+\]
+The logical folded tensor \(c_{\mathrm{combo}}\in\F^{\B^n}\) is
+\[
+  c_{\mathrm{combo}}[j]
+  =
+  \sum_{h\in\B^\ell}\rho[h]\,c[h,j].
+\]
+In the notation of Figure~\ref{fig:def-virtual-oracle-opening}, the opening plan
+for address \(j\) is
+\[
+  Q(j)=((O_c,(h,j)))_{h\in\B^\ell},
+\]
+and the transformation is
+\[
+  \Phi_j((v_h)_{h\in\B^\ell})
+  =
+  \sum_{h\in\B^\ell}\rho[h]v_h.
+\]
+Thus \(\mathsf{VirtualOracle.Open}(O_{\mathrm{virt}},j)\) opens the column
+\(c[\ast,j]\), computes the displayed linear combination, and returns
+\(c_{\mathrm{combo}}[j]\).  If the backend handle \(O_c\) is an ideal
+message-oracle handle, these backend calls are ideal
+\(\mathcal F_{\mathrm{MsgOracle}}.\mathsf{Open}\) calls.  If \(O_c\) is a
+Merkle or virtual implementation handle, these backend calls are authenticated
+openings implementing the same interface.
+
+Virtuality is therefore not a new trust assumption.  It is an implementation of
+an already-defined handle interface.
+
+\subsection{Layer Checklist}
+
+The rest of the paper should be read with this checklist in mind.
+
+\begin{enumerate}[label=\textbf{H\arabic*.},leftmargin=0.28in]
+  \item If a protocol says ``oracle string,'' it should mean a string stored by
+        \(\mathcal F_{\mathrm{MsgOracle}}\), or a handle implementing the same
+        open interface.
+  \item If a protocol says ``multilinear oracle,'' it should mean a hatted MLE
+        handle \(\widehat O_h:\F^d\to\F\) produced by
+        \(\mathcal F_{\mathrm{MLIOP}}.\mathsf{Commit}\).
+  \item If a protocol says ``commitment,'' it should mean a concrete
+        \(\mathsf{MsgOracleHandle}\) implementing
+        Figure~\ref{fig:func-msg-oracle}.
+  \item If a protocol exposes a method named \(\mathsf{Commit}\), it must state
+        which handle it returns and which \(\mathsf{Open}\) interface that
+        handle implements.
+  \item If a protocol says ``virtual,'' it must still name the interface being
+        implemented and the devirtualization rule.
+  \item If a protocol moves from MLIOP to IOPP or from IOPP to PCS, it must say
+        which ideal access has been replaced and what soundness theorem is being
+        consumed.
+\end{enumerate}

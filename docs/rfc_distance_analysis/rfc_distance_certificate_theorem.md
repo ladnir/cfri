@@ -18,6 +18,47 @@ the final certificate must either enforce the uniform-nonzero law above or inser
 normalization constant for uniform `T in F`. This is a construction constant, not a reason to
 change the determinant-`1` fold law.
 
+### Determinant-1 Nonzero-Root Normalization
+
+For the proof model, each local pair uses an independent challenge `T_i in F^*` and the pair map:
+
+```text
+(u_i, v_i) -> (u_i + T_i v_i, u_i + (T_i+1) v_i).
+```
+
+The matrix has determinant `1`, including in characteristic two. A singleton zero on side
+`epsilon in {0,1}` imposes:
+
+```text
+u_i + (T_i + epsilon) v_i = 0.
+```
+
+Thus it asks for the affine projective line:
+
+```text
+ell(r) = {(u,v): u + r v = 0},
+r = T_i + epsilon.
+```
+
+For either side, the map `T_i -> r` is injective from `F^*` into `F`. Therefore a prescribed
+affine root line has probability either `0` or `(q-1)^-1`; the projective line at infinity has
+probability `0`. For a fixed singleton support `A` and prescribed root lines:
+
+```text
+Pr[root lines on A match]
+  <= (q-1)^-|A|
+  = q^-|A| * (q/(q-1))^|A|.
+```
+
+So the `q^-|A|` root factor used by the local lemmas is valid up to the explicit normalization
+`(q/(q-1))^|A|`. At the target `q=2^128`, even `55` singleton root requests, corresponding to
+eleven minimal hard rows of size five, have negligible q-dimensional overhead. This overhead is
+absorbed by the finite local-normalization bucket in the hard-trace constants note.
+
+If a construction instead samples `T_i` uniformly from all of `F`, the determinant is still `1`
+and affine root lines have exact probability `q^-1`; only the missing-root exclusions above
+change. No step in this normalization uses the paper's `T'=-T` algebra.
+
 For depth `d` and expansion `c`:
 
 ```text

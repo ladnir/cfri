@@ -518,6 +518,9 @@ The intended interpretation is:
 Here `52` is the Bell number `B_5`. The minimal connected row itself uses only the connected
 partition, but allowing every partition of the five active singleton coordinates makes the bound
 stable under grouped component labels without paying for support choices again.
+The determinant-`1` nonzero-root normalization is the injective affine-root map stated in
+`rfc_distance_certificate_theorem.md`; it contributes only the finite factor
+`(q/(q-1))^a` on a size-`a` singleton support, not another `q+1` dimension.
 
 This is still not charging support choices: in an atomic profile the nested witnesses `B_i`, the
 paired/singleton split `P_i,S_i`, and the exact singleton support `A_i=S_i` are already part of the

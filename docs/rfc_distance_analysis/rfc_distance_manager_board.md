@@ -87,6 +87,9 @@ Live blockers:
 5. Stress higher-drop tau-two layers and mixed-fiber chain shapes beyond the retired
    complete-stride and paired-spine gates, especially tau sequences 1->2 and 2->1.
 6. Produce the final theorem-driven certificate output for e=71/e=72 after constants are inserted.
+   The determinant-1 nonzero-root normalization is now separated out: for `T in F^*`, singleton
+   roots cost at most `q^-1 * q/(q-1)` each, so this construction constant is finite and
+   binary-field compatible rather than a new q-dimensional loss.
 ```
 
 Current honesty check:

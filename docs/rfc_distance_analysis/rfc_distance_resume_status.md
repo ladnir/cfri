@@ -82,6 +82,11 @@ free.
    distribution: the proof notes often assume `T` uniform nonzero, while the code path appears to
    sample field elements directly. This should be normalized in the theorem statement.
 
+   Update: `rfc_distance_certificate_theorem.md` now states the determinant-1 nonzero-root
+   normalization. For `T in F^*`, each singleton root map is injective and costs at most
+   `(q-1)^-1 = q^-1 * q/(q-1)`. This is binary-field compatible and fits inside the finite
+   constants bucket for the target `q=2^128`.
+
 ## Current Artifacts And Status
 
 Local / recurrence pieces that now have usable notes:
@@ -134,8 +139,9 @@ The live blockers are now narrow:
 3. Direct proof of the delta=3 connected full-kernel endpoint used by the g=1 row, or a general
    component/full-kernel theorem with constants.
 4. Higher-drop tau-two layers beyond the g=1 first-drop case.
-5. Finite constants: determinant-1 root distribution, marked-line root-fiber constants,
-   exact-support inversion, split counts, and log-sum/state-count overhead.
+5. Finite constants: marked-line root-fiber constants, exact-support inversion, split counts, and
+   log-sum/state-count overhead. The determinant-1 nonzero-root normalization is now stated
+   separately and is no longer a q-dimensional blocker at the target field size.
 ```
 
 The best current next proof step is item 1:

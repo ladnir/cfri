@@ -791,7 +791,10 @@ Current ranked obstruction families:
    rank-defect, incidence, or high-kernel charge. New checkpoint:
    `rfc_high_defect_hard_segment_gap.md` shows the z=21 toy is below the production zero floor at
    child_k=32, but the reachable floor row `zeros=(34,39,44)` still has a three-q-dimension gap at
-   `b=14` even with one boundary charge;
+   `b=14` even with one boundary charge. New alternate route:
+   `rfc_depth5_base_seal_candidate.md` shows the depth-5 replica rank-pattern calibration crosses
+   at `z=34` with log2 moment `-115.10`, so a finite `B_5(1,34)<=2^-80` theorem would seal the
+   child-k=32 floor directly;
 2. higher-drop local layers kappa >= g+2;
 3. mixed-fiber chain shapes where the intermediate layer persists across levels;
 4. mixed chain shapes tau=1->2 and tau=2->1 after the exact-support incidence cap is fixed;

@@ -43,7 +43,7 @@ Open items are excluded from the denominator.
 | Reachable `child_k=32, zeros=(34,39,44)` stress row | 0 | 1 | 1 | 0% | Current blocker | Better than unreachable toy, but at `b=14` has a 3 q-dimension gap even with one boundary charge. |
 | High-kernel/local-incidence bonus | 0 | 0 | 0 | open | Next candidate | Need prove hard row carrying large shortened ambient pays more than uniform `q^-9`. |
 | Joint nested shortened-rank profile charge | 0 | 0 | 0 | open | Next candidate | May recover missing few dimensions by charging the whole nested profile, not max one edge. |
-| Finite `k<=32,e=2` base-case seal | 0 | 0 | 0 | open | Next candidate | Conditional certificate predicts this should hold; needs direct finite-depth theorem or enumerator-grade proof. |
+| Finite `k<=32,e=2` base-case seal | 0 | 1 | 0 | 0% | Promising partial | Depth-5 replica calibration crosses at `z=34` with log2 moment `-115.10`; needs rank-pattern theorem, since component-uniform mode fails. |
 | Systematic all-level adaptation | 0 | 1 | 0 | 0% | Deferred | Construction/correctness seems plausible; active proof push is original non-systematic. |
 
 ## Active Frontier
@@ -62,7 +62,7 @@ Three plausible ways to turn this into a win:
 ```text
 1. prove a disjoint boundary row for the failing high-defect state;
 2. prove a high-kernel/local-incidence bonus of at least 3 q-dimensions;
-3. seal the finite k<=32,e=2 base case directly.
+3. seal the finite k<=32,e=2 base case directly via rank-pattern induction.
 ```
 
 ## Update Rule
@@ -86,3 +86,8 @@ Charged hard-trace audit completed. Internal hard segments cannot add the scenar
 top of `9H`; that is double-counting. Boundary-plus remains valid only with a disjoint-boundary
 lemma. Production zero-floor reachability excludes the abstract `child_k=32,z=21` toy, but the
 reachable `zeros=(34,39,44)` row still leaves a 3 q-dimension gap at `b=14`.
+
+Depth-5 base-seal candidate tested. The replica rank-pattern calibration gives
+`B_5(1,34)` log2 moment `-115.10435419`, exactly matching the production zero floor at
+`child_k=32`. The component-uniform shortcut fails badly, so this is a rank-pattern theorem route,
+not an old component-uniform route.

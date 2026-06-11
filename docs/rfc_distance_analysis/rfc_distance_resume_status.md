@@ -361,6 +361,18 @@ from `z=2119`, all-paired compression to `child_k=32` already gives at least `34
 reachable floor stress row `zeros=(34,39,44)` is better but still has a small real gap: strict-only
 fails from `b=10`, and even boundary-plus fails from `b=14` with deficit `3`. The next proof target
 is a reachability-plus-boundary/high-kernel lemma for this narrowed row.
+
+New base-seal candidate:
+
+```text
+docs/rfc_distance_analysis/rfc_depth5_base_seal_candidate.md
+```
+
+The depth-5 rank-pattern calibration with `--singleton-charge replica` crosses exactly at
+`z=34 = k+2` with log2 moment `-115.10435419`. Since the production zero floor at `child_k=32` is
+also `34`, a finite `B_5(1,34)<=2^-80` theorem would let the global recurrence stop before the
+high-defect theta-chain gap. This route depends on proving the rank-pattern induction theorem for
+replica counts `1,2,4,8,16,32`; the conservative component-uniform model does not close it.
 ```
 
 ## Diagnostic Script

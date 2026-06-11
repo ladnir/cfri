@@ -884,7 +884,7 @@ This trace is the loose survivor counter-signal. It is not the final coverage ro
 first hard step uses `forced=3`, while a kernel-following minimal hard row propagates all five
 singleton zeros to the kernel child.
 
-For the strict kernel-child hard-row command:
+For the strict kernel-child hard-row command without visible-quotient loss:
 
 ```text
 python scripts/rfc_distance_analysis/rfc_shortened_rank_recurrence.py \
@@ -913,9 +913,38 @@ E_anc = 12,
 hard_trace_margin = 29.
 ```
 
-The proof target is therefore stronger and more concrete: show that every kernel-following
-minimal hard-segment contribution exposing the toy ancestor factor maps to the strict trace family
-above, or to a trace with no smaller value of:
+This is useful as a no-loss diagnostic. A more conservative coverage target subtracts the
+tau-two visible quotient before halving at each hard row:
+
+```text
+python scripts/rfc_distance_analysis/rfc_shortened_rank_recurrence.py \
+  --depth 5 \
+  --expansion 8 \
+  --dim 12 \
+  --zeros 21 \
+  --allowed-singletons 0,5 \
+  --hard-force-all-singletons \
+  --hard-visible-dim-loss 2 \
+  --ancestor-exponent 12 \
+  --trace
+```
+
+It gives:
+
+```text
+h=5 k=32 D=12 z=21 split p=8 s=5 forced=5 -> child D=5 z=13
+h=4 k=16 D=5  z=13 split p=4 s=5 forced=5 -> child D=2 z=9
+h=3 k=8  D=2  z=9  split p=2 s=5 forced=5 -> child D=0 z=7
+
+hard_steps = 3,
+rho_terminal = 0,
+E_anc = 12,
+hard_trace_margin = 15.
+```
+
+The proof target is therefore concrete: show that every kernel-following minimal hard-segment
+contribution exposing the toy ancestor factor maps to the conservative strict trace family above,
+or to a trace with no smaller value of:
 
 ```text
 9 * hard_steps + rho_terminal - E_anc.

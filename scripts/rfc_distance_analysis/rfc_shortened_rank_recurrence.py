@@ -24,6 +24,8 @@ accept a genuine loss.
 The --hard-force-all-singletons option is stricter and proof-oriented for
 kernel-following minimal hard rows: when s=5 it requires all five singleton
 coordinates to propagate into the child rank event, matching z_L=p+s.
+The optional --hard-visible-dim-loss subtracts the visible quotient dimension
+before halving at such hard rows, e.g. use 2 for a tau-two kernel-child route.
 """
 
 from __future__ import annotations
@@ -77,11 +79,13 @@ class ShortenedRankRecurrence:
         expansion: int,
         allowed_singletons: tuple[int, ...] | None = None,
         hard_force_all_singletons: bool = False,
+        hard_visible_dim_loss: int = 0,
     ) -> None:
         self.depth = depth
         self.expansion = expansion
         self.allowed_singletons = allowed_singletons
         self.hard_force_all_singletons = hard_force_all_singletons
+        self.hard_visible_dim_loss = hard_visible_dim_loss
         self.costs: list[list[list[int]]] = []
         self.choices: list[list[list[Choice | None]]] = []
         self._build()
@@ -93,6 +97,15 @@ class ShortenedRankRecurrence:
         if self.hard_force_all_singletons and singletons == 5:
             return range(5, 6)
         return range(singletons + 1)
+
+    def _child_dim(self, dim: int, singletons: int, forced: int) -> int:
+        visible_loss = (
+            self.hard_visible_dim_loss
+            if self.hard_force_all_singletons and singletons == 5
+            else 0
+        )
+        numerator = max(0, dim - visible_loss + singletons - forced)
+        return ceil_div(numerator, 2)
 
     def _build(self) -> None:
         # Base depth 0: repetition code of dimension 1.  With no zero requests,
@@ -175,7 +188,7 @@ class ShortenedRankRecurrence:
                         continue
                     for forced in self._forced_values(singletons):
                         child_z = paired + forced
-                        child_dim = ceil_div(dim + singletons - forced, 2)
+                        child_dim = self._child_dim(dim, singletons, forced)
                         if child_dim > child_k:
                             continue
                         cost = child_cost[child_dim][child_z]
@@ -246,7 +259,7 @@ class ShortenedRankRecurrence:
             if not self._split_allowed(singletons):
                 return None
             child_z = paired + forced
-            child_dim = ceil_div(dim + singletons - forced, 2)
+            child_dim = self._child_dim(dim, singletons, forced)
             if child_dim > child_k:
                 continue
             cost = self.costs[depth - 1][child_dim][child_z]
@@ -292,6 +305,12 @@ def parse_args() -> argparse.Namespace:
         action="store_true",
         help="when a recursive split has s=5, require all five singleton child zeros to be forced",
     )
+    parser.add_argument(
+        "--hard-visible-dim-loss",
+        type=int,
+        default=0,
+        help="dimension loss subtracted before halving at hard s=5 forced-all rows",
+    )
     parser.add_argument("--output-csv", type=Path)
     parser.add_argument("--trace", action="store_true")
     parser.add_argument(
@@ -314,6 +333,7 @@ def main() -> None:
         expansion=args.expansion,
         allowed_singletons=allowed_singletons,
         hard_force_all_singletons=args.hard_force_all_singletons,
+        hard_visible_dim_loss=args.hard_visible_dim_loss,
     )
     k = 1 << args.depth
     n = args.expansion * k

@@ -429,9 +429,33 @@ E_anc = 12,
 hard_trace_margin = 29.
 ```
 
-Thus the strict kernel-child version has much more room than the loose survivor envelope. The
-remaining proof obligation is to derive the strict hard-trace restriction from the actual
-kernel-following recurrence state.
+If the two-dimensional visible quotient is subtracted before halving at each hard row:
+
+```text
+python scripts/rfc_distance_analysis/rfc_shortened_rank_recurrence.py \
+  --depth 5 \
+  --expansion 8 \
+  --dim 12 \
+  --zeros 21 \
+  --allowed-singletons 0,5 \
+  --hard-force-all-singletons \
+  --hard-visible-dim-loss 2 \
+  --ancestor-exponent 12 \
+  --trace
+```
+
+the conservative margin is:
+
+```text
+hard_steps = 3,
+rho_term = 0,
+E_anc = 12,
+hard_trace_margin = 15.
+```
+
+Thus even the quotient-loss strict kernel-child version has more room than the loose survivor
+envelope. The remaining proof obligation is to derive this strict hard-trace restriction from the
+actual kernel-following recurrence state.
 
 ### Constants Budget For The Toy Margin
 
@@ -454,8 +478,9 @@ N^64 -> 7.0
 ```
 
 The loose near-dimension toy hard-trace margin before constants is `7`; the strict kernel-child
-version has margin `29`. The conservative constants work below keeps using the smaller loose margin
-as a stress budget, so any closure under margin `7` also fits the strict proof-relevant trace.
+version has margin `29`, and the quotient-loss strict version has margin `15`. The conservative
+constants work below keeps using the smaller loose margin as a stress budget, so any closure under
+margin `7` also fits the strict proof-relevant trace.
 Explicit frame factors of size `q+1` should be counted as about one q-dimension each. This is why
 the proof must keep the hard-trace state labels finite and canonical: duplicate certificates cannot
 be allowed to grow into a hidden `N^Omega(d)` or `q^Omega(1)` loss.

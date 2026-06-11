@@ -262,6 +262,23 @@ forces all five singleton zeros at each hard step and gives:
 This is the proof-relevant toy margin if the coverage lemma can derive strict kernel-child
 propagation from the minimal hard recurrence state.
 
+With the conservative tau-two visible-quotient loss:
+
+```text
+python scripts/rfc_distance_analysis/rfc_shortened_rank_recurrence.py \
+  --depth 5 --expansion 8 --dim 12 --zeros 21 \
+  --allowed-singletons 0,5 --hard-force-all-singletons --hard-visible-dim-loss 2 \
+  --ancestor-exponent 12 --trace
+```
+
+the trace still has margin:
+
+```text
+3*9 + 0 - 12 = 15.
+```
+
+This `15` margin is the safer current coverage target.
+
 After this turn, the hard-trace potential is stated as Lemma 4 in
 `rfc_theta_minus_one_isolation_lemma.md`. The remaining proof-grade obligations are:
 
@@ -305,7 +322,8 @@ pays its own local `q^-9` first-drop charge.
 Both toy traces are recorded in the theorem note. The loose survivor trace has two `s=5` steps,
 terminal survivor cost `1`, `E_anc=12`, and pre-constant margin `7`. The strict
 kernel-child trace has four `s=5` steps, terminal survivor cost `5`, `E_anc=12`, and margin `29`.
-The next proof step is to prove coverage by the strict trace family, or find a strict
+The conservative strict trace with visible quotient loss has margin `15`. The next proof step is
+to prove coverage by this conservative strict trace family, or find a strict
 kernel-child-compatible trace with smaller `9H + rho_terminal - E_anc`.
 ```
 

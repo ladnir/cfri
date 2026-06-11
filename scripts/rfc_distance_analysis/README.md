@@ -75,6 +75,8 @@ For kernel-following minimal hard rows, add `--hard-force-all-singletons`; this 
 hard step to propagate all five singleton zeros into the child rank event, matching the
 `z_L=p+s` hard-row zero propagation rather than the looser survivor-envelope minimum over forced
 singletons.
+Add `--hard-visible-dim-loss 2` for the conservative tau-two kernel-child coverage target, where
+the visible two-dimensional quotient is removed before halving the child rank dimension.
 
 `rfc_state_constant_budget.py` is deterministic bookkeeping, not a profiler. It converts canonical
 state-count models such as `N^32 * (q+1)^2 * 52^11` into q-dimensional overhead so the hard-trace

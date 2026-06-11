@@ -649,6 +649,66 @@ This closes the finite-label budget for the toy trace, conditional on the shorte
 recurrence supplying the stated `rho_term` and on the profile containing at most two decomposable
 marked-line boundary interfaces.
 
+### Boundary-Interface Separation Lemma
+
+The phrase "at most two decomposable marked-line boundary interfaces" should be read segmentwise.
+A minimal hard segment is a maximal consecutive rank-trace segment whose non-paired active rows are
+minimal connected first-drop rows:
+
+```text
+tau = 2,
+s = a = 5,
+delta = 3,
+comp = 1,
+g = 1,
+theta_2 = -1.
+```
+
+All other active tau-two rows are segment boundaries, not internal hard labels. In particular, the
+decomposable marked-line row has:
+
+```text
+a = 2,
+delta = 2,
+comp = 2,
+K = L = 0.
+```
+
+It cannot be a connected first-drop hard row because `a<5`. When it appears, the transition
+supplies a joint marked-line child state:
+
+```text
+(2,z_V), (1,z_V+1)
+```
+
+and pays its own frame-completion factor `(q+1)` through the marked-line recurrence. The recurrence
+therefore cuts the hard segment at this row. It is not legitimate to keep following the same
+minimal hard-trace potential while silently multiplying another `q+1` frame factor.
+
+Consequently, one maximal minimal-hard segment can have at most one marked-line interface on the
+way into the segment and at most one on the way out. Those two possible interfaces are exactly the
+explicit `(q+1)^2` reserve in the padded canonicalization bound. A profile with more decomposable
+interfaces is represented as several hard segments separated by joint marked-line transitions; each
+marked-line transition is charged by:
+
+```text
+C_row * (q+1) * F_child((2,z_V), (1,z_V+1)),
+```
+
+not by the minimal hard-segment constants budget.
+
+This separation is deterministic from the atomic labels:
+
+```text
+minimal hard row:       a=s=5, connected first-drop;
+decomposable boundary:  a=2, delta=2, comp=2;
+larger-support row:     a>5 or s>5, charged by its own local profile/residue.
+```
+
+Thus the constants proof does not need to absorb an unbounded number of frame factors inside one
+hard segment. Any attempt to group several marked-line rows into the same hard segment is a
+duplicate-certificate overcount and must be refined back into atomic profiles.
+
 ## Diagnostic Check
 
 The checkpoint script now reports the immediate child transition type for each best

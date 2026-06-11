@@ -273,6 +273,12 @@ It injects minimal hard-trace labels into
 on the shortened-kernel recurrence giving the stated `rho_term` and on the profile having at most
 two decomposable marked-line boundary interfaces; extra decomposable interfaces must be routed to
 the joint marked-line recurrence separately.
+
+New boundary-separation refinement: the "at most two" condition is segmentwise. A maximal
+minimal-hard segment can have one marked-line interface on entry and one on exit. If another
+decomposable `a=2,delta=2,comp=2` row appears internally, the atomic labels force a cut and the
+row is charged by the joint marked-line state `(2,z_V),(1,z_V+1)`, not by the hard-segment
+constants budget.
 ```
 
 ## Diagnostic Script

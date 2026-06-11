@@ -771,7 +771,9 @@ Current ranked obstruction families:
    label alphabet is complete and the root/frame cost is globally at most two `q+1` factors.
    Coarser duplicate-certificate grouped states can still break the margin. Current refinement:
    the padded canonicalization lemma is now written; its remaining conditions are the stated
-   `rho_term` rank recurrence and at most two decomposable marked-line boundary interfaces;
+   `rho_term` rank recurrence and at most two decomposable marked-line boundary interfaces per
+   maximal hard segment. Extra decomposable interfaces deterministically cut the segment and are
+   charged by the joint marked-line recurrence;
 2. higher-drop local layers kappa >= g+2;
 3. mixed-fiber chain shapes where the intermediate layer persists across levels;
 4. mixed chain shapes tau=1->2 and tau=2->1 after the exact-support incidence cap is fixed;

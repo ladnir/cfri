@@ -763,8 +763,10 @@ Current ranked obstruction families:
    `A subset S` and `a>=5`, so `s=5` forces the minimal hard label; larger `s,a` rows must be
    charged as larger-support local profiles, not collapsed into the minimal hard case. Constants
    checkpoint: a canonical budget `N^32 * (q+1)^2 * 52^11` costs `5.98988154` q-dimensions at the
-   target scale, leaving about `1.01` q-dimensions inside the toy hard-trace margin. Coarser
-   duplicate-certificate grouped states can still break the margin;
+   target scale, leaving about `1.01` q-dimensions inside the toy hard-trace margin. A padded
+   atomic target `N^32 * (q+1)^2 * 3328^11` still leaves about `0.49`, but only if the canonical
+   label alphabet is complete and the root/frame cost is globally at most two `q+1` factors.
+   Coarser duplicate-certificate grouped states can still break the margin;
 2. higher-drop local layers kappa >= g+2;
 3. mixed-fiber chain shapes where the intermediate layer persists across levels;
 4. mixed chain shapes tau=1->2 and tau=2->1 after the exact-support incidence cap is fixed;

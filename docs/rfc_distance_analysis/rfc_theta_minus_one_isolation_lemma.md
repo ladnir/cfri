@@ -497,6 +497,59 @@ roughly this size fits the toy margin. A much coarser `N^64` count plus any `q+1
 fit, so the implementation/theorem must avoid broad grouped profiles that reintroduce duplicate
 certificate multiplicity.
 
+### Padded Atomic Constants Target
+
+The previous budget deliberately spends `52^11` as a placeholder for finite local labels. A safer
+atomic target is to allow a per-level alphabet of size:
+
+```text
+3328 = 2 * 52 * 32.
+```
+
+The intended interpretation is:
+
+```text
+2   hard/all-paired trace symbol,
+52  partition/component label on the five minimal singleton coordinates,
+32  bounded local normalization bucket for the r_gen<=5 minor factor, determinant-1 root
+    normalization, and Gaussian endpoint constants.
+```
+
+Here `52` is the Bell number `B_5`. The minimal connected row itself uses only the connected
+partition, but allowing every partition of the five active singleton coordinates makes the bound
+stable under grouped component labels without paying for support choices again.
+
+This is still not charging support choices: in an atomic profile the nested witnesses `B_i`, the
+paired/singleton split `P_i,S_i`, and the exact singleton support `A_i=S_i` are already part of the
+outer first-moment sum and local row. The padded count only covers labels that survive after those
+objects are fixed.
+
+Keeping the same conservative residual polynomial pad gives:
+
+```text
+N^32 * (q+1)^2 * 3328^11.
+```
+
+The helper reports:
+
+```text
+python scripts/rfc_distance_analysis/rfc_state_constant_budget.py \
+  --poly-degree 32 \
+  --q-factors 2 \
+  --finite-labels 3328 \
+  --label-power 11 \
+  --margin 7
+
+qdim_total = 6.50550654,
+slack      = 0.49449346.
+```
+
+Thus the finite-constant blocker is now quite specific: prove that the minimal hard-trace
+canonicalization really leaves at most this padded atomic label count, and prove that the
+determinant-1/root-frame factors are globally bounded by two `q+1`-scale factors for the exposed
+toy trace. If either point fails, the constants proof must refine the residual `N^32` pad downward
+by using the exact witness/support accounting more aggressively.
+
 ## Diagnostic Check
 
 The checkpoint script now reports the immediate child transition type for each best

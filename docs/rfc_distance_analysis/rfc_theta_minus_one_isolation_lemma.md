@@ -297,6 +297,65 @@ hard-compatible trace. The correct hard-trace potential counts:
   - state constants.
 ```
 
+## Lemma 4: Hard-Trace Potential
+
+Consider a kernel-chain defect route in which every exposed shortened-kernel rank trace step is one
+of:
+
+```text
+s = 5  hard connected first-drop burst,
+s = 0  all-paired compression.
+```
+
+Let:
+
+```text
+H = number of s=5 trace steps above the terminal rank event,
+rho_term = shortened-kernel rank cost of the terminal event,
+E_anc = sum_i (t_i-t_{i+1})(D_i-t_i)
+```
+
+for the ancestor choices introduced by the extra nested flag layers. Then the chain contribution is
+dominated whenever:
+
+```text
+9H + rho_term >= E_anc + log_q(state constants).
+```
+
+Reason. Each `s=5` step is not merely a generic rank recurrence edge; it is exactly a connected
+tau-two first-drop row with minimal support `a=s=5`, so the local tau-two theorem supplies the
+`q^-9` charge for that row. Each `s=0` step is all-paired and contributes no new local row; it
+compresses the rank event to the child. The terminal event is then charged by the shortened-kernel
+rank recurrence. The ancestor factor is deterministic after the child zero witnesses are fixed,
+so it appears only through `E_anc` and explicit state constants.
+
+For the near-dimension toy:
+
+```text
+python scripts/rfc_distance_analysis/rfc_shortened_rank_recurrence.py \
+  --depth 5 \
+  --expansion 8 \
+  --dim 12 \
+  --zeros 21 \
+  --allowed-singletons 0,5 \
+  --ancestor-exponent 12 \
+  --trace
+```
+
+the diagnostic gives:
+
+```text
+hard_steps = 2,
+rho_term = 1,
+E_anc = 12,
+hard_trace_margin = 7.
+```
+
+This does not finish the proof because `log_q(state constants)` still has to be bounded and the
+hard-trace restriction must be derived from the actual recurrence state, not imposed by the
+diagnostic. It does show the corrected accounting that makes the paired-spine toy compatible with
+the theta-chain truncation route.
+
 ## Diagnostic Check
 
 The checkpoint script now reports the immediate child transition type for each best

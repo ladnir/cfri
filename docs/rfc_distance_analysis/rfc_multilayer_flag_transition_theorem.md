@@ -854,6 +854,16 @@ This suggests the corrected proof route: either the cheap rank path is non-hard 
 theta-chain analysis, or it is hard and supplies enough repeated first-drop charge to pay the
 ancestor factor.
 
+The theorem-grade version is isolated as Lemma 4 in:
+
+```text
+docs/rfc_distance_analysis/rfc_theta_minus_one_isolation_lemma.md
+```
+
+The remaining work is to prove that the recurrence can impose the hard-trace restriction from its
+state labels and to bound `log_q(state constants)`. Numerically, the near-dimension toy has margin
+`7` before constants under this corrected potential.
+
 ## Construction Constants
 
 The theorem must state the fold law explicitly. For the current in-repo encoder the local pair is:

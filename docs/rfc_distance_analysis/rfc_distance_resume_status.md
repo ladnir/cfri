@@ -228,7 +228,7 @@ Refinement: constraining the same toy to hard-compatible/all-paired splits:
 ```text
 python scripts/rfc_distance_analysis/rfc_shortened_rank_recurrence.py \
   --depth 5 --expansion 8 --dim 12 --zeros 21 \
-  --allowed-singletons 0,5 --trace
+  --allowed-singletons 0,5 --ancestor-exponent 12 --trace
 ```
 
 still gives `rho<=1`, but the trace has two `s=5` hard steps before all-paired compression. The
@@ -240,6 +240,13 @@ correct hard-trace margin is therefore:
 
 not the one-charge margin `9+1-12=-2`. This is the current promising route to close the toy while
 still honestly rejecting the generic-rank shortcut.
+
+After this turn, the hard-trace potential is stated as Lemma 4 in
+`rfc_theta_minus_one_isolation_lemma.md`. The remaining proof-grade obligations are:
+
+1. derive the hard/non-hard split from recurrence state labels, not from an imposed diagnostic flag;
+2. bound log_q(state constants) below the current toy margin 7, or refine the state count;
+3. prove non-hard paired-spine traces either leave the theta-chain analysis or pay explicit residue.
 ```
 
 ## Diagnostic Script

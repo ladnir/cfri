@@ -278,6 +278,11 @@ def parse_args() -> argparse.Namespace:
     )
     parser.add_argument("--output-csv", type=Path)
     parser.add_argument("--trace", action="store_true")
+    parser.add_argument(
+        "--ancestor-exponent",
+        type=int,
+        help="optional E_anc value for reporting 9*hard_steps + rho - E_anc",
+    )
     return parser.parse_args()
 
 
@@ -335,6 +340,21 @@ def main() -> None:
         rows = recurrence.trace(args.depth, args.dim, args.zeros)
     else:
         rows = []
+    hard_steps = sum(
+        1
+        for row in rows
+        if row.parent_depth > 1 and row.hard_theta_compatible
+    )
+    if args.ancestor_exponent is not None:
+        hard_margin = 9 * hard_steps + cost - args.ancestor_exponent
+        print(
+            "hard_steps,ancestor_exponent,hard_trace_margin",
+            file=sys.stderr,
+        )
+        print(
+            f"{hard_steps},{args.ancestor_exponent},{hard_margin}",
+            file=sys.stderr,
+        )
     if args.output_csv:
         with args.output_csv.open("w", newline="") as handle:
             if rows:

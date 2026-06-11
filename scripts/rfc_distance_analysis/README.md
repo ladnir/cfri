@@ -68,7 +68,8 @@ traces mark this route with `dominant_h=-4` if it is selected.
 `rfc_shortened_rank_recurrence.py` supports `--allowed-singletons 0,5` to restrict optimistic
 `rho_h(D,z)` traces to all-paired steps and hard theta-compatible singleton bursts. Use this when
 checking whether a cheap paired-spine rank trace should also pay one `q^-9` first-drop charge per
-hard `s=5` step.
+hard `s=5` step. Add `--ancestor-exponent E` to print the hard-trace margin
+`9*hard_steps + rho - E`.
 
 `rfc_root_line_kernel_profile.py` reports the corrected tau-2 asymptotic endpoint columns:
 `generic_endpoint_logq`, `component_endpoint_logq`, `endpoint_bound_logq`, and

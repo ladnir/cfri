@@ -83,6 +83,8 @@ The companion `boundary_plus_strict_hard_margin_logq` column adds the scenario's
 `--charge` to the strict hard potential. Treat it as boundary-only: it applies only after a
 separate lemma proves that the local charge is disjoint from the internal hard steps already
 counted in `strict_hard_potential_logq`.
+The reachable production-floor stress table for the current c=8/k=2048/e=71 target is
+`docs/rfc_distance_analysis/rfc_theta_chain_normal_slice_reachable_child32_z34_sweep.csv`.
 
 `rfc_shortened_rank_recurrence.py` supports `--allowed-singletons 0,5` to restrict optimistic
 `rho_h(D,z)` traces to all-paired steps and hard theta-compatible singleton bursts. Use this when

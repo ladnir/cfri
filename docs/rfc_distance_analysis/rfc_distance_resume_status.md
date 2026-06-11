@@ -349,6 +349,18 @@ low-defect hard segment -> strict hard-trace potential;
 high-defect shortened ambient -> proven boundary charge, extra rank-defect/incidence/high-kernel
                                   charge, or obstruction.
 ```
+
+New high-defect checkpoint:
+
+```text
+docs/rfc_distance_analysis/rfc_high_defect_hard_segment_gap.md
+```
+
+It records that the abstract `child_k=32,zeros=(21,26,31)` toy is below the production zero floor:
+from `z=2119`, all-paired compression to `child_k=32` already gives at least `34` zeros. The
+reachable floor stress row `zeros=(34,39,44)` is better but still has a small real gap: strict-only
+fails from `b=10`, and even boundary-plus fails from `b=14` with deficit `3`. The next proof target
+is a reachability-plus-boundary/high-kernel lemma for this narrowed row.
 ```
 
 ## Diagnostic Script

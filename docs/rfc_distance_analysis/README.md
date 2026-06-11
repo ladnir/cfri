@@ -77,6 +77,7 @@ rfc_theta_minus_one_chain_recurrence_target.md recurrence target for theta_2=-1 
 rfc_theta_minus_one_isolation_lemma.md        outer-chain isolation and kernel nested-flag target
 rfc_kernel_branch_nested_flag_recurrence.md   minimal nested-flag recurrence for kernel chains
 rfc_theta_minus_one_truncation_status.md      depth-6/7 chain diagnostics and truncation target
+rfc_high_defect_hard_segment_gap.md           current high-defect hard-segment gap and closure routes
 scripts/rfc_distance_analysis/rfc_defect_conservation.py fixed-witness defect-conservation diagnostic
 scripts/rfc_distance_analysis/rfc_shortened_rank_recurrence.py optimistic shortened-kernel rank recurrence
 rfc_rank_pattern_induction_target.md          current finite-replica induction target

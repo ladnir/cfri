@@ -238,6 +238,50 @@ def flag_child_bound(
     return best
 
 
+def flag_child_bound_report(
+    *,
+    child_by_span: dict[int, list[float]],
+    child_k: int,
+    child_n: int,
+    outer_span: int,
+    inner_span: int,
+    outer_zeros: int,
+    inner_zeros: int,
+    q_log2: float,
+    mode: str,
+) -> tuple[str, float, float, float]:
+    """Return the selected coarse child-flag relaxation and its two main candidates."""
+
+    outer = get_child_value(child_by_span, child_n, outer_span, outer_zeros)
+    inner = get_child_value(child_by_span, child_n, inner_span, inner_zeros)
+    if outer <= NEG_INF / 2 or inner <= NEG_INF / 2 or inner_span > outer_span:
+        return "none", NEG_INF, NEG_INF, NEG_INF
+    if mode == "product":
+        value = outer + inner
+        return "product", value, value, value
+    if mode == "outer-only":
+        value = outer + inner_span * (outer_span - inner_span) * q_log2
+        return "outer-only", value, value, NEG_INF
+
+    outer_first = outer + inner_span * (outer_span - inner_span) * q_log2
+    inner_first = inner + (outer_span - inner_span) * (child_k - outer_span) * q_log2
+    best_label = "outer-first" if outer_first <= inner_first else "inner-first"
+    best = min(outer_first, inner_first)
+    if mode == "best-shortened":
+        shortened_dim = max(inner_span, child_k - outer_zeros)
+        if shortened_dim >= outer_span:
+            shortened_inner_first = (
+                inner
+                + (outer_span - inner_span)
+                * (shortened_dim - outer_span)
+                * q_log2
+            )
+            if shortened_inner_first < best:
+                best = shortened_inner_first
+                best_label = "shortened-inner-first"
+    return best_label, best, outer_first, inner_first
+
+
 def marked_line_child_bound(
     *,
     child_by_span: dict[int, list[float]],
@@ -939,7 +983,8 @@ def main() -> None:
             "trace_level,span,z,p,s,a,tau,outer_span,inner_span,outer_zeros,inner_zeros,"
             "local_charge,delta,comp,g,theta,dominant_h,gamma,lift_qdim,"
             "tau1_quotient_qdim,tau1_universal_postroot_qdim,"
-            "tau1_support_saving_qdim,tau1_charged_postroot_qdim"
+            "tau1_support_saving_qdim,tau1_charged_postroot_qdim,"
+            "child_bound_choice,child_bound_log2,child_outer_first_log2,child_inner_first_log2"
         )
         span = args.trace_span
         z = args.trace_z
@@ -981,13 +1026,44 @@ def main() -> None:
                     tau1_support_saving_qdim,
                     tau1_charged_postroot_qdim,
                 ) = tau1_profile
+            child_bound_choice = ""
+            child_bound_log2 = ""
+            child_outer_first_log2 = ""
+            child_inner_first_log2 = ""
+            if visible_tau > 0:
+                child_values = values_by_level[level - 1]
+                child_n = args.expansion * (1 << (level - 1))
+                child_k = 1 << (level - 1)
+                (
+                    child_bound_choice,
+                    child_bound_value,
+                    child_outer_first_value,
+                    child_inner_first_value,
+                ) = flag_child_bound_report(
+                    child_by_span=child_values,
+                    child_k=child_k,
+                    child_n=child_n,
+                    outer_span=outer_span,
+                    inner_span=inner_span,
+                    outer_zeros=outer_zeros,
+                    inner_zeros=inner_zeros,
+                    q_log2=args.q_log2,
+                    mode=args.flag_bound,
+                )
+                if child_bound_value > NEG_INF / 2:
+                    child_bound_log2 = f"{child_bound_value:.8f}"
+                if child_outer_first_value > NEG_INF / 2:
+                    child_outer_first_log2 = f"{child_outer_first_value:.8f}"
+                if child_inner_first_value > NEG_INF / 2:
+                    child_inner_first_log2 = f"{child_inner_first_value:.8f}"
             print(
                 f"{level},{span},{z},{p},{singleton_count},{visible_support_size},"
                 f"{visible_tau},{outer_span},{inner_span},{outer_zeros},{inner_zeros},"
                 f"{local_charge},{local_delta},{local_components},{local_g},{local_theta},"
                 f"{local_h},{local_gamma},{lift_qdim},{tau1_quotient_qdim},"
                 f"{tau1_universal_postroot_qdim},{tau1_support_saving_qdim},"
-                f"{tau1_charged_postroot_qdim}"
+                f"{tau1_charged_postroot_qdim},{child_bound_choice},"
+                f"{child_bound_log2},{child_outer_first_log2},{child_inner_first_log2}"
             )
             span = outer_span
             z = outer_zeros

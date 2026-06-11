@@ -100,6 +100,20 @@ level  a  delta comp quotient_qdim universal_postroot support_saving charged_pos
 So the formal tau-one quotient-line lemma is needed for proof safety, but it is not the local
 improvement that closes this checkpoint.
 
+The same trace now reports which coarse child-flag relaxation is selected:
+
+```text
+level  child_bound_choice  child_bound_log2   outer_first_log2  inner_first_log2
+5      outer-first          2470.43486387      2470.43486387     3584.00000000
+4      inner-first          1439.60197386      1566.81698675     1439.60197386
+3      inner-first         -1255.04099425     -1003.06336206    -1255.04099425
+2      inner-first          -247.19264508       128.00000000     -247.19264508
+```
+
+After additionally removing duplicate kernel lifts, the upper trace switches to outer-first rows
+but the crossing remains `z=135`. Thus neither the tau-one local count nor a single kernel-lift
+factor is the missing lever. The next target is a true recursive joint child flag/diagram state.
+
 ## Kernel-Lift Cover Check
 
 The narrower diagnostic:

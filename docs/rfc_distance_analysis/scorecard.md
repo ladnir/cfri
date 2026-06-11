@@ -168,3 +168,8 @@ trace, the tau-one rows have `support_saving_qdim=0`; the charged post-root expo
 universal fixed-line exponents. Therefore the immediate blocker is not a missing tau-one local
 support-subcode saving, but the recursive joint child-state/quotient-plane accounting after those
 tau-one rows.
+
+Child-bound trace diagnostics added. In the safe tau-zero `z=34` trace the top row is outer-first,
+then the next rows are inner-first; with kernel-lift covering the upper rows switch to outer-first
+but the crossing remains `z=135`. This reinforces that no single one-layer child relaxation choice
+is the whole gap. The next candidate is an actual recursive joint child flag/diagram state.

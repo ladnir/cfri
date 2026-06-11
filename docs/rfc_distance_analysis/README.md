@@ -9,6 +9,8 @@ Useful entry points:
 rfc_distance_manager_board.md                 current manager board and lane ownership
 rfc_distance_resume_status.md                 concise resume note for restarting the proof thread
 rfc_fable_audit_2026_06_10.md                 external Fable audit and corrections
+claude_report.md                              follow-up external review of the resume status
+rfc_claude_report_response.md                 accepted/corrected actions from Claude report
 rfc_distance_certificate_theorem.md           canonical conditional theorem and certificate statement
 rfc_distance_certificate_c8_k2048_q128.json   generated default original c=8/k=2048/q=2^128 certificate
 rfc_distance_certificate_c8_k2048_q128.csv    same certificate in CSV form
@@ -16,6 +18,7 @@ rfc_original_falsification_status.md          active bad-family/falsification st
 rfc_lower_bound_falsification_multicopy.md    multi-copy broad-family falsification stress
 rfc_upper_bound_response_to_multicopy.md      exact-support response to seven-copy stress
 rfc_upper_bound_flag_lemma_target.md          exact-support and flag-lift lemma targets
+rfc_multilayer_flag_transition_theorem.md     shared flag transition target for marked-line/kernel rows
 rfc_flag_recurrence_proof_obligations.md      manager-facing two-layer proof map
 rfc_lower_bound_nested_kernel_cascade.md      nested-kernel falsification status
 rfc_nested_kernel_attack_matrix.md            manager-facing obstruction attack matrix
@@ -74,6 +77,8 @@ rfc_theta_minus_one_chain_recurrence_target.md recurrence target for theta_2=-1 
 rfc_theta_minus_one_isolation_lemma.md        outer-chain isolation and kernel nested-flag target
 rfc_kernel_branch_nested_flag_recurrence.md   minimal nested-flag recurrence for kernel chains
 rfc_theta_minus_one_truncation_status.md      depth-6/7 chain diagnostics and truncation target
+scripts/rfc_distance_analysis/rfc_defect_conservation.py fixed-witness defect-conservation diagnostic
+scripts/rfc_distance_analysis/rfc_shortened_rank_recurrence.py optimistic shortened-kernel rank recurrence
 rfc_rank_pattern_induction_target.md          current finite-replica induction target
 ```
 
@@ -97,6 +102,7 @@ rfc_replica_rank1_profile.py    r=2 root-compatibility singleton profile
 rfc_replica_span_moment.py      ordered-tuple span-aware diagnostic
 rfc_subspace_span_moment.py     subspace-span diagnostic exposing visible-kernel state
 rfc_flag_span_moment.py         two-layer flag diagnostic for kernel-zero propagation
+rfc_theta_chain_normal_slice.py shortened-ambient and defect-slice checker for theta-chain truncation
 rfc_visible_span_profile.py     exact local visible-span subspace profiler with support summaries
 rfc_support_profile_bound.py    support-containment Gaussian bound from delta(A)
 rfc_root_line_kernel_profile.py root-line kernel profile with exact-support inversion

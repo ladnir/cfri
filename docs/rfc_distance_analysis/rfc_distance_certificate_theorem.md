@@ -5,13 +5,18 @@ certificate path.
 
 ## Construction And Parameters
 
-Use the determinant-`1` RFC fold with every root challenge:
+Use the determinant-`1` RFC fold. The clean theorem target currently assumes every root challenge:
 
 ```text
 T in F^*
 ```
 
 sampled uniformly and independently. Do not switch to the `T'=-T` algebra.
+
+Implementation note: the in-repo table generation appears to sample field elements directly, so
+the final certificate must either enforce the uniform-nonzero law above or insert the finite
+normalization constant for uniform `T in F`. This is a construction constant, not a reason to
+change the determinant-`1` fold law.
 
 For depth `d` and expansion `c`:
 
@@ -119,13 +124,15 @@ log_q E_A(2)
      + polylog_q(|A|),
 ```
 
-where `E_A(2)` is the exact-support root-line count. The component/full-rank endpoint is controlled
-by diagonal endomorphisms, but the old full-variety component-only claim is false for dense
-restrictions. A stronger two-endpoint shortcut using only `g` and `comp` is also false in general:
-connected `a=5, delta=3, comp=1, g=1` rows have a codimension-one `kappa>=2` layer. The main
-remaining local proof obligation is now to bound and charge these intermediate rank-drop layers.
-The generic determinantal model predicts `gamma_h >= (h-g)^2` for non-full intermediate layers and
-the component lemma gives `gamma_delta=a-comp` for the full-kernel layer.
+where `E_A(2)` is the exact-support root-line count. The component/full-rank endpoint is expected
+to be controlled by diagonal endomorphisms, but it is still a proof obligation until the standalone
+component/full-kernel lemma is written with constants. The old full-variety component-only claim is
+false for dense restrictions. A stronger two-endpoint shortcut using only `g` and `comp` is also
+false in general: connected `a=5, delta=3, comp=1, g=1` rows have a codimension-one `kappa>=2`
+layer. The main remaining local proof obligation is now to bound and charge these intermediate
+rank-drop layers together with the full-kernel endpoint. The generic determinantal model predicts
+`gamma_h >= (h-g)^2` for non-full intermediate layers, while the full-kernel layer requires the
+component/full-kernel lemma `gamma_delta=a-comp`.
 
 ### L3. Tau-2 Weighted Exterior Bound
 
@@ -280,18 +287,37 @@ docs/rfc_distance_analysis/rfc_g1_first_drop_endpoint_lemma.md
 It proves:
 
 ```text
-gamma_2 >= 1,
-theta_2 = -1
+gamma_2 >= 1
 ```
 
-for the first-drop layer, with the full-kernel layer controlled by the connected component endpoint.
-Thus this row remains heavier than the old two-endpoint shortcut, but it is no longer an unbounded
-local-algebra blocker. The remaining issue is global recurrence control for possible chains of
-`theta_2=-1` layers.
+for the first-drop layer. The full row has:
 
-### L4. Finite-Replica Rank-Pattern Recurrence
+```text
+theta_2 = max(first-drop contribution, full-kernel contribution).
+```
 
-The global recurrence tracks:
+The first-drop contribution is `-1`. The full-kernel contribution is also at most `-1` once the
+connected full-kernel/component endpoint is proved for this row. Until that endpoint is written as
+a standalone lemma, the statement `theta_2=-1` for the whole row is conditional. Thus this row is
+no longer an unexplained local-algebra blocker, but it still contributes two live obligations:
+
+```text
+1. close the connected full-kernel endpoint for the h=delta=3 layer;
+2. control possible global chains of theta_2=-1 first-drop layers.
+```
+
+### L4. Finite-Replica Multi-Layer Flag Recurrence
+
+The global recurrence tracks nested flag moments:
+
+```text
+F_h((t_0,z_0), ..., (t_m,z_m)),
+V_0 >= V_1 >= ... >= V_m,
+dim V_i = t_i,
+|Z(V_i)| >= z_i.
+```
+
+The one-layer distance event is `F_d((1,k+e))`. The recurrence state records:
 
 ```text
 replica span dimension t,
@@ -310,10 +336,75 @@ visible-subspace count from L1/L3
 recursive charge for invisible kernel directions.
 ```
 
-The recurrence must dominate the exact first moment `B_d(1,z)`. In the current state it must also
-include the dominant layer value `theta_2(A)` or an equivalent charge for the intermediate
-rank-drop layers, and it must use the exact-support incidence cap before multiplying by any
-independent quotient-lift factor.
+For a parent layer `V_i`, the singleton kernel produces:
+
+```text
+pi(K_i) <= pi(V_i)
+```
+
+in the child code. The child recurrence state is the merged chain obtained by inserting all such
+kernels into the projected parent flag. The transition is proof-safe only after conditioning on one
+depth-`h-1` child code and counting one merged child flag. In particular, the recurrence must not
+replace a joint child event by:
+
+```text
+F_child(upper event) * F_child(lower event)
+```
+
+unless those events live over independent child-code randomness, which they do not inside one fold.
+The current target theorem is:
+
+```text
+docs/rfc_distance_analysis/rfc_multilayer_flag_transition_theorem.md
+```
+
+That theorem must dominate the exact first moment `B_d(1,z)`, include the dominant layer value
+`theta_2(A)` or an equivalent charge for intermediate rank-drop layers, and apply the
+exact-support incidence cap inside the represented quotient `pi(V_i)/pi(K_i)` before spending any
+quotient-lift factor.
+
+The L4 recurrence also needs an explicit flag-gap routing rule. In a kernel-following chain, an
+ancestor `V_i` above a lower child flag `V_{i+1}` is not chosen inside the full child message space;
+it is chosen inside the shortened ambient:
+
+```text
+H(B_i) = {messages vanishing on the child zero witness B_i}.
+```
+
+For fixed `B_i`, the lift factor is therefore:
+
+```text
+GaussianBinomial(dim H(B_i)-t_{i+1}, t_i-t_{i+1})_q.
+```
+
+If `dim H(B_i)` is near the MDS value `max(k_child-|B_i|,0)`, this shortened-ambient factor is the
+normal branch and should be paid directly by the accumulated local zero requests. If `dim H(B_i)`
+is larger, the transition must expose the enlarged shortened ambient as a recursive child
+shortened-kernel rank event:
+
+```text
+R_{h-1}(dim H(B_i), |B_i|)
+  = Pr_child[dim H(B_i) is at least this large].
+```
+
+The rank-tail codimension
+
+```text
+dim H(B_i) * (|B_i| - k_child + dim H(B_i))
+```
+
+is only the generic-rank calibration target for this exposed child rank event. The actual theorem
+must use the RFC shortened-kernel rank recurrence:
+
+```text
+rho_{h-1}(D,z) = -log_q Pr[dim H_{h-1}(B) >= D].
+```
+
+A raw child flag moment `F_{h-1}((D,|B_i|))` is too loose for this purpose because it counts all
+`D`-subspaces inside the shortened ambient; the kernel-chain recurrence already counts ancestor
+flags inside `H(B_i)` by the Gaussian shortened-ambient factor above. The exact all-paired branch
+of `rho` compresses to the child by `D -> ceil(D/2)`, so exposed defects cannot be certified by
+blindly plugging in the generic rank-tail exponent.
 
 ## Conditional Certificate Bound
 
@@ -360,7 +451,8 @@ paired-compression trace.
 
 The driver does not implement the full recurrence state from L4. It evaluates the final theorem
 shape after L1-L4 are assumed and reports that status explicitly. The output is therefore an
-idealized conditional certificate until L2, L4, and the polynomial factor `C(d,N)` are completed.
+idealized conditional certificate until L2, the conditional full-kernel endpoint in L3, L4, and the
+polynomial factor `C(d,N)` are completed.
 
 ## Default Target
 

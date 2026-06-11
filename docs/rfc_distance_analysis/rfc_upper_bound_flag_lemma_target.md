@@ -7,6 +7,13 @@ This note states the proof lemmas needed to turn the flag checkpoint in
 third-iteration feedback: exact-size support counting removes the false seven-copy marked-core
 stress, and the depth-4 flag toy materially improves the scalar endpoint-tau2 crossing.
 
+Current role: this note is the two-layer predecessor of
+`rfc_multilayer_flag_transition_theorem.md`. The shared multi-layer theorem is now the canonical
+target for rows that used to be handled separately, especially the decomposable marked-line row and
+the `theta_2=-1` kernel-chain row. The lemmas below remain useful local ingredients, but the proof
+must feed one merged child flag moment rather than multiplying child events that share the same
+random child code.
+
 ## Target Recurrence Object
 
 At one fold, let:

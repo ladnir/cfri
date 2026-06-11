@@ -1,0 +1,8 @@
+name,child_k,expansion,dims,zeros,b,short_dims,normal_slice_feasible,e_anc_logq,defect_codim_logq,max_defect_charge_logq,optimistic_rho_logq,max_optimistic_rho_logq,split_const_logq,charge_logq,margin_logq,normal_slice_safe,defect_routed_margin_logq,defect_routed_safe,rho_routed_margin_logq,rho_routed_safe
+observed_level4_inner_shape_child_k8_b0,8,8,"4,3,2,1","21,26,31","0,0,0","0,0,0",no,0,"0,0,0",0,"0,0,0",0,0,9,infeasible,yes,infeasible,yes,infeasible,yes
+observed_level4_inner_shape_child_k8_b1,8,8,"4,3,2,1","21,26,31","1,1,1","1,1,1",no,0,"14,19,24",24,"4,5,6",6,0,9,infeasible,yes,infeasible,yes,infeasible,yes
+observed_level4_inner_shape_child_k8_b2,8,8,"4,3,2,1","21,26,31","2,2,2","2,2,2",no,0,"30,40,50",50,"4,5,7",7,0,9,infeasible,yes,infeasible,yes,infeasible,yes
+observed_level4_inner_shape_child_k8_b3,8,8,"4,3,2,1","21,26,31","3,3,3","3,3,3",no,1,"48,63,78",78,"4,6,7",7,0,9,infeasible,yes,infeasible,yes,infeasible,yes
+observed_level4_inner_shape_child_k8_b4,8,8,"4,3,2,1","21,26,31","4,4,4","4,4,4",yes,3,"68,88,108",108,"5,6,7",7,0,9,6,yes,114,yes,13,yes
+observed_level4_inner_shape_child_k8_b5,8,8,"4,3,2,1","21,26,31","5,5,5","5,5,5",yes,6,"90,115,140",140,"inf,inf,inf",inf,0,9,3,yes,143,yes,inf,yes
+observed_level4_inner_shape_child_k8_b6,8,8,"4,3,2,1","21,26,31","6,6,6","6,6,6",yes,9,"114,144,174",174,"inf,inf,inf",inf,0,9,0,yes,174,yes,inf,yes

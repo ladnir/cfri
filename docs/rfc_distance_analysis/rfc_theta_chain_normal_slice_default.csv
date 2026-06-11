@@ -1,0 +1,4 @@
+name,child_k,expansion,dims,zeros,b,short_dims,normal_slice_feasible,e_anc_logq,defect_codim_logq,max_defect_charge_logq,optimistic_rho_logq,max_optimistic_rho_logq,split_const_logq,charge_logq,margin_logq,normal_slice_safe,defect_routed_margin_logq,defect_routed_safe,rho_routed_margin_logq,rho_routed_safe
+observed_level4_inner_shape_child_k8,8,8,"4,3,2,1","21,26,31","0,0,0","0,0,0",no,0,"0,0,0",0,"0,0,0",0,0,9,infeasible,yes,infeasible,yes,infeasible,yes
+observed_level5_inner_shape_child_k16,16,8,"4,3,2,1","101,106,111","0,0,0","0,0,0",no,0,"0,0,0",0,"0,0,0",0,0,9,infeasible,yes,infeasible,yes,infeasible,yes
+toy_child32_gap_near_dimension,32,8,"4,3,2,1","21,26,31","0,0,0","11,6,1",no,10,"0,0,0",0,"0,0,0",0,0,9,infeasible,yes,infeasible,yes,infeasible,yes

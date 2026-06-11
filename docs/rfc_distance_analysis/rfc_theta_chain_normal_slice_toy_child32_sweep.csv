@@ -1,0 +1,8 @@
+name,child_k,expansion,dims,zeros,b,short_dims,normal_slice_feasible,e_anc_logq,defect_codim_logq,max_defect_charge_logq,optimistic_rho_logq,max_optimistic_rho_logq,split_const_logq,charge_logq,margin_logq,normal_slice_safe,defect_routed_margin_logq,defect_routed_safe,rho_routed_margin_logq,rho_routed_safe
+toy_child32_gap_near_dimension_b0,32,8,"4,3,2,1","21,26,31","0,0,0","11,6,1",no,10,"0,0,0",0,"0,0,0",0,0,9,infeasible,yes,infeasible,yes,infeasible,yes
+toy_child32_gap_near_dimension_b1,32,8,"4,3,2,1","21,26,31","1,1,1","12,7,2",yes,12,"12,7,2",12,"1,1,1",1,0,9,-3,no,9,yes,-2,no
+toy_child32_gap_near_dimension_b2,32,8,"4,3,2,1","21,26,31","2,2,2","13,8,3",yes,15,"26,16,6",26,"1,1,1",1,0,9,-6,no,20,yes,-5,no
+toy_child32_gap_near_dimension_b3,32,8,"4,3,2,1","21,26,31","3,3,3","14,9,4",yes,18,"42,27,12",42,"1,1,1",1,0,9,-9,no,33,yes,-8,no
+toy_child32_gap_near_dimension_b4,32,8,"4,3,2,1","21,26,31","4,4,4","15,10,5",yes,21,"60,40,20",60,"1,1,1",1,0,9,-12,no,48,yes,-11,no
+toy_child32_gap_near_dimension_b5,32,8,"4,3,2,1","21,26,31","5,5,5","16,11,6",yes,24,"80,55,30",80,"1,1,1",1,0,9,-15,no,65,yes,-14,no
+toy_child32_gap_near_dimension_b6,32,8,"4,3,2,1","21,26,31","6,6,6","17,12,7",yes,27,"102,72,42",102,"inf,1,1",1,0,9,-18,no,84,yes,-17,no

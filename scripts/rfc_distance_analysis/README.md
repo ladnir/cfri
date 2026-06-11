@@ -23,6 +23,9 @@ rfc_replica_zero_moment.py          loose/optimistic aggregate replica recurrenc
 rfc_replica_span_moment.py          ordered-tuple span-aware diagnostic
 rfc_subspace_span_moment.py         subspace-span diagnostic exposing visible-kernel state
 rfc_flag_span_moment.py             two-layer flag diagnostic for kernel-zero propagation
+rfc_theta_chain_normal_slice.py     shortened-ambient/defect-slice checker with optimistic rho columns
+rfc_defect_conservation.py          fixed-witness rank-defect conservation checker for exposed shortened ambients
+rfc_shortened_rank_recurrence.py    optimistic rho_h(D,z) recurrence with paired-spine compression
 rfc_visible_span_profile.py         exact local visible-span subspace profiler with support summaries
 rfc_support_profile_bound.py        Gaussian support-containment bound from delta(A)
 rfc_root_line_kernel_profile.py     root-line kernel profile with exact-support inversion/discovery
@@ -61,6 +64,11 @@ the first quotient-incidence correction in `rfc_tau2_incidence_framing_lemma.md`
 partial-cover fiber accounting is still proof work, not a certified script feature.
 For the boundary `tau=2,a=2,delta=2,comp=2,K=0` row, it uses a safe joint marked-line child bound;
 traces mark this route with `dominant_h=-4` if it is selected.
+
+`rfc_shortened_rank_recurrence.py` supports `--allowed-singletons 0,5` to restrict optimistic
+`rho_h(D,z)` traces to all-paired steps and hard theta-compatible singleton bursts. Use this when
+checking whether a cheap paired-spine rank trace should also pay one `q^-9` first-drop charge per
+hard `s=5` step.
 
 `rfc_root_line_kernel_profile.py` reports the corrected tau-2 asymptotic endpoint columns:
 `generic_endpoint_logq`, `component_endpoint_logq`, `endpoint_bound_logq`, and

@@ -2,10 +2,10 @@
 
 Scope: original non-systematic RFC global distance recurrence.
 
-The local `g=1` first-drop endpoint is now quantified:
+The local `g=1` first-drop layer is now quantified:
 
 ```text
-theta_2 = -1.
+first-drop contribution = -1.
 ```
 
 This note identifies the next global question: can these one-q-dimension penalties recur across
@@ -22,7 +22,7 @@ delta = 3
 comp = 1
 g = 1
 h = 2
-theta_2 = -1.
+first-drop contribution = -1.
 ```
 
 The local theorem says the root-line layer has codimension at least one:
@@ -36,6 +36,9 @@ Thus the post-root endpoint exponent is:
 ```text
 2h - 4 - gamma_h = -1.
 ```
+
+The full-row statement `theta_2 <= -1` remains conditional on the full-kernel/component endpoint
+for the same support row.
 
 ## Why This Is Still A Global Issue
 
@@ -87,7 +90,7 @@ no product-of-first-moments flag bound
 and trace the first row with:
 
 ```text
-theta_2 = -1.
+first-drop exponent = -1.
 ```
 
 Report:
@@ -106,6 +109,53 @@ child state used.
 
 The target is to decide whether the `theta_2=-1` row is isolated by support/root charge or can
 feed into itself recursively.
+
+## Hardest Kernel-Chain Normal Form
+
+For one first-drop row:
+
+```text
+z = 2p + s,
+z_V = p + s - a,
+z_L = p + s,
+z_L - z_V = a.
+```
+
+Since connected first-drop rows have `a >= 5`, every kernel-following step inserts a child flag
+edge with at least five extra zero requests on the kernel layer.
+
+If `s>a`, then the outer child also receives residue:
+
+```text
+z_V = p + (s-a),
+```
+
+so the transition has explicit zero-budget burn on the outer branch. Therefore the hardest pure
+kernel chain is:
+
+```text
+s_i = a_i = 5
+```
+
+at every first-drop step. In that case:
+
+```text
+z_{i+1} = z_{L,i} = (z_i + 5)/2,
+z_i     = 2 z_{i+1} - 5.
+```
+
+After `m` consecutive kernel-following first-drop rows:
+
+```text
+z_m = z_0/2^m + 5(1 - 2^-m),
+z_0 = 2^m z_m - 5(2^m - 1).
+```
+
+This identity explains why a scalar recurrence is misleading: for a fixed deepest zero budget,
+kernel following can reduce the top zero request. The missing information is the nested flag
+itself: each step inserts a lower layer with a same-depth zero gap at least `5`. Truncation must
+therefore be proved as a nested-flag domination statement, not by comparing only the deepest scalar
+zero budget.
 
 ## Current Diagnostic Evidence
 

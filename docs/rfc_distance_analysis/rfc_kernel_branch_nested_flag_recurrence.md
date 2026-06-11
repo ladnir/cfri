@@ -282,6 +282,287 @@ chains are a state-counting/tightness problem, not a correctness problem. The ex
 recurrence is the tightening of this relaxation, replacing arbitrary ancestor superspaces with
 ancestor subspaces that share the same fold split and local root constraints.
 
+## Flag-Gap Ancestor Bound Target
+
+The hard pure-kernel chain has `s_i=a_i=5` at every first-drop row. Its scalar zero budget obeys:
+
+```text
+z_{i+1} = (z_i + 5)/2,
+```
+
+so scalar all-paired comparison is misleading. The usable structure is the same-depth flag gap
+created at every kernel step:
+
+```text
+z_L - z_V = a_i >= 5.
+```
+
+The inner-first relaxation above discards this gap by choosing ancestors in the full child message
+space. The theorem-grade replacement chooses ancestors inside the appropriate shortened ambient:
+
+```text
+ancestor quotient for V_i/V_{i+1}
+  lies in the child subcode vanishing on the zero witness of V_i.
+```
+
+### Deterministic Ancestor Lemma
+
+Fix one realized child code with message space `H`, and fix nested zero witnesses:
+
+```text
+B_0 subset B_1 subset ... subset B_m.
+```
+
+Define the shortened ambient:
+
+```text
+H_i = H(B_i) = {x in H : x vanishes on B_i},
+D_i = dim H_i.
+```
+
+Since `B_i subset B_{i+1}`, we have:
+
+```text
+H_0 >= H_1 >= ... >= H_m.
+```
+
+Fix the deepest layer `V_m <= H_m`, `dim V_m=t_m`. The number of ancestor flags:
+
+```text
+V_0 >= V_1 >= ... >= V_m,
+dim V_i=t_i,
+|Z(V_i)|>=z_i,
+z_{i+1} >= z_i + 5,
+```
+
+with the fixed witnesses `B_i` is at most:
+
+```text
+prod_i GaussianBinomial(short_dim(z_i)-t_{i+1}, t_i-t_{i+1})_q,
+```
+
+where `short_dim(z_i)` is now the actual value `D_i`.
+
+Proof: assuming `V_{i+1}` has already been chosen, it lies in `H_{i+1} <= H_i`. Choosing
+`V_i` with:
+
+```text
+V_{i+1} <= V_i <= H_i,
+dim V_i=t_i
+```
+
+is the same as choosing a `(t_i-t_{i+1})`-dimensional subspace of `H_i/V_{i+1}`, which has
+dimension `D_i-t_{i+1}`. Multiplying over `i=m-1,...,0` gives the displayed factor. Any fold-split,
+root-compatibility, exact-support, or local first-drop condition only reduces this count.
+
+Using the standard Gaussian bound gives:
+
+```text
+ancestor_factor
+  <= Gamma_q^m
+     q^sum_i (t_i-t_{i+1})(D_i-t_i).
+```
+
+The old inner-first relaxation replaced every `D_i` by the full child dimension `k_child`, giving:
+
+```text
+prod_i GaussianBinomial(k_child-t_{i+1}, t_i-t_{i+1})_q.
+```
+
+The saved exponent on the normal slice is therefore:
+
+```text
+sum_i (t_i-t_{i+1})(k_child-D_i).
+```
+
+This is the algebraic form of the flag-gap savings.
+
+### Rank-Defect Slicing
+
+For a witness set `B_i`, the shortened dimension is:
+
+```text
+D_i = k_child - rank(G_{B_i}).
+```
+
+On the normal slice:
+
+```text
+D_i <= max(k_child-|B_i|,0) + b_i,
+```
+
+the deterministic lemma gives the corresponding ancestor exponent with this value of `D_i`.
+The exceptional slice:
+
+```text
+D_i >= max(k_child-|B_i|,0) + b_i + 1
+```
+
+is itself a recursive rank-defect event: the canonical shortened ambient over `B_i` has dimension
+at least `D_i`. It should be exposed as the rank event:
+
+```text
+R_child(D_i, |B_i|) = 1[dim H(B_i) >= D_i].
+```
+
+Equivalently, for a fixed child code:
+
+```text
+dim H(B_i) >= D_i
+```
+
+is exactly the rank-defect event:
+
+```text
+rank(G_{B_i}) <= k_child - D_i.
+```
+
+The random-matrix codimension for this slice is:
+
+```text
+defect_charge(D_i, |B_i|)
+  = D_i (|B_i| - k_child + D_i),
+```
+
+with value `0` at the MDS dimension `D_i=max(k_child-|B_i|,0)`. This formula is not a new
+unconditional RFC theorem; it is the rank-tail charge that the recursive shortened-kernel rank
+certificate must recover. A raw flag moment `F_child((D_i,|B_i|),...)` is too loose here because it
+counts all `D_i`-subspaces inside `H(B_i)`, while the ancestor recurrence already counts chosen
+flags inside `H(B_i)` separately. The codimension formula is useful for deciding whether the
+exposed defect slice has enough expected slack.
+
+For RFC this codimension is a calibration, not an automatic charge. The canonical rank recurrence
+has an exact all-paired branch:
+
+```text
+rho_h(D,2p) = rho_{h-1}(ceil(D/2),p),
+```
+
+because paired zero requests make the parent shortened kernel the direct sum of two child shortened
+kernels. Thus the defect slice must be charged by the computed `rho` recurrence, not by blindly
+substituting the generic random-linear value.
+
+Thus the shortened-ambient ancestor bound is not an additional unproved randomness assumption. It
+is a deterministic flag count plus a choice:
+
+```text
+1. normal slice: use D_i close to the MDS value in the ancestor factor;
+2. defect slice: charge the enlarged H(B_i) recursively as a canonical rank event.
+```
+
+This converts length-four domination into a recursive certificate statement rather than a new
+local algebra problem.
+
+### Normal-Slice Domination Inequality
+
+For a proposed truncation from a length-four pure kernel chain to a length-three state, isolate the
+new deepest first-drop row. Its local charge is at least:
+
+```text
+q^-9.
+```
+
+The ancestor cost introduced by keeping one more lower flag layer is bounded, on fixed zero
+witnesses, by:
+
+```text
+E_anc = sum_i (t_i-t_{i+1})(D_i-t_i),
+D_i   = dim H(B_i).
+```
+
+A sufficient normal-slice domination condition is:
+
+```text
+E_anc + log_q(Split_i * C_i) <= 9 - margin,
+```
+
+where `Split_i` is the finite split/support multiplicity for the new first-drop row and `C_i`
+collects Gaussian, root-fiber, and state-count constants.
+
+If this inequality fails only because some `D_i` is too large, the branch is not discarded. It is
+moved to the defect slice by adding the enlarged shortened ambient as a recursive rank event:
+
+```text
+R_child(D_i, |B_i|).
+```
+
+Under the rank-tail heuristic, exposing any edge with defect charge:
+
+```text
+defect_charge(D_i, |B_i|)
+```
+
+changes the domination test to:
+
+```text
+E_anc + log_q(Split_i*C_i)
+  <= 9 + defect_charge(D_i, |B_i|) - margin.
+```
+
+In a proof, this inequality is implemented by the recursive shortened-kernel rank recurrence for
+the exposed defect layer, not by assuming independence.
+
+Thus the certificate implementation can use the following finite rule:
+
+```text
+if normal-slice inequality holds:
+    truncate the fourth kernel layer;
+else:
+    keep/expose the offending short_dim state.
+```
+
+The proof obligation is to show that the second branch cannot remain on the dominant path
+indefinitely: every exposed `short_dim` layer is a rank-defect event with its own zero witness, so
+the same finite-replica rank recurrence charges it recursively.
+
+### No Infinite Defect-Cycle Principle
+
+Defect routing is well-founded in the literal recurrence because an exposed layer lives in the
+child code, so the depth decreases by one. The remaining asymptotic concern is not an actual cycle;
+it is a depth-scaled path that repeatedly avoids normal-slice truncation while paying too little.
+
+Use the accumulated potential:
+
+```text
+Phi_path =
+  9 * (# first-drop kernel rows)
+  + sum exposed defect_charge(D_i, |B_i|)
+  - sum ancestor E_anc
+  - log_q(split/state constants).
+```
+
+The routing rule maintains the following invariant on every extension:
+
+```text
+normal branch:
+  the new first-drop charge q^-9 dominates the new ancestor cost, so Phi_path does not decrease;
+
+defect branch:
+  the normal inequality failed because some D_i was too large.
+  Expose that D_i layer and add defect_charge(D_i,|B_i|) through the recursive rank event.
+```
+
+Since:
+
+```text
+defect_charge(D,z) = D(z-k+D) > 0
+```
+
+whenever `D > max(k-z,0)`, every genuine defect exposure adds positive codimension. Therefore a
+long path can remain competitive only if each step is normal and near-tight. The normal-slice
+checker is exactly testing those near-tight cases. On the observed level-local theta-chain shapes,
+the normal slices are either infeasible or dominated by the third first-drop charge.
+
+This principle does not by itself finish the certificate. The missing theorem-grade step is to
+replace the rank-tail heuristic for `defect_charge` by the recursive shortened-kernel rank bound:
+
+```text
+R_child(D, z).
+```
+
+Once that bound is part of the finite-replica recurrence, defect routing cannot create an
+independent-product loophole or an uncharged chain.
+
 ## Exponent Consequence For theta_2=-1
 
 The local `theta_2=-1` row has:

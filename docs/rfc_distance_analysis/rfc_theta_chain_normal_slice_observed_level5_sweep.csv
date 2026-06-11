@@ -1,0 +1,8 @@
+name,child_k,expansion,dims,zeros,b,short_dims,normal_slice_feasible,e_anc_logq,defect_codim_logq,max_defect_charge_logq,optimistic_rho_logq,max_optimistic_rho_logq,split_const_logq,charge_logq,margin_logq,normal_slice_safe,defect_routed_margin_logq,defect_routed_safe,rho_routed_margin_logq,rho_routed_safe
+observed_level5_inner_shape_child_k16_b0,16,8,"4,3,2,1","101,106,111","0,0,0","0,0,0",no,0,"0,0,0",0,"0,0,0",0,0,9,infeasible,yes,infeasible,yes,infeasible,yes
+observed_level5_inner_shape_child_k16_b1,16,8,"4,3,2,1","101,106,111","1,1,1","1,1,1",no,0,"86,91,96",96,"inf,inf,inf",inf,0,9,infeasible,yes,infeasible,yes,infeasible,yes
+observed_level5_inner_shape_child_k16_b2,16,8,"4,3,2,1","101,106,111","2,2,2","2,2,2",no,0,"174,184,194",194,"inf,inf,inf",inf,0,9,infeasible,yes,infeasible,yes,infeasible,yes
+observed_level5_inner_shape_child_k16_b3,16,8,"4,3,2,1","101,106,111","3,3,3","3,3,3",no,1,"264,279,294",294,"inf,inf,inf",inf,0,9,infeasible,yes,infeasible,yes,infeasible,yes
+observed_level5_inner_shape_child_k16_b4,16,8,"4,3,2,1","101,106,111","4,4,4","4,4,4",yes,3,"356,376,396",396,"inf,inf,inf",inf,0,9,6,yes,402,yes,inf,yes
+observed_level5_inner_shape_child_k16_b5,16,8,"4,3,2,1","101,106,111","5,5,5","5,5,5",yes,6,"450,475,500",500,"inf,inf,inf",inf,0,9,3,yes,503,yes,inf,yes
+observed_level5_inner_shape_child_k16_b6,16,8,"4,3,2,1","101,106,111","6,6,6","6,6,6",yes,9,"546,576,606",606,"inf,inf,inf",inf,0,9,0,yes,606,yes,inf,yes

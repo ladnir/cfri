@@ -22,7 +22,8 @@ systematic-coordinate discount.
 
 ```text
 e=70: unsafe in the current exact-support stress model.
-e=71: still plausible; best corrected scalar stress is about -121.83 bits.
+e=71: still plausible; ideal final-shape moment is about -119.68 bits, while the best corrected
+      scalar stress row is about -121.83 bits.
 e=72: conservative fallback if constants or exact flag enumeration eat the e=71 margin.
 ```
 
@@ -57,8 +58,9 @@ complete-stride flag intersections:
 paired-spine lift:
   t=2 and resolved t=3 full-kernel gates show only finite Gaussian constants.
 
-tau=2 product endpoint:
-  closed-form product row has about two q-dimensions of slack.
+tau=2 local decomposable endpoint:
+  closed-form local decomposable row has about two q-dimensions of slack. This does not justify
+  multiplying child moments; shared child randomness is handled by the multi-layer flag theorem.
 
 dense connected tau=2 endpoint row:
   GF(11) and GF(31) connected examples have positive raw finite-field excess but negative
@@ -69,18 +71,22 @@ dense connected tau=2 endpoint row:
 Live blockers:
 
 ```text
-1. Write the formal joint marked-line/frame recurrence for the neutral decomposable
-   |A|=2, delta=2, comp=2 row. The product-of-first-moments split is invalid because the
-   two lines share the same child-code randomness.
+1. Prove/finalize the formal shared-randomness-safe multi-layer flag transition theorem. The target
+   note now covers both the neutral decomposable |A|=2, delta=2, comp=2 marked-line/frame row and
+   the theta_2=-1 kernel-chain recurrence. The product-of-first-moments split is invalid because
+   the child events share the same code randomness.
 2. Prove the global finite-replica/flag recurrence with exact-support inversion, the tau-two
    exact-support Grassmann incidence cap, and polynomial factors.
 3. Control possible chains of theta_2=-1 first-drop rows. The outer-branch accounting now has a
    zero-budget burn lemma; the kernel-branch route now has a three-layer nested-flag recurrence
    contract. Depth-6/7 best-transition diagnostics show max consecutive theta-chain length 1; the
    remaining proof target is a length-three truncation or length-four domination lemma.
-4. Stress higher-drop tau-two layers and mixed-fiber chain shapes beyond the retired
+4. Prove the delta=3 connected full-kernel/component endpoint used by the g=1 row, or mark the
+   g=1 full-row theta_2=-1 conclusion as conditional until the general component endpoint is
+   theorem-grade.
+5. Stress higher-drop tau-two layers and mixed-fiber chain shapes beyond the retired
    complete-stride and paired-spine gates, especially tau sequences 1->2 and 2->1.
-5. Produce the final theorem-driven certificate output for e=71/e=72 after constants are inserted.
+6. Produce the final theorem-driven certificate output for e=71/e=72 after constants are inserted.
 ```
 
 Current honesty check:
@@ -88,9 +94,9 @@ Current honesty check:
 ```text
 We are making real progress on the local obstruction list, but the certificate is not proved yet.
 The main risk has shifted from local endpoint falsification to recurrence state: the tau-2 proof
-needs layer codimensions, exact-support incidence caps, joint marked-line states, and
-small-support layer accounting.  A shortcut using only `g` and `comp` is no longer a candidate
-theorem.
+needs layer codimensions, exact-support incidence caps, shared-randomness-safe multi-layer flag
+states, and small-support layer accounting.  A shortcut using only `g` and `comp` is no longer a
+candidate theorem.
 ```
 
 ## Active Lanes
@@ -194,12 +200,15 @@ relaxation; that has been removed from the default `best` mode.
 A coarse joint marked-line diagnostic is now implemented for the `|A|=2` row:
 
 ```text
-product_row_contribution <= poly(N) * (q+1) * F_child((2,z), (1,z+1)).
+local_decomposable_row_contribution <= poly(N) * (q+1) * F_child((2,z_V), (1,z_V+1)).
 ```
 
 At depth 4 this is already strong enough to move the dominant row to the connected
-`|A|=3,delta=2,comp=1` endpoint. This is still a diagnostic until the joint marked-line recurrence
-is written as a theorem. The `|A|=3` endpoint itself now has a direct `U_{2,3}` proof in:
+`|A|=3,delta=2,comp=1` endpoint. The joint marked-line recurrence is now drafted in the
+multi-layer theorem note; the local marked-component certificate and uniform `(q+1)`
+frame-completion count are written there. The remaining marked-line work is finite bookkeeping:
+the determinant-1 root-fiber constant and exact-support inversion. The `|A|=3` endpoint itself now
+has a direct `U_{2,3}` proof in:
 
 ```text
 docs/rfc_distance_analysis/rfc_u23_tau2_endpoint_lemma.md
@@ -212,15 +221,17 @@ first-drop local layer is now quantified by:
 docs/rfc_distance_analysis/rfc_g1_first_drop_endpoint_lemma.md
 ```
 
-which proves `gamma_2>=1` and hence `theta_2=-1` for the
-`|A|=5,delta=3,comp=1,g=1,h=2` row. The row remains one q-dimension heavier than the old shortcut,
-but it is no longer a mysterious local-algebra gap. The remaining hard cases are now:
+which proves `gamma_2>=1` and hence first-drop exponent `-1` for the
+`|A|=5,delta=3,comp=1,g=1,h=2` layer. The full-row conclusion `theta_2=-1` still depends on the
+`h=delta=3` full-kernel/component endpoint. The row remains one q-dimension heavier than the old
+shortcut, but it is no longer a mysterious first-drop gap. The remaining hard cases are now:
 
 ```text
-1. formal joint marked-line/frame recurrence for the |A|=2,delta=2,comp=2 row;
-2. global recurrence control for possible chains of theta_2=-1 first-drop rows;
-3. higher-drop local layers kappa >= g+2;
-4. mixed-fiber quotient incidence when kernels persist across levels.
+1. global recurrence control for possible chains of theta_2=-1 first-drop rows;
+2. direct delta=3 full-kernel/component endpoint for the g=1 row;
+3. finite marked-line constants: determinant-1 root-fiber constant and exact-support inversion;
+4. higher-drop local layers kappa >= g+2;
+5. mixed-fiber quotient incidence when kernels persist across levels.
 ```
 
 The old complete-stride enumerator target below is now historical context; those gates came back
@@ -397,11 +408,11 @@ Tau-2 endpoint-counter status:
     enumeration over GF(65537) for size 8 is infeasible.
 
   Next required method:
-    a non-enumerative or support-targeted endpoint counter for the product-style
+    a non-enumerative or support-targeted endpoint counter for the decomposable
     delta=2, comp=2, g=0 row.
 
-Tau-2 product endpoint resolution:
-  closed-form product row over GF(65537):
+Tau-2 local decomposable endpoint resolution:
+  closed-form decomposable row over GF(65537):
     support_size = 8
     delta = 2
     comp = 2
@@ -413,9 +424,10 @@ Tau-2 product endpoint resolution:
     endpoint_excess_logq = -1.9999972483
 
   Interpretation:
-    the product row is benign.  It has roughly two q-dimensions of slack against the safe
-    endpoint bound.  The next endpoint target is a dense connected tau-2 profile with
-    comp=1, delta=2, and g>=2.
+    the local decomposable row is benign.  It has roughly two q-dimensions of slack against the
+    safe endpoint bound. This is a local endpoint statement only; it does not justify multiplying
+    child moments. The next endpoint target is a dense connected tau-2 profile with comp=1,
+    delta=2, and g>=2.
 
 Dense connected tau-2 endpoint target correction:
   comp=1, delta=2, g>=2 is infeasible for connected no-loop supports.
@@ -710,7 +722,7 @@ Tau-2 layer-codimension correction:
     available.
     The a=2,delta=2,comp=2,K=L=0 row is decomposable, but the squared first-moment split is
     invalid. The current safe route is a joint marked-line/frame state:
-      product_row_contribution <= poly(N) * (q+1) * F_child((2,z), (1,z+1))
+      local_decomposable_row_contribution <= poly(N) * (q+1) * F_child((2,z_V), (1,z_V+1))
 
   Remaining incidence generalization:
     sharpen L<=V with Q=V/L and partial-cover singleton blocks.  The expected transition is:
@@ -728,11 +740,30 @@ or the production-scaled corrected e=71 bad-count exceeds -80 bits.
 Current ranked obstruction families:
 
 ```text
-1. formal proof of the joint marked-line/frame state for the |A|=2,delta=2,comp=2 boundary row;
-2. recurrence audit for chains of theta_2=-1 first-drop rows;
-3. higher-drop local layers kappa >= g+2;
-4. mixed-fiber chain shapes where the intermediate layer persists across levels;
-5. mixed chain shapes tau=1->2 and tau=2->1 after the exact-support incidence cap is fixed.
+1. recurrence audit for chains of theta_2=-1 first-drop rows, now focused on the normal/defect
+   inequality after the deterministic shortened-ambient ancestor bound. Current diagnostic:
+   observed level-local inner shapes are safe/infeasible for b<=6, but a toy near-dimension slice
+   fails normal truncation at b=1 and is rescued only after exposing the enlarged shortened ambient.
+   Correction: the exposed object must be the canonical shortened-kernel rank event
+   `R_child(D,z)=Pr[dim H(B)>=D]`, not the raw flag moment `F_child((D,z))`; the latter has negative
+   one-step slack in `rfc_defect_conservation.py`. Next proof step: build the RFC recurrence for
+   this rank event, including all-paired compression, and prove it supplies enough codimension for
+   the exposed defect slices. Current obstruction: `rfc_shortened_rank_recurrence.py` finds
+   paired-spine rank events with optimistic costs `rho<=1` for the constrained
+   `h=5,D=12,z=21,p=10,s=1` toy and `rho<=2` for observed-style `h=4,z=21,D=7,8` defects.
+   Combined theta-chain check: the toy `child_k=32,b=1` has rho margin `-2`, while observed
+   `child_k=8,b=4` has rho margin `13` and observed `child_k=16,b=4` has no cheap rho event.
+   Next proof step: isolate/exclude the near-dimension paired-spine toy from dominant
+   `theta_2=-1` paths, or find the missing support/fiber charge it pays. Current refinement:
+   the cheap toy trace has no hard `s=5` step (`s=1`, then `s=8` with residue 3, then all-paired),
+   so the live theorem can split hard theta-compatible rank traces from non-hard paired-spine
+   residue/all-paired traces. New refinement: if the toy is constrained to hard/all-paired splits
+   (`--allowed-singletons 0,5`), it has two hard `s=5` steps and margin `2*9+1-12=7`, so the
+   corrected potential should count one local charge per hard rank-trace step;
+2. higher-drop local layers kappa >= g+2;
+3. mixed-fiber chain shapes where the intermediate layer persists across levels;
+4. mixed chain shapes tau=1->2 and tau=2->1 after the exact-support incidence cap is fixed;
+5. finite marked-line root-fiber/exact-support constants.
 ```
 
 The chain target is split out in:

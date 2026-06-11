@@ -166,6 +166,137 @@ and, if `L` itself takes a first-drop row, extend to a longer nested flag. This 
 lesson as the decomposable `|A|=2,delta=2,comp=2` row: shared child-code randomness forces a joint
 state.
 
+## Pure Kernel-Chain Budget Identity
+
+If a first-drop chain follows kernel children at every step, the hardest case is `s=a` at every
+step. Otherwise the outer child receives residue `s-a`, and any later exit through the outer branch
+is charged by Lemma 2.
+
+In the hard case, connected first-drop rows have `a=s=5` at minimum. Along the followed kernel
+branch:
+
+```text
+z_{i+1} = z_{L,i} = p_i + 5,
+z_i     = 2p_i + 5.
+```
+
+Thus:
+
+```text
+z_{i+1} = (z_i + 5)/2,
+z_i     = 2z_{i+1} - 5.
+```
+
+For `m` consecutive kernel-following first-drop rows:
+
+```text
+z_m = z_0/2^m + 5(1 - 2^-m),
+z_0 = 2^m z_m - 5(2^m - 1).
+```
+
+This is the reason the kernel branch cannot be controlled by scalar zero budgets alone. The scalar
+deepest event looks easier than all-paired compression for fixed `z_m`. The missing charge is the
+nested flag data: each step inserts a lower child layer with same-depth zero-budget gap at least:
+
+```text
+z_L - z_V = a >= 5.
+```
+
+The truncation proof must keep those inserted layers, or replace them with a theorem-grade
+ancestor-count bound that explicitly pays for the lost flag gaps.
+
+## Lemma 3: Cheap Paired-Spine Rank Traces Are Not Hard Theta Chains
+
+The optimistic shortened-kernel rank recurrence exposes a possible obstruction: a large shortened
+kernel can be cheap when a bottom root-line collision is lifted through paired spines. This does
+not by itself produce a consecutive hard `theta_2=-1` chain.
+
+A connected hard first-drop row requires:
+
+```text
+tau = 2,
+a = |A| >= 5,
+s >= a.
+```
+
+The minimal zero-budget case that can stack without outer residue is:
+
+```text
+s = a = 5.
+```
+
+Thus any rank-trace split with:
+
+```text
+s < 5
+```
+
+cannot be a connected `theta_2=-1` first-drop row at that level. Any split with:
+
+```text
+s > 5
+```
+
+can contain an `a=5` first-drop support only with explicit singleton residue:
+
+```text
+s-a >= s-5
+```
+
+which is passed to the outer child as additional zero budget by Lemma 1.
+
+The diagnostic trace for the dangerous near-dimension toy is:
+
+```text
+h=5: D=12,z=21,p=10,s=1,forced=0 -> child D=7,z=10
+h=4: D=7,z=10,p=1,s=8,forced=7 -> child D=4,z=8
+h=3: D=4,z=8,p=4,s=0 -> child D=2,z=4
+h=2: D=2,z=4,p=2,s=0 -> child D=1,z=2
+h=1: D=1,z=2,p=0,s=2 -> root-line collision
+```
+
+None of these steps has `s=5`. The first step has too few singleton coordinates to support a
+connected first-drop row. The second step has at least three singleton-residue zeros if an `a=5`
+theta row is forced into it. The remaining steps are all-paired or too small. Therefore this cheap
+rank trace is a paired-spine rank obstruction, not a proof of a self-feeding hard
+`theta_2=-1` chain.
+
+The proof still has to charge the paired-spine rank obstruction in the full recurrence. But the
+theta-chain truncation lemma can split cases:
+
+```text
+hard theta-compatible split: s=5, use nested-flag normal/rho margin;
+non-hard rank split: route to paired-spine rank state or charge residue s-5.
+```
+
+Moreover, the hard-compatible restriction changes the accounting. If a cheap rank trace is forced
+to use only:
+
+```text
+s = 5  hard theta-compatible singleton bursts,
+s = 0  all-paired compression,
+```
+
+then every `s=5` step is an actual first-drop row and must contribute its own local charge `q^-9`.
+For the near-dimension toy, the constrained trace has two such steps before paired compression:
+
+```text
+h=5: s=5 -> child D=7,z=11
+h=4: s=5 -> child D=4,z=8
+h=3: s=0 -> child D=2,z=4
+h=2: s=0 -> child D=1,z=2
+```
+
+Thus a truncation test that charges only one new `q^-9` row is too pessimistic for the
+hard-compatible trace. The correct hard-trace potential counts:
+
+```text
+9 * (# hard s=5 rank-trace steps)
+  + rho_terminal
+  - E_anc
+  - state constants.
+```
+
 ## Diagnostic Check
 
 The checkpoint script now reports the immediate child transition type for each best

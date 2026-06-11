@@ -1021,6 +1021,63 @@ mode may choose `forced<5`: that mode is a sufficient-construction envelope, whi
 kernel-following proof path uses the actual kernel child `L`, where all five singleton coordinates
 are zero by definition.
 
+### Strict Hard-Trace Normal-Slice Diagnostic
+
+The normal-slice checker now reports the theorem-target potential for this strict route. For each
+exposed shortened ambient edge `(D_i, B_i)` it runs the hard-compatible recurrence with:
+
+```text
+allowed singleton counts = {0,5},
+all five singletons forced into the kernel child,
+visible quotient loss = 2.
+```
+
+It then reports:
+
+```text
+strict_hard_potential = 9 * hard_steps + rho_terminal,
+strict_hard_margin    = strict_hard_potential - E_anc - split_const.
+```
+
+On the known near-dimension toy:
+
+```text
+child_k=32,
+dims=(4,3,2,1),
+zeros=(21,26,31),
+b=(1,1,1),
+E_anc=12.
+```
+
+the ordinary normal slice is unsafe and the loose rho rescue is also unsafe:
+
+```text
+normal margin = -3,
+loose rho margin = -2.
+```
+
+But the strict hard trace gives:
+
+```text
+hard_steps = 3,
+rho_terminal = 0,
+strict_hard_potential = 27,
+strict_hard_margin = 15.
+```
+
+For the observed local slices that originally motivated the truncation test, the same strict
+columns remain positive:
+
+```text
+child_k=8,  zeros=(21,26,31),    b=(4,4,4): strict_hard_margin = 15;
+child_k=16, zeros=(101,106,111), b=(4,4,4): strict_hard_margin = 15.
+```
+
+This is not yet the global certificate. It is the current invariant to globalize: every minimal
+hard segment should either map to this strict hard-compatible trace family, or exit through a
+non-hard boundary row that is charged by residue, larger support, or the joint marked-line
+recurrence.
+
 Current diagnostic status. The optimistic script:
 
 ```text

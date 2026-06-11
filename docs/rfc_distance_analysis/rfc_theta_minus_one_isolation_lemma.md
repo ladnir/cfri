@@ -489,6 +489,36 @@ nonnegative margin after summing:
 9H + rho_terminal - E_anc - log_q(state constants).
 ```
 
+The normal-slice checker now computes this strict hard-trace potential directly. On the hard
+near-dimension toy:
+
+```text
+child_k=32,
+dims=(4,3,2,1),
+zeros=(21,26,31),
+b=(1,1,1),
+E_anc=12,
+```
+
+the old diagnostics give:
+
+```text
+normal margin = -3,
+loose rho margin = -2.
+```
+
+The strict kernel-child trace gives:
+
+```text
+strict_hard_potential = 27,
+strict_hard_margin = 15.
+```
+
+Thus the counter-signal is now localized: loose paired-spine rank traces are unsafe, but the
+proof-relevant strict kernel-child hard trace has positive margin on the same slice. The next
+global task is to prove that every minimal hard segment is covered by this strict trace family, or
+that it exits through a non-hard boundary charged elsewhere.
+
 ### Constants Budget For The Toy Margin
 
 For the default target:

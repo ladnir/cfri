@@ -327,6 +327,14 @@ is now written: for a kernel-following minimal hard row, `dim K>=D-2`, `L=pi(K)`
 `P union S`, and `K<=L+L`, giving `D_child>=ceil((D-2)/2)` and `z_child=p+5`. The next proof step
 is to globalize this over all hard-segment states, or find a strict kernel-child-compatible trace
 with smaller `9H + rho_terminal - E_anc`.
+
+Update: `scripts/rfc_distance_analysis/rfc_theta_chain_normal_slice.py` now reports strict
+hard-trace columns using the conservative kernel-child recurrence above. On the known hard toy
+`child_k=32,dims=(4,3,2,1),zeros=(21,26,31),b=(1,1,1)`, the old loose-rho route still fails
+with margin `-2`, while the strict hard-trace route has margin `15`. The observed `child_k=8`
+and `child_k=16` local slices with `b=(4,4,4)` also report strict hard margin `15`. This upgrades
+the live blocker from "understand the toy" to "prove every minimal hard segment is covered by the
+strict trace, or exits through a separately charged non-hard boundary."
 ```
 
 ## Diagnostic Script

@@ -98,6 +98,17 @@ def rho_recurrence(depth: int, expansion: int) -> ShortenedRankRecurrence:
     return ShortenedRankRecurrence(depth=depth, expansion=expansion)
 
 
+@lru_cache(maxsize=None)
+def strict_hard_recurrence(depth: int, expansion: int) -> ShortenedRankRecurrence:
+    return ShortenedRankRecurrence(
+        depth=depth,
+        expansion=expansion,
+        allowed_singletons=(0, 5),
+        hard_force_all_singletons=True,
+        hard_visible_dim_loss=2,
+    )
+
+
 def optimistic_rho_costs(scenario: Scenario, edge_zeros: tuple[int, ...], short: tuple[int, ...]) -> tuple[int, ...]:
     depth = log2_exact_power(scenario.child_k)
     recurrence = rho_recurrence(depth, scenario.expansion)
@@ -110,6 +121,40 @@ def optimistic_rho_costs(scenario: Scenario, edge_zeros: tuple[int, ...], short:
     return tuple(costs)
 
 
+def strict_hard_trace_potentials(
+    scenario: Scenario,
+    edge_zeros: tuple[int, ...],
+    short: tuple[int, ...],
+) -> tuple[tuple[int, int, int], ...]:
+    """Return (rho_terminal, hard_steps, 9*hard_steps+rho_terminal) per edge.
+
+    This is the conservative theorem-target trace from
+    rfc_multilayer_flag_transition_theorem.md: internal singleton bursts are
+    restricted to s=5, all five singleton zeros propagate to the kernel child,
+    and the visible tau-two quotient is removed before halving.
+    """
+
+    depth = log2_exact_power(scenario.child_k)
+    recurrence = strict_hard_recurrence(depth, scenario.expansion)
+    out: list[tuple[int, int, int]] = []
+    for zero_count, short_dim in zip(edge_zeros, short):
+        if short_dim > scenario.child_k:
+            out.append((INF, 0, INF))
+            continue
+        rho = recurrence.cost(depth, short_dim, zero_count)
+        if rho >= INF:
+            out.append((INF, 0, INF))
+            continue
+        trace = recurrence.trace(depth, short_dim, zero_count)
+        hard_steps = sum(
+            1
+            for row in trace
+            if row.parent_depth > 1 and row.hard_theta_compatible
+        )
+        out.append((rho, hard_steps, 9 * hard_steps + rho))
+    return tuple(out)
+
+
 def evaluate(scenario: Scenario) -> dict[str, str]:
     edge_zeros = scenario.zeros[: len(scenario.dims) - 1]
     edge_b = scenario.b[: len(scenario.dims) - 1]
@@ -119,16 +164,23 @@ def evaluate(scenario: Scenario) -> dict[str, str]:
         defect_codim(scenario.child_k, z, d) for z, d in zip(edge_zeros, short)
     )
     rho_costs = optimistic_rho_costs(scenario, edge_zeros, short)
+    strict_hard_stats = strict_hard_trace_potentials(scenario, edge_zeros, short)
     max_defect_charge = max(defect_charges) if defect_charges else 0
     finite_rho = [cost for cost in rho_costs if cost < INF]
     max_rho_cost = max(finite_rho) if finite_rho else INF
+    finite_strict_hard = [potential for _, _, potential in strict_hard_stats if potential < INF]
+    max_strict_hard_potential = max(finite_strict_hard) if finite_strict_hard else INF
     lhs = e_anc + scenario.split_const
     margin = scenario.charge - lhs
     defect_margin = scenario.charge + max_defect_charge - lhs
     rho_margin = scenario.charge + max_rho_cost - lhs if max_rho_cost < INF else INF
+    strict_hard_margin = (
+        max_strict_hard_potential - lhs if max_strict_hard_potential < INF else INF
+    )
     safe = (not feasible) or margin >= 0
     defect_safe = safe or defect_margin >= 0
     rho_safe = safe or max_rho_cost >= INF or rho_margin >= 0
+    strict_hard_safe = safe or max_strict_hard_potential >= INF or strict_hard_margin >= 0
     return {
         "name": scenario.name,
         "child_k": str(scenario.child_k),
@@ -143,6 +195,20 @@ def evaluate(scenario: Scenario) -> dict[str, str]:
         "max_defect_charge_logq": str(max_defect_charge),
         "optimistic_rho_logq": ",".join("inf" if cost >= INF else str(cost) for cost in rho_costs),
         "max_optimistic_rho_logq": "inf" if max_rho_cost >= INF else str(max_rho_cost),
+        "strict_hard_rho_logq": ",".join(
+            "inf" if rho >= INF else str(rho) for rho, _, _ in strict_hard_stats
+        ),
+        "strict_hard_steps": ",".join(
+            "inf" if potential >= INF else str(steps)
+            for _, steps, potential in strict_hard_stats
+        ),
+        "strict_hard_potential_logq": ",".join(
+            "inf" if potential >= INF else str(potential)
+            for _, _, potential in strict_hard_stats
+        ),
+        "max_strict_hard_potential_logq": (
+            "inf" if max_strict_hard_potential >= INF else str(max_strict_hard_potential)
+        ),
         "split_const_logq": f"{scenario.split_const:.6g}",
         "charge_logq": str(scenario.charge),
         "margin_logq": "infeasible" if not feasible else f"{margin:.6g}",
@@ -153,6 +219,14 @@ def evaluate(scenario: Scenario) -> dict[str, str]:
             "infeasible" if not feasible else "inf" if rho_margin >= INF else f"{rho_margin:.6g}"
         ),
         "rho_routed_safe": "yes" if rho_safe else "no",
+        "strict_hard_margin_logq": (
+            "infeasible"
+            if not feasible
+            else "inf"
+            if strict_hard_margin >= INF
+            else f"{strict_hard_margin:.6g}"
+        ),
+        "strict_hard_safe": "yes" if strict_hard_safe else "no",
     }
 
 

@@ -32,7 +32,9 @@ that exposes low-visible-rank singleton blocks.
 
 ## State
 
-Use exact witness zero sets and subspace flags.
+Use exact witness zero sets and subspace/container flags. The point is to bound existence of a bad
+parent line, not to count every nonzero vector or every line inside a higher-dimensional bad
+container separately.
 
 For a child code at depth `h`, define:
 
@@ -255,6 +257,8 @@ Current deterministic diagnostics bracket the target:
 optimistic scalar replica recurrence:  crossing_z = 34
 span/subspace endpoint diagnostics:    crossing_z = 249
 two-layer flag checkpoint:             crossing_z = 137
+tau0 cover-lift checkpoint:            crossing_z = 135
+all cover-lift checkpoint:             crossing_z = 35
 ```
 
 Interpretation:
@@ -269,6 +273,12 @@ span/subspace:
 two-layer flag checkpoint:
   proof-shaped but still too loose; uses coarse child flag relaxations and not the finite exact
   recurrence for the reachable states.
+
+cover-lift checkpoints:
+  diagnostic only. Covering tau-zero/all-paired lifts barely helps, but covering all quotient lifts
+  moves the vector-count crossing to z=35. At z=34 the vector log moment is 27.64399707; subtracting
+  one q-factor for projective top-line counting gives -100.35600293. Thus a proof-safe
+  container/projectivization recurrence could plausibly seal z=34 with about 20 bits of slack.
 ```
 
 ## Next Concrete Implementation
@@ -276,11 +286,11 @@ two-layer flag checkpoint:
 Add a finite dynamic program for the depth-5 base seal that:
 
 ```text
-1. decomposes ordered pairs by span t=1 or t=2;
+1. decomposes top bad lines by child container span rather than ordered-vector multiplicity;
 2. transitions t=2 states through tau=0,1,2 exact-support branches;
-3. stores two-layer child flag states instead of replacing them by one-layer relaxations;
+3. stores two-layer child flag/container states instead of replacing them by one-layer relaxations;
 4. uses theorem exponents for tau=2, including theta_2(A) and the Grassmann cap;
-5. emits the dominant trace and slack for z=34.
+5. emits both vector-count and projective/container-count diagnostics for z=34.
 ```
 
 The first smoke target is:

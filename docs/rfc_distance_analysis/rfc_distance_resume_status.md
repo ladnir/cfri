@@ -390,8 +390,11 @@ high-defect theta-chain gap.
 Audit correction: the scalar rank-pattern induction theorem is too strong. The local
 `q^{-r|E|}` singleton charge fails on low-visible-rank blocks. Span-only and subspace-only
 diagnostics are much too pessimistic (`crossing_z=249`), while the existing two-layer flag
-checkpoint improves this to `crossing_z=137`. The finite base seal is still plausible, but only
-after implementing/proving the exact-support flag recurrence that charges:
+checkpoint improves this to `crossing_z=137`. A diagnostic cover-lift run gives
+`crossing_z=35`, and at `z=34` gives vector log2 moment `27.64399707`, which becomes
+`-100.35600293` after removing the top projective-line `q` multiplicity. The finite base seal is
+still plausible, but only after implementing/proving the exact-support container/flag recurrence
+that charges:
 
 ```text
 pi(K) <= pi(W),

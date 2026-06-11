@@ -16,6 +16,10 @@ The endpoint-tau2-layer-incidence mode is an experimental calibration for the qu
 lemma: after a child flag is chosen, tau-two local layers are measured in the quotient `V/L`
 rather than only in the full child code after outer zeros.  It also applies the exact-support
 Grassmann cap `local_charge >= |A|` from the incidence note.
+
+The cover-lift modes are diagnostics for existence-style container counting. They are not
+certificates. They test whether dominant pessimism is coming from counting every parent lift inside
+one child container, instead of counting the child container once.
 """
 
 from __future__ import annotations
@@ -253,6 +257,7 @@ def lift_flag_span_moment(
     singleton_charge_mode: str,
     flag_bound_mode: str,
     max_visible_tau: int,
+    cover_lift_mode: str,
     max_parent_span: int | None = None,
 ) -> tuple[dict[int, list[float]], dict[tuple[int, int], tuple[int, ...] | None]]:
     child_n = len(next(iter(child_by_span.values()))) - 1
@@ -398,6 +403,8 @@ def lift_flag_span_moment(
                                 charge_log = -charge * q_log2
                                 if visible_tau == 0:
                                     lift_log = parent_span * (2 * outer_span - parent_span) * q_log2
+                                    if cover_lift_mode in ("tau0", "all"):
+                                        lift_log = 0.0
                                     child_log = get_child_value(
                                         child_by_span,
                                         child_n,
@@ -412,6 +419,8 @@ def lift_flag_span_moment(
                                         visible_tau * (2 * outer_span - parent_span) * q_log2
                                     )
                                     lift_log = kernel_lift_log + quotient_lift_log
+                                    if cover_lift_mode == "all":
+                                        lift_log = 0.0
                                     child_log = flag_child_bound(
                                         child_by_span=child_by_span,
                                         child_k=child_k,
@@ -578,6 +587,15 @@ def main() -> None:
     )
     parser.add_argument("--max-visible-tau", type=int, default=2)
     parser.add_argument(
+        "--cover-lift-mode",
+        choices=["none", "tau0", "all"],
+        default="none",
+        help=(
+            "Diagnostic only: remove selected parent-lift multiplicities to test container-style "
+            "existence counting. Not a certificate mode."
+        ),
+    )
+    parser.add_argument(
         "--prune-to-final-span",
         type=int,
         default=0,
@@ -641,6 +659,7 @@ def main() -> None:
             args.singleton_charge,
             args.flag_bound,
             args.max_visible_tau,
+            args.cover_lift_mode,
             max_parent_span,
         )
         trace.append(choices)

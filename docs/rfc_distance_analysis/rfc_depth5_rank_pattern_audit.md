@@ -284,6 +284,48 @@ z_pi(K) = p + s.
 The remaining gap is therefore not the local root equation itself. It is the looseness of the
 current finite flag checkpoint, especially the child flag bound and shortened-ambient accounting.
 
+### Cover-Lift Diagnostic
+
+The flag checkpoint now has a diagnostic-only cover mode:
+
+```text
+--cover-lift-mode tau0|all
+```
+
+This tests whether the checkpoint is losing mostly by counting every parent lift inside one child
+container, rather than counting the child container once for an existence certificate.
+
+With only tau-zero lifts covered:
+
+```text
+crossing_z = 135
+crossing_excess = 103
+```
+
+so all-paired/invisible lift multiplicity is not the main source of the `z=137` pessimism.
+
+With all lift multiplicity removed:
+
+```text
+crossing_z = 35
+crossing_excess = 3
+log2 vector moment at z=34 = 27.64399707.
+```
+
+The final line/vector conversion accounts for one factor of `q`. If the top event is counted
+projectively, this diagnostic would read:
+
+```text
+log2 projective/container moment at z=34
+  approx 27.64399707 - 128
+  = -100.35600293.
+```
+
+That would seal `z=34` with about `20` bits of slack. This is not a theorem, because removing all
+lift multiplicity needs a proof-safe covering map from bad parent lines to child containers plus
+local quotient/root-line data. But it is a strong signal that the remaining base-seal work is a
+covering/projectivization lemma for quotient lifts, not a new local root-equation miracle.
+
 ## Next Work Items
 
 1. Implement a finite `r=2` exact-support recurrence for the `B_4(2,u)` states with local
@@ -292,4 +334,7 @@ current finite flag checkpoint, especially the child flag bound and shortened-am
    `rfc_tau2_weighted_exterior_bound.md`, not the scalar `q^{-2a}` charge.
 3. Track whether the dense boundary states `|A|=13,14,15` over quotient rank `7` or `8` are rescued
    by recursive kernel/marked-line charges.
-4. Only after that rerun the depth-5 seal and report a certified crossing.
+4. Prove a covering/projectivization lemma for quotient lifts: bad parent lines with the same
+   child container, visible quotient, and root-line profile should be counted once at the container
+   level whenever the whole fiber is bad, and with the actual local quotient incidence otherwise.
+5. Only after that rerun the depth-5 seal and report a certified crossing.

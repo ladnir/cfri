@@ -89,7 +89,7 @@ Audit update: it also cannot rely directly on the scalar `q^{-r|E|}` rank-patter
 scalar charge is false for low-visible-rank child blocks. The scalar run above remains the
 optimistic trace to beat, not a theorem.
 
-The corrected route is the finite exact-support flag recurrence targeted in:
+The corrected route is the finite exact-support container/flag recurrence targeted in:
 
 ```text
 docs/rfc_distance_analysis/rfc_depth5_rank_pattern_audit.md
@@ -112,7 +112,7 @@ B_5(1,34) <= 2^-80.
 ```
 
 The theorem should be independent of empirical sampling. The proof-safe path is to decompose the
-depth-4 `r=2` states by visible singleton dimension and recurse through the child flag:
+depth-4 `r=2` states by visible singleton dimension and recurse through the child container/flag:
 
 ```text
 pi(K) <= pi(W),
@@ -120,8 +120,9 @@ z_pi(W) = p+s-a,
 z_pi(K) = p+s.
 ```
 
-The scalar replica counts `r=1,2,4,8,16,32` still describe the unfolding, but low-span branches
-must be charged through this flag state rather than by a shape-free `q^{-r|E|}` local factor.
+The scalar replica counts `r=1,2,4,8,16,32` still describe the unfolding, but low-span and
+high-multiplicity quotient-lift branches must be charged through this container/flag state rather
+than by a shape-free `q^{-r|E|}` local factor or by counting every parent lift separately.
 
 The precise recurrence contract and calibration tables are now in:
 

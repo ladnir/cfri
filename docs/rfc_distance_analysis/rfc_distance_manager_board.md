@@ -47,11 +47,13 @@ Depth-5 base-seal update:
 optimistic scalar replica calibration: z=34, log2 moment -115.10
 span/subspace endpoint diagnostics:    z=249
 two-layer flag checkpoint:             z=137
+cover-lift all diagnostic:             z=35
+projective z=34 cover heuristic:       -100.36 bits
 ```
 
 The scalar `q^{-r|E|}` rank-pattern recurrence is retired as a theorem. It fails on
 low-visible-rank blocks before tuple-span/flag savings are exposed. The finite base seal remains
-plausible only as an exact-support flag recurrence.
+plausible only as an exact-support container/flag recurrence.
 
 ## Blocker Review
 
@@ -103,8 +105,9 @@ Live blockers:
    roots cost at most `q^-1 * q/(q-1)` each, so this construction constant is finite and
    binary-field compatible rather than a new q-dimensional loss.
 7. For the depth-5 base-seal route, replace the scalar rank-pattern recurrence by a finite
-   exact-support flag recurrence for the reachable `B_4(2,u)` states. The required child state is
-   `pi(K)<=pi(W)` with zero budgets `p+s-a` and `p+s`.
+   exact-support container/flag recurrence for the reachable `B_4(2,u)` states. The required child
+   state is `pi(K)<=pi(W)` with zero budgets `p+s-a` and `p+s`; the key new lemma is a
+   proof-safe covering/projectivization map for quotient lifts.
 ```
 
 Current honesty check:

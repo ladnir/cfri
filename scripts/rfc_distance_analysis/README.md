@@ -130,6 +130,12 @@ tau-two `theta_2=-1` rows through the outer/inner child graph.
 `rfc_multicopy_falsification.py` is adversarial. It estimates whether broad one-copy near-families
 can intersect across many independent RFC copies often enough to threaten the target excess.
 
+`rfc_replica_zero_moment.py` has two explanation helpers for the finite depth-5 base-seal route:
+use `--explain-z Z --top-terms K` to print the dominant one-step split terms along the best trace,
+and `--dump-level L --dump-start A --dump-stop B` to print aggregate moments at an intermediate
+level. These are deterministic recurrence diagnostics, still conditional on the rank-pattern
+local theorem.
+
 `rfc_visible_span_profile.py` precomputes the exact Gaussian-binomial number of local subspaces and
 skips subsets above `--max-subspaces`; this keeps sampled runs from accidentally turning into large
 enumerations.

@@ -80,6 +80,7 @@ rfc_kernel_branch_nested_flag_recurrence.md   minimal nested-flag recurrence for
 rfc_theta_minus_one_truncation_status.md      depth-6/7 chain diagnostics and truncation target
 rfc_high_defect_hard_segment_gap.md           current high-defect hard-segment gap and closure routes
 rfc_depth5_base_seal_candidate.md             finite k=32/e=2 base-seal candidate for the gap
+rfc_depth5_rank_pattern_contract.md           rank-pattern recurrence contract for B_5(1,34)
 scripts/rfc_distance_analysis/rfc_defect_conservation.py fixed-witness defect-conservation diagnostic
 scripts/rfc_distance_analysis/rfc_shortened_rank_recurrence.py optimistic shortened-kernel rank recurrence
 rfc_rank_pattern_induction_target.md          current finite-replica induction target

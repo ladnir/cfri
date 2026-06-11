@@ -373,6 +373,12 @@ The depth-5 rank-pattern calibration with `--singleton-charge replica` crosses e
 also `34`, a finite `B_5(1,34)<=2^-80` theorem would let the global recurrence stop before the
 high-defect theta-chain gap. This route depends on proving the rank-pattern induction theorem for
 replica counts `1,2,4,8,16,32`; the conservative component-uniform model does not close it.
+
+The explicit recurrence contract and top-term table are in:
+
+```text
+docs/rfc_distance_analysis/rfc_depth5_rank_pattern_contract.md
+```
 ```
 
 ## Diagnostic Script

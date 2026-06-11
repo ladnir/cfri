@@ -115,6 +115,12 @@ r = 1,2,4,8,16,32
 that occur while unfolding the depth-5 first moment, using the exact rank-one singleton algebra
 instead of the component-uniform shortcut.
 
+The precise recurrence contract and calibration tables are now in:
+
+```text
+docs/rfc_distance_analysis/rfc_depth5_rank_pattern_contract.md
+```
+
 ## Interaction With The High-Defect Gap
 
 The hard-segment stress row:

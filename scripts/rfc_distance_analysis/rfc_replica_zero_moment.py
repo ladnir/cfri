@@ -150,6 +150,73 @@ def lift_moment(
     return parent, choices
 
 
+def lift_terms_for_z(
+    child: list[float],
+    comb: list[list[float]],
+    q_log2: float,
+    q_exact: int | None,
+    replica_count: int,
+    singleton_charge: str,
+    child_k: int,
+    z: int,
+) -> list[tuple[float, int, int, int, int]]:
+    """Return one-step recurrence terms for a fixed parent zero count.
+
+    Rows are `(term_log2, p, s, c, u)` sorted descending by contribution.
+    This is a diagnostic/explanation helper; it mirrors `lift_moment`.
+    """
+
+    child_n = len(child) - 1
+    log_q_minus_1 = log2_q_minus(1, q_log2, q_exact)
+    log_q_minus_2 = log2_q_minus(2, q_log2, q_exact)
+    terms: list[tuple[float, int, int, int, int]] = []
+    for p in range(z // 2 + 1):
+        s = z - 2 * p
+        if p + s > child_n:
+            continue
+        orientation_log = float(s)
+        singleton_den_log = s * log_q_minus_1
+        max_c = min(s, child_n - p)
+        for c in range(max_c + 1):
+            u = p + c
+            if child[u] <= NEG_INF / 2:
+                continue
+            extras = s - c
+            if extras > child_n - u:
+                continue
+            if singleton_charge == "loose":
+                root_charge_log = -singleton_den_log + c * log_q_minus_2
+            elif singleton_charge == "replica":
+                root_charge_log = -(s - c) * replica_count * q_log2
+            elif singleton_charge == "component-uniform":
+                if replica_count <= 1:
+                    charge = extras
+                else:
+                    common_rank = min(u, child_k)
+                    quotient_rank = max(0, child_k - common_rank)
+                    if extras == 0:
+                        charge = 0
+                    elif quotient_rank == 0:
+                        charge = 0
+                    elif extras <= quotient_rank:
+                        charge = replica_count * extras
+                    else:
+                        charge = extras + replica_count * quotient_rank - 1
+                root_charge_log = -charge * q_log2
+            else:
+                raise ValueError(f"unknown singleton charge {singleton_charge}")
+            term = (
+                orientation_log
+                + root_charge_log
+                + comb[u][p]
+                + comb[child_n - u][extras]
+                + child[u]
+            )
+            terms.append((term, p, s, c, u))
+    terms.sort(reverse=True)
+    return terms
+
+
 def first_crossing(values: list[float], security_bits: float) -> int | None:
     target = -security_bits
     for z, log_value in enumerate(values):
@@ -167,6 +234,11 @@ def main() -> None:
     parser.add_argument("--security-bits", type=float, default=80.0)
     parser.add_argument("--print-window", type=int, default=5)
     parser.add_argument("--trace-z", type=int, default=-1)
+    parser.add_argument("--explain-z", type=int, default=-1)
+    parser.add_argument("--top-terms", type=int, default=8)
+    parser.add_argument("--dump-level", type=int, default=-1)
+    parser.add_argument("--dump-start", type=int, default=0)
+    parser.add_argument("--dump-stop", type=int, default=-1)
     parser.add_argument(
         "--singleton-charge",
         choices=["loose", "replica", "component-uniform"],
@@ -189,6 +261,7 @@ def main() -> None:
     comb = log2_comb_table(total_n)
     replica_count = 1 << args.depth
     values = initial_nonzero_moment(args.expansion, replica_count, args.q_log2)
+    values_by_level = [values]
     trace: list[list[tuple[int, int, int, int] | None]] = []
     print(
         "level,replica_count,k,n,min_log2,max_log2",
@@ -212,6 +285,7 @@ def main() -> None:
             args.singleton_charge,
             1 << (level - 1),
         )
+        values_by_level.append(values)
         trace.append(choices)
         replica_count = parent_replica_count
         finite = [v for v in values if v > NEG_INF / 2]
@@ -251,6 +325,49 @@ def main() -> None:
             p, s, c, u = choice
             print(f"{level},{z},{p},{s},{c},{u}")
             z = u
+    if args.explain_z >= 0:
+        if args.explain_z > total_n:
+            raise SystemExit("--explain-z is larger than n")
+        print("explain_level,z,rank,term_log2,gap_to_best,p,s,c,u")
+        z = args.explain_z
+        for level in range(args.depth, 0, -1):
+            child = values_by_level[level - 1]
+            replica = 1 << (args.depth - level)
+            child_k = 1 << (level - 1)
+            terms = lift_terms_for_z(
+                child,
+                comb,
+                args.q_log2,
+                q_exact,
+                replica,
+                args.singleton_charge,
+                child_k,
+                z,
+            )
+            if not terms:
+                print(f"{level},{z},,,,,,,,")
+                break
+            best = terms[0][0]
+            for rank, (term, p, s, c, u) in enumerate(terms[: args.top_terms], start=1):
+                print(f"{level},{z},{rank},{term:.8f},{best-term:.8f},{p},{s},{c},{u}")
+            z = terms[0][4]
+    if args.dump_level >= 0:
+        if args.dump_level > args.depth:
+            raise SystemExit("--dump-level must be between 0 and depth")
+        values_at_level = values_by_level[args.dump_level]
+        dump_stop = args.dump_stop if args.dump_stop >= 0 else len(values_at_level) - 1
+        dump_stop = min(dump_stop, len(values_at_level) - 1)
+        if args.dump_start < 0 or args.dump_start > dump_stop:
+            raise SystemExit("--dump-start/--dump-stop define an empty range")
+        replica_at_level = 1 << (args.depth - args.dump_level)
+        print("dump_level,replica_count,k,n,z,log2_moment")
+        for z in range(args.dump_start, dump_stop + 1):
+            value = values_at_level[z]
+            label = "-inf" if value <= NEG_INF / 2 else f"{value:.8f}"
+            print(
+                f"{args.dump_level},{replica_at_level},{1 << args.dump_level},"
+                f"{args.expansion * (1 << args.dump_level)},{z},{label}"
+            )
 
 
 if __name__ == "__main__":

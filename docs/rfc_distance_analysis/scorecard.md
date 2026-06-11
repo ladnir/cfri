@@ -44,7 +44,7 @@ Open items are excluded from the denominator.
 | Raw one-step defect conservation for floor row | 0 | 0 | 1 | 0% | Retired for this blocker | `rfc_defect_conservation.py --child-k 16 --parent-dim 14 --parent-zeros 34` gives worst slack `-210`; raw flag counting is too loose. |
 | High-kernel/local-incidence bonus | 0 | 0 | 0 | open | Next candidate | Need prove hard row carrying large shortened ambient pays more than uniform `q^-9`. |
 | Joint nested shortened-rank profile charge | 0 | 0 | 0 | open | Next candidate | May recover missing few dimensions by charging the whole nested profile, not max one edge. |
-| Finite `k<=32,e=2` base-case seal | 0 | 1 | 0 | 0% | Promising partial | Depth-5 replica calibration crosses at `z=34` with log2 moment `-115.10`; needs rank-pattern theorem, since component-uniform mode fails. |
+| Finite `k<=32,e=2` base-case seal | 0 | 1 | 0 | 0% | Promising partial | Depth-5 replica calibration crosses at `z=34` with log2 moment `-115.10`; recurrence contract is written; needs rank-pattern theorem, since component-uniform mode fails. |
 | Systematic all-level adaptation | 0 | 1 | 0 | 0% | Deferred | Construction/correctness seems plausible; active proof push is original non-systematic. |
 
 ## Active Frontier
@@ -92,6 +92,10 @@ Depth-5 base-seal candidate tested. The replica rank-pattern calibration gives
 `B_5(1,34)` log2 moment `-115.10435419`, exactly matching the production zero floor at
 `child_k=32`. The component-uniform shortcut fails badly, so this is a rank-pattern theorem route,
 not an old component-uniform route.
+
+Depth-5 rank-pattern contract written. The top-level mass at `z=34` is dominated by `c=0` splits;
+the first `c=1` term is more than `123` bits below the best. Remaining proof task is the
+multi-coordinate rank-pattern induction through depth five.
 
 Raw one-step defect conservation tested on the floor row and retired for this blocker:
 `child_k=16,parent_dim=14,parent_zeros=34` has worst slack `-210`, confirming that raw flag

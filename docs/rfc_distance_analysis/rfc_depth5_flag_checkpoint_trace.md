@@ -100,10 +100,29 @@ crossing_excess = 105.
 
 The dominant rows either have no kernel lift or are controlled by quotient incidence instead.
 
+## Shortened Child Flag Check
+
+The diagnostic:
+
+```text
+--flag-bound best-shortened
+```
+
+replaces the inner-first flag ambient by the ideal shortened dimension after the outer zero witness.
+It has no effect on the current depth-5 checkpoint:
+
+```text
+crossing_z = 137,
+crossing_excess = 105.
+```
+
+At `z=34`, the best trace is unchanged from `flag_bound=best`. Thus the missing proof strength is
+not a one-layer shortened-child ambient correction.
+
 ## Current Diagnosis
 
 The base-seal proof is not blocked by the local tau-two root equation alone, and it is not rescued
-by covering duplicate kernel lifts.
+by covering duplicate kernel lifts or by a one-layer shortened child flag ambient.
 
 The current checkpoint is loose because it still routes quotient-incidence chains through coarse
 one-layer child flag bounds. The next proof/implementation target is a finite exact-support

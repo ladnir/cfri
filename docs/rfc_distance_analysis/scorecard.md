@@ -46,6 +46,7 @@ Open items are excluded from the denominator.
 | All-lift cover shortcut | 0 | 0 | 1 | 0% | Retired as theorem | `--cover-lift-mode all` moves depth-5 checkpoint to `z=35`, but it drops tau-positive quotient-line/plane incidence and is anti-conservative. |
 | Quotient-incidence flag-lift recurrence | 0 | 2 | 0 | 0% | Keep as corrected candidate | Tau-zero duplicate-lift covering is safe; tau-positive branches must count quotient lines/planes via support-subcode/exterior incidence plus invisible-fiber dimensions. |
 | Kernel-lift-only cover | 0 | 0 | 1 | 0% | Not useful for current base seal | `--cover-kernel-lift` keeps quotient incidence and leaves depth-5 checkpoint at `z=137`; dominant rows are quotient-incidence, not kernel-lift, driven. |
+| One-layer shortened child flag ambient | 0 | 0 | 1 | 0% | Not useful for current base seal | Diagnostic `--flag-bound best-shortened` leaves the depth-5 checkpoint at `z=137` and the `z=34` trace unchanged. |
 | High-kernel/local-incidence bonus | 0 | 0 | 0 | open | Next candidate | Need prove hard row carrying large shortened ambient pays more than uniform `q^-9`. |
 | Joint nested shortened-rank profile charge | 0 | 0 | 0 | open | Next candidate | May recover missing few dimensions by charging the whole nested profile, not max one edge. |
 | Finite `k<=32,e=2` base-case seal | 0 | 2 | 0 | 0% | Promising but needs flag refinement | Depth-5 replica calibration crosses at `z=34` with log2 moment `-115.10`; scalar rank-pattern recurrence failed audit; two-layer flag checkpoint crosses at `z=137`, so the finite seal now needs a tighter exact-support flag recurrence. |
@@ -149,3 +150,7 @@ Corrected depth-5 checkpoint trace written in `rfc_depth5_flag_checkpoint_trace.
 covering leaves the `z=34` vector log moment at `2497.05`, and the best trace moves into tau-one
 quotient-incidence chains. Kernel-lift-only covering has no crossing effect (`z=137`). The next
 candidate must be a finite quotient-incidence DP, not a lift-cover shortcut.
+
+The ideal one-layer shortened-child flag diagnostic also has no effect: `--flag-bound
+best-shortened` leaves the crossing at `z=137` and the `z=34` best trace unchanged. This pushes
+against more scalar/one-edge ambient tweaks and toward a joint finite quotient-incidence state.

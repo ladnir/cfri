@@ -24,6 +24,10 @@ proof must add quotient-incidence counts back rather than simply zeroing the lif
 The kernel-lift cover diagnostic is narrower: it removes only the choice of `K <= L+L` after the
 inner child container `L` is fixed, while keeping quotient incidence. This is a proof target rather
 than a certificate.
+
+The best-shortened flag bound is also diagnostic. It replaces the ambient dimension in the
+inner-first flag count by the ideal shortened dimension after outer zeros. This tests whether a
+simple shortened-child correction helps the depth-5 checkpoint; it is not a theorem-grade RFC bound.
 """
 
 from __future__ import annotations
@@ -212,12 +216,26 @@ def flag_child_bound(
         return outer + inner
     if mode == "outer-only":
         return outer + inner_span * (outer_span - inner_span) * q_log2
-    if mode != "best":
+    if mode not in ("best", "best-shortened"):
         raise ValueError(f"unknown flag bound mode {mode!r}")
 
     outer_first = outer + inner_span * (outer_span - inner_span) * q_log2
     inner_first = inner + (outer_span - inner_span) * (child_k - outer_span) * q_log2
-    return min(outer_first, inner_first)
+    best = min(outer_first, inner_first)
+    if mode == "best-shortened":
+        # Diagnostic: after choosing L with the stronger zero witness, extend V inside the
+        # shortened ambient H(B_outer) rather than the full child message space.  This uses the
+        # ideal/MDS ambient dimension and is not a theorem-grade RFC bound.
+        shortened_dim = max(inner_span, child_k - outer_zeros)
+        if shortened_dim >= outer_span:
+            shortened_inner_first = (
+                inner
+                + (outer_span - inner_span)
+                * (shortened_dim - outer_span)
+                * q_log2
+            )
+            best = min(best, shortened_inner_first)
+    return best
 
 
 def marked_line_child_bound(
@@ -607,7 +625,7 @@ def main() -> None:
     )
     parser.add_argument(
         "--flag-bound",
-        choices=["best", "product", "outer-only"],
+        choices=["best", "best-shortened", "product", "outer-only"],
         default="best",
     )
     parser.add_argument("--max-visible-tau", type=int, default=2)

@@ -132,6 +132,9 @@ quotient-incidence/fiber theorem; zeroing those lifts is only a sensitivity test
 The narrower `--cover-kernel-lift` diagnostic removes only the `K<=L+L` kernel-lift factor while
 keeping quotient incidence. In the current depth-5 base checkpoint it leaves the crossing at
 `z=137`, so kernel-lift multiplicity is not the active source of looseness.
+The diagnostic-only `--flag-bound best-shortened` mode tests an ideal shortened ambient for the
+inner-first child flag count. It leaves the same depth-5 checkpoint crossing, so the missing bound is
+not recovered by this one-layer shortened-child correction.
 Use `--report-theta-chains -1` to summarize the longest consecutive best-transition chain of
 tau-two `theta_2=-1` rows through the outer/inner child graph.
 

@@ -769,7 +769,9 @@ Current ranked obstruction families:
    target scale, leaving about `1.01` q-dimensions inside the toy hard-trace margin. A padded
    atomic target `N^32 * (q+1)^2 * 3328^11` still leaves about `0.49`, but only if the canonical
    label alphabet is complete and the root/frame cost is globally at most two `q+1` factors.
-   Coarser duplicate-certificate grouped states can still break the margin;
+   Coarser duplicate-certificate grouped states can still break the margin. Current refinement:
+   the padded canonicalization lemma is now written; its remaining conditions are the stated
+   `rho_term` rank recurrence and at most two decomposable marked-line boundary interfaces;
 2. higher-drop local layers kappa >= g+2;
 3. mixed-fiber chain shapes where the intermediate layer persists across levels;
 4. mixed chain shapes tau=1->2 and tau=2->1 after the exact-support incidence cap is fixed;

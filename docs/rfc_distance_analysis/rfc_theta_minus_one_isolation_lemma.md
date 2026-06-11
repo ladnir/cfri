@@ -553,6 +553,102 @@ determinant-1/root-frame factors are globally bounded by two `q+1`-scale factors
 toy trace. If either point fails, the constants proof must refine the residual `N^32` pad downward
 by using the exact witness/support accounting more aggressively.
 
+### Padded Canonicalization Lemma
+
+For the default target `d=11`, after fixing the exact nested zero witnesses and atomic
+paired/singleton split profile, the minimal hard-trace contribution can be injected into:
+
+```text
+{residual polynomial labels}
+  x {0,1}^d
+  x {partitions of a five-set}^d
+  x {local finite buckets}^d
+  x {at most two frame lines}.
+```
+
+The corresponding count is bounded by:
+
+```text
+N^32 * (2 * 52 * 32)^11 * (q+1)^2.
+```
+
+Here the factors have the following proof meaning.
+
+```text
+residual polynomial labels:
+  order-preserving insertion/deletion labels alpha,beta;
+  choice of the canonical hard spine when several equal children are available;
+  trace endpoint, first/last active depth, and log-sum over shortened-rank terminal rows.
+
+{0,1}^d:
+  whether a level is a minimal hard singleton burst or all-paired compression.
+
+52^d:
+  a padded component/partition label for the five active singleton coordinates.
+
+32^d:
+  finite local constants: r_gen<=5 first-drop minor factor, determinant-1 nonzero-root
+  normalization, bounded Gaussian prefactors, and the finite choice between equivalent local
+  normal forms.
+
+(q+1)^2:
+  reserved for at most two decomposable marked-line/frame completions at entry/exit boundaries.
+```
+
+The injection is canonicalized as follows. Given an actual parent contribution, first discard all
+basis data and keep only the subspaces and exact supports. If several child insertions or equal
+dimension/zero-budget layers represent the same contribution, keep the lexicographically first
+order-preserving `alpha,beta` merge map. If several hard spines are compatible with the same
+nested flag, keep the first one by depth and child index. These tie-breaks are functions of the
+already fixed atomic profile and therefore introduce only the residual polynomial labels above;
+they do not create new q-dimensional events.
+
+For a minimal hard row, `A=S` and `|A|=5`, so there is no additional support label once the
+singleton witness set is fixed. Exact-support root compatibility for a tau-two visible plane fixes
+one affine root line per coordinate; by the determinant-`1` normalization this contributes only
+the finite `(q/(q-1))^5` factor already assigned to the local bucket. The local first-drop
+Schwartz-Zippel proof contributes the finite `r_gen<=5` factor and the q-dimensional charge
+`q^-9`; it does not require choosing a new projective frame.
+
+The marked-line factor `q+1` is not paid per hard row. It appears only for the decomposable
+`|A|=2,delta=2,comp=2` boundary row, where the second component line inside a fixed child
+two-plane is genuinely not determined by a marked child line. Therefore a minimal hard trace that
+does not pass through that boundary row has no `q+1` frame loss, and a grouped toy trace with at
+most two such boundary interfaces is covered by the explicit `(q+1)^2` reserve. Any recurrence
+profile with more decomposable boundary interfaces is not part of this minimal hard-trace state; it
+must be charged by the joint marked-line recurrence as a separate structural row.
+
+All q-dimensional linear choices left after this canonicalization are exactly the three terms in
+Lemma 4:
+
+```text
+9H          local first-drop charges,
+rho_term    terminal shortened-kernel rank event,
+E_anc       ancestor subspace choices.
+```
+
+Thus, for the hard-compatible near-dimension toy:
+
+```text
+9H + rho_term - E_anc = 7
+```
+
+and the padded constants above cost:
+
+```text
+6.50550654
+```
+
+q-dimensions at `N=16384,q=2^128`, leaving:
+
+```text
+0.49449346.
+```
+
+This closes the finite-label budget for the toy trace, conditional on the shortened-kernel rank
+recurrence supplying the stated `rho_term` and on the profile containing at most two decomposable
+marked-line boundary interfaces.
+
 ## Diagnostic Check
 
 The checkpoint script now reports the immediate child transition type for each best

@@ -266,6 +266,13 @@ canonical budget `N^32 * (q+1)^2 * 52^11` costs `5.98988154` q-dimensions, leavi
 The stronger padded atomic target `N^32 * (q+1)^2 * 3328^11` costs `6.50550654`, leaving
 `0.49449346`. The next proof must keep state labels canonical enough to stay within that budget
 or reduce the residual `N^32` pad by using exact witness/support accounting more aggressively.
+
+Update: `rfc_theta_minus_one_isolation_lemma.md` now contains the padded canonicalization lemma.
+It injects minimal hard-trace labels into
+`N^32 * (2*52*32)^11 * (q+1)^2` after exact witnesses/splits are fixed. The closure is conditional
+on the shortened-kernel recurrence giving the stated `rho_term` and on the profile having at most
+two decomposable marked-line boundary interfaces; extra decomposable interfaces must be routed to
+the joint marked-line recurrence separately.
 ```
 
 ## Diagnostic Script

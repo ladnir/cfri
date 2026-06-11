@@ -8,6 +8,7 @@ Useful entry points:
 ```text
 rfc_distance_manager_board.md                 current manager board and lane ownership
 rfc_distance_resume_status.md                 concise resume note for restarting the proof thread
+scorecard.md                                  success/failure scorecard for proof ideas
 rfc_fable_audit_2026_06_10.md                 external Fable audit and corrections
 claude_report.md                              follow-up external review of the resume status
 rfc_claude_report_response.md                 accepted/corrected actions from Claude report

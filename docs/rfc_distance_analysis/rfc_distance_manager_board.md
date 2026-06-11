@@ -773,7 +773,11 @@ Current ranked obstruction families:
    the padded canonicalization lemma is now written; its remaining conditions are the stated
    `rho_term` rank recurrence and at most two decomposable marked-line boundary interfaces per
    maximal hard segment. Extra decomposable interfaces deterministically cut the segment and are
-   charged by the joint marked-line recurrence;
+   charged by the joint marked-line recurrence. Important correction: the shortened-rank script is
+   a survivor envelope, not a standalone lower bound on `rho_h`; the remaining theorem obligation
+   is coverage of every minimal hard segment by a hard-compatible survivor trace whose `s=5` steps
+   pay local `q^-9` charges. The recorded toy trace has pre-constant margin `7`; next attack is to
+   prove no covered hard-compatible trace has smaller `9H + rho_terminal - E_anc`;
 2. higher-drop local layers kappa >= g+2;
 3. mixed-fiber chain shapes where the intermediate layer persists across levels;
 4. mixed chain shapes tau=1->2 and tau=2->1 after the exact-support incidence cap is fixed;

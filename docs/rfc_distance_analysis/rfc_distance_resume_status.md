@@ -279,6 +279,18 @@ minimal-hard segment can have one marked-line interface on entry and one on exit
 decomposable `a=2,delta=2,comp=2` row appears internally, the atomic labels force a cut and the
 row is charged by the joint marked-line state `(2,z_V),(1,z_V+1)`, not by the hard-segment
 constants budget.
+
+Rank-recurrence correction: `rfc_multilayer_flag_transition_theorem.md` now treats
+`rfc_shortened_rank_recurrence.py` as a survivor envelope, not as a standalone lower bound on
+`rho_h`. A child shortened-rank event can force a parent survivor, so the diagnostic gives cheap
+obstruction paths. The proof-safe target is a coverage lemma: every minimal hard-segment
+contribution admits a hard-compatible survivor trace, and every `s=5` survivor step in that trace
+pays its own local `q^-9` first-drop charge.
+
+The hard-compatible toy trace is recorded in the theorem note. It has two `s=5` steps, terminal
+survivor cost `1`, `E_anc=12`, and pre-constant margin `7`. The next proof step is to prove
+coverage by this trace family, or find a hard-compatible trace with smaller
+`9H + rho_terminal - E_anc`.
 ```
 
 ## Diagnostic Script

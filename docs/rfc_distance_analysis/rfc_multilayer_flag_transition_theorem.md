@@ -763,6 +763,129 @@ requirement is weaker and more concrete: the computed RFC rank cost `rho_h(D,z)`
 the local first-drop charges, must dominate the shortened-ancestor exponents on the finite set of
 exposed theta-chain slices.
 
+### Projection Rank Survivor Recurrence Target
+
+The shortened-rank recurrence used in the diagnostics is an adversarial survivor envelope, not by
+itself a lower bound on `rho_h`. This direction matters. Fix a parent witness:
+
+```text
+B = paired(P) union singleton(S),
+|P| = p,
+|S| = s.
+```
+
+Let:
+
+```text
+H_h(B) = {parent messages whose folded codeword vanishes on B}.
+```
+
+If:
+
+```text
+dim H_{h-1}(P union U) >= D_child,
+D_child >= ceil((D+s-u)/2),
+U subset S,
+u = |U|,
+```
+
+then the child event is sufficient to create a parent survivor of dimension at least `D`:
+
+```text
+dim H_h(B) >= D.
+```
+
+Reason. Paired coordinates force both child halves to vanish on `P`. Coordinates in `U` are also
+forced to vanish in the child, so the doubled child ambient has dimension at least
+`2D_child`. The remaining singleton equations in `S \ U` impose at most `s-u` linear constraints.
+Therefore the parent solution space has dimension at least:
+
+```text
+2D_child - (s-u) >= D.
+```
+
+Consequently, after fixing the atomic split and charging the finite choice of `U subset S`, the
+survivor envelope satisfies:
+
+```text
+rho_h(D, 2p+s)
+  <= min_{0 <= u <= s}
+       rho_{h-1}(ceil((D+s-u)/2), p+u),
+```
+
+up to finite subset/counting factors. This inequality is useful as a counter-signal: paired-spine
+survivors can make shortened-rank events much cheaper than the generic rank-tail formula.
+
+The proof-safe hard-segment target is stronger and different: every minimal hard segment must be
+covered by a canonical survivor trace of this form, and every `s=5` survivor step in that trace is
+also a minimal connected first-drop row, so it pays its own local `q^-9` charge. The segment is
+then bounded by:
+
+```text
+q^(-9H) * q^(-rho_terminal) * q^(E_anc) * state_constants,
+```
+
+where `rho_terminal` is the terminal cost at the bottom of the survivor trace. Thus the proof does
+not use the survivor recurrence as a standalone rank-probability lower bound; it uses it as a
+canonical decomposition of the bad contribution into local hard-row charges plus a terminal rank
+event.
+
+For a hard segment, the only internal singleton counts are:
+
+```text
+s = 0  all-paired compression,
+s = 5  minimal connected first-drop burst.
+```
+
+Thus the hard-compatible recurrence is the same projection recurrence with singleton counts
+restricted to `{0,5}`. Any step with `s<5`, `s>5`, or a decomposable `a=2` row is a segment
+boundary and is charged outside this hard recurrence.
+
+The remaining theorem obligation is the coverage statement:
+
+```text
+every minimal hard-segment parent contribution admits such a hard-compatible survivor trace.
+```
+
+The current script computes the cost of this survivor envelope and verifies that, for the dangerous
+toy, the local hard-row charges plus terminal survivor cost dominate the ancestor exponent after
+the padded constants are included.
+
+For the hard-compatible toy command:
+
+```text
+python scripts/rfc_distance_analysis/rfc_shortened_rank_recurrence.py \
+  --depth 5 \
+  --expansion 8 \
+  --dim 12 \
+  --zeros 21 \
+  --allowed-singletons 0,5 \
+  --ancestor-exponent 12 \
+  --trace
+```
+
+the survivor trace is:
+
+```text
+h=5 k=32 D=12 z=21 split p=8 s=5 forced=3 -> child D=7 z=11
+h=4 k=16 D=7  z=11 split p=3 s=5 forced=5 -> child D=4 z=8
+h=3 k=8  D=4  z=8  split p=4 s=0 forced=0 -> child D=2 z=4
+h=2 k=4  D=2  z=4  split p=2 s=0 forced=0 -> child D=1 z=2
+h=1 k=2  D=1  z=2  split p=0 s=2 forced=0 -> child D=0 z=0
+
+hard_steps = 2,
+rho_terminal = 1,
+E_anc = 12,
+hard_trace_margin = 7.
+```
+
+The proof target is therefore concrete: show that every minimal hard-segment contribution exposing
+the toy ancestor factor maps to a trace of this type, or to a trace with no smaller value of:
+
+```text
+9 * hard_steps + rho_terminal - E_anc.
+```
+
 Current diagnostic status. The optimistic script:
 
 ```text

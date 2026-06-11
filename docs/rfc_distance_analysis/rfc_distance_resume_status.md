@@ -335,6 +335,17 @@ with margin `-2`, while the strict hard-trace route has margin `15`. The observe
 and `child_k=16` local slices with `b=(4,4,4)` also report strict hard margin `15`. This upgrades
 the live blocker from "understand the toy" to "prove every minimal hard segment is covered by the
 strict trace, or exits through a separately charged non-hard boundary."
+
+Correction after charged-DP audit: the strict hard potential is now optimized directly with
+`hard_step_charge=9`, not added after a rho-minimizing trace is chosen. This preserved the `b=1`
+margin but exposed the next real issue. For the same toy family with `b=(b,b,b)`, strict-only
+margin is positive through `b=8`, zero at `b=9`, and negative from `b=10`; at `b=10` the margin is
+`36-39=-3`. Therefore the next proof split must be:
+
+```text
+low-defect hard segment -> strict hard-trace potential;
+high-defect shortened ambient -> extra rank-defect/incidence/high-kernel charge, or obstruction.
+```
 ```
 
 ## Diagnostic Script

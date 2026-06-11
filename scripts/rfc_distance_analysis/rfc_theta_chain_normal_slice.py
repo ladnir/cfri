@@ -106,6 +106,7 @@ def strict_hard_recurrence(depth: int, expansion: int) -> ShortenedRankRecurrenc
         allowed_singletons=(0, 5),
         hard_force_all_singletons=True,
         hard_visible_dim_loss=2,
+        hard_step_charge=9,
     )
 
 
@@ -141,8 +142,8 @@ def strict_hard_trace_potentials(
         if short_dim > scenario.child_k:
             out.append((INF, 0, INF))
             continue
-        rho = recurrence.cost(depth, short_dim, zero_count)
-        if rho >= INF:
+        potential = recurrence.cost(depth, short_dim, zero_count)
+        if potential >= INF:
             out.append((INF, 0, INF))
             continue
         trace = recurrence.trace(depth, short_dim, zero_count)
@@ -151,7 +152,8 @@ def strict_hard_trace_potentials(
             for row in trace
             if row.parent_depth > 1 and row.hard_theta_compatible
         )
-        out.append((rho, hard_steps, 9 * hard_steps + rho))
+        rho_terminal = potential - 9 * hard_steps
+        out.append((rho_terminal, hard_steps, potential))
     return tuple(out)
 
 

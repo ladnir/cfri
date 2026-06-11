@@ -68,16 +68,17 @@ traces mark this route with `dominant_h=-4` if it is selected.
 
 `rfc_theta_chain_normal_slice.py` also reports the conservative strict hard-trace potential used by
 the current theorem target. These columns use `rfc_shortened_rank_recurrence.py` internally with
-`allowed_singletons=(0,5)`, `hard_force_all_singletons=True`, and `hard_visible_dim_loss=2`, then
-report:
+`allowed_singletons=(0,5)`, `hard_force_all_singletons=True`, `hard_visible_dim_loss=2`, and
+`hard_step_charge=9`, then report the charged dynamic-programming optimum:
 
 ```text
 strict_hard_potential_logq = 9 * hard_steps + rho_terminal
 strict_hard_margin_logq    = strict_hard_potential_logq - E_anc - split_const
 ```
 
-The columns are deterministic theorem-exponent diagnostics; they do not consume empirical
-profiler counts.
+The columns are deterministic theorem-exponent diagnostics; they do not consume empirical profiler
+counts. The hard charge is optimized inside the dynamic program, so these columns are not the
+post-hoc charge of a trace chosen only to minimize terminal `rho`.
 
 `rfc_shortened_rank_recurrence.py` supports `--allowed-singletons 0,5` to restrict optimistic
 `rho_h(D,z)` traces to all-paired steps and hard theta-compatible singleton bursts. Use this when

@@ -80,12 +80,14 @@ class ShortenedRankRecurrence:
         allowed_singletons: tuple[int, ...] | None = None,
         hard_force_all_singletons: bool = False,
         hard_visible_dim_loss: int = 0,
+        hard_step_charge: int = 0,
     ) -> None:
         self.depth = depth
         self.expansion = expansion
         self.allowed_singletons = allowed_singletons
         self.hard_force_all_singletons = hard_force_all_singletons
         self.hard_visible_dim_loss = hard_visible_dim_loss
+        self.hard_step_charge = hard_step_charge
         self.costs: list[list[list[int]]] = []
         self.choices: list[list[list[Choice | None]]] = []
         self._build()
@@ -194,6 +196,8 @@ class ShortenedRankRecurrence:
                         cost = child_cost[child_dim][child_z]
                         if cost >= INF:
                             continue
+                        if singletons == 5:
+                            cost += self.hard_step_charge
                         if cost < best_cost:
                             gen = generic_rank_cost(parent_k, dim, z)
                             best_cost = cost
@@ -265,6 +269,8 @@ class ShortenedRankRecurrence:
             cost = self.costs[depth - 1][child_dim][child_z]
             if cost >= INF:
                 continue
+            if singletons == 5:
+                cost += self.hard_step_charge
             if best is None or cost < best.cost:
                 gen = generic_rank_cost(parent_k, dim, parent_z)
                 best = Choice(
@@ -311,6 +317,12 @@ def parse_args() -> argparse.Namespace:
         default=0,
         help="dimension loss subtracted before halving at hard s=5 forced-all rows",
     )
+    parser.add_argument(
+        "--hard-step-charge",
+        type=int,
+        default=0,
+        help="add this q-exponent charge to every recursive s=5 hard step in the dynamic program",
+    )
     parser.add_argument("--output-csv", type=Path)
     parser.add_argument("--trace", action="store_true")
     parser.add_argument(
@@ -334,6 +346,7 @@ def main() -> None:
         allowed_singletons=allowed_singletons,
         hard_force_all_singletons=args.hard_force_all_singletons,
         hard_visible_dim_loss=args.hard_visible_dim_loss,
+        hard_step_charge=args.hard_step_charge,
     )
     k = 1 << args.depth
     n = args.expansion * k
@@ -383,7 +396,7 @@ def main() -> None:
         if row.parent_depth > 1 and row.hard_theta_compatible
     )
     if args.ancestor_exponent is not None:
-        hard_margin = 9 * hard_steps + cost - args.ancestor_exponent
+        hard_margin = cost + (9 - args.hard_step_charge) * hard_steps - args.ancestor_exponent
         print(
             "hard_steps,ancestor_exponent,hard_trace_margin",
             file=sys.stderr,

@@ -782,8 +782,11 @@ Current ranked obstruction families:
    `dim K>=D-2`, `L zero on P union S`, and `K<=L+L`. The normal-slice checker now reports this
    strict hard-trace potential directly: the hard toy has loose-rho margin `-2` but strict hard
    margin `15`, and the observed child-k 8/16 slices with `b=4` also have strict hard margin `15`.
-   Next attack is to globalize the strict margin over all hard-segment states, or find a smaller
-   strict `9H + rho_terminal - E_anc`;
+   Charged-DP audit preserved the b=1 margin but found the strict-only boundary: for the toy
+   family with `b=(b,b,b)`, strict margin is positive through `b=8`, zero at `b=9`, and negative
+   from `b=10` (`36-39=-3`). Next attack is now a two-regime proof: low-defect hard segments use
+   strict trace potential; high-defect shortened ambients must expose extra rank-defect,
+   incidence, or high-kernel charge;
 2. higher-drop local layers kappa >= g+2;
 3. mixed-fiber chain shapes where the intermediate layer persists across levels;
 4. mixed chain shapes tau=1->2 and tau=2->1 after the exact-support incidence cap is fixed;

@@ -519,6 +519,24 @@ proof-relevant strict kernel-child hard trace has positive margin on the same sl
 global task is to prove that every minimal hard segment is covered by this strict trace family, or
 that it exits through a non-hard boundary charged elsewhere.
 
+Important correction: the strict hard potential must be optimized directly in the dynamic program,
+with a `q^-9` charge added to each recursive `s=5` hard step. It is not safe to minimize terminal
+`rho` first and add hard charges after the fact.
+
+A `b=0..16` sweep of the same toy family shows the strict-only regime has a real boundary. The
+strict hard margin is positive through `b=8`, zero at `b=9`, and negative from `b=10`. At `b=10`:
+
+```text
+short_dims=(21,16,11),
+E_anc=39,
+strict_hard_potential=36,
+strict_hard_margin=-3.
+```
+
+So the global proof cannot be "strict hard trace only". It must split low-defect segments from
+high-defect shortened ambients. The latter need an extra rank-defect, incidence, or high-kernel
+charge; otherwise they are the next genuine obstruction.
+
 ### Constants Budget For The Toy Margin
 
 For the default target:

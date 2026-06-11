@@ -1024,12 +1024,13 @@ are zero by definition.
 ### Strict Hard-Trace Normal-Slice Diagnostic
 
 The normal-slice checker now reports the theorem-target potential for this strict route. For each
-exposed shortened ambient edge `(D_i, B_i)` it runs the hard-compatible recurrence with:
+exposed shortened ambient edge `(D_i, B_i)` it runs the charged hard-compatible recurrence with:
 
 ```text
 allowed singleton counts = {0,5},
 all five singletons forced into the kernel child,
-visible quotient loss = 2.
+visible quotient loss = 2,
+hard step charge = 9.
 ```
 
 It then reports:
@@ -1038,6 +1039,9 @@ It then reports:
 strict_hard_potential = 9 * hard_steps + rho_terminal,
 strict_hard_margin    = strict_hard_potential - E_anc - split_const.
 ```
+
+The charge is optimized inside the dynamic program. It is not computed by first choosing a trace
+that minimizes only terminal `rho` and then adding `9H` afterward.
 
 On the known near-dimension toy:
 
@@ -1077,6 +1081,37 @@ This is not yet the global certificate. It is the current invariant to globalize
 hard segment should either map to this strict hard-compatible trace family, or exit through a
 non-hard boundary row that is charged by residue, larger support, or the joint marked-line
 recurrence.
+
+The same toy family also exposes the next blocker. Sweeping the defect parameter `b` in:
+
+```text
+child_k=32,
+dims=(4,3,2,1),
+zeros=(21,26,31),
+b=(b,b,b)
+```
+
+shows that strict hard-trace margin is positive through `b=8`, exactly zero at `b=9`, and negative
+from `b=10`. At `b=10`:
+
+```text
+short_dims=(21,16,11),
+E_anc=39,
+strict_hard_potential=36,
+strict_hard_margin=-3.
+```
+
+Thus the strict hard trace is not a standalone global domination theorem. The proof needs a
+two-regime split:
+
+```text
+low-defect hard segments:
+  dominated by strict hard-trace potential;
+
+high-defect shortened ambients:
+  must expose additional rank-defect, incidence, or high-kernel charge, or they are a genuine
+  obstruction.
+```
 
 Current diagnostic status. The optimistic script:
 

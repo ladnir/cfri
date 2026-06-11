@@ -1,0 +1,6 @@
+mode,prime,child_depth,child_k,child_n,expansion,checked_tuples,category,total,per_tuple_coordinate_rate
+exact,5,1,2,8,4,390624,rank0,4992,0.001597444089456869
+exact,5,1,2,8,4,390624,rank1_no_root,120000,0.03840009830425166
+exact,5,1,2,8,4,390624,rank1_one_root,240000,0.07680019660850332
+exact,5,1,2,8,4,390624,rank1_two_roots,360000,0.11520029491275498
+exact,5,1,2,8,4,390624,rank2,2400000,0.7680019660850331

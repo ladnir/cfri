@@ -130,7 +130,7 @@ The data supports:
 
 ```text
 original:
-  generic MDS, i.e. e = 0
+  fixed-subset generic-minor candidate, with sampled MDS unresolved
 
 systematic:
   depth 2: e = 1 exactly in large-prime check

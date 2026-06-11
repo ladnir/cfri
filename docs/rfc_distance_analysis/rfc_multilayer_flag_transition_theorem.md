@@ -828,8 +828,14 @@ non-hard paired-spine rank step:
   if s=0, it is all-paired compression and does not create a new theta row.
 ```
 
-This does not yet prove the full recurrence, but it localizes the live proof obligation to hard
-`s=5` rank traces rather than arbitrary near-dimension shortened-kernel events.
+More precisely, the atomic labels give `A subset S`, so `a<=s`; connected first-drop rows have
+`a>=5`. Thus `s=5` forces `a=5`, while `s>5,a>5` is a larger-support tau-two row rather than the
+minimal hard label. The larger-support case must be charged by its own local profile and flag gap
+`z_L-z_V=a`; it is not allowed to borrow the minimal `a=5` hard-trace accounting.
+
+This does not yet prove the full recurrence, but it localizes the live proof obligation to minimal
+hard `s=a=5` rank traces plus the separate larger-support/residue rows, rather than arbitrary
+near-dimension shortened-kernel events.
 
 For hard-compatible rank traces, the defect-routing potential should count hard trace steps, not
 only the newest visible row:

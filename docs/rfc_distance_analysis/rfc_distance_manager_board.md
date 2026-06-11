@@ -759,7 +759,9 @@ Current ranked obstruction families:
    so the live theorem can split hard theta-compatible rank traces from non-hard paired-spine
    residue/all-paired traces. New refinement: if the toy is constrained to hard/all-paired splits
    (`--allowed-singletons 0,5`), it has two hard `s=5` steps and margin `2*9+1-12=7`, so the
-   corrected potential should count one local charge per hard rank-trace step;
+   corrected potential should count one local charge per hard rank-trace step. State-label split:
+   `A subset S` and `a>=5`, so `s=5` forces the minimal hard label; larger `s,a` rows must be
+   charged as larger-support local profiles, not collapsed into the minimal hard case;
 2. higher-drop local layers kappa >= g+2;
 3. mixed-fiber chain shapes where the intermediate layer persists across levels;
 4. mixed chain shapes tau=1->2 and tau=2->1 after the exact-support incidence cap is fixed;

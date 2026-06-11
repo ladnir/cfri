@@ -247,6 +247,15 @@ After this turn, the hard-trace potential is stated as Lemma 4 in
 1. derive the hard/non-hard split from recurrence state labels, not from an imposed diagnostic flag;
 2. bound log_q(state constants) below the current toy margin 7, or refine the state count;
 3. prove non-hard paired-spine traces either leave the theta-chain analysis or pay explicit residue.
+
+New refinement: the state-label split is deterministic because `A subset S`, so `a<=s`, while a
+connected `theta_2=-1` first-drop row has `a>=5`. Hence `s=5` forces the minimal hard label
+`a=s=5`; `s<5` is impossible for such a row; `s>5,a=5` has outer residue; and `s>5,a>5` is a
+larger-support local row that must be charged separately.
+
+Constants budget at the target scale: `log_q N = 14/128`. The toy margin `7` can absorb up to
+roughly `N^64` worth of fixed polynomial state count, minus any explicit `q+1` frame factors. The
+next proof must keep state labels canonical enough to stay within that budget.
 ```
 
 ## Diagnostic Script

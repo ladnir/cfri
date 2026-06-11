@@ -269,6 +269,59 @@ hard theta-compatible split: s=5, use nested-flag normal/rho margin;
 non-hard rank split: route to paired-spine rank state or charge residue s-5.
 ```
 
+### State-Label Split Lemma
+
+The hard/non-hard split is determined by the atomic recurrence labels, not by a diagnostic choice.
+For an active singleton row, the profile includes:
+
+```text
+S = singleton zero coordinates,
+A subset S = exact visible support,
+s = |S|,
+a = |A|.
+```
+
+For a connected `theta_2=-1` first-drop row:
+
+```text
+a >= 5.
+```
+
+Therefore:
+
+```text
+s < 5:
+  impossible for a connected theta_2=-1 row, since a <= s;
+
+s = 5:
+  any connected theta_2=-1 row has a = s = 5.
+  This is the minimal hard label and has no outer residue;
+
+s > 5, a = 5:
+  the row is a minimal-support first-drop row with explicit residue s-a = s-5
+  on the outer child;
+
+s > 5, a > 5:
+  the row is not the minimal hard label.
+  It is a larger-support tau-two row and must be charged by its own local profile
+  and the larger flag gap z_L-z_V=a.
+```
+
+Proof. The inclusion `A subset S` gives `a <= s`. The connected first-drop local theorem gives
+`a >= 5`. The four cases above exhaust the possible values of `s` and `a`. The residue statement
+is Lemma 1:
+
+```text
+z_V = p+s-a,
+z_L = p+s,
+z_L-z_V = a.
+```
+
+Only the case `s=a=5` is allowed to enter the minimal hard-trace potential with charge exactly
+`9` per hard step. The larger-support case may be better, but it is a different local row; the
+certificate must use its actual local charge/state count rather than silently treating it as the
+minimal hard label.
+
 Moreover, the hard-compatible restriction changes the accounting. If a cheap rank trace is forced
 to use only:
 
@@ -355,6 +408,32 @@ This does not finish the proof because `log_q(state constants)` still has to be 
 hard-trace restriction must be derived from the actual recurrence state, not imposed by the
 diagnostic. It does show the corrected accounting that makes the paired-spine toy compatible with
 the theta-chain truncation route.
+
+### Constants Budget For The Toy Margin
+
+For the default target:
+
+```text
+N = 16384,
+q = 2^128,
+log_q N = 14/128 = 0.109375.
+```
+
+Thus polynomial state counts have the following q-dimensional costs:
+
+```text
+N^8  -> 0.875
+N^16 -> 1.75
+N^32 -> 3.5
+N^48 -> 5.25
+N^64 -> 7.0
+```
+
+The near-dimension toy hard-trace margin before constants is `7`, so this route can absorb a
+substantial fixed polynomial state count, but not an untracked exponential-in-depth family. Explicit
+frame factors of size `q+1` should be counted as about one q-dimension each. This is why the proof
+must keep the hard-trace state labels finite and canonical: duplicate certificates cannot be
+allowed to grow into a hidden `N^Omega(d)` or `q^Omega(1)` loss.
 
 ## Diagnostic Check
 

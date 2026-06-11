@@ -173,6 +173,116 @@ but does not include the full Gaussian parent-lift multiplicity.
 For a final projective distance event, the top line is counted projectively. If an auxiliary script
 prints nonzero-vector moments, subtract one factor of `q` before comparing to `2^-lambda`.
 
+## Safe Subcases
+
+### Tau Zero
+
+If:
+
+```text
+tau = 0,
+A = empty,
+K = W,
+```
+
+then the singleton block is completely invisible. The only child datum is:
+
+```text
+V = pi(W),
+V zero on P union S.
+```
+
+Every parent subspace `W` inside `V+V` has the requested paired and singleton zeros, because both
+child projections are zero on every requested child coordinate. Therefore for an existence bound:
+
+```text
+count V once,
+do not multiply by # { W <= V+V }.
+```
+
+The only finite data left are the split choices and the child container event `F_{h-1}((dim V,
+p+s))`. This proves tau-zero lift covering as a direct container argument.
+
+### Tau One
+
+Assume:
+
+```text
+tau = 1,
+K = ker(W -> R),
+dim R = 1.
+```
+
+Fix the child flag:
+
+```text
+L = pi(K) <= V = pi(W),
+```
+
+and fix the visible quotient datum:
+
+```text
+R <= (V+V)/(L+L)
+```
+
+with exact support `A` and root-line assignment `ell_A`.
+
+The child zero budgets are:
+
+```text
+V zero on P union (S \ A),
+L zero on P union S.
+```
+
+For every parent lift in this fiber:
+
+```text
+kernel directions vanish on all S through L,
+visible quotient directions vanish on S \ A through V,
+visible quotient directions vanish on A by the fixed root line ell_A.
+```
+
+Thus all parent lifts in the fiber are bad for the same witness. An existence bound may count the
+container tuple:
+
+```text
+(L <= V, R, ell_A)
+```
+
+once, rather than multiplying by the Gaussian number of extensions `K <= W`.
+
+The tau-one local count is therefore:
+
+```text
+root factor q^-a
+times the number of exact-support visible lines R in the represented quotient.
+```
+
+This is exactly the support-subcode line count from `delta(A)`, with finite projective constants.
+
+### Tau Two
+
+The same covering philosophy should apply to tau two, but this is the live proof obligation rather
+than a closed subcase. The local datum must include:
+
+```text
+R <= (V+V)/(L+L),
+dim R = 2,
+exact support A,
+root-line layer X_h(A),
+```
+
+and for the decomposable `a=2,delta=2,comp=2` row it must include the joint marked-line/frame child
+state. The tau-two branch is where a proof can accidentally reintroduce either:
+
+```text
+1. a product of child moments over shared randomness, or
+2. a Gaussian quotient-lift factor that the container map was supposed to remove.
+```
+
+Closing tau two means proving the weighted exterior/root-line count is the right count of
+quotient data `R`, not an additional multiplier on top of all ambient lifts.
+
 ## Proof Obligations
 
 1. Canonical covering: every bad parent line with a fixed exact zero witness maps to at least one

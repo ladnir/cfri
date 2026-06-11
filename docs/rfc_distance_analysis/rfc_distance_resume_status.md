@@ -131,7 +131,8 @@ docs/rfc_distance_analysis/rfc_depth5_finite_flag_recurrence_target.md
 docs/rfc_distance_analysis/rfc_covering_flag_lift_lemma.md
   Status: theorem target.
   States the covering/projectivization lemma suggested by the cover-lift diagnostics. This is now
-  the key proof step for making the depth-5 base seal theorem-grade.
+  the key proof step for making the depth-5 base seal theorem-grade. Tau-zero and tau-one covering
+  are written as direct container arguments; tau-two quotient incidence remains open.
 ```
 
 The external Fable audit was useful and found the product-of-first-moments bug. Its record is:

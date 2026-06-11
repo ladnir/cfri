@@ -238,14 +238,29 @@ python scripts/rfc_distance_analysis/rfc_shortened_rank_recurrence.py \
 ```
 
 still gives `rho<=1`, but the trace has two `s=5` hard steps before all-paired compression. The
-correct hard-trace margin is therefore:
+loose survivor-envelope hard-trace margin is therefore:
 
 ```text
 2*9 + 1 - 12 = 7,
 ```
 
-not the one-charge margin `9+1-12=-2`. This is the current promising route to close the toy while
-still honestly rejecting the generic-rank shortcut.
+not the one-charge margin `9+1-12=-2`. This remains a conservative stress budget. The stricter
+kernel-child propagation mode:
+
+```text
+python scripts/rfc_distance_analysis/rfc_shortened_rank_recurrence.py \
+  --depth 5 --expansion 8 --dim 12 --zeros 21 \
+  --allowed-singletons 0,5 --hard-force-all-singletons --ancestor-exponent 12 --trace
+```
+
+forces all five singleton zeros at each hard step and gives:
+
+```text
+4*9 + 5 - 12 = 29.
+```
+
+This is the proof-relevant toy margin if the coverage lemma can derive strict kernel-child
+propagation from the minimal hard recurrence state.
 
 After this turn, the hard-trace potential is stated as Lemma 4 in
 `rfc_theta_minus_one_isolation_lemma.md`. The remaining proof-grade obligations are:
@@ -287,10 +302,11 @@ obstruction paths. The proof-safe target is a coverage lemma: every minimal hard
 contribution admits a hard-compatible survivor trace, and every `s=5` survivor step in that trace
 pays its own local `q^-9` first-drop charge.
 
-The hard-compatible toy trace is recorded in the theorem note. It has two `s=5` steps, terminal
-survivor cost `1`, `E_anc=12`, and pre-constant margin `7`. The next proof step is to prove
-coverage by this trace family, or find a hard-compatible trace with smaller
-`9H + rho_terminal - E_anc`.
+Both toy traces are recorded in the theorem note. The loose survivor trace has two `s=5` steps,
+terminal survivor cost `1`, `E_anc=12`, and pre-constant margin `7`. The strict
+kernel-child trace has four `s=5` steps, terminal survivor cost `5`, `E_anc=12`, and margin `29`.
+The next proof step is to prove coverage by the strict trace family, or find a strict
+kernel-child-compatible trace with smaller `9H + rho_terminal - E_anc`.
 ```
 
 ## Diagnostic Script

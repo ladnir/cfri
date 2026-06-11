@@ -20,6 +20,10 @@ This gives an optimistic cost for bad shortened kernels.  If this cheap model
 still gives enough charge for a theta-chain defect slice, the real proof has
 room.  If it does not, the proof must use sharper local root-rank costs or
 accept a genuine loss.
+
+The --hard-force-all-singletons option is stricter and proof-oriented for
+kernel-following minimal hard rows: when s=5 it requires all five singleton
+coordinates to propagate into the child rank event, matching z_L=p+s.
 """
 
 from __future__ import annotations
@@ -72,16 +76,23 @@ class ShortenedRankRecurrence:
         depth: int,
         expansion: int,
         allowed_singletons: tuple[int, ...] | None = None,
+        hard_force_all_singletons: bool = False,
     ) -> None:
         self.depth = depth
         self.expansion = expansion
         self.allowed_singletons = allowed_singletons
+        self.hard_force_all_singletons = hard_force_all_singletons
         self.costs: list[list[list[int]]] = []
         self.choices: list[list[list[Choice | None]]] = []
         self._build()
 
     def _split_allowed(self, singletons: int) -> bool:
         return self.allowed_singletons is None or singletons in self.allowed_singletons
+
+    def _forced_values(self, singletons: int) -> range:
+        if self.hard_force_all_singletons and singletons == 5:
+            return range(5, 6)
+        return range(singletons + 1)
 
     def _build(self) -> None:
         # Base depth 0: repetition code of dimension 1.  With no zero requests,
@@ -162,7 +173,7 @@ class ShortenedRankRecurrence:
                         continue
                     if paired + singletons > child_n:
                         continue
-                    for forced in range(singletons + 1):
+                    for forced in self._forced_values(singletons):
                         child_z = paired + forced
                         child_dim = ceil_div(dim + singletons - forced, 2)
                         if child_dim > child_k:
@@ -231,7 +242,7 @@ class ShortenedRankRecurrence:
         if paired + singletons > child_n:
             return None
         best: Choice | None = None
-        for forced in range(singletons + 1):
+        for forced in self._forced_values(singletons):
             if not self._split_allowed(singletons):
                 return None
             child_z = paired + forced
@@ -276,6 +287,11 @@ def parse_args() -> argparse.Namespace:
         "--allowed-singletons",
         help="comma-separated singleton counts allowed in recursive rho splits, e.g. 0,5",
     )
+    parser.add_argument(
+        "--hard-force-all-singletons",
+        action="store_true",
+        help="when a recursive split has s=5, require all five singleton child zeros to be forced",
+    )
     parser.add_argument("--output-csv", type=Path)
     parser.add_argument("--trace", action="store_true")
     parser.add_argument(
@@ -297,6 +313,7 @@ def main() -> None:
         depth=args.depth,
         expansion=args.expansion,
         allowed_singletons=allowed_singletons,
+        hard_force_all_singletons=args.hard_force_all_singletons,
     )
     k = 1 << args.depth
     n = args.expansion * k

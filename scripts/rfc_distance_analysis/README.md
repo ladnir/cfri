@@ -71,6 +71,10 @@ traces mark this route with `dominant_h=-4` if it is selected.
 checking whether a cheap paired-spine rank trace should also pay one `q^-9` first-drop charge per
 hard `s=5` step. Add `--ancestor-exponent E` to print the hard-trace margin
 `9*hard_steps + rho - E`.
+For kernel-following minimal hard rows, add `--hard-force-all-singletons`; this requires an `s=5`
+hard step to propagate all five singleton zeros into the child rank event, matching the
+`z_L=p+s` hard-row zero propagation rather than the looser survivor-envelope minimum over forced
+singletons.
 
 `rfc_state_constant_budget.py` is deterministic bookkeeping, not a profiler. It converts canonical
 state-count models such as `N^32 * (q+1)^2 * 52^11` into q-dimensional overhead so the hard-trace

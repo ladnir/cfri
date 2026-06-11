@@ -847,9 +847,10 @@ The remaining theorem obligation is the coverage statement:
 every minimal hard-segment parent contribution admits such a hard-compatible survivor trace.
 ```
 
-The current script computes the cost of this survivor envelope and verifies that, for the dangerous
-toy, the local hard-row charges plus terminal survivor cost dominate the ancestor exponent after
-the padded constants are included.
+The current script computes the cost of this survivor envelope. The loose survivor mode is useful
+for finding counter-signals, but the proof-relevant kernel-following hard row must use the
+stricter `z_L=p+s` propagation: when `s=5`, all five singleton zeros are inserted into the child
+rank event. This is the `--hard-force-all-singletons` mode.
 
 For the hard-compatible toy command:
 
@@ -879,8 +880,42 @@ E_anc = 12,
 hard_trace_margin = 7.
 ```
 
-The proof target is therefore concrete: show that every minimal hard-segment contribution exposing
-the toy ancestor factor maps to a trace of this type, or to a trace with no smaller value of:
+This trace is the loose survivor counter-signal. It is not the final coverage route because the
+first hard step uses `forced=3`, while a kernel-following minimal hard row propagates all five
+singleton zeros to the kernel child.
+
+For the strict kernel-child hard-row command:
+
+```text
+python scripts/rfc_distance_analysis/rfc_shortened_rank_recurrence.py \
+  --depth 5 \
+  --expansion 8 \
+  --dim 12 \
+  --zeros 21 \
+  --allowed-singletons 0,5 \
+  --hard-force-all-singletons \
+  --ancestor-exponent 12 \
+  --trace
+```
+
+the survivor trace is:
+
+```text
+h=5 k=32 D=12 z=21 split p=8 s=5 forced=5 -> child D=6 z=13
+h=4 k=16 D=6  z=13 split p=4 s=5 forced=5 -> child D=3 z=9
+h=3 k=8  D=3  z=9  split p=2 s=5 forced=5 -> child D=2 z=7
+h=2 k=4  D=2  z=7  split p=1 s=5 forced=5 -> child D=1 z=6
+h=1 k=2  D=1  z=6  terminal depth-one survivor cost = 5
+
+hard_steps = 4,
+rho_terminal = 5,
+E_anc = 12,
+hard_trace_margin = 29.
+```
+
+The proof target is therefore stronger and more concrete: show that every kernel-following
+minimal hard-segment contribution exposing the toy ancestor factor maps to the strict trace family
+above, or to a trace with no smaller value of:
 
 ```text
 9 * hard_steps + rho_terminal - E_anc.

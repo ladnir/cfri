@@ -404,10 +404,34 @@ E_anc = 12,
 hard_trace_margin = 7.
 ```
 
-This does not finish the proof because `log_q(state constants)` still has to be bounded and the
-hard-trace restriction must be derived from the actual recurrence state, not imposed by the
-diagnostic. It does show the corrected accounting that makes the paired-spine toy compatible with
-the theta-chain truncation route.
+This is the loose survivor-envelope diagnostic. It does not finish the proof because `forced`
+singletons are optimized freely. For the proof-relevant kernel-following hard row, all five
+singleton zeros propagate to the kernel child:
+
+```text
+python scripts/rfc_distance_analysis/rfc_shortened_rank_recurrence.py \
+  --depth 5 \
+  --expansion 8 \
+  --dim 12 \
+  --zeros 21 \
+  --allowed-singletons 0,5 \
+  --hard-force-all-singletons \
+  --ancestor-exponent 12 \
+  --trace
+```
+
+which gives:
+
+```text
+hard_steps = 4,
+rho_term = 5,
+E_anc = 12,
+hard_trace_margin = 29.
+```
+
+Thus the strict kernel-child version has much more room than the loose survivor envelope. The
+remaining proof obligation is to derive the strict hard-trace restriction from the actual
+kernel-following recurrence state.
 
 ### Constants Budget For The Toy Margin
 
@@ -429,11 +453,12 @@ N^48 -> 5.25
 N^64 -> 7.0
 ```
 
-The near-dimension toy hard-trace margin before constants is `7`, so this route can absorb a
-substantial fixed polynomial state count, but not an untracked exponential-in-depth family. Explicit
-frame factors of size `q+1` should be counted as about one q-dimension each. This is why the proof
-must keep the hard-trace state labels finite and canonical: duplicate certificates cannot be
-allowed to grow into a hidden `N^Omega(d)` or `q^Omega(1)` loss.
+The loose near-dimension toy hard-trace margin before constants is `7`; the strict kernel-child
+version has margin `29`. The conservative constants work below keeps using the smaller loose margin
+as a stress budget, so any closure under margin `7` also fits the strict proof-relevant trace.
+Explicit frame factors of size `q+1` should be counted as about one q-dimension each. This is why
+the proof must keep the hard-trace state labels finite and canonical: duplicate certificates cannot
+be allowed to grow into a hidden `N^Omega(d)` or `q^Omega(1)` loss.
 
 ### Canonical-State Constants Lemma
 

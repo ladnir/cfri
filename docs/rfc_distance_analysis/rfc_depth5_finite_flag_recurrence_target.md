@@ -288,13 +288,11 @@ two-layer flag checkpoint:
   recurrence for the reachable states.
 
 cover-lift checkpoints:
-  diagnostic only. Covering tau-zero/all-paired lifts barely helps, but covering all quotient lifts
-  moves the vector-count crossing to z=35. At z=34 the vector log moment is 27.64399707; subtracting
-  one q-factor for projective top-line counting gives -100.35600293. Thus a proof-safe
-  container/projectivization recurrence could plausibly seal z=34 with about 20 bits of slack.
-  The mixed-mode table says this cannot be just a tau-two patch; it needs a covering principle
-  that spans tau-zero, tau-one, and tau-two lift fibers. The lemma target is
-  `rfc_covering_flag_lift_lemma.md`.
+  diagnostic only. Covering tau-zero/all-paired lifts barely helps, but zeroing all quotient lifts
+  moves the vector-count crossing to z=35. That all-cover mode is anti-conservative as a theorem:
+  for tau>0, quotient lines/planes are themselves event data and must be counted through quotient
+  incidence or invisible-fiber terms. The mixed-mode table is still useful because it shows where
+  multiplicity is concentrated. The corrected lemma target is `rfc_covering_flag_lift_lemma.md`.
 ```
 
 ## Next Concrete Implementation
@@ -305,7 +303,8 @@ Add a finite dynamic program for the depth-5 base seal that:
 1. decomposes top bad lines by child container span rather than ordered-vector multiplicity;
 2. transitions t=2 states through tau=0,1,2 exact-support branches;
 3. stores two-layer child flag/container states instead of replacing them by one-layer relaxations;
-4. uses theorem exponents for tau=2, including theta_2(A) and the Grassmann cap;
+4. uses quotient-incidence exponents for tau>0, including invisible-fiber dimension,
+   theta_2(A), and the Grassmann cap;
 5. emits both vector-count and projective/container-count diagnostics for z=34.
 ```
 

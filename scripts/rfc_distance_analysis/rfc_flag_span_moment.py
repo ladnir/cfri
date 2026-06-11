@@ -17,9 +17,9 @@ lemma: after a child flag is chosen, tau-two local layers are measured in the qu
 rather than only in the full child code after outer zeros.  It also applies the exact-support
 Grassmann cap `local_charge >= |A|` from the incidence note.
 
-The cover-lift modes are diagnostics for existence-style container counting. They are not
-certificates. They test whether dominant pessimism is coming from counting every parent lift inside
-one child container, instead of counting the child container once.
+The cover-lift modes are anti-conservative diagnostics for existence-style container counting. They
+are not certificates. They test where quotient/lift multiplicity is concentrated; for tau>0, a
+proof must add quotient-incidence counts back rather than simply zeroing the lift factor.
 """
 
 from __future__ import annotations
@@ -663,6 +663,12 @@ def main() -> None:
     if total_n > args.max_n and not args.allow_large:
         raise SystemExit(
             f"refusing total length {total_n}; pass --allow-large or raise --max-n"
+        )
+    if args.cover_lift_mode != "none":
+        print(
+            "warning: --cover-lift-mode is anti-conservative and diagnostic only; "
+            "tau>0 modes omit quotient-incidence multiplicity",
+            flush=True,
         )
 
     comb = log2_comb_table(total_n)

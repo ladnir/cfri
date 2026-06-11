@@ -131,8 +131,10 @@ docs/rfc_distance_analysis/rfc_depth5_finite_flag_recurrence_target.md
 docs/rfc_distance_analysis/rfc_covering_flag_lift_lemma.md
   Status: theorem target.
   States the covering/projectivization lemma suggested by the cover-lift diagnostics. This is now
-  the key proof step for making the depth-5 base seal theorem-grade. Tau-zero and tau-one covering
-  are written as direct container arguments; tau-two quotient incidence remains open.
+  the key proof step for making the depth-5 base seal theorem-grade. Important correction:
+  all-cover lift removal is anti-conservative for tau-positive branches because quotient
+  lines/planes are event data. Tau-zero duplicate-lift covering is safe; tau-positive branches need
+  quotient-incidence/fiber accounting.
 ```
 
 The external Fable audit was useful and found the product-of-first-moments bug. Its record is:
@@ -396,11 +398,10 @@ high-defect theta-chain gap.
 Audit correction: the scalar rank-pattern induction theorem is too strong. The local
 `q^{-r|E|}` singleton charge fails on low-visible-rank blocks. Span-only and subspace-only
 diagnostics are much too pessimistic (`crossing_z=249`), while the existing two-layer flag
-checkpoint improves this to `crossing_z=137`. A diagnostic cover-lift run gives
-`crossing_z=35`, and at `z=34` gives vector log2 moment `27.64399707`, which becomes
-`-100.35600293` after removing the top projective-line `q` multiplicity. The finite base seal is
-still plausible, but only after implementing/proving the exact-support container/flag recurrence
-that charges:
+checkpoint improves this to `crossing_z=137`. A diagnostic all-cover run gives `crossing_z=35`,
+but that run is anti-conservative because it erases tau-positive quotient incidence. The finite
+base seal is still plausible, but only after implementing/proving the exact-support
+container/flag recurrence that charges:
 
 ```text
 pi(K) <= pi(W),

@@ -48,12 +48,13 @@ optimistic scalar replica calibration: z=34, log2 moment -115.10
 span/subspace endpoint diagnostics:    z=249
 two-layer flag checkpoint:             z=137
 cover-lift all diagnostic:             z=35
-projective z=34 cover heuristic:       -100.36 bits
+projective z=34 cover heuristic:       -100.36 bits, anti-conservative
 ```
 
 The scalar `q^{-r|E|}` rank-pattern recurrence is retired as a theorem. It fails on
 low-visible-rank blocks before tuple-span/flag savings are exposed. The finite base seal remains
-plausible only as an exact-support container/flag recurrence.
+plausible only as an exact-support container/flag recurrence. The all-cover diagnostic is not a
+candidate theorem; tau-positive quotient incidence must be counted.
 
 ## Blocker Review
 
@@ -107,8 +108,9 @@ Live blockers:
 7. For the depth-5 base-seal route, replace the scalar rank-pattern recurrence by a finite
    exact-support container/flag recurrence for the reachable `B_4(2,u)` states. The required child
    state is `pi(K)<=pi(W)` with zero budgets `p+s-a` and `p+s`; the key new lemma is a
-   proof-safe covering/projectivization map for quotient lifts, now stated in
-   `rfc_covering_flag_lift_lemma.md`.
+   proof-safe quotient-incidence/projectivization map for quotient lifts, now stated in
+   `rfc_covering_flag_lift_lemma.md`. Tau-zero duplicate lift covering is safe; tau-positive
+   branches must keep quotient line/plane incidence and invisible-fiber dimensions.
 ```
 
 Current honesty check:

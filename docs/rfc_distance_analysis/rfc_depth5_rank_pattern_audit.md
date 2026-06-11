@@ -292,8 +292,8 @@ The flag checkpoint now has a diagnostic-only cover mode:
 --cover-lift-mode tau0|all
 ```
 
-This tests whether the checkpoint is losing mostly by counting every parent lift inside one child
-container, rather than counting the child container once for an existence certificate.
+This tests where parent-lift and quotient-incidence multiplicity is concentrated. It does not give
+a certificate, because tau-positive quotient lines/planes are themselves event data.
 
 With only tau-zero lifts covered:
 
@@ -325,8 +325,8 @@ tau1tau2:  z=129
 all:       z=35
 ```
 
-The final line/vector conversion accounts for one factor of `q`. If the top event is counted
-projectively, this diagnostic would read:
+If one incorrectly treated the all-cover run as a projective certificate, the final line/vector
+conversion would read:
 
 ```text
 log2 projective/container moment at z=34
@@ -334,10 +334,10 @@ log2 projective/container moment at z=34
   = -100.35600293.
 ```
 
-That would seal `z=34` with about `20` bits of slack. This is not a theorem, because removing all
-lift multiplicity needs a proof-safe covering map from bad parent lines to child containers plus
-local quotient/root-line data. But it is a strong signal that the remaining base-seal work is a
-covering/projectivization lemma for quotient lifts, not a new local root-equation miracle.
+This number is anti-conservative: removing all lift multiplicity also removes quotient-line/plane
+incidence. The valid lesson is narrower but still useful: the remaining base-seal work is not a
+new local root-equation miracle; it is to replace crude lift/local products by a proof-safe
+quotient-incidence/fiber count.
 
 ## Next Work Items
 
@@ -347,7 +347,7 @@ covering/projectivization lemma for quotient lifts, not a new local root-equatio
    `rfc_tau2_weighted_exterior_bound.md`, not the scalar `q^{-2a}` charge.
 3. Track whether the dense boundary states `|A|=13,14,15` over quotient rank `7` or `8` are rescued
    by recursive kernel/marked-line charges.
-4. Prove a covering/projectivization lemma for quotient lifts: bad parent lines with the same
-   child container, visible quotient, and root-line profile should be counted once at the container
-   level whenever the whole fiber is bad, and with the actual local quotient incidence otherwise.
+4. Prove a covering/projectivization lemma for quotient lifts: duplicate extensions after fixing
+   the child container and quotient/root datum should be counted once, while the quotient
+   line/plane incidence and invisible-fiber dimensions are still charged.
 5. Only after that rerun the depth-5 seal and report a certified crossing.

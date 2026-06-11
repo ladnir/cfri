@@ -34,8 +34,9 @@ cover all, z=34 vector log2:           27.64399707
 cover all, z=34 projective heuristic: -100.35600293
 ```
 
-Thus the base seal is probably controlled by a covering/projectivization issue, not by a missing
-local root equation.
+Thus the base seal is sensitive to covering/projectivization, but the `all` cover run is
+anti-conservative. The valid proof target is to replace crude independent lift/local products by
+quotient-incidence counts, not to erase quotient multiplicity.
 
 ## One-Layer Covering Map
 
@@ -83,7 +84,7 @@ local layer label h if tau=2.
 The proposed canonical certificate of `W` is:
 
 ```text
-Cert(W) = (P,S,A,tau,L<=V,R,ell_A,local layer labels),
+Cert(W) = (P,S,A,tau,L<=V,full quotient datum R,ell_A,local layer labels),
 ```
 
 with `L` omitted if `K=0`. Ties must be broken canonically when a line has extra zeros or a
@@ -129,8 +130,9 @@ or its two-layer analogue:
 q^{kappa(2 dim L-kappa) + tau(2 dim V-t)}.
 ```
 
-The local quotient/root datum is still counted. The claim is only that the ambient lift
-multiplicity inside a fixed child container is not an event multiplicity.
+The local quotient/root datum is still counted, including invisible-fiber dimensions outside the
+visible singleton support. The claim is only that after this quotient datum is fixed, duplicate
+extensions inside the same child container are not separate container events.
 
 ## Candidate Lemma
 
@@ -165,15 +167,17 @@ where `LocalContainer(Phi)` includes:
 root probabilities,
 exact-support root-line counts,
 visible quotient incidence counts,
+invisible-fiber dimensions for quotient data,
 finite projective/frame constants,
 ```
 
-but does not include the full Gaussian parent-lift multiplicity.
+but does not include duplicate Gaussian extension multiplicity after the quotient datum has been
+fixed.
 
 For a final projective distance event, the top line is counted projectively. If an auxiliary script
 prints nonzero-vector moments, subtract one factor of `q` before comparing to `2^-lambda`.
 
-## Safe Subcases
+## Safe Subcases And Correction
 
 ### Tau Zero
 
@@ -203,7 +207,10 @@ do not multiply by # { W <= V+V }.
 The only finite data left are the split choices and the child container event `F_{h-1}((dim V,
 p+s))`. This proves tau-zero lift covering as a direct container argument.
 
-### Tau One
+### Tau One: Correction
+
+The previous tempting statement was: fix the child flag and visible support, then count the parent
+fiber once. That is too optimistic unless the full quotient line datum is also counted.
 
 Assume:
 
@@ -219,13 +226,13 @@ Fix the child flag:
 L = pi(K) <= V = pi(W),
 ```
 
-and fix the visible quotient datum:
+and fix the full visible quotient datum:
 
 ```text
 R <= (V+V)/(L+L)
 ```
 
-with exact support `A` and root-line assignment `ell_A`.
+with exact support `A` on the singleton block and root-line assignment `ell_A`.
 
 The child zero budgets are:
 
@@ -242,23 +249,28 @@ visible quotient directions vanish on S \ A through V,
 visible quotient directions vanish on A by the fixed root line ell_A.
 ```
 
-Thus all parent lifts in the fiber are bad for the same witness. An existence bound may count the
-container tuple:
+Thus all parent lifts in the fiber are bad for the same witness. However, the quotient line `R`
+is itself an event variable. For a fixed child container there can be many possible quotient lines,
+and the probability that at least one is root-compatible grows with the quotient ambient
+dimension. Therefore a proof may count the container tuple:
 
 ```text
 (L <= V, R, ell_A)
 ```
 
-once, rather than multiplying by the Gaussian number of extensions `K <= W`.
+once, but it may not omit the count of possible `R`.
 
 The tau-one local count is therefore:
 
 ```text
 root factor q^-a
-times the number of exact-support visible lines R in the represented quotient.
+times the number of exact-support quotient lines R in the represented quotient.
 ```
 
-This is exactly the support-subcode line count from `delta(A)`, with finite projective constants.
+This is exactly the support-subcode line count from `delta(A)`, with finite projective constants,
+plus any invisible-fiber dimension from quotient coordinates outside the singleton support. In
+other words, tau-one covering removes duplicate extensions of a fixed quotient line, but it does
+not remove quotient-line incidence.
 
 ### Tau Two
 
@@ -280,8 +292,51 @@ state. The tau-two branch is where a proof can accidentally reintroduce either:
 2. a Gaussian quotient-lift factor that the container map was supposed to remove.
 ```
 
-Closing tau two means proving the weighted exterior/root-line count is the right count of
-quotient data `R`, not an additional multiplier on top of all ambient lifts.
+Closing tau two means proving the weighted exterior/root-line count, including any invisible-fiber
+dimension, is the right count of quotient data `R`. It should replace the independent product:
+
+```text
+Gaussian quotient lift * local charge computed in the wrong ambient,
+```
+
+but it does not justify setting the quotient-lift exponent to zero.
+
+## Anti-Conservative Shortcut Retired
+
+The diagnostic:
+
+```text
+--cover-lift-mode all
+```
+
+sets all lift exponents to zero. This is useful only as a sensitivity test. It is not a candidate
+theorem.
+
+Counterexample shape: take a fixed child container `V` and a singleton block `A` with `a` roots.
+If the quotient ambient has dimension `m`, the event that some quotient line is compatible has
+rough exponent:
+
+```text
+q^(m-1-a)
+```
+
+in the rare-event range. Counting the container once with only a root factor `q^-a` misses the
+projective quotient-line family `q^(m-1)`.
+
+For tau two the same issue is the family of quotient planes. The valid replacement is the
+incidence/fiber expression:
+
+```text
+fiber_qdim(Q,A) + theta_2(Q|_A,A),
+```
+
+or the coarse exact-support Grassmann cap:
+
+```text
+2(m-2) - |A|.
+```
+
+Those terms are quotient data counts. They cannot be dropped.
 
 ## Proof Obligations
 

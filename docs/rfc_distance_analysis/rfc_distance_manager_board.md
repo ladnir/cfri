@@ -778,8 +778,9 @@ Current ranked obstruction families:
    is coverage of every minimal hard segment by a hard-compatible survivor trace whose `s=5` steps
    pay local `q^-9` charges. The loose recorded toy trace has pre-constant margin `7`; the stricter
    kernel-child propagation trace has margin `29`, and the conservative visible-quotient-loss
-   strict trace has margin `15`. Next attack is to prove coverage by the conservative strict trace
-   family, or find a smaller strict `9H + rho_terminal - E_anc`;
+   strict trace has margin `15`. Local coverage is now reduced to the deterministic inequalities
+   `dim K>=D-2`, `L zero on P union S`, and `K<=L+L`; next attack is to globalize the strict
+   margin over all hard-segment states, or find a smaller strict `9H + rho_terminal - E_anc`;
 2. higher-drop local layers kappa >= g+2;
 3. mixed-fiber chain shapes where the intermediate layer persists across levels;
 4. mixed chain shapes tau=1->2 and tau=2->1 after the exact-support incidence cap is fixed;

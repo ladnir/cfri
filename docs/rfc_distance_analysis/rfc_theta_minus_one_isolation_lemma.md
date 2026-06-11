@@ -457,6 +457,38 @@ Thus even the quotient-loss strict kernel-child version has more room than the l
 envelope. The remaining proof obligation is to derive this strict hard-trace restriction from the
 actual kernel-following recurrence state.
 
+### Strict Kernel-Child Coverage
+
+The strict restriction is derived in
+`rfc_multilayer_flag_transition_theorem.md`. For one kernel-following minimal hard row, the visible
+singleton quotient has dimension `tau=2`, so the kernel loses at most two dimensions:
+
+```text
+dim K >= D - 2.
+```
+
+The kernel child `L=pi(K)` is zero on `P union S` by the coordinatewise zero-propagation lemma, so
+all five singleton zeros are forced into the child rank event. Since `K <= L+L`:
+
+```text
+dim L >= ceil((D-2)/2).
+```
+
+Thus every such row is covered by the conservative strict recurrence:
+
+```text
+D_child = ceil((D-2)/2),
+z_child = p + 5.
+```
+
+This closes the local coverage step for minimal kernel-following hard rows. The remaining global
+question is whether every hard-segment state that can appear in the distance recurrence has
+nonnegative margin after summing:
+
+```text
+9H + rho_terminal - E_anc - log_q(state constants).
+```
+
 ### Constants Budget For The Toy Margin
 
 For the default target:

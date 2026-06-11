@@ -322,9 +322,11 @@ pays its own local `q^-9` first-drop charge.
 Both toy traces are recorded in the theorem note. The loose survivor trace has two `s=5` steps,
 terminal survivor cost `1`, `E_anc=12`, and pre-constant margin `7`. The strict
 kernel-child trace has four `s=5` steps, terminal survivor cost `5`, `E_anc=12`, and margin `29`.
-The conservative strict trace with visible quotient loss has margin `15`. The next proof step is
-to prove coverage by this conservative strict trace family, or find a strict
-kernel-child-compatible trace with smaller `9H + rho_terminal - E_anc`.
+The conservative strict trace with visible quotient loss has margin `15`. The local coverage lemma
+is now written: for a kernel-following minimal hard row, `dim K>=D-2`, `L=pi(K)` is zero on
+`P union S`, and `K<=L+L`, giving `D_child>=ceil((D-2)/2)` and `z_child=p+5`. The next proof step
+is to globalize this over all hard-segment states, or find a strict kernel-child-compatible trace
+with smaller `9H + rho_terminal - E_anc`.
 ```
 
 ## Diagnostic Script

@@ -297,6 +297,24 @@ def lift_flag_span_moment(
         return local_profile_cache[key]
 
     child_spans = sorted(child_by_span)
+
+    def covers_lift(visible_tau: int) -> bool:
+        if cover_lift_mode == "all":
+            return True
+        if cover_lift_mode == "tau0":
+            return visible_tau == 0
+        if cover_lift_mode == "tau1":
+            return visible_tau == 1
+        if cover_lift_mode == "tau2":
+            return visible_tau == 2
+        if cover_lift_mode == "tau0tau1":
+            return visible_tau in (0, 1)
+        if cover_lift_mode == "tau0tau2":
+            return visible_tau in (0, 2)
+        if cover_lift_mode == "tau1tau2":
+            return visible_tau in (1, 2)
+        return False
+
     for parent_span in range(1, max_parent_span + 1):
         for z in range(parent_n + 1):
             total = NEG_INF
@@ -403,7 +421,7 @@ def lift_flag_span_moment(
                                 charge_log = -charge * q_log2
                                 if visible_tau == 0:
                                     lift_log = parent_span * (2 * outer_span - parent_span) * q_log2
-                                    if cover_lift_mode in ("tau0", "all"):
+                                    if covers_lift(visible_tau):
                                         lift_log = 0.0
                                     child_log = get_child_value(
                                         child_by_span,
@@ -419,7 +437,7 @@ def lift_flag_span_moment(
                                         visible_tau * (2 * outer_span - parent_span) * q_log2
                                     )
                                     lift_log = kernel_lift_log + quotient_lift_log
-                                    if cover_lift_mode == "all":
+                                    if covers_lift(visible_tau):
                                         lift_log = 0.0
                                     child_log = flag_child_bound(
                                         child_by_span=child_by_span,
@@ -588,7 +606,16 @@ def main() -> None:
     parser.add_argument("--max-visible-tau", type=int, default=2)
     parser.add_argument(
         "--cover-lift-mode",
-        choices=["none", "tau0", "all"],
+        choices=[
+            "none",
+            "tau0",
+            "tau1",
+            "tau2",
+            "tau0tau1",
+            "tau0tau2",
+            "tau1tau2",
+            "all",
+        ],
         default="none",
         help=(
             "Diagnostic only: remove selected parent-lift multiplicities to test container-style "

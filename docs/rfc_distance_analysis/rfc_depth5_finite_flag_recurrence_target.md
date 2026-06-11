@@ -261,6 +261,19 @@ tau0 cover-lift checkpoint:            crossing_z = 135
 all cover-lift checkpoint:             crossing_z = 35
 ```
 
+More granular cover-lift diagnostics:
+
+```text
+none:      z=137
+tau0:      z=135
+tau1:      z=137
+tau2:      z=129
+tau0tau1:  z=133
+tau0tau2:  z=61
+tau1tau2:  z=129
+all:       z=35
+```
+
 Interpretation:
 
 ```text
@@ -279,6 +292,9 @@ cover-lift checkpoints:
   moves the vector-count crossing to z=35. At z=34 the vector log moment is 27.64399707; subtracting
   one q-factor for projective top-line counting gives -100.35600293. Thus a proof-safe
   container/projectivization recurrence could plausibly seal z=34 with about 20 bits of slack.
+  The mixed-mode table says this cannot be just a tau-two patch; it needs a covering principle
+  that spans tau-zero, tau-one, and tau-two lift fibers. The lemma target is
+  `rfc_covering_flag_lift_lemma.md`.
 ```
 
 ## Next Concrete Implementation

@@ -127,6 +127,11 @@ docs/rfc_distance_analysis/rfc_depth5_finite_flag_recurrence_target.md
   Status: theorem/DP target.
   States the finite two-layer flag recurrence needed for the base seal, including tau=0/1/2
   branches and the depth-4 `B_4(2,u)` state table for `0<=u<=17`.
+
+docs/rfc_distance_analysis/rfc_covering_flag_lift_lemma.md
+  Status: theorem target.
+  States the covering/projectivization lemma suggested by the cover-lift diagnostics. This is now
+  the key proof step for making the depth-5 base seal theorem-grade.
 ```
 
 The external Fable audit was useful and found the product-of-first-moments bug. Its record is:

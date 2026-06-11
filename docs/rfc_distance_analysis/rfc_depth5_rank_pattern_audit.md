@@ -312,6 +312,19 @@ crossing_excess = 3
 log2 vector moment at z=34 = 27.64399707.
 ```
 
+The full mixed-mode table is:
+
+```text
+none:      z=137
+tau0:      z=135
+tau1:      z=137
+tau2:      z=129
+tau0tau1:  z=133
+tau0tau2:  z=61
+tau1tau2:  z=129
+all:       z=35
+```
+
 The final line/vector conversion accounts for one factor of `q`. If the top event is counted
 projectively, this diagnostic would read:
 

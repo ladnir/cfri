@@ -43,7 +43,7 @@ Open items are excluded from the denominator.
 | Reachable `child_k=32, zeros=(34,39,44)` stress row | 0 | 1 | 1 | 0% | Current blocker | Better than unreachable toy, but at `b=14` has a 3 q-dimension gap even with one boundary charge. |
 | Raw one-step defect conservation for floor row | 0 | 0 | 1 | 0% | Retired for this blocker | `rfc_defect_conservation.py --child-k 16 --parent-dim 14 --parent-zeros 34` gives worst slack `-210`; raw flag counting is too loose. |
 | Scalar `q^{-r|E|}` rank-pattern recurrence | 0 | 0 | 1 | 0% | Retired as theorem | Base repetition / low-visible-rank blocks lose `q^{(r-1)(s-1)}` locally; needs span/visible-support/flag state. |
-| Covering/projective flag-lift recurrence | 0 | 1 | 0 | 0% | New promising candidate | Diagnostic `--cover-lift-mode all` moves depth-5 checkpoint to `z=35`; projectivizing the `z=34` top event gives about `-100.36` bits, but needs a proof-safe covering map. |
+| Covering/projective flag-lift recurrence | 0 | 2 | 0 | 0% | New promising candidate | Diagnostic `--cover-lift-mode all` moves depth-5 checkpoint to `z=35`; projectivizing the `z=34` top event gives about `-100.36` bits. Mixed cover modes show all tau layers matter; needs proof-safe covering map. |
 | High-kernel/local-incidence bonus | 0 | 0 | 0 | open | Next candidate | Need prove hard row carrying large shortened ambient pays more than uniform `q^-9`. |
 | Joint nested shortened-rank profile charge | 0 | 0 | 0 | open | Next candidate | May recover missing few dimensions by charging the whole nested profile, not max one edge. |
 | Finite `k<=32,e=2` base-case seal | 0 | 2 | 0 | 0% | Promising but needs flag refinement | Depth-5 replica calibration crosses at `z=34` with log2 moment `-115.10`; scalar rank-pattern recurrence failed audit; two-layer flag checkpoint crosses at `z=137`, so the finite seal now needs a tighter exact-support flag recurrence. |
@@ -120,11 +120,19 @@ The concrete target is now recorded in `rfc_depth5_finite_flag_recurrence_target
 Covering/projective flag-lift diagnostic added to `rfc_flag_span_moment.py`. Results:
 
 ```text
---cover-lift-mode tau0: crossing_z=135
---cover-lift-mode all:  crossing_z=35, z34 vector log2=27.64399707
+none:       crossing_z=137
+tau0:       crossing_z=135
+tau1:       crossing_z=137
+tau2:       crossing_z=129
+tau0tau1:   crossing_z=133
+tau0tau2:   crossing_z=61
+tau1tau2:   crossing_z=129
+all:        crossing_z=35, z34 vector log2=27.64399707
 projective z34 heuristic: 27.64399707 - 128 = -100.35600293
 ```
 
 This makes the next proof target sharper: construct a valid container/projectivization recurrence
 for quotient lifts. If that is valid with small constants, the depth-5 base seal may close at the
 production floor `z=34`.
+
+Covering flag-lift lemma target written in `rfc_covering_flag_lift_lemma.md`.

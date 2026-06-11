@@ -124,10 +124,11 @@ this computes only spans that can feed the final top line. Use `--report-local-t
 best tau-two transitions using the first-drop `theta_2=-1` layer, and `--trace-span` with
 `--trace-z` to follow a non-line state. The theta report also includes the immediate outer/inner
 child transition type, which is useful for spotting possible first-drop chains.
-The diagnostic-only `--cover-lift-mode tau0|all` switch removes selected parent-lift
-multiplicities to test container/projective covering ideas. It is not a certificate mode; it is a
-stress probe for whether the finite flag recurrence should count child containers rather than
-every parent lift inside a container.
+The diagnostic-only `--cover-lift-mode` switch removes selected parent-lift multiplicities to test
+container/projective covering ideas. Supported probes are `tau0`, `tau1`, `tau2`, `tau0tau1`,
+`tau0tau2`, `tau1tau2`, and `all`. It is not a certificate mode; it is a stress probe for whether
+the finite flag recurrence should count child containers rather than every parent lift inside a
+container.
 Use `--report-theta-chains -1` to summarize the longest consecutive best-transition chain of
 tau-two `theta_2=-1` rows through the outer/inner child graph.
 

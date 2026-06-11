@@ -107,7 +107,8 @@ Live blockers:
 7. For the depth-5 base-seal route, replace the scalar rank-pattern recurrence by a finite
    exact-support container/flag recurrence for the reachable `B_4(2,u)` states. The required child
    state is `pi(K)<=pi(W)` with zero budgets `p+s-a` and `p+s`; the key new lemma is a
-   proof-safe covering/projectivization map for quotient lifts.
+   proof-safe covering/projectivization map for quotient lifts, now stated in
+   `rfc_covering_flag_lift_lemma.md`.
 ```
 
 Current honesty check:

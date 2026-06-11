@@ -6,6 +6,12 @@ Status: theorem target with the conditioning proposition and coarse ambient lift
 This is the shared object that should replace separate ad hoc handling of the decomposable
 marked-line row and the `theta_2=-1` kernel-chain row.
 
+Depth-5 base-seal update: the current flag checkpoint is not fixed by removing tau-zero duplicate
+lifts, by removing only duplicate kernel lifts, or by replacing one child flag ambient with the
+ideal shortened ambient. The missing object is therefore not a scalar rank tweak. It is a finite
+quotient-incidence state that keeps all child flag layers produced by the same child code instance
+in one joint object.
+
 ## State
 
 For depth `h`, define:
@@ -28,6 +34,32 @@ The final distance event is:
 ```text
 F_d((1,k+e)).
 ```
+
+For implementation, it is often better to store the zero witness in category form. Instead of only
+recording cumulative budgets `z_i`, record exact nested witness increments:
+
+```text
+C_j = B_j \ B_{j-1},  B_{-1}=empty,
+```
+
+so a coordinate in `C_j` is required to vanish first at layer `V_j` and then automatically vanishes
+on all deeper layers. The cumulative form is recovered by:
+
+```text
+z_i = |C_0| + ... + |C_i|.
+```
+
+This category form makes one-step split compatibility explicit. A two-layer chain state has only
+outer-zero and inner-only categories; after recursing through a kernel child, the same construction
+naturally creates a third category. For the finite depth-5 base seal, a proof-safe implementation
+should allow the joint state to grow and then prune dominated category vectors, rather than assume
+two layers remain closed under recursion.
+
+Warning: a single chain may still be a relaxation. From a parent flag `L <= V`, the next fold can
+produce both `pi(K_L) <= pi(L)` and `pi(K_V) <= pi(V)`. These subspaces need not collapse to one
+strict total chain unless an additional reduction lemma proves comparability or safely merges them.
+The fully proof-safe object is therefore a small inclusion diagram, with the chain recurrence used
+only after proving that the reachable diagram can be linearized without undercounting.
 
 The recurrence must count one child flag over one shared child-code instance. It must never replace
 a joint event by a product of child moments.

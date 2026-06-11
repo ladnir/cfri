@@ -131,7 +131,8 @@ mode. For tau-positive branches, quotient lines/planes are event data and must b
 quotient-incidence/fiber theorem; zeroing those lifts is only a sensitivity test.
 The narrower `--cover-kernel-lift` diagnostic removes only the `K<=L+L` kernel-lift factor while
 keeping quotient incidence. In the current depth-5 base checkpoint it leaves the crossing at
-`z=137`, so kernel-lift multiplicity is not the active source of looseness.
+`z=137`; combined with safe tau-zero covering it still only reaches `z=135`, so kernel-lift
+multiplicity is not the active source of looseness.
 The diagnostic-only `--flag-bound best-shortened` mode tests an ideal shortened ambient for the
 inner-first child flag count. It leaves the same depth-5 checkpoint crossing, so the missing bound is
 not recovered by this one-layer shortened-child correction.

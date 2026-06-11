@@ -45,6 +45,7 @@ rfc_tau2_dense_connected_endpoint_attack.md   falsification criteria for dense c
 rfc_tau2_dense_connected_formula_target.md    finite-constant formula for dense connected endpoint
 rfc_tau2_dense_connected_gf11_signal.md       GF(11) dense endpoint signal interpretation
 rfc_tau2_incidence_framing_lemma.md           quotient-incidence and exact-support Grassmann cap
+rfc_tau1_quotient_line_incidence_lemma.md     fixed-flag tau-one quotient-line incidence bound
 rfc_dense_endpoint_support_capture_attack.md  support-capture attack criteria for dense endpoint
 rfc_dense_endpoint_replay_contract.md         larger-field dense endpoint replay contract
 rfc_dense_endpoint_replay_field_model.md      field-model choice for endpoint replay

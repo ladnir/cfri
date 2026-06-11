@@ -100,6 +100,23 @@ crossing_excess = 105.
 
 The dominant rows either have no kernel lift or are controlled by quotient incidence instead.
 
+Combining the safe tau-zero lift cover with the narrower kernel-lift cover:
+
+```text
+--cover-lift-mode tau0 --cover-kernel-lift
+```
+
+still leaves the checkpoint far from the production floor:
+
+```text
+crossing_z = 135,
+crossing_excess = 103.
+```
+
+This is essentially the same crossing as tau-zero covering alone. The trace changes internally, but
+the remaining mass is still carried by quotient-incidence and recursive child-flag looseness rather
+than by duplicate kernel lifts.
+
 ## Shortened Child Flag Check
 
 The diagnostic:

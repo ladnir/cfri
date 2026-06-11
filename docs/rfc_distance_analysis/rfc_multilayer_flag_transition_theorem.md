@@ -1101,16 +1101,32 @@ strict_hard_potential=36,
 strict_hard_margin=-3.
 ```
 
+The checker also reports a boundary-only comparison:
+
+```text
+boundary_plus_strict_hard_margin = charge + strict_hard_potential - E_anc - split_const.
+```
+
+For the same `b=10` row, this is:
+
+```text
+9 + 36 - 39 = 6.
+```
+
+Audit convention. For an internal hard segment, the local `charge=9` is already counted in `9H`;
+adding it again is double-counting. The boundary-plus comparison is valid only after a separate
+lemma proves a disjoint boundary row outside the internal hard segment.
+
 Thus the strict hard trace is not a standalone global domination theorem. The proof needs a
-two-regime split:
+two-regime/accounting split:
 
 ```text
 low-defect hard segments:
   dominated by strict hard-trace potential;
 
 high-defect shortened ambients:
-  must expose additional rank-defect, incidence, or high-kernel charge, or they are a genuine
-  obstruction.
+  must either use a proven disjoint boundary charge, or expose additional rank-defect, incidence,
+  or high-kernel charge; otherwise they are a genuine obstruction.
 ```
 
 Current diagnostic status. The optimistic script:

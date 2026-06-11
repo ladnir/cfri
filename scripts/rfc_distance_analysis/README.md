@@ -79,6 +79,10 @@ strict_hard_margin_logq    = strict_hard_potential_logq - E_anc - split_const
 The columns are deterministic theorem-exponent diagnostics; they do not consume empirical profiler
 counts. The hard charge is optimized inside the dynamic program, so these columns are not the
 post-hoc charge of a trace chosen only to minimize terminal `rho`.
+The companion `boundary_plus_strict_hard_margin_logq` column adds the scenario's explicit
+`--charge` to the strict hard potential. Treat it as boundary-only: it applies only after a
+separate lemma proves that the local charge is disjoint from the internal hard steps already
+counted in `strict_hard_potential_logq`.
 
 `rfc_shortened_rank_recurrence.py` supports `--allowed-singletons 0,5` to restrict optimistic
 `rho_h(D,z)` traces to all-paired steps and hard theta-compatible singleton bursts. Use this when

@@ -530,6 +530,66 @@ For the toy `b=1` numbers this gives:
 This is the current best proof route: non-hard cheap rank paths are isolated by residue/all-paired
 classification, while hard-compatible cheap rank paths carry one `q^-9` charge per `s=5` step.
 
+## Charged Strict Hard-Trace Update
+
+The normal-slice checker now has strict hard-trace columns. These use the conservative
+kernel-child recurrence:
+
+```text
+allowed singleton counts = {0,5},
+all five hard singletons forced into the kernel child,
+visible quotient loss = 2,
+hard step charge = 9.
+```
+
+The charge is optimized inside the dynamic program. Thus:
+
+```text
+strict_hard_potential = 9 * hard_steps + rho_terminal
+```
+
+is the charged optimum, not a post-hoc charge added to a rho-minimizing trace.
+
+For the near-dimension toy:
+
+```text
+child_k=32,
+dims=(4,3,2,1),
+zeros=(21,26,31),
+b=(1,1,1),
+```
+
+the old loose-rho route is unsafe:
+
+```text
+rho-routed margin = -2.
+```
+
+The strict hard route is safe:
+
+```text
+strict_hard_margin = 15.
+```
+
+However, sweeping `b=(b,b,b)` shows the strict-only route is not enough by itself:
+
+```text
+b <= 8: strict_hard_margin > 0;
+b = 9:  strict_hard_margin = 0;
+b = 10: strict_hard_margin = 36 - 39 = -3.
+```
+
+The boundary-only comparison column:
+
+```text
+boundary_plus_strict_hard_margin
+```
+
+adds the scenario's explicit `charge=9`. At `b=10` this gives `6`. Audit convention: this extra
+charge is not available for an internal hard segment because `strict_hard_potential` already
+counts `9H`. It can be used only after proving a disjoint boundary row. Otherwise, high-defect
+shortened ambients need an additional rank-defect, incidence, or high-kernel charge.
+
 If this lemma is too tight globally, the fallback is still finite: implement length-four flags in
 the certificate driver and rerun the same state-counting argument. The depth-7 best-transition
 diagnostic suggests this fallback will not be on the dominant path.

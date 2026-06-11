@@ -340,11 +340,14 @@ Correction after charged-DP audit: the strict hard potential is now optimized di
 `hard_step_charge=9`, not added after a rho-minimizing trace is chosen. This preserved the `b=1`
 margin but exposed the next real issue. For the same toy family with `b=(b,b,b)`, strict-only
 margin is positive through `b=8`, zero at `b=9`, and negative from `b=10`; at `b=10` the margin is
-`36-39=-3`. Therefore the next proof split must be:
+`36-39=-3`. The boundary-only comparison column gives `9+36-39=6`, but the audit convention is
+that this extra `9` cannot be used for an internal hard segment unless a disjoint boundary row is
+proved. Therefore the next proof split must be:
 
 ```text
 low-defect hard segment -> strict hard-trace potential;
-high-defect shortened ambient -> extra rank-defect/incidence/high-kernel charge, or obstruction.
+high-defect shortened ambient -> proven boundary charge, extra rank-defect/incidence/high-kernel
+                                  charge, or obstruction.
 ```
 ```
 

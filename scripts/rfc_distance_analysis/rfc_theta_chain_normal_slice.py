@@ -179,10 +179,18 @@ def evaluate(scenario: Scenario) -> dict[str, str]:
     strict_hard_margin = (
         max_strict_hard_potential - lhs if max_strict_hard_potential < INF else INF
     )
+    boundary_plus_strict_hard_margin = (
+        scenario.charge + max_strict_hard_potential - lhs
+        if max_strict_hard_potential < INF
+        else INF
+    )
     safe = (not feasible) or margin >= 0
     defect_safe = safe or defect_margin >= 0
     rho_safe = safe or max_rho_cost >= INF or rho_margin >= 0
     strict_hard_safe = safe or max_strict_hard_potential >= INF or strict_hard_margin >= 0
+    boundary_plus_strict_hard_safe = (
+        safe or max_strict_hard_potential >= INF or boundary_plus_strict_hard_margin >= 0
+    )
     return {
         "name": scenario.name,
         "child_k": str(scenario.child_k),
@@ -229,6 +237,14 @@ def evaluate(scenario: Scenario) -> dict[str, str]:
             else f"{strict_hard_margin:.6g}"
         ),
         "strict_hard_safe": "yes" if strict_hard_safe else "no",
+        "boundary_plus_strict_hard_margin_logq": (
+            "infeasible"
+            if not feasible
+            else "inf"
+            if boundary_plus_strict_hard_margin >= INF
+            else f"{boundary_plus_strict_hard_margin:.6g}"
+        ),
+        "boundary_plus_strict_hard_safe": "yes" if boundary_plus_strict_hard_safe else "no",
     }
 
 

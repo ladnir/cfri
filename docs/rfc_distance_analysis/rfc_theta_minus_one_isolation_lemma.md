@@ -533,9 +533,18 @@ strict_hard_potential=36,
 strict_hard_margin=-3.
 ```
 
-So the global proof cannot be "strict hard trace only". It must split low-defect segments from
-high-defect shortened ambients. The latter need an extra rank-defect, incidence, or high-kernel
-charge; otherwise they are the next genuine obstruction.
+The boundary-only accounting column adds a separately available local charge:
+
+```text
+boundary_plus_strict_hard_margin = 9 + 36 - 39 = 6.
+```
+
+Audit convention: for an internal hard segment this extra `q^-9` is already counted in `9H`, so
+adding it again is double-counting. The boundary-plus margin is valid only after proving a disjoint
+boundary row outside the internal hard segment. Therefore the global proof must split low-defect
+segments from high-defect shortened ambients. The latter need either a proven boundary charge or
+an extra rank-defect, incidence, or high-kernel charge; otherwise they are the next genuine
+obstruction.
 
 ### Constants Budget For The Toy Margin
 

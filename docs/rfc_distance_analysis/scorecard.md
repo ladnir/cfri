@@ -173,3 +173,10 @@ Child-bound trace diagnostics added. In the safe tau-zero `z=34` trace the top r
 then the next rows are inner-first; with kernel-lift covering the upper rows switch to outer-first
 but the crossing remains `z=135`. This reinforces that no single one-layer child relaxation choice
 is the whole gap. The next candidate is an actual recursive joint child flag/diagram state.
+
+Trace semantics corrected: the previous displayed safe-tau-zero trace followed the outer projection
+spine even when the child-bound relaxation selected an inner-first child state. `--trace-z` now
+defaults to the bound-following path, with `--trace-follow projection` available for the old view.
+The corrected `z=34` path is tau-one at levels 5, 4, and 3, tau-two at level 2, then a base tau-one
+row. This makes the immediate proof target sharper: a joint state must preserve the inner-first
+child flag created at level 4 and its interaction with the later tau-two boundary row.

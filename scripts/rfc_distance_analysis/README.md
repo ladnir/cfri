@@ -143,6 +143,9 @@ support-subcode saving, so tau-one local sharpening is not the active rescue.
 Trace rows also print `child_bound_choice` plus the outer-first and inner-first child-flag
 relaxation values. Use these columns to see whether the current bound is following the outer
 container, the stricter inner event, or a shortened diagnostic ambient.
+By default `--trace-z` follows the selected child-bound branch. Pass `--trace-follow projection`
+to recover the older outer-projection spine; that path is useful for orientation but is not always
+the dominant recurrence branch.
 Use `--report-theta-chains -1` to summarize the longest consecutive best-transition chain of
 tau-two `theta_2=-1` rows through the outer/inner child graph.
 

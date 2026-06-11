@@ -697,6 +697,15 @@ def main() -> None:
     parser.add_argument("--print-window", type=int, default=5)
     parser.add_argument("--trace-z", type=int, default=-1)
     parser.add_argument("--trace-span", type=int, default=1)
+    parser.add_argument(
+        "--trace-follow",
+        choices=["bound", "projection"],
+        default="bound",
+        help=(
+            "When tracing, follow the selected child-bound branch or always follow the outer "
+            "projection path."
+        ),
+    )
     parser.add_argument("--max-n", type=int, default=DEFAULT_MAX_N)
     parser.add_argument("--allow-large", action="store_true")
     parser.add_argument(
@@ -980,7 +989,7 @@ def main() -> None:
 
     if args.trace_z >= 0:
         print(
-            "trace_level,span,z,p,s,a,tau,outer_span,inner_span,outer_zeros,inner_zeros,"
+            "trace_level,span,z,log2_state,p,s,a,tau,outer_span,inner_span,outer_zeros,inner_zeros,"
             "local_charge,delta,comp,g,theta,dominant_h,gamma,lift_qdim,"
             "tau1_quotient_qdim,tau1_universal_postroot_qdim,"
             "tau1_support_saving_qdim,tau1_charged_postroot_qdim,"
@@ -989,9 +998,14 @@ def main() -> None:
         span = args.trace_span
         z = args.trace_z
         for level in range(args.depth, 0, -1):
+            trace_values = values_by_level[level].get(span)
+            trace_value = NEG_INF
+            if trace_values is not None and 0 <= z < len(trace_values):
+                trace_value = trace_values[z]
+            trace_value_label = "-inf" if trace_value <= NEG_INF / 2 else f"{trace_value:.8f}"
             choice = trace[level - 1].get((span, z))
             if choice is None:
-                print(f"{level},{span},{z},,,,,,,,")
+                print(f"{level},{span},{z},{trace_value_label},,,,,,,,")
                 break
             (
                 p,
@@ -1057,7 +1071,7 @@ def main() -> None:
                 if child_inner_first_value > NEG_INF / 2:
                     child_inner_first_log2 = f"{child_inner_first_value:.8f}"
             print(
-                f"{level},{span},{z},{p},{singleton_count},{visible_support_size},"
+                f"{level},{span},{z},{trace_value_label},{p},{singleton_count},{visible_support_size},"
                 f"{visible_tau},{outer_span},{inner_span},{outer_zeros},{inner_zeros},"
                 f"{local_charge},{local_delta},{local_components},{local_g},{local_theta},"
                 f"{local_h},{local_gamma},{lift_qdim},{tau1_quotient_qdim},"
@@ -1065,8 +1079,17 @@ def main() -> None:
                 f"{tau1_charged_postroot_qdim},{child_bound_choice},"
                 f"{child_bound_log2},{child_outer_first_log2},{child_inner_first_log2}"
             )
-            span = outer_span
-            z = outer_zeros
+            next_span = outer_span
+            next_z = outer_zeros
+            if (
+                args.trace_follow == "bound"
+                and child_bound_choice in ("inner-first", "shortened-inner-first")
+                and inner_span > 0
+            ):
+                next_span = inner_span
+                next_z = inner_zeros
+            span = next_span
+            z = next_z
 
 
 if __name__ == "__main__":

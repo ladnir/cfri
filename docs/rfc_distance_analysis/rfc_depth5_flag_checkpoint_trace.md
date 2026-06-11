@@ -67,20 +67,21 @@ the `z=34` vector moment is still:
 log2 vector moment = 2497.05321083.
 ```
 
-Best trace:
+Best bound-following trace:
 
 ```text
-level span z   log2_state      p   s   a   tau outer inner outer_z inner_z charge delta lift_qdim
-5     1    34  2369.05321083   15  4   4   1   2     0     15      19      4      1     3
-4     2    15  2470.43486387   7   1   1   1   4     2     7       8       1      1     9
-3     4    7   1054.81698675   3   1   1   1   4     4     3       4       1      1     19
-2     4    3   -1003.06336206  0   3   3   2   2     1     0       3       6      2     0
-1     2    0   0.00000000      0   0   0   0   1     1     0       0       0      0     0
+level span z   log2_state      p   s   a   tau outer inner outer_z inner_z charge delta lift_qdim child_bound
+5     1    34  2369.05321083   15  4   4   1   2     0     15      19      4      1     3         outer-first
+4     2    15  2470.43486387   7   1   1   1   4     2     7       8       1      1     9         inner-first
+3     2    8   415.60197386    3   2   2   1   4     2     3       5       2      1     9         outer-first
+2     4    3   -1003.06336206  0   3   3   2   2     1     0       3       6      2     0         inner-first
+1     1    3   -247.19264508   0   3   3   1   1     0     0       3       3      1     1         outer-first
 ```
 
 After removing the safe tau-zero duplicate lifts, the dominant path moves to tau-one
-quotient-incidence chains. These tau-one quotient choices are real event data; they cannot be
-zeroed the way the anti-conservative all-cover diagnostic does.
+quotient-incidence rows with a tau-two boundary row at level two. These tau-positive quotient
+choices are real event data; they cannot be zeroed the way the anti-conservative all-cover
+diagnostic does.
 
 The tau-one incidence report:
 
@@ -94,7 +95,8 @@ shows that the tau-one rows on this `z=34` trace have no hidden support-subcode 
 level  a  delta comp quotient_qdim universal_postroot support_saving charged_postroot
 5      4  1     1    3             -1                 0              -1
 4      1  1     1    6              5                 0               5
-3      1  1     1    4              3                 0               3
+3      2  1     1    6              4                 0               4
+1      3  1     1    1             -2                 0              -2
 ```
 
 So the formal tau-one quotient-line lemma is needed for proof safety, but it is not the local
@@ -106,8 +108,9 @@ The same trace now reports which coarse child-flag relaxation is selected:
 level  child_bound_choice  child_bound_log2   outer_first_log2  inner_first_log2
 5      outer-first          2470.43486387      2470.43486387     3584.00000000
 4      inner-first          1439.60197386      1566.81698675     1439.60197386
-3      inner-first         -1255.04099425     -1003.06336206    -1255.04099425
+3      outer-first          -491.06336206      -491.06336206     -244.60768258
 2      inner-first          -247.19264508       128.00000000     -247.19264508
+1      outer-first             0.00000000         0.00000000        0.00000000
 ```
 
 After additionally removing duplicate kernel lifts, the upper trace switches to outer-first rows

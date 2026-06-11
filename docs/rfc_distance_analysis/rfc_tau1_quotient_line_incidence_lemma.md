@@ -175,3 +175,18 @@ as quotient-incidence events, but it does not claim a new exponent by itself. Fo
 `a`, especially `a=1`, the universal exponent can match the existing coarse quotient-lift cost.
 The next implementation step is to expose `E_A`, `m_A`, and `f_A` in the finite state so we can see
 which tau-one rows admit support-subcode sharpening.
+
+The first implementation diagnostic is:
+
+```text
+scripts/rfc_distance_analysis/rfc_flag_span_moment.py --report-tau1-incidence
+```
+
+On the current depth-5 `z=34` trace with safe tau-zero lift covering, the tau-one rows all have:
+
+```text
+support_saving_qdim = 0.
+```
+
+So the current depth-5 blocker is downstream of tau-one local line incidence: recursive child-state
+coupling and the following tau-two boundary row remain the active targets.

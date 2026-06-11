@@ -82,6 +82,24 @@ After removing the safe tau-zero duplicate lifts, the dominant path moves to tau
 quotient-incidence chains. These tau-one quotient choices are real event data; they cannot be
 zeroed the way the anti-conservative all-cover diagnostic does.
 
+The tau-one incidence report:
+
+```text
+--report-tau1-incidence
+```
+
+shows that the tau-one rows on this `z=34` trace have no hidden support-subcode saving:
+
+```text
+level  a  delta comp quotient_qdim universal_postroot support_saving charged_postroot
+5      4  1     1    3             -1                 0              -1
+4      1  1     1    6              5                 0               5
+3      1  1     1    4              3                 0               3
+```
+
+So the formal tau-one quotient-line lemma is needed for proof safety, but it is not the local
+improvement that closes this checkpoint.
+
 ## Kernel-Lift Cover Check
 
 The narrower diagnostic:

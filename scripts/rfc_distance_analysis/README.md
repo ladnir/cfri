@@ -136,6 +136,10 @@ multiplicity is not the active source of looseness.
 The diagnostic-only `--flag-bound best-shortened` mode tests an ideal shortened ambient for the
 inner-first child flag count. It leaves the same depth-5 checkpoint crossing, so the missing bound is
 not recovered by this one-layer shortened-child correction.
+Use `--report-tau1-incidence` to print fixed-flag tau-one quotient-line diagnostics:
+quotient ambient dimension, universal post-root exponent, support-subcode saving, and charged
+post-root exponent. In the current `z=34` tau-zero-cover trace, all tau-one rows have zero
+support-subcode saving, so tau-one local sharpening is not the active rescue.
 Use `--report-theta-chains -1` to summarize the longest consecutive best-transition chain of
 tau-two `theta_2=-1` rows through the outer/inner child graph.
 

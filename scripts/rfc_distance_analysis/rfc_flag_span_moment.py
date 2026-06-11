@@ -560,6 +560,43 @@ def choice_children(choice: tuple[int, ...]) -> list[tuple[str, int, int]]:
     return children
 
 
+def tau1_incidence_profile(
+    parent_span: int,
+    choice: tuple[int, ...],
+) -> tuple[int, int, int, int, int, int, int] | None:
+    """Return dimension diagnostics for the fixed-flag tau-one quotient-line row.
+
+    The recurrence already counts the quotient-line family through the Gaussian quotient lift.
+    These diagnostics compare that coarse universal line count against the support-subcode saving
+    used by the local tau-one charge.
+    """
+
+    visible_support_size = choice[2]
+    visible_tau = choice[3]
+    outer_span = choice[4]
+    local_charge = choice[7]
+    local_delta = choice[8]
+    local_components = choice[9]
+    if visible_tau != 1:
+        return None
+    quotient_qdim = 2 * outer_span - parent_span
+    quotient_ambient_dim = quotient_qdim + 1
+    visible_image_dim_bound = min(quotient_ambient_dim, 2 * local_delta)
+    invisible_fiber_dim_min = max(0, quotient_ambient_dim - visible_image_dim_bound)
+    universal_postroot_qdim = quotient_qdim - visible_support_size
+    support_saving_qdim = max(0, local_delta - local_components)
+    charged_postroot_qdim = quotient_qdim - local_charge
+    return (
+        quotient_qdim,
+        quotient_ambient_dim,
+        visible_image_dim_bound,
+        invisible_fiber_dim_min,
+        universal_postroot_qdim,
+        support_saving_qdim,
+        charged_postroot_qdim,
+    )
+
+
 def theta_chain_reports(
     trace: list[dict[tuple[int, int], tuple[int, ...] | None]],
     values_by_level: list[dict[int, list[float]]],
@@ -681,6 +718,11 @@ def main() -> None:
         default=None,
         help="Report longest best-transition chains containing this tau-two theta value.",
     )
+    parser.add_argument(
+        "--report-tau1-incidence",
+        action="store_true",
+        help="Report best-transition tau-one quotient-line incidence dimension diagnostics.",
+    )
     parser.add_argument("--report-limit", type=int, default=20)
     args = parser.parse_args()
 
@@ -715,6 +757,7 @@ def main() -> None:
     trace: list[dict[tuple[int, int], tuple[int, ...] | None]] = []
     values_by_level: list[dict[int, list[float]]] = [{span: values[:] for span, values in values_by_span.items()}]
     theta_reports: list[tuple[float, int, int, int, tuple[int, ...]]] = []
+    tau1_reports: list[tuple[float, int, int, int, tuple[int, ...]]] = []
 
     print("level,k,n,span_count,min_log2,max_log2", flush=True)
     print(f"0,1,{args.expansion},1,0.00000000,0.00000000", flush=True)
@@ -748,6 +791,14 @@ def main() -> None:
                 if value <= NEG_INF / 2:
                     continue
                 theta_reports.append((value, level, span, z, choice))
+        if args.report_tau1_incidence:
+            for (span, z), choice in choices.items():
+                if choice is None or choice[3] != 1:
+                    continue
+                value = values_by_span[span][z]
+                if value <= NEG_INF / 2:
+                    continue
+                tau1_reports.append((value, level, span, z, choice))
         finite = [
             value
             for values in values_by_span.values()
@@ -831,6 +882,48 @@ def main() -> None:
                 f"{inner_next_tau},{inner_next_theta}"
             )
 
+    if args.report_tau1_incidence:
+        tau1_reports.sort(reverse=True, key=lambda row: row[0])
+        print(
+            "tau1_report_level,span,z,log2_state,p,s,a,outer_span,inner_span,"
+            "outer_zeros,inner_zeros,local_charge,delta,comp,quotient_qdim,"
+            "quotient_ambient_dim,visible_image_dim_bound,invisible_fiber_dim_min,"
+            "universal_postroot_qdim,support_saving_qdim,charged_postroot_qdim,"
+            "lift_qdim"
+        )
+        for value, level, span, z, choice in tau1_reports[: args.report_limit]:
+            profile = tau1_incidence_profile(span, choice)
+            if profile is None:
+                continue
+            (
+                quotient_qdim,
+                quotient_ambient_dim,
+                visible_image_dim_bound,
+                invisible_fiber_dim_min,
+                universal_postroot_qdim,
+                support_saving_qdim,
+                charged_postroot_qdim,
+            ) = profile
+            p = choice[0]
+            singleton_count = choice[1]
+            visible_support_size = choice[2]
+            outer_span = choice[4]
+            inner_span = choice[5]
+            outer_zeros = choice[6]
+            local_charge = choice[7]
+            local_delta = choice[8]
+            local_components = choice[9]
+            lift_qdim = choice[14]
+            inner_zeros = p + singleton_count
+            print(
+                f"{level},{span},{z},{value:.8f},{p},{singleton_count},"
+                f"{visible_support_size},{outer_span},{inner_span},{outer_zeros},"
+                f"{inner_zeros},{local_charge},{local_delta},{local_components},"
+                f"{quotient_qdim},{quotient_ambient_dim},{visible_image_dim_bound},"
+                f"{invisible_fiber_dim_min},{universal_postroot_qdim},"
+                f"{support_saving_qdim},{charged_postroot_qdim},{lift_qdim}"
+            )
+
     if args.report_theta_chains is not None:
         print("theta_chain_len,start_level,span,z,log2_state,path")
         for chain_len, level, span, z, value, path in theta_chain_reports(
@@ -844,7 +937,9 @@ def main() -> None:
     if args.trace_z >= 0:
         print(
             "trace_level,span,z,p,s,a,tau,outer_span,inner_span,outer_zeros,inner_zeros,"
-            "local_charge,delta,comp,g,theta,dominant_h,gamma,lift_qdim"
+            "local_charge,delta,comp,g,theta,dominant_h,gamma,lift_qdim,"
+            "tau1_quotient_qdim,tau1_universal_postroot_qdim,"
+            "tau1_support_saving_qdim,tau1_charged_postroot_qdim"
         )
         span = args.trace_span
         z = args.trace_z
@@ -871,11 +966,28 @@ def main() -> None:
                 lift_qdim,
             ) = choice
             inner_zeros = p + singleton_count
+            tau1_profile = tau1_incidence_profile(span, choice)
+            tau1_quotient_qdim = ""
+            tau1_universal_postroot_qdim = ""
+            tau1_support_saving_qdim = ""
+            tau1_charged_postroot_qdim = ""
+            if tau1_profile is not None:
+                (
+                    tau1_quotient_qdim,
+                    _tau1_quotient_ambient_dim,
+                    _tau1_visible_image_dim_bound,
+                    _tau1_invisible_fiber_dim_min,
+                    tau1_universal_postroot_qdim,
+                    tau1_support_saving_qdim,
+                    tau1_charged_postroot_qdim,
+                ) = tau1_profile
             print(
                 f"{level},{span},{z},{p},{singleton_count},{visible_support_size},"
                 f"{visible_tau},{outer_span},{inner_span},{outer_zeros},{inner_zeros},"
                 f"{local_charge},{local_delta},{local_components},{local_g},{local_theta},"
-                f"{local_h},{local_gamma},{lift_qdim}"
+                f"{local_h},{local_gamma},{lift_qdim},{tau1_quotient_qdim},"
+                f"{tau1_universal_postroot_qdim},{tau1_support_saving_qdim},"
+                f"{tau1_charged_postroot_qdim}"
             )
             span = outer_span
             z = outer_zeros

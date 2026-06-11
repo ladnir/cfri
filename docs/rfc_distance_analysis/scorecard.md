@@ -45,7 +45,7 @@ Open items are excluded from the denominator.
 | Scalar `q^{-r|E|}` rank-pattern recurrence | 0 | 0 | 1 | 0% | Retired as theorem | Base repetition / low-visible-rank blocks lose `q^{(r-1)(s-1)}` locally; needs span/visible-support/flag state. |
 | All-lift cover shortcut | 0 | 0 | 1 | 0% | Retired as theorem | `--cover-lift-mode all` moves depth-5 checkpoint to `z=35`, but it drops tau-positive quotient-line/plane incidence and is anti-conservative. |
 | Quotient-incidence flag-lift recurrence | 0 | 2 | 0 | 0% | Keep as corrected candidate | Tau-zero duplicate-lift covering is safe; tau-positive branches must count quotient lines/planes via support-subcode/exterior incidence plus invisible-fiber dimensions. |
-| Tau-one fixed-flag quotient-line incidence | 0 | 1 | 0 | 0% | Safe local brick, not a closer | `rfc_tau1_quotient_line_incidence_lemma.md` proves the post-root exponent `f_A + m_A - 1 - |A|`; small-support rows can still match the coarse bound. |
+| Tau-one fixed-flag quotient-line incidence | 0 | 1 | 0 | 0% | Safe local brick, not a closer | `rfc_tau1_quotient_line_incidence_lemma.md` proves the post-root exponent `f_A + m_A - 1 - |A|`; `--report-tau1-incidence` shows the `z=34` tau-one trace rows have `support_saving=0`. |
 | Kernel-lift-only cover | 0 | 0 | 1 | 0% | Not useful for current base seal | `--cover-kernel-lift` keeps quotient incidence and leaves depth-5 checkpoint at `z=137`; combined with safe tau-zero covering it still only reaches `z=135`. |
 | One-layer shortened child flag ambient | 0 | 0 | 1 | 0% | Not useful for current base seal | Diagnostic `--flag-bound best-shortened` leaves the depth-5 checkpoint at `z=137` and the `z=34` trace unchanged. |
 | High-kernel/local-incidence bonus | 0 | 0 | 0 | open | Next candidate | Need prove hard row carrying large shortened ambient pays more than uniform `q^-9`. |
@@ -162,3 +162,9 @@ and quotient data are carried explicitly. It also warned that recursive child fl
 inclusion diagram rather than a single chain. The first safe tau-positive brick is now written as
 `rfc_tau1_quotient_line_incidence_lemma.md`: for fixed child flag and support `A`, the universal
 post-root quotient-line exponent is `f_A + m_A - 1 - |A|`, with binary-field constants included.
+
+Tau-one incidence diagnostics added to `rfc_flag_span_moment.py`. On the safe tau-zero `z=34`
+trace, the tau-one rows have `support_saving_qdim=0`; the charged post-root exponents equal the
+universal fixed-line exponents. Therefore the immediate blocker is not a missing tau-one local
+support-subcode saving, but the recursive joint child-state/quotient-plane accounting after those
+tau-one rows.

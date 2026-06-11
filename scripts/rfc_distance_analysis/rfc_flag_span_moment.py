@@ -20,6 +20,10 @@ Grassmann cap `local_charge >= |A|` from the incidence note.
 The cover-lift modes are anti-conservative diagnostics for existence-style container counting. They
 are not certificates. They test where quotient/lift multiplicity is concentrated; for tau>0, a
 proof must add quotient-incidence counts back rather than simply zeroing the lift factor.
+
+The kernel-lift cover diagnostic is narrower: it removes only the choice of `K <= L+L` after the
+inner child container `L` is fixed, while keeping quotient incidence. This is a proof target rather
+than a certificate.
 """
 
 from __future__ import annotations
@@ -258,6 +262,7 @@ def lift_flag_span_moment(
     flag_bound_mode: str,
     max_visible_tau: int,
     cover_lift_mode: str,
+    cover_kernel_lift: bool,
     max_parent_span: int | None = None,
 ) -> tuple[dict[int, list[float]], dict[tuple[int, int], tuple[int, ...] | None]]:
     child_n = len(next(iter(child_by_span.values()))) - 1
@@ -433,6 +438,8 @@ def lift_flag_span_moment(
                                     kernel_lift_log = (
                                         kernel_dim * (2 * inner_span - kernel_dim) * q_log2
                                     )
+                                    if cover_kernel_lift:
+                                        kernel_lift_log = 0.0
                                     quotient_lift_log = (
                                         visible_tau * (2 * outer_span - parent_span) * q_log2
                                     )
@@ -623,6 +630,14 @@ def main() -> None:
         ),
     )
     parser.add_argument(
+        "--cover-kernel-lift",
+        action="store_true",
+        help=(
+            "Diagnostic/proof target: remove only K<=L+L kernel-lift multiplicity after the "
+            "inner child container is fixed, while keeping quotient incidence."
+        ),
+    )
+    parser.add_argument(
         "--prune-to-final-span",
         type=int,
         default=0,
@@ -693,6 +708,7 @@ def main() -> None:
             args.flag_bound,
             args.max_visible_tau,
             args.cover_lift_mode,
+            args.cover_kernel_lift,
             max_parent_span,
         )
         trace.append(choices)

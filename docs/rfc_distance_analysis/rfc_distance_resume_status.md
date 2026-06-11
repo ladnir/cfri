@@ -135,6 +135,12 @@ docs/rfc_distance_analysis/rfc_covering_flag_lift_lemma.md
   all-cover lift removal is anti-conservative for tau-positive branches because quotient
   lines/planes are event data. Tau-zero duplicate-lift covering is safe; tau-positive branches need
   quotient-incidence/fiber accounting.
+
+docs/rfc_distance_analysis/rfc_depth5_flag_checkpoint_trace.md
+  Status: diagnostic.
+  Records the corrected depth-5 traces. Safe tau-zero covering leaves z=34 far too large and moves
+  the dominant path into tau-one quotient-incidence chains. Kernel-lift-only covering has no
+  crossing effect.
 ```
 
 The external Fable audit was useful and found the product-of-first-moments bug. Its record is:

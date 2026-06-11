@@ -84,6 +84,7 @@ rfc_depth5_rank_pattern_contract.md           rank-pattern recurrence contract f
 rfc_depth5_rank_pattern_audit.md              audit showing scalar rank-pattern needs flag refinement
 rfc_depth5_finite_flag_recurrence_target.md   finite flag DP/theorem target for the base seal
 rfc_covering_flag_lift_lemma.md               covering/projectivization lemma target for quotient lifts
+rfc_depth5_flag_checkpoint_trace.md           corrected trace showing quotient-incidence blocker
 scripts/rfc_distance_analysis/rfc_defect_conservation.py fixed-witness defect-conservation diagnostic
 scripts/rfc_distance_analysis/rfc_shortened_rank_recurrence.py optimistic shortened-kernel rank recurrence
 rfc_rank_pattern_induction_target.md          current finite-replica induction target

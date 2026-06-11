@@ -129,6 +129,9 @@ multiplicities to locate where lift/quotient incidence is concentrated. Supporte
 `tau0`, `tau1`, `tau2`, `tau0tau1`, `tau0tau2`, `tau1tau2`, and `all`. It is not a certificate
 mode. For tau-positive branches, quotient lines/planes are event data and must be counted by a
 quotient-incidence/fiber theorem; zeroing those lifts is only a sensitivity test.
+The narrower `--cover-kernel-lift` diagnostic removes only the `K<=L+L` kernel-lift factor while
+keeping quotient incidence. In the current depth-5 base checkpoint it leaves the crossing at
+`z=137`, so kernel-lift multiplicity is not the active source of looseness.
 Use `--report-theta-chains -1` to summarize the longest consecutive best-transition chain of
 tau-two `theta_2=-1` rows through the outer/inner child graph.
 

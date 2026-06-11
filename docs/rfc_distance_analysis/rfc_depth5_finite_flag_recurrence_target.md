@@ -321,3 +321,9 @@ q_log2=128.
 If this finite DP still crosses far above `34`, the base-seal route is probably not the fastest
 path. If it moves close to `34`, the remaining task is to turn the finite transition inequalities
 into theorem-grade lemmas and constants.
+
+The corrected checkpoint trace after retiring the all-cover shortcut is recorded in:
+
+```text
+docs/rfc_distance_analysis/rfc_depth5_flag_checkpoint_trace.md
+```

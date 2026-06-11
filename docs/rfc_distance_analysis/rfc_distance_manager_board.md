@@ -55,6 +55,7 @@ The scalar `q^{-r|E|}` rank-pattern recurrence is retired as a theorem. It fails
 low-visible-rank blocks before tuple-span/flag savings are exposed. The finite base seal remains
 plausible only as an exact-support container/flag recurrence. The all-cover diagnostic is not a
 candidate theorem; tau-positive quotient incidence must be counted.
+Corrected trace note: `rfc_depth5_flag_checkpoint_trace.md`.
 
 ## Blocker Review
 
@@ -110,7 +111,8 @@ Live blockers:
    state is `pi(K)<=pi(W)` with zero budgets `p+s-a` and `p+s`; the key new lemma is a
    proof-safe quotient-incidence/projectivization map for quotient lifts, now stated in
    `rfc_covering_flag_lift_lemma.md`. Tau-zero duplicate lift covering is safe; tau-positive
-   branches must keep quotient line/plane incidence and invisible-fiber dimensions.
+   branches must keep quotient line/plane incidence and invisible-fiber dimensions. Kernel-lift
+   covering alone has no effect on the current depth-5 crossing.
 ```
 
 Current honesty check:

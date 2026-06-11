@@ -2,7 +2,12 @@
 
 Scope: original non-systematic RFC, finite base seal for the `c=8,k=2048,e=71` distance proof.
 
-Status: proof contract and deterministic calibration. This is not yet a theorem.
+Status: deterministic calibration and a now-audited non-theorem scalar contract.
+
+Important update: `rfc_depth5_rank_pattern_audit.md` shows that the scalar
+`q^{-r(s-c)}` singleton charge is not proof-safe for multi-coordinate low-visible-rank child
+images. This note remains useful as the optimistic calibration and target trace, but the theorem
+route must refine it to an exact-support/flag recurrence.
 
 ## Target
 

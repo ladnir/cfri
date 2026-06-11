@@ -41,6 +41,18 @@ tau=2 intermediate rank-drop layers, especially the connected
 a=5, delta=3, comp=1, g=1, kappa>=2 layer.
 ```
 
+Depth-5 base-seal update:
+
+```text
+optimistic scalar replica calibration: z=34, log2 moment -115.10
+span/subspace endpoint diagnostics:    z=249
+two-layer flag checkpoint:             z=137
+```
+
+The scalar `q^{-r|E|}` rank-pattern recurrence is retired as a theorem. It fails on
+low-visible-rank blocks before tuple-span/flag savings are exposed. The finite base seal remains
+plausible only as an exact-support flag recurrence.
+
 ## Blocker Review
 
 Retired empirical blockers:
@@ -90,6 +102,9 @@ Live blockers:
    The determinant-1 nonzero-root normalization is now separated out: for `T in F^*`, singleton
    roots cost at most `q^-1 * q/(q-1)` each, so this construction constant is finite and
    binary-field compatible rather than a new q-dimensional loss.
+7. For the depth-5 base-seal route, replace the scalar rank-pattern recurrence by a finite
+   exact-support flag recurrence for the reachable `B_4(2,u)` states. The required child state is
+   `pi(K)<=pi(W)` with zero budgets `p+s-a` and `p+s`.
 ```
 
 Current honesty check:
@@ -794,8 +809,9 @@ Current ranked obstruction families:
    `b=14` even with one boundary charge. New alternate route:
    `rfc_depth5_base_seal_candidate.md` shows the depth-5 replica rank-pattern calibration crosses
    at `z=34` with log2 moment `-115.10`, so a finite `B_5(1,34)<=2^-80` theorem would seal the
-   child-k=32 floor directly. The exact recurrence contract is now
-   `rfc_depth5_rank_pattern_contract.md`;
+   child-k=32 floor directly. Audit update: the scalar recurrence contract in
+   `rfc_depth5_rank_pattern_contract.md` is only the optimistic trace. The proof-safe route is the
+   exact-support flag refinement in `rfc_depth5_rank_pattern_audit.md`;
 2. higher-drop local layers kappa >= g+2;
 3. mixed-fiber chain shapes where the intermediate layer persists across levels;
 4. mixed chain shapes tau=1->2 and tau=2->1 after the exact-support incidence cap is fixed;

@@ -42,9 +42,10 @@ Open items are excluded from the denominator.
 | Observed-shape defect routing | 2 | 0 | 0 | 100% | Looks safe | Child-k 8/16 observed slices are safe or strict-impossible with huge defect charge. |
 | Reachable `child_k=32, zeros=(34,39,44)` stress row | 0 | 1 | 1 | 0% | Current blocker | Better than unreachable toy, but at `b=14` has a 3 q-dimension gap even with one boundary charge. |
 | Raw one-step defect conservation for floor row | 0 | 0 | 1 | 0% | Retired for this blocker | `rfc_defect_conservation.py --child-k 16 --parent-dim 14 --parent-zeros 34` gives worst slack `-210`; raw flag counting is too loose. |
+| Scalar `q^{-r|E|}` rank-pattern recurrence | 0 | 0 | 1 | 0% | Retired as theorem | Base repetition / low-visible-rank blocks lose `q^{(r-1)(s-1)}` locally; needs span/visible-support/flag state. |
 | High-kernel/local-incidence bonus | 0 | 0 | 0 | open | Next candidate | Need prove hard row carrying large shortened ambient pays more than uniform `q^-9`. |
 | Joint nested shortened-rank profile charge | 0 | 0 | 0 | open | Next candidate | May recover missing few dimensions by charging the whole nested profile, not max one edge. |
-| Finite `k<=32,e=2` base-case seal | 0 | 1 | 0 | 0% | Promising partial | Depth-5 replica calibration crosses at `z=34` with log2 moment `-115.10`; recurrence contract is written; needs rank-pattern theorem, since component-uniform mode fails. |
+| Finite `k<=32,e=2` base-case seal | 0 | 2 | 0 | 0% | Promising but needs flag refinement | Depth-5 replica calibration crosses at `z=34` with log2 moment `-115.10`; scalar rank-pattern recurrence failed audit; two-layer flag checkpoint crosses at `z=137`, so the finite seal now needs a tighter exact-support flag recurrence. |
 | Systematic all-level adaptation | 0 | 1 | 0 | 0% | Deferred | Construction/correctness seems plausible; active proof push is original non-systematic. |
 
 ## Active Frontier
@@ -100,3 +101,17 @@ multi-coordinate rank-pattern induction through depth five.
 Raw one-step defect conservation tested on the floor row and retired for this blocker:
 `child_k=16,parent_dim=14,parent_zeros=34` has worst slack `-210`, confirming that raw flag
 counting is far too loose here.
+
+Depth-5 scalar rank-pattern recurrence audited and retired as a theorem. The local charge
+`q^{-r|E|}` fails on low-visible-rank blocks; a base repetition block of size `s` misses
+`q^{(r-1)(s-1)}` before span savings. The finite base seal remains plausible only as an
+exact-support flag recurrence. Diagnostics now bracket the situation:
+
+```text
+optimistic scalar replica: z=34
+span/subspace only:        z=249
+two-layer flag checkpoint: z=137
+```
+
+So the active task is tightening the finite flag recurrence, not proving the old scalar contract.
+The concrete target is now recorded in `rfc_depth5_finite_flag_recurrence_target.md`.

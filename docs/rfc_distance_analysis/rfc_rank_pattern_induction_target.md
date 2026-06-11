@@ -80,6 +80,15 @@ new root randomness.
 
 ## Minimal Sufficient Claim
 
+Update: this scalar claim is now known to be too strong as stated. The depth-5 audit found
+low-visible-rank child blocks where a shape-free `q^{-r|E|}` singleton charge is false before
+tuple-span and child-flag savings are exposed. The corrected sufficient claim is the finite
+exact-support flag recurrence in:
+
+```text
+docs/rfc_distance_analysis/rfc_depth5_finite_flag_recurrence_target.md
+```
+
 A sufficient theorem for the near-MDS estimate is:
 
 ```text

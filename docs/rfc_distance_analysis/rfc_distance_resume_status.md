@@ -116,6 +116,17 @@ docs/rfc_distance_analysis/rfc_kernel_branch_nested_flag_recurrence.md
 docs/rfc_distance_analysis/rfc_theta_minus_one_truncation_status.md
   Status: diagnostic.
   Depth-6/7 diagnostics show max consecutive best-transition theta_2=-1 chain length 1.
+
+docs/rfc_distance_analysis/rfc_depth5_rank_pattern_audit.md
+  Status: audit / correction.
+  The optimistic depth-5 scalar rank-pattern recurrence crosses at z=34, but the scalar
+  `q^{-r|E|}` local charge is false as a theorem for low-visible-rank child blocks. The base-seal
+  route now requires a finite exact-support flag recurrence.
+
+docs/rfc_distance_analysis/rfc_depth5_finite_flag_recurrence_target.md
+  Status: theorem/DP target.
+  States the finite two-layer flag recurrence needed for the base seal, including tau=0/1/2
+  branches and the depth-4 `B_4(2,u)` state table for `0<=u<=17`.
 ```
 
 The external Fable audit was useful and found the product-of-first-moments bug. Its record is:
@@ -362,17 +373,31 @@ reachable floor stress row `zeros=(34,39,44)` is better but still has a small re
 fails from `b=10`, and even boundary-plus fails from `b=14` with deficit `3`. The next proof target
 is a reachability-plus-boundary/high-kernel lemma for this narrowed row.
 
-New base-seal candidate:
+New base-seal candidate, now qualified:
 
 ```text
 docs/rfc_distance_analysis/rfc_depth5_base_seal_candidate.md
+docs/rfc_distance_analysis/rfc_depth5_rank_pattern_contract.md
+docs/rfc_distance_analysis/rfc_depth5_rank_pattern_audit.md
+docs/rfc_distance_analysis/rfc_depth5_finite_flag_recurrence_target.md
 ```
 
 The depth-5 rank-pattern calibration with `--singleton-charge replica` crosses exactly at
 `z=34 = k+2` with log2 moment `-115.10435419`. Since the production zero floor at `child_k=32` is
 also `34`, a finite `B_5(1,34)<=2^-80` theorem would let the global recurrence stop before the
-high-defect theta-chain gap. This route depends on proving the rank-pattern induction theorem for
-replica counts `1,2,4,8,16,32`; the conservative component-uniform model does not close it.
+high-defect theta-chain gap.
+
+Audit correction: the scalar rank-pattern induction theorem is too strong. The local
+`q^{-r|E|}` singleton charge fails on low-visible-rank blocks. Span-only and subspace-only
+diagnostics are much too pessimistic (`crossing_z=249`), while the existing two-layer flag
+checkpoint improves this to `crossing_z=137`. The finite base seal is still plausible, but only
+after implementing/proving the exact-support flag recurrence that charges:
+
+```text
+pi(K) <= pi(W),
+z_pi(W) = p + s - a,
+z_pi(K) = p + s.
+```
 
 The explicit recurrence contract and top-term table are in:
 

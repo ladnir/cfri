@@ -83,11 +83,17 @@ It crosses only at:
 crossing_z = 249.
 ```
 
-So the base seal cannot rely on the old component-uniform shortcut. It needs the rank-pattern
-induction theorem targeted in:
+So the base seal cannot rely on the old component-uniform shortcut.
+
+Audit update: it also cannot rely directly on the scalar `q^{-r|E|}` rank-pattern recurrence. That
+scalar charge is false for low-visible-rank child blocks. The scalar run above remains the
+optimistic trace to beat, not a theorem.
+
+The corrected route is the finite exact-support flag recurrence targeted in:
 
 ```text
-docs/rfc_distance_analysis/rfc_rank_pattern_induction_target.md
+docs/rfc_distance_analysis/rfc_depth5_rank_pattern_audit.md
+docs/rfc_distance_analysis/rfc_depth5_finite_flag_recurrence_target.md
 ```
 
 ## Proof Target
@@ -105,20 +111,23 @@ or more generally:
 B_5(1,34) <= 2^-80.
 ```
 
-The theorem should be independent of empirical sampling. A sufficient path is to prove the
-rank-pattern induction recurrence for all replica counts:
+The theorem should be independent of empirical sampling. The proof-safe path is to decompose the
+depth-4 `r=2` states by visible singleton dimension and recurse through the child flag:
 
 ```text
-r = 1,2,4,8,16,32
+pi(K) <= pi(W),
+z_pi(W) = p+s-a,
+z_pi(K) = p+s.
 ```
 
-that occur while unfolding the depth-5 first moment, using the exact rank-one singleton algebra
-instead of the component-uniform shortcut.
+The scalar replica counts `r=1,2,4,8,16,32` still describe the unfolding, but low-span branches
+must be charged through this flag state rather than by a shape-free `q^{-r|E|}` local factor.
 
 The precise recurrence contract and calibration tables are now in:
 
 ```text
 docs/rfc_distance_analysis/rfc_depth5_rank_pattern_contract.md
+docs/rfc_distance_analysis/rfc_depth5_finite_flag_recurrence_target.md
 ```
 
 ## Interaction With The High-Defect Gap
@@ -146,6 +155,6 @@ for the `e=71` target.
 
 Promising partial.
 
-It turns the current frontier from a global high-defect chain problem into a finite rank-pattern
-base theorem. The remaining work is nontrivial but more bounded than a new arbitrary-depth
+It turns the current frontier from a global high-defect chain problem into a finite exact-support
+flag theorem. The remaining work is nontrivial but more bounded than a new arbitrary-depth
 theta-chain lemma.

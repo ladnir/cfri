@@ -41,6 +41,7 @@ Open items are excluded from the denominator.
 | Production zero-floor reachability | 1 | 1 | 0 | 50% | Useful narrowing | Excludes `child_k=32,z=21` toy from production `e=71`; reachable `z=34` stress still has a gap. |
 | Observed-shape defect routing | 2 | 0 | 0 | 100% | Looks safe | Child-k 8/16 observed slices are safe or strict-impossible with huge defect charge. |
 | Reachable `child_k=32, zeros=(34,39,44)` stress row | 0 | 1 | 1 | 0% | Current blocker | Better than unreachable toy, but at `b=14` has a 3 q-dimension gap even with one boundary charge. |
+| Raw one-step defect conservation for floor row | 0 | 0 | 1 | 0% | Retired for this blocker | `rfc_defect_conservation.py --child-k 16 --parent-dim 14 --parent-zeros 34` gives worst slack `-210`; raw flag counting is too loose. |
 | High-kernel/local-incidence bonus | 0 | 0 | 0 | open | Next candidate | Need prove hard row carrying large shortened ambient pays more than uniform `q^-9`. |
 | Joint nested shortened-rank profile charge | 0 | 0 | 0 | open | Next candidate | May recover missing few dimensions by charging the whole nested profile, not max one edge. |
 | Finite `k<=32,e=2` base-case seal | 0 | 1 | 0 | 0% | Promising partial | Depth-5 replica calibration crosses at `z=34` with log2 moment `-115.10`; needs rank-pattern theorem, since component-uniform mode fails. |
@@ -91,3 +92,7 @@ Depth-5 base-seal candidate tested. The replica rank-pattern calibration gives
 `B_5(1,34)` log2 moment `-115.10435419`, exactly matching the production zero floor at
 `child_k=32`. The component-uniform shortcut fails badly, so this is a rank-pattern theorem route,
 not an old component-uniform route.
+
+Raw one-step defect conservation tested on the floor row and retired for this blocker:
+`child_k=16,parent_dim=14,parent_zeros=34` has worst slack `-210`, confirming that raw flag
+counting is far too loose here.

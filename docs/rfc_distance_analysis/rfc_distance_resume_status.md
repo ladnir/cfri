@@ -255,7 +255,9 @@ larger-support local row that must be charged separately.
 
 Constants budget at the target scale: `log_q N = 14/128`. The toy margin `7` can absorb up to
 roughly `N^64` worth of fixed polynomial state count, minus any explicit `q+1` frame factors. The
-next proof must keep state labels canonical enough to stay within that budget.
+new helper `scripts/rfc_distance_analysis/rfc_state_constant_budget.py` shows that the illustrative
+canonical budget `N^32 * (q+1)^2 * 52^11` costs `5.98988154` q-dimensions, leaving `1.01011846`.
+The next proof must keep state labels canonical enough to stay within that budget.
 ```
 
 ## Diagnostic Script

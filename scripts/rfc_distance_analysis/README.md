@@ -26,6 +26,7 @@ rfc_flag_span_moment.py             two-layer flag diagnostic for kernel-zero pr
 rfc_theta_chain_normal_slice.py     shortened-ambient/defect-slice checker with optimistic rho columns
 rfc_defect_conservation.py          fixed-witness rank-defect conservation checker for exposed shortened ambients
 rfc_shortened_rank_recurrence.py    optimistic rho_h(D,z) recurrence with paired-spine compression
+rfc_state_constant_budget.py        q-dimensional budget helper for hard-trace state constants
 rfc_visible_span_profile.py         exact local visible-span subspace profiler with support summaries
 rfc_support_profile_bound.py        Gaussian support-containment bound from delta(A)
 rfc_root_line_kernel_profile.py     root-line kernel profile with exact-support inversion/discovery
@@ -70,6 +71,10 @@ traces mark this route with `dominant_h=-4` if it is selected.
 checking whether a cheap paired-spine rank trace should also pay one `q^-9` first-drop charge per
 hard `s=5` step. Add `--ancestor-exponent E` to print the hard-trace margin
 `9*hard_steps + rho - E`.
+
+`rfc_state_constant_budget.py` is deterministic bookkeeping, not a profiler. It converts canonical
+state-count models such as `N^32 * (q+1)^2 * 52^11` into q-dimensional overhead so the hard-trace
+potential in `rfc_theta_minus_one_isolation_lemma.md` can be checked against its remaining margin.
 
 `rfc_root_line_kernel_profile.py` reports the corrected tau-2 asymptotic endpoint columns:
 `generic_endpoint_logq`, `component_endpoint_logq`, `endpoint_bound_logq`, and

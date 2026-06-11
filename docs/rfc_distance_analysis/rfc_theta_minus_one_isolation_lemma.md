@@ -435,6 +435,68 @@ frame factors of size `q+1` should be counted as about one q-dimension each. Thi
 must keep the hard-trace state labels finite and canonical: duplicate certificates cannot be
 allowed to grow into a hidden `N^Omega(d)` or `q^Omega(1)` loss.
 
+### Canonical-State Constants Lemma
+
+Work with exact nested zero witnesses and atomic profiles as in
+`rfc_multilayer_flag_transition_theorem.md`. For a minimal hard trace step:
+
+```text
+s = a = 5,
+A subset S,
+```
+
+we have `A=S`. Therefore, after the singleton witness set `S` is fixed, the visible-support label
+has no extra choice. The remaining real choices fall into the following buckets:
+
+```text
+already charged:
+  - zero witness and paired/singleton split choices in the outer first-moment sum;
+  - local root-line variety size in the q^-9 hard-row charge;
+  - ancestor subspace choices in E_anc;
+  - terminal shortened-kernel rank event in rho_term;
+
+finite canonical labels:
+  - active edge order and merge/delete labels alpha,beta;
+  - local component/matroid type on five support coordinates;
+  - hard/all-paired trace word of length at most d;
+  - finite root-fiber normalization for the determinant-1 law;
+  - Gaussian prefactors Gamma_q^O(d).
+```
+
+The duplicate-certificate rule is essential. Different bases of the same visible two-plane,
+different bases of the same parent/kernel subspaces, marked-core labels that collapse to the same
+exact support, and unconsumed tracked sublines are not events. They may be used to prove a bound
+for one atomic event, but they cannot multiply the event after the canonical state has been chosen.
+
+For the default target, a conservative illustrative budget is:
+
+```text
+N^32 * (q+1)^2 * 52^11.
+```
+
+The helper:
+
+```text
+python scripts/rfc_distance_analysis/rfc_state_constant_budget.py \
+  --poly-degree 32 \
+  --q-factors 2 \
+  --finite-labels 52 \
+  --label-power 11 \
+  --margin 7
+```
+
+reports:
+
+```text
+qdim_total = 5.98988154,
+slack      = 1.01011846.
+```
+
+This is not a final constants proof, but it shows the scale: a canonical hard-trace state count of
+roughly this size fits the toy margin. A much coarser `N^64` count plus any `q+1` factors would not
+fit, so the implementation/theorem must avoid broad grouped profiles that reintroduce duplicate
+certificate multiplicity.
+
 ## Diagnostic Check
 
 The checkpoint script now reports the immediate child transition type for each best

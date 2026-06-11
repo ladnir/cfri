@@ -70,12 +70,12 @@ log2 vector moment = 2497.05321083.
 Best trace:
 
 ```text
-level span z   log2_state      p   s   a   tau outer inner outer_z inner_z charge lift_qdim
-5     1    34  2369.05321083   15  4   4   1   2     0     15      19      4      3
-4     2    15  2470.43486387   7   1   1   1   4     2     7       8       1      9
-3     4    7   1054.81698675   3   1   1   1   4     4     3       4       1      19
-2     4    3   -1003.06336206  0   3   3   2   2     1     0       3       6      0
-1     2    0   0.00000000      0   0   0   0   1     1     0       0       0      0
+level span z   log2_state      p   s   a   tau outer inner outer_z inner_z charge delta lift_qdim
+5     1    34  2369.05321083   15  4   4   1   2     0     15      19      4      1     3
+4     2    15  2470.43486387   7   1   1   1   4     2     7       8       1      1     9
+3     4    7   1054.81698675   3   1   1   1   4     4     3       4       1      1     19
+2     4    3   -1003.06336206  0   3   3   2   2     1     0       3       6      2     0
+1     2    0   0.00000000      0   0   0   0   1     1     0       0       0      0     0
 ```
 
 After removing the safe tau-zero duplicate lifts, the dominant path moves to tau-one

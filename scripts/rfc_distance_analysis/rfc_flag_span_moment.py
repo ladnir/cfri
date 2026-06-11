@@ -415,6 +415,11 @@ def lift_flag_span_moment(
                                 if outer_span == 0:
                                     continue
                                 if incidence_mode:
+                                    quotient_delta_floor = (
+                                        max(0, outer_span - inner_span)
+                                        if visible_tau == 2
+                                        else 0
+                                    )
                                     (
                                         charge,
                                         local_delta,
@@ -427,7 +432,7 @@ def lift_flag_span_moment(
                                         visible_tau,
                                         outer_zeros,
                                         visible_support_size,
-                                        max(0, outer_span - inner_span),
+                                        quotient_delta_floor,
                                     )
                                     if charge >= INF:
                                         continue

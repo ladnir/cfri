@@ -287,6 +287,16 @@ or a sharper two-marked-line frame state. The `q+1` factor pays for the second l
 two-dimensional child span. This row is decomposable, but it is not closed by a product of first
 moments.
 
+The current demanded trace also exposes a high-lift variant with parent span `2`, `tau=2`,
+`|A|=2`, `delta=2`, `comp=2`, `K=0`, and fixed child span `4`. After the child 4-container is
+fixed, each rank-one component spans a child 2-plane inside a codimension-one slice of that
+container. This replaces the scalar post-root `q^8` component placement by `q^4` up to Gaussian
+constants. The local statement and diagnostic hook are recorded in:
+
+```text
+docs/rfc_distance_analysis/rfc_support_two_high_lift_component_plane_bound.md
+```
+
 The next boundary row:
 
 ```text

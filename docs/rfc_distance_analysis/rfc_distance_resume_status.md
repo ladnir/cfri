@@ -207,6 +207,15 @@ docs/rfc_distance_analysis/rfc_nested_tau0_equal_container_filter.md
   `423.08002115` to `27.05765334` bits in the strong table. The demanded depth-5 no-closure
   checkpoint with `--nested-tau0-equal-container-filter` reports `z=34` at `1080.36409460` bits;
   still not closed.
+
+docs/rfc_distance_analysis/rfc_support_two_high_lift_component_plane_bound.md
+  Status: local theorem target and diagnostic.
+  Handles the high-lift decomposable support-two row at `(2,15)` with `K=0` and `dim V=4`. After
+  fixing `V`, each rank-one support component spans a child 2-plane inside a codimension-one slice
+  of `V`, costing `q^2` per component instead of `q^4`. The opt-in mode
+  `--support2-component-plane-mode high-lift` moves the demanded depth-5 full-level-2 checkpoint
+  to `final_span_1_z_report,34,967.01172212` and `crossing_z=130`. The new top blocker is
+  `a=3,delta=3,comp=3` tau-two layer-codimension.
 ```
 
 The external Fable audit was useful and found the product-of-first-moments bug. Its record is:

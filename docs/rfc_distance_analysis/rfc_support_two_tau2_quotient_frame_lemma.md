@@ -261,6 +261,47 @@ not the next aggregate bottleneck for this level-3 table by itself. The next imp
 is therefore to integrate the child-only quotient-diamond query into the demanded pair table, then
 retrace the full depth-5 `z=34` path and identify the new dominant family.
 
+## High-Lift Component-Plane Follow-Up
+
+After the nested tau-zero equal-container filter, the next support-two rows at state `(2,15)` are
+not the low-lift diamond above. They have:
+
+```text
+parent span = 2
+tau = 2
+|A| = 2
+delta = 2
+comp = 2
+K = 0
+dim V = 4
+```
+
+Each rank-one support component can span a child 2-plane, but that plane lies inside a
+codimension-one slice of the fixed child 4-container. The local component-plane bound is isolated
+in:
+
+```text
+docs/rfc_distance_analysis/rfc_support_two_high_lift_component_plane_bound.md
+```
+
+The corresponding diagnostic mode is:
+
+```text
+--support2-component-plane-mode high-lift
+```
+
+It changes only this high-lift support-two shape, replacing the eight-q-dimensional post-root
+component placement budget by four q-dimensions. In the current demanded depth-5 checkpoint with
+full level-2 tables, it moves:
+
+```text
+final_span_1_z_report,34: 1080.07027174 -> 967.01172212
+crossing_z:              133 -> 130
+```
+
+The support-two frame rows then fall below the top, and the visible blocker becomes an
+`a=3,delta=3,comp=3` tau-two layer-codimension row.
+
 ## Integrated Recurrence Diagnostic
 
 The child-only mode is now available in the pair-table recurrence as:

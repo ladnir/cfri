@@ -56,6 +56,7 @@ Open items are excluded from the denominator.
 | Nested quotient/subspace/consumed-kernel counting | 0 | 1 | 0 | 0% | Strong diagnostic, conditional theorem target | The three modes `inner-in-outer`, `inner-in-outer`, and `tau0-inner-contained` lower the level-3 stress table to `303.44` and full depth-5 `z=34` to `1232.89`. `rfc_exact_support_quotient_state.md` now states the needed compatibility labels, especially `K_lower = W_lower cap K_upper` for upper-visible nested quotient counting. Decoded trace columns show the top stress row still has remaining quotient lifts `outer=8, inner=1`, so the residual is the outer support-two tau-two frame count. |
 | Kernel-lift-only cover | 0 | 1 | 1 | 0% | Useful after richer state, still not enough | Earlier `--cover-kernel-lift` kept crossing at `z=137`; after nested diagnostics it lowers `z=34` to `924.69`, but crossing remains `z=133` and tau-two/tau-one quotient chains dominate. |
 | Support-two tau-two quotient-frame bound | 1 | 2 | 0 | 33% | Keep, but old stress row is no longer dominant | The decoded `(4,7)>=(2,8)` structural trace has outer `a=2,tau=2,charge=4,lift=12` and adjusted qdim `8`, while the nested inner tau-one line is already reduced to one remaining quotient dimension. `--support2-diamond-mode child-only` lowers that level-3 pair sum from `303.44` to `61.01` bits and full depth-5 `z=34` from `1232.89` to `1095.86`, but the new blocker is `(4,2)>=(2,4)` with a strong bottom/kernel zero budget. |
+| High-lift support-two component planes | 1 | 1 | 0 | 50% | Strong local improvement, next blocker exposed | `rfc_support_two_high_lift_component_plane_bound.md` proves the intended count shape for `parent_span=2,tau=2,a=2,K=0,dim V=4`: after `V` is fixed, the two rank-one components choose child 2-planes inside codimension-one slices, saving four q-dimensions. Diagnostic mode `--support2-component-plane-mode high-lift` moves the full-level-2 demanded checkpoint to `z=34` value `967.01` and crossing `z=130`; now `a=3,delta=3,comp=3` tau-two rows dominate. |
 | Strong-bottom positive-kernel containment | 0 | 1 | 0 | 0% | Local lemma plausible, not enough | `--consumed-kernel-mode inner-kernel-contained` charges a lower positive kernel inside the upper kernel. On `(4,2)>=(2,4)` it moves the table only from `932.90` to `931.48` bits before a codimension-one support-two line-quotient row takes over. |
 | Support-two line-quotient impossibility | 0 | 4 | 0 | 0% | Valid local filter, small fair-baseline gain | `--support2-line-quotient-filter` removes decomposable tau-two support rows with `dim(V/L)=1`, where nonempty root-line support is impossible. `--exact-filtered-empty` proves the lower `(4,2)>=(2,4)` entry is empty and improves the strong-bottom table to `803.48`. In the fair `tau0-inner-contained` baseline it moves depth-5 `z=34` from `1095.86` to `1094.26`. The `1478.22` regression belongs to the stronger `inner-kernel-contained` diagnostic and is partly sparse-demand state loss; `--full-table-until 2` and `--demand-closure-passes 1` both improve that strong-mode report to `1352.53`, while a second closure pass does not move it. |
 | One-layer shortened child flag ambient | 0 | 0 | 1 | 0% | Not useful for current base seal | Diagnostic `--flag-bound best-shortened` leaves the depth-5 checkpoint at `z=137` and the `z=34` trace unchanged. |
@@ -155,6 +156,14 @@ force the upper active support to be zero in that container. With
 `final_span_1_z_report,34,1080.36409460`. This is a real exact-support win, but the certificate is
 still open; the next visible competitors are support-two quotient-frame and tau-two
 layer-codimension rows at state `(2,15)`.
+
+High-lift support-two component-plane diagnostic added. For the decomposable `a=2,delta=2,comp=2`
+row with `K=0` and `dim V=4`, each rank-one component plane lies in a codimension-one slice of
+the fixed `V`, saving four q-dimensions versus the scalar quotient placement. With
+`--support2-component-plane-mode high-lift` and full lower tables through level 2, the demanded
+depth-5 checkpoint reports `final_span_1_z_report,34,967.01172212` and `crossing_z=130`. The
+state `(2,15)` is now topped by `p=6,s=3,a=3,tau=2,delta=3,comp=3`, so the next local blocker is a
+tau-two layer-codimension row rather than support-two high-lift placement.
 
 ### 2026-06-11
 

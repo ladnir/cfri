@@ -40,6 +40,7 @@ from rfc_flag_span_moment import (  # noqa: E402
     log2_comb_table,
     merge_equal_dimension_chain,
     marked_line_child_bound,
+    support2_component_plane_saving_qdim,
 )
 
 
@@ -132,6 +133,7 @@ def enumerate_terms_for_state(
     max_visible_tau: int,
     cover_lift_mode: str,
     cover_kernel_lift: bool,
+    support2_component_plane_mode: str = "none",
 ) -> list[TermCandidate]:
     child_n = len(next(iter(child_by_span.values()))) - 1
     child_spans = sorted(child_by_span)
@@ -266,6 +268,19 @@ def enumerate_terms_for_state(
                             lift_log = kernel_lift_log + quotient_lift_log
                             if covers_lift(cover_lift_mode, visible_tau):
                                 lift_log = 0.0
+                            else:
+                                component_plane_saving = support2_component_plane_saving_qdim(
+                                    mode=support2_component_plane_mode,
+                                    parent_span=parent_span,
+                                    visible_tau=visible_tau,
+                                    visible_support_size=visible_support_size,
+                                    kernel_dim=kernel_dim,
+                                    inner_span=inner_span,
+                                    outer_span=outer_span,
+                                    local_delta=local_delta,
+                                    local_components=local_components,
+                                )
+                                lift_log -= component_plane_saving * q_log2
                             child_log = flag_table_bound_for_layers(
                                 values_by_span=child_by_span,
                                 flag_table=child_flag_table,

@@ -271,6 +271,7 @@ def compute_pair_enumerated_flag_table(
     support2_diamond_mode: str,
     support2_line_filter: bool,
     nested_tau0_equal_container_filter: bool,
+    support2_component_plane_mode: str,
     exact_filtered_empty: bool,
     allowed_keys: set[tuple[State, State]] | None = None,
 ) -> tuple[FlagTable, TableStats]:
@@ -301,6 +302,7 @@ def compute_pair_enumerated_flag_table(
             max_visible_tau=max_visible_tau,
             cover_lift_mode=cover_lift_mode,
             cover_kernel_lift=cover_kernel_lift,
+            support2_component_plane_mode=support2_component_plane_mode,
         )
         return terms
 
@@ -431,6 +433,7 @@ def collect_pair_row_child_flag_keys(
     support2_diamond_mode: str,
     support2_line_filter: bool,
     nested_tau0_equal_container_filter: bool,
+    support2_component_plane_mode: str,
     demanded_keys: set[tuple[State, State]],
 ) -> set[tuple[State, State]]:
     """Collect lower two-layer keys queried by pair rows for demanded entries."""
@@ -462,6 +465,7 @@ def collect_pair_row_child_flag_keys(
             max_visible_tau=max_visible_tau,
             cover_lift_mode=cover_lift_mode,
             cover_kernel_lift=cover_kernel_lift,
+            support2_component_plane_mode=support2_component_plane_mode,
         )
         cached = take_terms(terms, term_limit)
         term_cache[state] = cached
@@ -689,6 +693,7 @@ def _build_pair_levels_once(
     support2_diamond_mode: str,
     support2_line_filter: bool,
     nested_tau0_equal_container_filter: bool,
+    support2_component_plane_mode: str,
     exact_filtered_empty: bool,
     last_level_keys: set[tuple[State, State]] | None,
     demand_next_level: bool,
@@ -728,6 +733,7 @@ def _build_pair_levels_once(
             previous_choices,
             previous_flag_table,
             exclude_collapsed_active=exclude_collapsed_active,
+            support2_component_plane_mode=support2_component_plane_mode,
         )
         allowed_keys = last_level_keys if level == stop_level else None
         if allowed_keys is None and level == depth and level == stop_level:
@@ -778,6 +784,7 @@ def _build_pair_levels_once(
             support2_diamond_mode=support2_diamond_mode,
             support2_line_filter=support2_line_filter,
             nested_tau0_equal_container_filter=nested_tau0_equal_container_filter,
+            support2_component_plane_mode=support2_component_plane_mode,
             exact_filtered_empty=exact_filtered_empty,
             allowed_keys=allowed_keys,
         )
@@ -815,6 +822,7 @@ def build_pair_levels(
     support2_diamond_mode: str,
     support2_line_filter: bool,
     nested_tau0_equal_container_filter: bool,
+    support2_component_plane_mode: str,
     exact_filtered_empty: bool,
     last_level_keys: set[tuple[State, State]] | None,
     demand_next_level: bool,
@@ -846,6 +854,7 @@ def build_pair_levels(
             support2_diamond_mode=support2_diamond_mode,
             support2_line_filter=support2_line_filter,
             nested_tau0_equal_container_filter=nested_tau0_equal_container_filter,
+            support2_component_plane_mode=support2_component_plane_mode,
             exact_filtered_empty=exact_filtered_empty,
             last_level_keys=last_level_keys,
             demand_next_level=demand_next_level,
@@ -884,6 +893,7 @@ def build_pair_levels(
                 support2_diamond_mode=support2_diamond_mode,
                 support2_line_filter=support2_line_filter,
                 nested_tau0_equal_container_filter=nested_tau0_equal_container_filter,
+                support2_component_plane_mode=support2_component_plane_mode,
                 demanded_keys=demanded_keys,
             )
             if not child_keys:
@@ -965,6 +975,16 @@ def main() -> None:
         help=(
             "diagnostic: exclude decomposable support-two tau-two rows with "
             "dim(V/L)=1, where nonempty exact root-line support is impossible"
+        ),
+    )
+    parser.add_argument(
+        "--support2-component-plane-mode",
+        choices=("none", "high-lift"),
+        default="none",
+        help=(
+            "diagnostic: for the high-lift decomposable support-two row, count "
+            "two component child planes inside codimension-one slices of the "
+            "fixed child 4-container"
         ),
     )
     parser.add_argument(
@@ -1085,6 +1105,7 @@ def main() -> None:
         support2_diamond_mode=args.support2_diamond_mode,
         support2_line_filter=args.support2_line_quotient_filter,
         nested_tau0_equal_container_filter=args.nested_tau0_equal_container_filter,
+        support2_component_plane_mode=args.support2_component_plane_mode,
         exact_filtered_empty=args.exact_filtered_empty,
         last_level_keys=last_level_keys,
         demand_next_level=args.demand_next_level,
@@ -1199,6 +1220,7 @@ def main() -> None:
                 max_visible_tau=args.max_visible_tau,
                 cover_lift_mode=args.cover_lift_mode,
                 cover_kernel_lift=args.cover_kernel_lift,
+                support2_component_plane_mode=args.support2_component_plane_mode,
             ),
             args.term_limit,
         )
@@ -1216,6 +1238,7 @@ def main() -> None:
                 max_visible_tau=args.max_visible_tau,
                 cover_lift_mode=args.cover_lift_mode,
                 cover_kernel_lift=args.cover_kernel_lift,
+                support2_component_plane_mode=args.support2_component_plane_mode,
             ),
             args.term_limit,
         )
@@ -1414,6 +1437,7 @@ def main() -> None:
                 max_visible_tau=args.max_visible_tau,
                 cover_lift_mode=args.cover_lift_mode,
                 cover_kernel_lift=args.cover_kernel_lift,
+                support2_component_plane_mode=args.support2_component_plane_mode,
             ),
             args.trace_state_top,
         )

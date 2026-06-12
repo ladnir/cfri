@@ -543,6 +543,46 @@ def marked_line_child_bound(
     )
 
 
+def support2_component_plane_saving_qdim(
+    *,
+    mode: str,
+    parent_span: int,
+    visible_tau: int,
+    visible_support_size: int,
+    kernel_dim: int,
+    inner_span: int,
+    outer_span: int,
+    local_delta: int,
+    local_components: int,
+) -> int:
+    """Diagnostic saving for the high-lift decomposable support-two row.
+
+    This is deliberately narrow.  It targets the current `(2,15)` support-two
+    frame rows where a two-dimensional parent quotient has no kernel and its
+    two rank-one support components each span a child 2-plane inside a
+    codimension-one slice of the fixed child 4-container.  The component-plane
+    count costs `q^2` per component rather than the current `q^4` per
+    component, saving four q-dimensions.
+    """
+
+    if mode == "none":
+        return 0
+    if mode != "high-lift":
+        raise ValueError(f"unknown support2 component-plane mode: {mode}")
+    if (
+        parent_span == 2
+        and visible_tau == 2
+        and visible_support_size == 2
+        and kernel_dim == 0
+        and inner_span == 0
+        and outer_span == 4
+        and local_delta == 2
+        and local_components == 2
+    ):
+        return 4
+    return 0
+
+
 def lift_flag_span_moment(
     child_by_span: dict[int, list[float]],
     comb: list[list[float]],
@@ -557,6 +597,7 @@ def lift_flag_span_moment(
     child_choices: dict[tuple[int, int], tuple[int, ...] | None] | None = None,
     child_flag_table: FlagTable | None = None,
     exclude_collapsed_active: bool = False,
+    support2_component_plane_mode: str = "none",
 ) -> tuple[dict[int, list[float]], dict[tuple[int, int], tuple[int, ...] | None]]:
     child_n = len(next(iter(child_by_span.values()))) - 1
     parent_n = 2 * child_n
@@ -754,6 +795,19 @@ def lift_flag_span_moment(
                                     lift_log = kernel_lift_log + quotient_lift_log
                                     if covers_lift(visible_tau):
                                         lift_log = 0.0
+                                    else:
+                                        component_plane_saving = support2_component_plane_saving_qdim(
+                                            mode=support2_component_plane_mode,
+                                            parent_span=parent_span,
+                                            visible_tau=visible_tau,
+                                            visible_support_size=visible_support_size,
+                                            kernel_dim=kernel_dim,
+                                            inner_span=inner_span,
+                                            outer_span=outer_span,
+                                            local_delta=local_delta,
+                                            local_components=local_components,
+                                        )
+                                        lift_log -= component_plane_saving * q_log2
                                     child_log = flag_child_bound(
                                         child_by_span=child_by_span,
                                         child_k=child_k,

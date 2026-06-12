@@ -454,6 +454,70 @@ The remaining proof obligations are:
    exterior/root-line counts.
 ```
 
+### Canonical Quotient/Root Datum
+
+This subsection fixes the meaning of obligation 1 for the current transition.
+
+Condition on the child code and on the current fold roots. For the singleton child block `S`, let:
+
+```text
+ev_S^T : H_{h-1} + H_{h-1} -> F^S
+```
+
+be the linear singleton-evaluation map induced by the determinant-1 fold. Its exact formula is not
+important here; only linearity and the zero propagation rules are used. For a parent subspace
+`W`, define:
+
+```text
+K = ker(ev_S^T|_W),
+Q_W = W / K,
+R_A = image(ev_A^T : Q_W -> F^A),
+```
+
+where `A` is the exact visible singleton support. Since `K` is the kernel of the full singleton
+map, `Q_W -> F^A` is injective after restricting to the exact support, so:
+
+```text
+dim Q_W = dim R_A = tau.
+```
+
+The canonical quotient/root datum `Q` is the represented object:
+
+```text
+(A, R_A, root labels on A, local tau-two layer labels if tau=2),
+```
+
+together with any quotient preimage/frame data that the local incidence bound explicitly counts.
+Thus:
+
+```text
+tau = 1: Q is a represented quotient line with its root labels;
+tau = 2: Q is a represented quotient plane with the exterior/root-line certificate.
+```
+
+This definition separates two kinds of multiplicity:
+
+```text
+1. quotient incidence:
+   choices of represented lines/planes, frames, and root labels that change R_A or its local
+   certificate. These are real event data and stay in LocalContainer(Phi).
+
+2. kernel fiber:
+   choices of K_parent <= L+L that induce the same child container and the same represented
+   quotient/root datum Q. These are the duplicate fibers targeted by the container cover.
+```
+
+The key invariance is:
+
+```text
+ev_S^T(L+L) = 0
+```
+
+whenever `L` is zero on `S`. Therefore changing an unconsumed kernel lift inside `L+L` does not
+change the induced singleton quotient/root datum. If a row can see the difference between two such
+kernel lifts only by marking an additional hidden subspace inside the lift, then that hidden
+subspace is consumed data and is outside the cover.
+
 ### Container Composability
 
 This subsection addresses obligation 3 for the unconsumed-kernel case, after the

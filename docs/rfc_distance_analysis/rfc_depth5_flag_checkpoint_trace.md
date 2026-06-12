@@ -173,6 +173,8 @@ fixed child plane, plus finite split constants. The diagnostic estimate is:
 carried merge saving:       251.97763219 bits
 two-marked-line saving:     381.41503750 bits
 combined local saving:      633.39266969 bits
+adjusted vector moment:    1863.66054115 bits
+residual to target:        1943.66054115 bits = 15.18484798 q-dim
 ```
 
 This is material but still not enough to close `z=34`. It does, however, identify the next

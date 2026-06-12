@@ -192,5 +192,6 @@ small incidence diagram rather than a total chain.
 Two-marked-line plane lemma target written. In the exposed diagram, once the outer tau-two row fixes
 the child 2-plane and one marked line, the inner tau-zero line costs at most `q+1` choices in that
 plane rather than the coarse `q^4` ancestor choice. The diagnostic estimates another `381.42` bits
-of saving, for `633.39` bits combined with the carried-flag merge. This is real progress but still
-local; the full `z=34` gap remains much larger.
+of saving, for `633.39` bits combined with the carried-flag merge. Applying both to the displayed
+path leaves vector log2 moment `1863.66`, still `15.18` q-dimensions above the `2^-80` target. This
+is real progress but still local; the full `z=34` gap remains much larger.

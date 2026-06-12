@@ -161,6 +161,10 @@ CSV_FIELDS = [
     "saving_log2",
     "diagram_bound_log2",
     "diagram_saving_log2",
+    "adjusted_state_log2",
+    "adjusted_vector_log2",
+    "residual_to_target_bits",
+    "residual_to_target_qdim",
     "note",
 ]
 
@@ -192,6 +196,7 @@ def main() -> None:
     parser.add_argument("--cover-lift-mode", default="tau0")
     parser.add_argument("--cover-kernel-lift", action="store_true")
     parser.add_argument("--prune-to-final-span", type=int, default=1)
+    parser.add_argument("--security-bits", type=float, default=80.0)
     parser.add_argument("--trace-span", type=int, default=1)
     parser.add_argument("--trace-z", type=int, default=34)
     args = parser.parse_args()
@@ -287,6 +292,7 @@ def main() -> None:
     next_inner_state = carried_child_flag[1]
     next_outer_choice = levels[2].choices.get(next_outer_state)
     next_inner_choice = levels[2].choices.get(next_inner_state)
+    total_local_saving = current_bound - carried_bound
     if next_outer_choice is not None and next_inner_choice is not None:
         comb = log2_comb_table(args.expansion * (1 << args.depth))
         inner_shape_log2 = split_shape_log2(
@@ -300,6 +306,8 @@ def main() -> None:
         # child line ranges over at most q+1 lines in that plane.  The small split factor is
         # included; finite root/constant refinements are deliberately not claimed here.
         two_marked_line_bound = outer_value + args.q_log2 + inner_shape_log2
+        diagram_saving = carried_bound - two_marked_line_bound
+        total_local_saving += diagram_saving
         emit_row(
             writer,
             kind="next_diagram",
@@ -316,12 +324,34 @@ def main() -> None:
             carried_child_flag="(2,0) with marked lines (1,4) and (1,3)",
             current_bound_log2=f"{carried_bound:.8f}",
             diagram_bound_log2=f"{two_marked_line_bound:.8f}",
-            diagram_saving_log2=f"{carried_bound - two_marked_line_bound:.8f}",
+            diagram_saving_log2=f"{diagram_saving:.8f}",
             note=(
                 "outer tau2 row and inner tau0 row create two marked child lines inside one "
                 "2-plane; q+1 line-choice diagnostic includes inner split factor only"
             ),
         )
+
+    top_state = (args.trace_span, args.trace_z)
+    original_state = value_at(levels[args.depth].values, top_state)
+    adjusted_state = original_state - total_local_saving
+    adjusted_vector = adjusted_state + args.q_log2
+    residual = adjusted_vector + args.security_bits
+    emit_row(
+        writer,
+        kind="adjusted_path",
+        level=args.depth,
+        state=format_state(top_state),
+        value_log2=f"{original_state:.8f}",
+        saving_log2=f"{total_local_saving:.8f}",
+        adjusted_state_log2=f"{adjusted_state:.8f}",
+        adjusted_vector_log2=f"{adjusted_vector:.8f}",
+        residual_to_target_bits=f"{residual:.8f}",
+        residual_to_target_qdim=f"{residual / args.q_log2:.8f}",
+        note=(
+            "applies only the carried-merge and two-marked-line local savings to the displayed "
+            "dominant path; not a summed recurrence"
+        ),
+    )
 
 
 if __name__ == "__main__":

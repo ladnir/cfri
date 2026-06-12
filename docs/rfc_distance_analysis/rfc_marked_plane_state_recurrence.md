@@ -182,6 +182,36 @@ and the best rows save exactly `3.00000000` q-dimensions before finite constants
 evidence that the diagram recurrence has a small repeated state family, not just a single isolated
 repair.
 
+`scripts/rfc_distance_analysis/rfc_diagram_path_dp.py` follows the corrected bound trace and applies
+the carried-flag and marked-plane transitions when they are exposed. On the default depth-5 `z=34`
+path it recovers the known local accounting:
+
+```text
+carry merge saving:       251.97763219 bits
+marked-plane saving:      381.41503750 bits
+combined saving:          633.39266969 bits
+remaining residual:        15.18484798 q-dimensions
+```
+
+As a separate scalar-recursive diagnostic, `rfc_flag_span_moment.py --flag-bound best-marked-plane`
+allows the recurrence to use the q+1 marked-plane child replacement wherever the relevant child
+choices already exist. This mode is selected on the depth-5 `z=34` trace (`dominant_h=-5`) and
+improves the top vector moment to:
+
+```text
+2244.71357608 bits
+```
+
+but the crossing remains:
+
+```text
+crossing_z = 135.
+```
+
+This is a key negative signal. The q+1 brick is valid and useful, but a scalar child-flag tweak
+cannot reproduce the full carried-path saving because it does not preserve the outer layer across an
+inner-first collapse. The next recurrence must carry the multi-layer diagram state itself.
+
 ## Audit Result
 
 A side audit agreed that the local rule is promising provided it is integrated as an atomic diagram

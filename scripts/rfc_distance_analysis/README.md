@@ -26,6 +26,7 @@ rfc_flag_span_moment.py             two-layer flag diagnostic for kernel-zero pr
 rfc_carried_flag_diagnostic.py      targeted carried-flag merge/diagram diagnostic for depth-5 trace
 rfc_diagram_state.py                finite incidence-diagram state skeleton and merge rules
 rfc_marked_plane_state_diagnostic.py scans finite marked-line-in-plane state savings
+rfc_diagram_path_dp.py              follows bound trace with carried-flag and marked-plane savings
 rfc_theta_chain_normal_slice.py     shortened-ambient/defect-slice checker with optimistic rho and strict hard-trace columns
 rfc_defect_conservation.py          fixed-witness rank-defect conservation checker for exposed shortened ambients
 rfc_shortened_rank_recurrence.py    optimistic rho_h(D,z) recurrence with paired-spine compression
@@ -68,6 +69,11 @@ the first quotient-incidence correction in `rfc_tau2_incidence_framing_lemma.md`
 partial-cover fiber accounting is still proof work, not a certified script feature.
 For the boundary `tau=2,a=2,delta=2,comp=2,K=0` row, it uses a safe joint marked-line child bound;
 traces mark this route with `dominant_h=-4` if it is selected.
+The diagnostic `--flag-bound best-marked-plane` mode additionally lets the recurrence use the
+two-lines-under-plane `q+1` child replacement when the required child choices are already present.
+On the current depth-5 `z=34` checkpoint this mode is selected (`dominant_h=-5`) and improves the
+top vector moment to `2244.71357608` bits, but the crossing remains `z=135`. This is important:
+the local marked-plane brick alone does not replace the carried multi-layer diagram state.
 
 `rfc_theta_chain_normal_slice.py` also reports the conservative strict hard-trace potential used by
 the current theorem target. These columns use `rfc_shortened_rank_recurrence.py` internally with
@@ -191,6 +197,20 @@ yet propagate a full diagram state through all levels.
 Use `--group-by-transition-diagram` to aggregate the matching rows by generated child diagram. On
 the current depth-5 defaults, the top positive groups are all two line nodes under a zero-budget
 child plane and show the expected `3.00000000` q-dimensional saving before finite constants.
+
+`rfc_diagram_path_dp.py` is a path-only diagnostic. With the default `best` child-flag mode it
+recovers the known depth-5 carried-path savings:
+
+```text
+carry merge:    251.97763219 bits
+marked plane:   381.41503750 bits
+combined:       633.39266969 bits
+residual:        15.18484798 q-dimensions
+```
+
+With `--flag-bound best-marked-plane`, the post-hoc positive rows disappear because the recurrence
+has already used the local q+1 brick where it can. The remaining gap shows that the next required
+object is a genuine multi-layer diagram DP, not another scalar child-flag tweak.
 
 `rfc_multicopy_falsification.py` is adversarial. It estimates whether broad one-copy near-families
 can intersect across many independent RFC copies often enough to threaten the target excess.

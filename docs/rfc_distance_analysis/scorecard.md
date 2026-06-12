@@ -48,7 +48,7 @@ Open items are excluded from the denominator.
 | Tau-one fixed-flag quotient-line incidence | 0 | 1 | 0 | 0% | Safe local brick, not a closer | `rfc_tau1_quotient_line_incidence_lemma.md` proves the post-root exponent `f_A + m_A - 1 - |A|`; `--report-tau1-incidence` shows the `z=34` tau-one trace rows have `support_saving=0`. |
 | Carried two-layer flag merge | 1 | 1 | 0 | 50% | Keep, exposes next diagram | `rfc_carried_flag_diagnostic.py` carries `F_3((4,7),(2,8))`, improves `(4,3)>=(2,5)` to `(4,4)>=(2,5)`, and saves `251.98` bits; next state is a two-marked-line diagram. |
 | Two-marked-line plane diagram | 1 | 1 | 0 | 50% | Keep, local but insufficient | `rfc_two_marked_line_plane_lemma.md` replaces a coarse `q^4` ancestor choice by `q+1`, saving another `381.42` bits on the carried path. |
-| Finite marked-plane state recurrence | 0 | 1 | 0 | 0% | Next candidate | `rfc_marked_plane_state_recurrence.md` and `rfc_marked_plane_state_diagnostic.py` turn the hand-expanded two-line diagram into an ordered-line state scan; still needs recursive propagation through all diagram nodes. |
+| Finite marked-plane state recurrence | 1 | 2 | 0 | 33% | Keep, must become multi-layer DP | `rfc_marked_plane_state_recurrence.md`, `rfc_marked_plane_state_diagnostic.py`, and `rfc_diagram_path_dp.py` turn the hand-expanded two-line diagram into an ordered-line state scan and path diagnostic. Inline scalar mode improves `z=34` but crossing stays `135`, so recursive diagram propagation is still required. |
 | Kernel-lift-only cover | 0 | 0 | 1 | 0% | Not useful for current base seal | `--cover-kernel-lift` keeps quotient incidence and leaves depth-5 checkpoint at `z=137`; combined with safe tau-zero covering it still only reaches `z=135`. |
 | One-layer shortened child flag ambient | 0 | 0 | 1 | 0% | Not useful for current base seal | Diagnostic `--flag-bound best-shortened` leaves the depth-5 checkpoint at `z=137` and the `z=34` trace unchanged. |
 | High-kernel/local-incidence bonus | 0 | 0 | 0 | open | Next candidate | Need prove hard row carrying large shortened ambient pays more than uniform `q^-9`. |
@@ -217,3 +217,19 @@ Marked-plane grouping mode added. Grouping positive rows by transition diagram s
 family `I0:d1:z_a;O0:d2:z0;O1:d1:z_b|I0<=O0;O1<=O0`, with best rows saving exactly `3` q-dimensions
 before finite constants. This supports building a small finite diagram DP rather than chasing many
 unrelated special cases.
+
+Path-DP and inline-recursive diagnostics added. `rfc_diagram_path_dp.py` recovers the known default
+depth-5 `z=34` carried-path savings exactly:
+
+```text
+carry merge:    251.97763219 bits
+marked plane:   381.41503750 bits
+combined:       633.39266969 bits
+residual:        15.18484798 q-dimensions
+```
+
+Injecting only the marked-plane q+1 brick into `rfc_flag_span_moment.py` as
+`--flag-bound best-marked-plane` is selected on the trace (`dominant_h=-5`) and improves the top
+vector moment to `2244.71357608` bits, but it leaves the crossing at `z=135`. This is a useful
+failure: the local q+1 brick is not enough unless the recurrence also carries the higher outer layer
+through inner-first collapses.

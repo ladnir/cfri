@@ -83,6 +83,7 @@ def build_levels(
     values: dict[int, list[float]] = {1: [NEG_INF] * (expansion + 1)}
     values[1][0] = 0.0
     levels = [LevelData(values={span: row[:] for span, row in values.items()}, choices={})]
+    previous_choices: dict[tuple[int, int], Choice | None] | None = None
     for level in range(1, depth + 1):
         max_parent_span = None
         if prune_to_final_span > 0:
@@ -98,7 +99,9 @@ def build_levels(
             cover_lift_mode,
             cover_kernel_lift,
             max_parent_span,
+            previous_choices,
         )
+        previous_choices = choices
         levels.append(LevelData(values={span: row[:] for span, row in values.items()}, choices=choices))
     return levels
 

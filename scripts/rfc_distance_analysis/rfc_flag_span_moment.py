@@ -28,6 +28,10 @@ than a certificate.
 The best-shortened flag bound is also diagnostic. It replaces the ambient dimension in the
 inner-first flag count by the ideal shortened dimension after outer zeros. This tests whether a
 simple shortened-child correction helps the depth-5 checkpoint; it is not a theorem-grade RFC bound.
+
+The best-marked-plane flag bound is another diagnostic. When the child flag has a carrier
+two-plane-with-marked-line row and a lower tau-zero child-line row, it uses the safe q+1
+line-in-plane replacement instead of the coarse ambient flag extension.
 """
 
 from __future__ import annotations
@@ -216,7 +220,7 @@ def flag_child_bound(
         return outer + inner
     if mode == "outer-only":
         return outer + inner_span * (outer_span - inner_span) * q_log2
-    if mode not in ("best", "best-shortened"):
+    if mode not in ("best", "best-shortened", "best-marked-plane"):
         raise ValueError(f"unknown flag bound mode {mode!r}")
 
     outer_first = outer + inner_span * (outer_span - inner_span) * q_log2
@@ -282,6 +286,73 @@ def flag_child_bound_report(
     return best_label, best, outer_first, inner_first
 
 
+def choice_split_shape_log2(
+    choice: tuple[int, ...],
+    child_n: int,
+    comb: list[list[float]],
+) -> float:
+    p = choice[0]
+    singleton_count = choice[1]
+    visible_support_size = choice[2]
+    outer_zeros = choice[6]
+    return (
+        float(singleton_count)
+        + comb[outer_zeros][p]
+        + comb[child_n - outer_zeros][visible_support_size]
+    )
+
+
+def choice_local_row_log2(
+    choice: tuple[int, ...],
+    child_n: int,
+    comb: list[list[float]],
+    q_log2: float,
+) -> float:
+    local_charge = choice[7]
+    lift_qdim = choice[14]
+    return choice_split_shape_log2(choice, child_n, comb) - local_charge * q_log2 + lift_qdim * q_log2
+
+
+def choice_is_plane_carrier(choice: tuple[int, ...]) -> bool:
+    return choice[4] == 2 and choice[5] == 1
+
+
+def choice_is_tau0_child_line(choice: tuple[int, ...]) -> bool:
+    return choice[3] == 0 and choice[4] == 1 and choice[5] == 1
+
+
+def marked_plane_flag_child_bound(
+    *,
+    child_by_span: dict[int, list[float]],
+    child_choices: dict[tuple[int, int], tuple[int, ...] | None] | None,
+    comb: list[list[float]],
+    child_n: int,
+    outer_span: int,
+    inner_span: int,
+    outer_zeros: int,
+    inner_zeros: int,
+    q_log2: float,
+) -> float:
+    """Diagnostic q+1 bound for a two-line-in-plane child diagram."""
+
+    if child_choices is None or inner_span <= 0 or child_n <= 1:
+        return NEG_INF
+    outer_choice = child_choices.get((outer_span, outer_zeros))
+    inner_choice = child_choices.get((inner_span, inner_zeros))
+    if outer_choice is None or inner_choice is None:
+        return NEG_INF
+    if not choice_is_plane_carrier(outer_choice):
+        return NEG_INF
+    if not choice_is_tau0_child_line(inner_choice):
+        return NEG_INF
+    outer_value = get_child_value(child_by_span, child_n, outer_span, outer_zeros)
+    if outer_value <= NEG_INF / 2:
+        return NEG_INF
+    grandchild_n = child_n // 2
+    inner_local = choice_local_row_log2(inner_choice, grandchild_n, comb, q_log2)
+    return outer_value + inner_local + q_log2
+
+
 def marked_line_child_bound(
     *,
     child_by_span: dict[int, list[float]],
@@ -326,6 +397,7 @@ def lift_flag_span_moment(
     cover_lift_mode: str,
     cover_kernel_lift: bool,
     max_parent_span: int | None = None,
+    child_choices: dict[tuple[int, int], tuple[int, ...] | None] | None = None,
 ) -> tuple[dict[int, list[float]], dict[tuple[int, int], tuple[int, ...] | None]]:
     child_n = len(next(iter(child_by_span.values()))) - 1
     parent_n = 2 * child_n
@@ -491,6 +563,7 @@ def lift_flag_span_moment(
                                         local_h = -2
                                         local_gamma = -2
                                 charge_log = -charge * q_log2
+                                marked_plane_child_used = False
                                 if visible_tau == 0:
                                     lift_log = parent_span * (2 * outer_span - parent_span) * q_log2
                                     if covers_lift(visible_tau):
@@ -524,6 +597,21 @@ def lift_flag_span_moment(
                                         q_log2=q_log2,
                                         mode=flag_bound_mode,
                                     )
+                                    if flag_bound_mode == "best-marked-plane":
+                                        marked_plane_log = marked_plane_flag_child_bound(
+                                            child_by_span=child_by_span,
+                                            child_choices=child_choices,
+                                            comb=comb,
+                                            child_n=child_n,
+                                            outer_span=outer_span,
+                                            inner_span=inner_span,
+                                            outer_zeros=outer_zeros,
+                                            inner_zeros=inner_zeros,
+                                            q_log2=q_log2,
+                                        )
+                                        if marked_plane_log > NEG_INF / 2 and marked_plane_log < child_log:
+                                            child_log = marked_plane_log
+                                            marked_plane_child_used = True
 
                                 if child_log <= NEG_INF / 2:
                                     continue
@@ -569,8 +657,8 @@ def lift_flag_span_moment(
                                         local_components,
                                         local_g,
                                         local_theta,
-                                        -4 if marked_line_used else local_h,
-                                        -4 if marked_line_used else local_gamma,
+                                        -5 if marked_plane_child_used else (-4 if marked_line_used else local_h),
+                                        -5 if marked_plane_child_used else (-4 if marked_line_used else local_gamma),
                                         int(round(lift_log / q_log2)),
                                     )
 
@@ -720,7 +808,7 @@ def main() -> None:
     )
     parser.add_argument(
         "--flag-bound",
-        choices=["best", "best-shortened", "product", "outer-only"],
+        choices=["best", "best-shortened", "best-marked-plane", "product", "outer-only"],
         default="best",
     )
     parser.add_argument("--max-visible-tau", type=int, default=2)
@@ -814,6 +902,7 @@ def main() -> None:
 
     print("level,k,n,span_count,min_log2,max_log2", flush=True)
     print(f"0,1,{args.expansion},1,0.00000000,0.00000000", flush=True)
+    previous_choices: dict[tuple[int, int], tuple[int, ...] | None] | None = None
     for level in range(1, args.depth + 1):
         max_parent_span = None
         if args.prune_to_final_span > 0:
@@ -829,7 +918,9 @@ def main() -> None:
             args.cover_lift_mode,
             args.cover_kernel_lift,
             max_parent_span,
+            previous_choices,
         )
+        previous_choices = choices
         trace.append(choices)
         values_by_level.append({span: values[:] for span, values in values_by_span.items()})
         if args.report_local_theta is not None:

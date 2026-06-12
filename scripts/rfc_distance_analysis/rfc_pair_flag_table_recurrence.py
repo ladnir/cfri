@@ -1155,8 +1155,12 @@ def main() -> None:
             "pair_adjusted_lift_minus_charge_qdim,"
             "outer_remaining_quotient_lift_qdim,"
             "inner_remaining_quotient_lift_qdim,"
-            "outer_tau1_quotient_qdim,outer_tau1_charged_postroot_qdim,"
-            "inner_tau1_quotient_qdim,inner_tau1_charged_postroot_qdim,"
+            "outer_tau1_quotient_qdim,outer_tau1_visible_image_qdim,"
+            "outer_tau1_invisible_fiber_qdim,outer_tau1_universal_postroot_qdim,"
+            "outer_tau1_support_saving_qdim,outer_tau1_charged_postroot_qdim,"
+            "inner_tau1_quotient_qdim,inner_tau1_visible_image_qdim,"
+            "inner_tau1_invisible_fiber_qdim,inner_tau1_universal_postroot_qdim,"
+            "inner_tau1_support_saving_qdim,inner_tau1_charged_postroot_qdim,"
             "outer_choice,inner_choice"
         )
         for rank, row in enumerate(rows[: args.trace_table_top], start=1):
@@ -1187,14 +1191,30 @@ def main() -> None:
             outer_tau1 = tau1_incidence_profile(outer_span, row.outer.choice)
             inner_tau1 = tau1_incidence_profile(inner_span, row.inner.choice)
             outer_tau1_quotient = ""
+            outer_tau1_visible_image = ""
+            outer_tau1_invisible_fiber = ""
+            outer_tau1_universal_postroot = ""
+            outer_tau1_support_saving = ""
             outer_tau1_charged_postroot = ""
             inner_tau1_quotient = ""
+            inner_tau1_visible_image = ""
+            inner_tau1_invisible_fiber = ""
+            inner_tau1_universal_postroot = ""
+            inner_tau1_support_saving = ""
             inner_tau1_charged_postroot = ""
             if outer_tau1 is not None:
                 outer_tau1_quotient = str(outer_tau1[0])
+                outer_tau1_visible_image = str(outer_tau1[2])
+                outer_tau1_invisible_fiber = str(outer_tau1[3])
+                outer_tau1_universal_postroot = str(outer_tau1[4])
+                outer_tau1_support_saving = str(outer_tau1[5])
                 outer_tau1_charged_postroot = str(outer_tau1[6])
             if inner_tau1 is not None:
                 inner_tau1_quotient = str(inner_tau1[0])
+                inner_tau1_visible_image = str(inner_tau1[2])
+                inner_tau1_invisible_fiber = str(inner_tau1[3])
+                inner_tau1_universal_postroot = str(inner_tau1[4])
+                inner_tau1_support_saving = str(inner_tau1[5])
                 inner_tau1_charged_postroot = str(inner_tau1[6])
             child_flag = clean_csv_field(">=".join(format_state(layer) for layer in row.child_layers))
             outer_choice = clean_csv_field(format_choice(row.outer.choice))
@@ -1217,8 +1237,12 @@ def main() -> None:
                 f"{outer_adjusted_qdim + inner_adjusted_qdim},"
                 f"{outer_remaining_quotient},"
                 f"{inner_remaining_quotient},"
-                f"{outer_tau1_quotient},{outer_tau1_charged_postroot},"
-                f"{inner_tau1_quotient},{inner_tau1_charged_postroot},"
+                f"{outer_tau1_quotient},{outer_tau1_visible_image},"
+                f"{outer_tau1_invisible_fiber},{outer_tau1_universal_postroot},"
+                f"{outer_tau1_support_saving},{outer_tau1_charged_postroot},"
+                f"{inner_tau1_quotient},{inner_tau1_visible_image},"
+                f"{inner_tau1_invisible_fiber},{inner_tau1_universal_postroot},"
+                f"{inner_tau1_support_saving},{inner_tau1_charged_postroot},"
                 f"{outer_choice},{inner_choice}"
             )
 
@@ -1229,6 +1253,7 @@ def main() -> None:
             "local_log2,child_log2,p,s,a,tau,outer_span,inner_span,"
             "outer_zeros,inner_zeros,local_charge,delta,comp,theta,"
             "dominant_h,gamma,lift_qdim,tau1_quotient_qdim,"
+            "tau1_visible_image_qdim,tau1_invisible_fiber_qdim,"
             "tau1_universal_postroot_qdim,tau1_support_saving_qdim,"
             "tau1_charged_postroot_qdim,child_flag"
         )
@@ -1283,6 +1308,8 @@ def main() -> None:
             inner_zeros = p + singleton_count
             tau1_profile = tau1_incidence_profile(span, term.choice)
             tau1_quotient_qdim = ""
+            tau1_visible_image_qdim = ""
+            tau1_invisible_fiber_qdim = ""
             tau1_universal_postroot_qdim = ""
             tau1_support_saving_qdim = ""
             tau1_charged_postroot_qdim = ""
@@ -1290,8 +1317,8 @@ def main() -> None:
                 (
                     tau1_quotient_qdim,
                     _tau1_quotient_ambient_dim,
-                    _tau1_visible_image_dim_bound,
-                    _tau1_invisible_fiber_dim_min,
+                    tau1_visible_image_qdim,
+                    tau1_invisible_fiber_qdim,
                     tau1_universal_postroot_qdim,
                     tau1_support_saving_qdim,
                     tau1_charged_postroot_qdim,
@@ -1307,7 +1334,8 @@ def main() -> None:
                 f"{inner_span},{outer_zeros},{inner_zeros},"
                 f"{local_charge},{local_delta},{local_components},"
                 f"{local_theta},{local_h},{local_gamma},{lift_qdim},"
-                f"{tau1_quotient_qdim},{tau1_universal_postroot_qdim},"
+                f"{tau1_quotient_qdim},{tau1_visible_image_qdim},"
+                f"{tau1_invisible_fiber_qdim},{tau1_universal_postroot_qdim},"
                 f"{tau1_support_saving_qdim},{tau1_charged_postroot_qdim},"
                 f"{child_flag}"
             )

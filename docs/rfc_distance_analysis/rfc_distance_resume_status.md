@@ -389,6 +389,19 @@ count a fresh independent tau-one line family when it is conditioned on that car
 conditional row to analyze is `(4,7)>=(2,8)`, whose dominant child-table row has
 `outer_tau1_charged_postroot_qdim = 3`.
 
+Update: the expanded tau-one profile columns show that this `3` is entirely invisible-fiber
+budget:
+
+```text
+outer_tau1_visible_image_qdim      = 2
+outer_tau1_invisible_fiber_qdim    = 3
+outer_tau1_charged_postroot_qdim   = 3
+```
+
+Therefore carrying only the root-visible image of the line saves zero q-dimensions on this row.
+The state must carry the full ambient quotient line `R <= E_A`, or else explicitly pay the new
+fiber dimension by which the child line differs from `R`.
+
 After that, return to the theta_2=-1 kernel-chain truncation and the connected full-kernel local
 endpoint. Those remain real blockers, but they are not the first item on the active frontier.
 

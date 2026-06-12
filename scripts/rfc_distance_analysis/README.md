@@ -504,14 +504,32 @@ carried recursively.
 
 ```text
 outer_tau1_quotient_qdim
+outer_tau1_visible_image_qdim
+outer_tau1_invisible_fiber_qdim
+outer_tau1_universal_postroot_qdim
+outer_tau1_support_saving_qdim
 outer_tau1_charged_postroot_qdim
 inner_tau1_quotient_qdim
+inner_tau1_visible_image_qdim
+inner_tau1_invisible_fiber_qdim
+inner_tau1_universal_postroot_qdim
+inner_tau1_support_saving_qdim
 inner_tau1_charged_postroot_qdim
 ```
 
 For the first carried-line target `(4,7)>=(2,8)`, the dominant row has
-`outer_tau1_charged_postroot_qdim=3`. The proof target is documented in
-`docs/rfc_distance_analysis/rfc_tau1_carried_line_state.md`.
+`outer_tau1_charged_postroot_qdim=3`, and the expanded profile shows this is entirely invisible
+fiber:
+
+```text
+outer_tau1_visible_image_qdim      = 2
+outer_tau1_invisible_fiber_qdim    = 3
+outer_tau1_charged_postroot_qdim   = 3
+```
+
+So a carried state that remembers only the root-visible image would save zero on this row. The
+proof target must carry the full ambient quotient line `R <= E_A`, or explicitly charge the new
+fiber dimension. The target is documented in `docs/rfc_distance_analysis/rfc_tau1_carried_line_state.md`.
 
 `rfc_multicopy_falsification.py` is adversarial. It estimates whether broad one-copy near-families
 can intersect across many independent RFC copies often enough to threaten the target excess.

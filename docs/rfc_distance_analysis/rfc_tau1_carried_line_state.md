@@ -119,6 +119,36 @@ The diagnostic saving target is the child-table `outer_tau1_charged_postroot_qdi
 does not determine the child tau-one line uniquely; the recurrence must expose that conditional
 dimension rather than assume it away.
 
+## Conditional Dimension Diagnostic
+
+The expanded `--trace-table-state` columns show that the first target row is more delicate than a
+root-visible-line reuse:
+
+```text
+state (4,7)>=(2,8), rank-1 row:
+outer_tau1_quotient_qdim             = 4
+outer_tau1_visible_image_qdim        = 2
+outer_tau1_invisible_fiber_qdim      = 3
+outer_tau1_universal_postroot_qdim   = 3
+outer_tau1_support_saving_qdim       = 0
+outer_tau1_charged_postroot_qdim     = 3
+```
+
+Thus the entire post-root budget in this child row is invisible-fiber budget. Carrying only the
+root-visible image of the quotient line would leave the same three q-dimensions. In conditional
+terms:
+
+```text
+condition on visible image only:  conditioned qdim = 3, saving = 0
+condition on full ambient line R: conditioned qdim = 0, saving = 3
+```
+
+So the required state must carry the full ambient projective line `R <= E_A`, not merely its
+projection to the active root coordinates. This is still compatible with the tau-one local lemma:
+the parent row already paid for the full line family. The remaining theorem obligation is to show
+that the child's dominant tau-one row uses the same carried full line, or else to charge exactly the
+new fiber dimension by which it differs.
+
 ## Next Diagnostic
 
 The next useful diagnostic should not globally set tau-one quotient cost to zero. Instead, it

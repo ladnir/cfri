@@ -406,7 +406,9 @@ tau-one quotient-line family; it cannot simply select the cheaper child branch.
 
 The carried-line state target is separated out in
 `rfc_tau1_carried_line_state.md`. That note records the first conditional child-table target:
-`(4,7)>=(2,8)` with dominant `outer_tau1_charged_postroot_qdim = 3`.
+`(4,7)>=(2,8)` with dominant `outer_tau1_charged_postroot_qdim = 3`. Expanded diagnostics show
+that this is invisible-fiber budget, so the state must carry the full ambient quotient line `R`,
+not just the root-visible image, if it is to save those dimensions.
 
 ## Certificate Recurrence Shape
 

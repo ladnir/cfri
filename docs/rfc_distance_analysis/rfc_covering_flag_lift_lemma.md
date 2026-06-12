@@ -368,6 +368,92 @@ local quotient/root datum count,
 
 not just zero out lift factors globally.
 
+## Kernel-Lift Container Cover Lemma
+
+Status: theorem target; supported by the level-3 stress diagnostic below, not yet a completed
+certificate lemma.
+
+Fix a one-step transition profile:
+
+```text
+P,S,A,tau,
+child flag L <= V,
+local quotient/root datum Q,
+root labels ell_A,
+local tau-two layer labels if tau=2.
+```
+
+Here `L` and `V` are the child kernel and outer containers, with:
+
+```text
+pi(K) <= L <= V,
+pi(W) <= V,
+```
+
+and zero budgets:
+
+```text
+V zero on P union (S \ A),
+L zero on P union S.
+```
+
+The local datum `Q` contains exactly the quotient information that affects the singleton equations:
+for tau one it is the quotient line and root labels; for tau two it is the quotient plane together
+with the root-line/layer certificate. It must include the quotient-incidence count. In particular,
+the lemma does not delete the projective family of quotient lines or planes.
+
+For a fixed profile as above, all choices of the parent kernel lift:
+
+```text
+K_parent <= L + L,
+dim K_parent = kappa = t - tau,
+```
+
+are duplicate certificates for the same container event. The coarse recurrence pays:
+
+```text
+q^{kappa(2 dim(L) - kappa)}
+```
+
+for these choices. The container-cover target is to replace that factor by one event after
+`L <= V` and `Q` are fixed.
+
+The proof idea is direct. Every vector in `K_parent` maps into `L`, and `L` is zero on all requested
+singleton child positions `P union S`. Therefore changing the kernel lift cannot change any
+requested parent zero:
+
+```text
+paired zeros:
+  follow from V zero on P;
+
+singletons outside A:
+  follow from V zero on S \ A;
+
+singletons inside A:
+  depend only on Q and ell_A, since kernel directions vanish there through L.
+```
+
+Thus the fiber over:
+
+```text
+(P,S,A,tau,L<=V,Q,ell_A,layer labels)
+```
+
+is covered by one transition container. The recurrence may count that profile once, provided the
+state it passes upward is the container tuple rather than an arbitrary representative parent
+subspace.
+
+The remaining proof obligations are:
+
+```text
+1. define the quotient datum Q canonically enough that every parent W maps to at least one profile;
+2. prove tie-breaking for extra zeros/support shrinkage costs only polynomial factors;
+3. prove later folds consume the carried container tuple without needing to recover the discarded
+   kernel-lift representative;
+4. keep quotient incidence in LocalContainer(Phi), including tau-one line counts and tau-two
+   exterior/root-line counts.
+```
+
 ## Level-3 Flag Stress Row
 
 The marked-plane recurrence diagnostics now isolate a concrete stress row:
@@ -392,6 +478,15 @@ This `lift=19` splits as:
 ```text
 kernel_lift   = kappa(2r0-kappa) = 3(8-3) = 15,
 quotient_lift = tau(2r1-t)       = 1(8-4) = 4.
+```
+
+The classifier CSV now emits these split columns directly:
+
+```text
+top_outer_kernel_lift_qdim
+top_outer_quotient_lift_qdim
+top_inner_kernel_lift_qdim
+top_inner_quotient_lift_qdim
 ```
 
 A diagnostic collapsed-active filter removes the exact-flag overcount where equal-dimensional child

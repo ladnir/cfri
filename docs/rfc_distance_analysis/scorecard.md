@@ -271,4 +271,5 @@ q-dimensions, but does not close the row. The fixed-table diagnostic
 child table values fixed; it changes the pair sum to `940.85227227` bits against the same
 `1187.19455102` bit coarse baseline, giving `1.92454905` q-dimensions of slack. This says the
 quotient-line/plane incidence should remain counted; the next theorem target is duplicate
-kernel-lift covering after the child flag and local quotient/root datum are fixed.
+kernel-lift covering after the child flag and local quotient/root datum are fixed. The dominant
+original outer row splits as `kernel_lift=15`, `quotient_lift=4`, making the target very specific.

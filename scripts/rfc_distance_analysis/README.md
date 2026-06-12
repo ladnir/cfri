@@ -249,6 +249,9 @@ this cuts the level-3 loss to `4.08510402` q-dimensions. Use `--posthoc-cover-ke
 the child tables fixed but subtract tau-positive kernel-lift multiplicity; this closes the level-3
 stress row with `1.92454905` q-dimensions of slack. That option is a proof-target diagnostic, not a
 certificate mode.
+The CSV also splits the top row's lift into `top_*_kernel_lift_qdim` and
+`top_*_quotient_lift_qdim` so the quotient-incidence part can be audited separately from duplicate
+kernel-lift multiplicity.
 The first table attempt, `--flag-bound best-two-layer-table`, confirms this: the level-2 table saves
 the expected marked-plane q-dimensions on states such as `(4,4)>=(2,5)`, but by level 3 the target
 flags report zero additional table saving because the scalar dominant choices have already routed

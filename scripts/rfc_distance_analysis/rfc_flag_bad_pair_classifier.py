@@ -59,6 +59,10 @@ CSV_FIELDS = [
     "top_outer_local_log2",
     "top_inner_local_log2",
     "top_child_flag_log2",
+    "top_outer_kernel_lift_qdim",
+    "top_outer_quotient_lift_qdim",
+    "top_inner_kernel_lift_qdim",
+    "top_inner_quotient_lift_qdim",
     "top_outer_choice",
     "top_inner_choice",
     "note",
@@ -166,6 +170,13 @@ def choice_kernel_lift_qdim(parent_span: int, choice: tuple[int, ...]) -> int:
         return 0
     kernel_dim = parent_span - view.tau
     return kernel_dim * (2 * view.inner_span - kernel_dim)
+
+
+def choice_quotient_lift_qdim(parent_span: int, choice: tuple[int, ...]) -> int:
+    view = choice_view(choice)
+    if view.tau <= 0:
+        return 0
+    return view.tau * (2 * view.outer_span - parent_span)
 
 
 def adjusted_local_log2(
@@ -338,6 +349,8 @@ def make_output_row(
     coarse: float,
     pair_sum: float,
     q_log2: float,
+    outer_parent_span: int,
+    inner_parent_span: int,
     note: str = "",
 ) -> dict[str, object]:
     top = stats.top
@@ -358,6 +371,18 @@ def make_output_row(
         "top_outer_local_log2": f"{top.outer_local_log2:.8f}" if top is not None else "",
         "top_inner_local_log2": f"{top.inner_local_log2:.8f}" if top is not None else "",
         "top_child_flag_log2": f"{top.child_flag_log2:.8f}" if top is not None else "",
+        "top_outer_kernel_lift_qdim": (
+            choice_kernel_lift_qdim(outer_parent_span, top.outer.choice) if top is not None else ""
+        ),
+        "top_outer_quotient_lift_qdim": (
+            choice_quotient_lift_qdim(outer_parent_span, top.outer.choice) if top is not None else ""
+        ),
+        "top_inner_kernel_lift_qdim": (
+            choice_kernel_lift_qdim(inner_parent_span, top.inner.choice) if top is not None else ""
+        ),
+        "top_inner_quotient_lift_qdim": (
+            choice_quotient_lift_qdim(inner_parent_span, top.inner.choice) if top is not None else ""
+        ),
         "top_outer_choice": format_choice(top.outer.choice) if top is not None else "",
         "top_inner_choice": format_choice(top.inner.choice) if top is not None else "",
         "note": note,
@@ -493,6 +518,8 @@ def main() -> None:
             coarse=coarse,
             pair_sum=pair_sum,
             q_log2=args.q_log2,
+            outer_parent_span=args.outer_state[0],
+            inner_parent_span=args.inner_state[0],
             note="truncated pair sum; omitted terms can only increase the full naive sum",
         )
     )
@@ -509,6 +536,8 @@ def main() -> None:
             coarse=coarse,
             pair_sum=pair_sum,
             q_log2=args.q_log2,
+            outer_parent_span=args.outer_state[0],
+            inner_parent_span=args.inner_state[0],
             note="how concentrated the visible top of the pair sum is",
         )
     )
@@ -525,6 +554,8 @@ def main() -> None:
                     coarse=coarse,
                     pair_sum=pair_sum,
                     q_log2=args.q_log2,
+                    outer_parent_span=args.outer_state[0],
+                    inner_parent_span=args.inner_state[0],
                 )
             )
 

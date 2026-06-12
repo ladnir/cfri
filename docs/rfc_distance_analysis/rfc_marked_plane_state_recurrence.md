@@ -299,6 +299,13 @@ charge=1, delta=1, comp=1,
 lift=19.
 ```
 
+The classifier now prints the lift split for each top grouped row. For this row:
+
+```text
+outer kernel lift:   15 q-dim
+outer quotient lift:  4 q-dim
+```
+
 So the bad mass is not a broad failure of the marked-plane local brick. It is a high-lift tau-one
 outer witness family that admits many inner refinements whose child diagrams collapse back to
 `(4,4)` or a short two-layer flag. A proof now has a concrete target: either choose this witness

@@ -151,8 +151,8 @@ docs/rfc_distance_analysis/rfc_marked_plane_state_recurrence.md
 docs/rfc_distance_analysis/rfc_flag_bad_pair_classifier_level3_4_7_ge_2_8.csv
   Status: current obstruction classifier.
   The level-3 bad pair mass is concentrated in one tau-one high-lift outer witness:
-  `p=3,s=1,a=1,tau=1,child=(4,4),z=3,charge=1,lift=19`. The top 12 pair products already equal
-  the displayed truncated pair sum.
+  `p=3,s=1,a=1,tau=1,child=(4,4),z=3,charge=1,lift=19`, split as `kernel_lift=15` and
+  `quotient_lift=4`. The top 12 pair products already equal the displayed truncated pair sum.
 
 docs/rfc_distance_analysis/rfc_flag_bad_pair_classifier_level3_4_7_ge_2_8_kernel_cover.csv
   Status: current best closure diagnostic.

@@ -373,6 +373,19 @@ and `ell` is not determined by the kept container tuple, then `ell` is consumed 
 must be promoted into the flag state or charged as an additional quotient/kernel incidence event.
 This is the line between the safe kernel-cover diagnostic and the retired `all` cover shortcut.
 
+For two nested parent layers `W_j <= W_i`, the sibling-consumption test is concrete. With the same
+singleton evaluation map:
+
+```text
+K_j = ker(ev_S^T|_{W_j}) = W_j cap K_i,
+dim K_j = dim W_j - tau_j.
+```
+
+Thus a lower layer with `dim W_j = tau_j` is fully visible and does not consume the upper kernel
+fiber. A lower layer with `dim W_j > tau_j` marks positive-dimensional data inside the upper kernel
+and must be treated as consumed kernel data unless that marked subspace is already represented in
+the carried container state.
+
 ## Required Ingredients
 
 ### Exact Support Indexing

@@ -601,6 +601,50 @@ included in the state and counted as event data. This is the same distinction us
 `rfc_tracked_kernel_chain_state.md`: unconsumed selected kernel lines are duplicate certificates,
 while consumed selected lines are real state.
 
+### Two-Layer Sibling Consumption Test
+
+For a nested parent flag:
+
+```text
+W_1 <= W_0
+```
+
+with the same singleton evaluation map `ev_S^T`, let:
+
+```text
+K_i = ker(ev_S^T|_{W_i}),
+t_i = dim W_i,
+tau_i = dim ev_S^T(W_i).
+```
+
+Then:
+
+```text
+K_1 = W_1 cap K_0,
+dim(K_1) = t_1 - tau_1.
+```
+
+The proof is immediate from `W_1 <= W_0`: the vectors of `W_1` that vanish on the singleton block
+are exactly the vectors of `W_1` lying in the upper kernel `K_0`.
+
+Therefore a lower sibling layer consumes hidden subspace data inside the upper kernel lift exactly
+through its own kernel dimension `t_1 - tau_1`.
+
+```text
+t_1 = tau_1:
+  the lower layer is fully visible and cannot consume the upper kernel fiber.
+
+t_1 > tau_1:
+  the lower layer marks a positive-dimensional subspace of the upper kernel; this is consumed
+  kernel data and must be carried or charged.
+```
+
+This is the algebra behind the classifier column:
+
+```text
+top_outer_kernel_unconsumed_by_inner.
+```
+
 ## Level-3 Flag Stress Row
 
 The marked-plane recurrence diagnostics now isolate a concrete stress row:

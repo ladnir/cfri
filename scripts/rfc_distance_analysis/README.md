@@ -474,7 +474,18 @@ is not yet state-complete enough: it can drop lower pair-table improvements and 
 coarse flag bounds. `--full-table-until 2` is a diagnostic knob for this: with the stronger mode it
 recovers the targeted `(4,7)>=(2,8)` child value `423.08002115` and moves the global `z=34` report
 from `1478.22313584` to `1352.53125813`, but trying to keep level 3 fully complete timed out in
-the current Python driver. The next missing object is therefore a sparse-demand closure/richer
+the current Python driver.
+
+`--demand-closure-passes` is the cheaper version of the same test. It adds lower pair-table keys
+queried by demanded pair rows, then rebuilds. In the same stronger mode:
+
+```text
+--demand-closure-passes 1: z=34 value 1352.53125813, level-2 table entries 754
+--demand-closure-passes 2: z=34 value 1352.53125813
+```
+
+So pair-child demand closure explains the `1478 -> 1352` recovery without making the whole lower
+table complete, but it does not close the remaining gap. The next missing object is a richer
 filtered diagram state for the positive-kernel extension, not another scalar-only filter.
 
 `rfc_multicopy_falsification.py` is adversarial. It estimates whether broad one-copy near-families

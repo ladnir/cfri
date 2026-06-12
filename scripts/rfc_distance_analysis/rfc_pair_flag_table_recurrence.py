@@ -28,6 +28,8 @@ sys.path.insert(0, str(Path(__file__).resolve().parent))
 
 from rfc_flag_bad_pair_classifier import (  # noqa: E402
     build_pair_rows,
+    choice_has_collapsed_active_container,
+    choice_has_support2_line_quotient_impossibility,
     choice_kernel_lift_qdim,
     choice_quotient_lift_qdim,
     covered_kernel_lift_qdims,
@@ -316,6 +318,118 @@ def compute_pair_enumerated_flag_table(
     return table, stats
 
 
+def collect_pair_row_child_flag_keys(
+    *,
+    current_values_by_span: dict[int, list[float]],
+    previous_values_by_span: dict[int, list[float]],
+    previous_flag_table: FlagTable | None,
+    comb: list[list[float]],
+    q_log2: float,
+    level: int,
+    expansion: int,
+    singleton_charge: str,
+    max_visible_tau: int,
+    cover_lift_mode: str,
+    cover_kernel_lift: bool,
+    term_limit: int,
+    exclude_collapsed_active: bool,
+    kernel_cover_mode: str,
+    nested_quotient_mode: str,
+    nested_subspace_mode: str,
+    consumed_kernel_mode: str,
+    support2_diamond_mode: str,
+    support2_line_filter: bool,
+    demanded_keys: set[tuple[State, State]],
+) -> set[tuple[State, State]]:
+    """Collect lower two-layer keys queried by pair rows for demanded entries."""
+
+    if previous_flag_table is None or not demanded_keys:
+        return set()
+
+    child_k = 1 << level
+    child_n = expansion * (1 << level)
+    previous_k = 1 << (level - 1)
+    previous_n = expansion * (1 << (level - 1))
+    states = set(finite_states(current_values_by_span))
+    term_cache: dict[State, list[TermCandidate]] = {}
+
+    def terms_for_state(state: State) -> list[TermCandidate]:
+        cached = term_cache.get(state)
+        if cached is not None:
+            return cached
+        terms = enumerate_terms_for_state(
+            child_by_span=previous_values_by_span,
+            child_flag_table=previous_flag_table,
+            comb=comb,
+            q_log2=q_log2,
+            child_k=previous_k,
+            parent_span=state[0],
+            zeros=state[1],
+            singleton_charge_mode=singleton_charge,
+            flag_bound_mode="best-two-layer-table",
+            max_visible_tau=max_visible_tau,
+            cover_lift_mode=cover_lift_mode,
+            cover_kernel_lift=cover_kernel_lift,
+        )
+        cached = take_terms(terms, term_limit)
+        term_cache[state] = cached
+        return cached
+
+    child_keys: set[tuple[State, State]] = set()
+    for outer_state, inner_state in demanded_keys:
+        if outer_state not in states or inner_state not in states:
+            continue
+        if inner_state[0] > outer_state[0] or inner_state[1] < outer_state[1]:
+            continue
+        _label, baseline, _outer_first, _inner_first = flag_child_bound_report(
+            child_by_span=current_values_by_span,
+            child_k=child_k,
+            child_n=child_n,
+            outer_span=outer_state[0],
+            inner_span=inner_state[0],
+            outer_zeros=outer_state[1],
+            inner_zeros=inner_state[1],
+            q_log2=q_log2,
+            mode="best",
+        )
+        if baseline <= NEG_INF / 2:
+            continue
+        for outer in terms_for_state(outer_state):
+            if exclude_collapsed_active and choice_has_collapsed_active_container(outer.choice):
+                continue
+            if (
+                support2_line_filter
+                and choice_has_support2_line_quotient_impossibility(outer.choice)
+            ):
+                continue
+            for inner in terms_for_state(inner_state):
+                if exclude_collapsed_active and choice_has_collapsed_active_container(inner.choice):
+                    continue
+                if (
+                    support2_line_filter
+                    and choice_has_support2_line_quotient_impossibility(inner.choice)
+                ):
+                    continue
+                child_layers = tuple(
+                    merge_equal_dimension_chain(
+                        list(outer.child_layers) + list(inner.child_layers)
+                    )
+                )
+                if len(child_layers) != 2:
+                    continue
+                child_flag_log2 = flag_table_bound_for_layers(
+                    values_by_span=previous_values_by_span,
+                    flag_table=previous_flag_table,
+                    child_k=previous_k,
+                    child_n=previous_n,
+                    q_log2=q_log2,
+                    layers=child_layers,
+                )
+                if child_flag_log2 > NEG_INF / 2:
+                    child_keys.add((child_layers[0], child_layers[1]))
+    return child_keys
+
+
 def collect_next_lift_flag_keys(
     *,
     child_by_span: dict[int, list[float]],
@@ -455,7 +569,7 @@ def collect_next_lift_flag_keys(
     return keys
 
 
-def build_pair_levels(
+def _build_pair_levels_once(
     *,
     depth: int,
     stop_level: int,
@@ -478,7 +592,12 @@ def build_pair_levels(
     last_level_keys: set[tuple[State, State]] | None,
     demand_next_level: bool,
     full_table_until: int,
-) -> tuple[list[LevelData], list[TableStats]]:
+    extra_allowed_keys_by_level: dict[int, set[tuple[State, State]]] | None,
+) -> tuple[
+    list[LevelData],
+    list[TableStats],
+    dict[int, set[tuple[State, State]] | None],
+]:
     total_n = expansion * (1 << depth)
     comb = log2_comb_table(total_n)
     values: dict[int, list[float]] = {1: [NEG_INF] * (expansion + 1)}
@@ -488,6 +607,7 @@ def build_pair_levels(
     previous_choices: dict[tuple[int, int], tuple[int, ...] | None] | None = None
     previous_flag_table: FlagTable | None = None
     previous_values = {span: row[:] for span, row in values.items()}
+    used_allowed_keys_by_level: dict[int, set[tuple[State, State]] | None] = {}
 
     for level in range(1, stop_level + 1):
         max_parent_span = None
@@ -527,6 +647,15 @@ def build_pair_levels(
                 max_visible_tau=max_visible_tau,
                 max_parent_span=next_max_parent_span,
             )
+        extra_allowed_keys = (
+            extra_allowed_keys_by_level.get(level)
+            if extra_allowed_keys_by_level is not None
+            else None
+        )
+        if allowed_keys is not None and extra_allowed_keys:
+            allowed_keys = set(allowed_keys)
+            allowed_keys.update(extra_allowed_keys)
+        used_allowed_keys_by_level[level] = allowed_keys
         flag_table, table_stats = compute_pair_enumerated_flag_table(
             current_values_by_span=values,
             previous_values_by_span=previous_values,
@@ -561,6 +690,106 @@ def build_pair_levels(
         previous_choices = choices
         previous_flag_table = flag_table
         previous_values = {span: row[:] for span, row in values.items()}
+    return levels, stats_by_level, used_allowed_keys_by_level
+
+
+def build_pair_levels(
+    *,
+    depth: int,
+    stop_level: int,
+    expansion: int,
+    q_log2: float,
+    singleton_charge: str,
+    max_visible_tau: int,
+    cover_lift_mode: str,
+    cover_kernel_lift: bool,
+    prune_to_final_span: int,
+    term_limit: int,
+    exclude_collapsed_active: bool,
+    kernel_cover_mode: str,
+    nested_quotient_mode: str,
+    nested_subspace_mode: str,
+    consumed_kernel_mode: str,
+    support2_diamond_mode: str,
+    support2_line_filter: bool,
+    exact_filtered_empty: bool,
+    last_level_keys: set[tuple[State, State]] | None,
+    demand_next_level: bool,
+    full_table_until: int,
+    demand_closure_passes: int = 0,
+) -> tuple[list[LevelData], list[TableStats]]:
+    extra_allowed_keys_by_level: dict[int, set[tuple[State, State]]] = {}
+    closure_passes = max(0, demand_closure_passes)
+    total_n = expansion * (1 << depth)
+    comb = log2_comb_table(total_n)
+
+    for pass_index in range(closure_passes + 1):
+        levels, stats_by_level, used_allowed_keys_by_level = _build_pair_levels_once(
+            depth=depth,
+            stop_level=stop_level,
+            expansion=expansion,
+            q_log2=q_log2,
+            singleton_charge=singleton_charge,
+            max_visible_tau=max_visible_tau,
+            cover_lift_mode=cover_lift_mode,
+            cover_kernel_lift=cover_kernel_lift,
+            prune_to_final_span=prune_to_final_span,
+            term_limit=term_limit,
+            exclude_collapsed_active=exclude_collapsed_active,
+            kernel_cover_mode=kernel_cover_mode,
+            nested_quotient_mode=nested_quotient_mode,
+            nested_subspace_mode=nested_subspace_mode,
+            consumed_kernel_mode=consumed_kernel_mode,
+            support2_diamond_mode=support2_diamond_mode,
+            support2_line_filter=support2_line_filter,
+            exact_filtered_empty=exact_filtered_empty,
+            last_level_keys=last_level_keys,
+            demand_next_level=demand_next_level,
+            full_table_until=full_table_until,
+            extra_allowed_keys_by_level=extra_allowed_keys_by_level,
+        )
+        if not demand_next_level or pass_index >= closure_passes:
+            return levels, stats_by_level
+
+        changed = False
+        for level in range(2, stop_level + 1):
+            demanded_keys = used_allowed_keys_by_level.get(level)
+            if demanded_keys is None or not demanded_keys:
+                continue
+            child_level = level - 1
+            if child_level <= full_table_until:
+                continue
+            child_keys = collect_pair_row_child_flag_keys(
+                current_values_by_span=levels[level].values,
+                previous_values_by_span=levels[child_level].values,
+                previous_flag_table=levels[child_level].flag_table,
+                comb=comb,
+                q_log2=q_log2,
+                level=level,
+                expansion=expansion,
+                singleton_charge=singleton_charge,
+                max_visible_tau=max_visible_tau,
+                cover_lift_mode=cover_lift_mode,
+                cover_kernel_lift=cover_kernel_lift,
+                term_limit=term_limit,
+                exclude_collapsed_active=exclude_collapsed_active,
+                kernel_cover_mode=kernel_cover_mode,
+                nested_quotient_mode=nested_quotient_mode,
+                nested_subspace_mode=nested_subspace_mode,
+                consumed_kernel_mode=consumed_kernel_mode,
+                support2_diamond_mode=support2_diamond_mode,
+                support2_line_filter=support2_line_filter,
+                demanded_keys=demanded_keys,
+            )
+            if not child_keys:
+                continue
+            extra_keys = extra_allowed_keys_by_level.setdefault(child_level, set())
+            before = len(extra_keys)
+            extra_keys.update(child_keys)
+            changed = changed or len(extra_keys) > before
+        if not changed:
+            return levels, stats_by_level
+
     return levels, stats_by_level
 
 
@@ -686,6 +915,15 @@ def main() -> None:
             "through this level before switching to sparse demanded keys"
         ),
     )
+    parser.add_argument(
+        "--demand-closure-passes",
+        type=int,
+        default=0,
+        help=(
+            "diagnostic: after each sparse run, add lower pair-table keys queried "
+            "by demanded pair rows and rebuild for this many passes"
+        ),
+    )
     args = parser.parse_args()
 
     if args.proof_shaped:
@@ -696,6 +934,8 @@ def main() -> None:
         raise SystemExit("--stop-level must be between 0 and --depth")
     if args.full_table_until < 0 or args.full_table_until > args.depth:
         raise SystemExit("--full-table-until must be between 0 and --depth")
+    if args.demand_closure_passes < 0:
+        raise SystemExit("--demand-closure-passes must be nonnegative")
     last_level_keys = None
     if args.last_level_report_only:
         if not args.report_flag_state:
@@ -727,6 +967,7 @@ def main() -> None:
         last_level_keys=last_level_keys,
         demand_next_level=args.demand_next_level,
         full_table_until=args.full_table_until,
+        demand_closure_passes=args.demand_closure_passes,
     )
 
     print(

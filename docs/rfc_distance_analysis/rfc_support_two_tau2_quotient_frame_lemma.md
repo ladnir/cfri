@@ -389,6 +389,13 @@ entries no longer support the previous pair-table improvement and the recurrence
 coarse bounds. Keeping levels 1 and 2 complete with `--full-table-until 2` recovers the targeted
 `(4,7)>=(2,8)` value `423.08002115` and improves the strong-mode `z=34` report to
 `1352.53125813`; keeping level 3 complete was too expensive in the current Python driver.
+The cheaper `--demand-closure-passes` diagnostic reaches the same point by adding only lower
+pair-table keys queried by demanded pair rows:
+
+```text
+--demand-closure-passes 1: z=34 value 1352.53125813, level-2 entries 754
+--demand-closure-passes 2: z=34 value 1352.53125813
+```
 
 Interpretation: the local line-quotient impossibility appears sound, and exact-empty handling is
 correct for fully enumerated empty entries. The remaining problem is state sufficiency for the

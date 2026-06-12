@@ -353,9 +353,17 @@ The large `1478.22313584` regression happens only after switching to the stronge
 `(4,7)>=(2,8)` because the sparse two-layer table loses lower improvements and falls back to coarse
 bounds. A new `--full-table-until 2` diagnostic confirms this is at least partly sparse-demand
 plumbing: it recovers the targeted `(4,7)>=(2,8)` value `423.08002115` and improves the strong-mode
-global report to `1352.53125813` bits. A blunt `--full-table-until 3` run timed out, so the next
-real implementation target is a sparse-demand closure or richer filtered diagram state for the
-positive-kernel extension, not more global scalar filtering.
+global report to `1352.53125813` bits. The cheaper `--demand-closure-passes` diagnostic reaches the
+same value with fewer lower entries:
+
+```text
+--demand-closure-passes 1: z=34 value 1352.53125813, level-2 entries 754
+--demand-closure-passes 2: z=34 value 1352.53125813
+```
+
+A blunt `--full-table-until 3` run timed out, and two closure passes do not improve further, so the
+next real implementation target is a richer filtered diagram state for the positive-kernel
+extension, not more global scalar filtering.
 
 After that, return to the theta_2=-1 kernel-chain truncation and the connected full-kernel local
 endpoint. Those remain real blockers, but they are not the first item on the active frontier.

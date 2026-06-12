@@ -362,8 +362,10 @@ The earlier regression to `1478.22313584` occurs only with the stronger
 `inner-kernel-contained` positive-kernel diagnostic. That is not evidence against the line-quotient
 impossibility; it means the current sparse two-layer table does not have enough state to retain all
 lower pair improvements after impossible quotient-line profiles are removed. The next recurrence
-needs to carry the filtered strong-bottom diagram itself, or close sparse demanded tables under the
-pair-child flags they query.
+needs to carry the filtered strong-bottom diagram itself. Closing sparse demanded tables under the
+pair-child flags they query helps the stronger positive-kernel diagnostic (`1478.22313584` to
+`1352.53125813` at `z=34`) but stabilizes there after one pass, so closure alone is not the final
+missing theorem.
 
 ## Tau-One Chain Rows
 

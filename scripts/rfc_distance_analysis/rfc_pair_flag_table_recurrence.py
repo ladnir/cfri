@@ -1,0 +1,394 @@
+#!/usr/bin/env python3
+r"""Pair-enumerating two-layer flag-table recurrence diagnostic.
+
+This script is the next step after `rfc_flag_bad_pair_classifier.py`.
+Instead of auditing one requested flag state, it builds a two-layer flag table
+by enumerating expansion pairs for every reachable two-layer state.  The table
+can then be fed into the next scalar lift level.
+
+This is still diagnostic, not a certificate.  With `--term-limit`, the pair
+sum is truncated to the largest scalar expansion terms for each layer.  The
+proof-shaped mode of interest is:
+
+    --exclude-collapsed-active --kernel-cover-mode sibling-unconsumed
+
+which mirrors the current theorem target: exact-support rerouting for collapsed
+active rows plus kernel-fiber covering only when the displayed lower sibling is
+fully visible.
+"""
+
+from __future__ import annotations
+
+import argparse
+from dataclasses import dataclass
+from pathlib import Path
+import sys
+
+sys.path.insert(0, str(Path(__file__).resolve().parent))
+
+from rfc_flag_bad_pair_classifier import build_pair_rows  # noqa: E402
+from rfc_flag_span_moment import (  # noqa: E402
+    NEG_INF,
+    FlagTable,
+    State,
+    first_crossing,
+    flag_child_bound_report,
+    lift_flag_span_moment,
+    log2_comb_table,
+)
+from rfc_flag_state_choice_diagnostic import (  # noqa: E402
+    TermCandidate,
+    enumerate_terms_for_state,
+    format_state,
+)
+
+
+@dataclass(frozen=True)
+class LevelData:
+    values: dict[int, list[float]]
+    choices: dict[tuple[int, int], tuple[int, ...] | None]
+    flag_table: FlagTable | None
+
+
+@dataclass
+class TableStats:
+    entries: int = 0
+    improved_entries: int = 0
+    best_saving_log2: float = 0.0
+    best_state: tuple[State, State] | None = None
+    best_value_log2: float = NEG_INF
+    best_baseline_log2: float = NEG_INF
+
+
+def parse_flag_state(text: str) -> tuple[int, int, int, int]:
+    parts = text.split(",")
+    if len(parts) != 4:
+        raise argparse.ArgumentTypeError(
+            "flag state must be outer_span,outer_z,inner_span,inner_z"
+        )
+    try:
+        outer_span, outer_z, inner_span, inner_z = (int(part) for part in parts)
+    except ValueError as exc:
+        raise argparse.ArgumentTypeError("flag state entries must be integers") from exc
+    return outer_span, outer_z, inner_span, inner_z
+
+
+def finite_states(values_by_span: dict[int, list[float]]) -> list[State]:
+    states: list[State] = []
+    for span, values in values_by_span.items():
+        for zeros, value in enumerate(values):
+            if value > NEG_INF / 2:
+                states.append((span, zeros))
+    return sorted(states, key=lambda state: (state[0], state[1]))
+
+
+def take_terms(terms: list[TermCandidate], limit: int) -> list[TermCandidate]:
+    if limit <= 0:
+        return terms
+    return terms[:limit]
+
+
+def compute_pair_enumerated_flag_table(
+    *,
+    current_values_by_span: dict[int, list[float]],
+    previous_values_by_span: dict[int, list[float]],
+    previous_flag_table: FlagTable | None,
+    comb: list[list[float]],
+    q_log2: float,
+    level: int,
+    expansion: int,
+    singleton_charge: str,
+    max_visible_tau: int,
+    cover_lift_mode: str,
+    cover_kernel_lift: bool,
+    term_limit: int,
+    exclude_collapsed_active: bool,
+    kernel_cover_mode: str,
+    allowed_keys: set[tuple[State, State]] | None = None,
+) -> tuple[FlagTable, TableStats]:
+    child_k = 1 << level
+    child_n = expansion * (1 << level)
+    previous_k = 1 << (level - 1)
+    previous_n = expansion * (1 << (level - 1))
+    states = finite_states(current_values_by_span)
+    table: FlagTable = {}
+    stats = TableStats()
+    term_cache: dict[State, list[TermCandidate]] = {}
+
+    def terms_for_state(state: State) -> list[TermCandidate]:
+        cached = term_cache.get(state)
+        if cached is not None:
+            return cached
+        terms = enumerate_terms_for_state(
+            child_by_span=previous_values_by_span,
+            child_flag_table=previous_flag_table,
+            comb=comb,
+            q_log2=q_log2,
+            child_k=previous_k,
+            parent_span=state[0],
+            zeros=state[1],
+            singleton_charge_mode=singleton_charge,
+            flag_bound_mode="best-two-layer-table",
+            max_visible_tau=max_visible_tau,
+            cover_lift_mode=cover_lift_mode,
+            cover_kernel_lift=cover_kernel_lift,
+        )
+        cached = take_terms(terms, term_limit)
+        term_cache[state] = cached
+        return cached
+
+    for outer_state in states:
+        for inner_state in states:
+            if inner_state[0] > outer_state[0] or inner_state[1] < outer_state[1]:
+                continue
+            key = (outer_state, inner_state)
+            if allowed_keys is not None and key not in allowed_keys:
+                continue
+            _label, baseline, _outer_first, _inner_first = flag_child_bound_report(
+                child_by_span=current_values_by_span,
+                child_k=child_k,
+                child_n=child_n,
+                outer_span=outer_state[0],
+                inner_span=inner_state[0],
+                outer_zeros=outer_state[1],
+                inner_zeros=inner_state[1],
+                q_log2=q_log2,
+                mode="best",
+            )
+            if baseline <= NEG_INF / 2:
+                continue
+
+            outer_terms = terms_for_state(outer_state)
+            inner_terms = terms_for_state(inner_state)
+            _rows, pair_sum = build_pair_rows(
+                outer_terms=outer_terms,
+                inner_terms=inner_terms,
+                child_values=previous_values_by_span,
+                child_flag_table=previous_flag_table,
+                child_k=previous_k,
+                child_n=previous_n,
+                q_log2=q_log2,
+                outer_parent_span=outer_state[0],
+                inner_parent_span=inner_state[0],
+                exclude_collapsed_active=exclude_collapsed_active,
+                kernel_cover_mode=kernel_cover_mode,
+            )
+            value = min(baseline, pair_sum) if pair_sum > NEG_INF / 2 else baseline
+            table[key] = value
+            stats.entries += 1
+            saving = baseline - value
+            if saving > 0:
+                stats.improved_entries += 1
+                if saving > stats.best_saving_log2:
+                    stats.best_saving_log2 = saving
+                    stats.best_state = (outer_state, inner_state)
+                    stats.best_value_log2 = value
+                    stats.best_baseline_log2 = baseline
+    return table, stats
+
+
+def build_pair_levels(
+    *,
+    depth: int,
+    stop_level: int,
+    expansion: int,
+    q_log2: float,
+    singleton_charge: str,
+    max_visible_tau: int,
+    cover_lift_mode: str,
+    cover_kernel_lift: bool,
+    prune_to_final_span: int,
+    term_limit: int,
+    exclude_collapsed_active: bool,
+    kernel_cover_mode: str,
+    last_level_keys: set[tuple[State, State]] | None,
+) -> tuple[list[LevelData], list[TableStats]]:
+    total_n = expansion * (1 << depth)
+    comb = log2_comb_table(total_n)
+    values: dict[int, list[float]] = {1: [NEG_INF] * (expansion + 1)}
+    values[1][0] = 0.0
+    levels = [LevelData(values={1: values[1][:]}, choices={}, flag_table=None)]
+    stats_by_level = [TableStats()]
+    previous_choices: dict[tuple[int, int], tuple[int, ...] | None] | None = None
+    previous_flag_table: FlagTable | None = None
+    previous_values = {span: row[:] for span, row in values.items()}
+
+    for level in range(1, stop_level + 1):
+        max_parent_span = None
+        if prune_to_final_span > 0:
+            max_parent_span = prune_to_final_span * (1 << (depth - level))
+        values, choices = lift_flag_span_moment(
+            values,
+            comb,
+            q_log2,
+            1 << (level - 1),
+            singleton_charge,
+            "best-two-layer-table",
+            max_visible_tau,
+            cover_lift_mode,
+            cover_kernel_lift,
+            max_parent_span,
+            previous_choices,
+            previous_flag_table,
+        )
+        flag_table, table_stats = compute_pair_enumerated_flag_table(
+            current_values_by_span=values,
+            previous_values_by_span=previous_values,
+            previous_flag_table=previous_flag_table,
+            comb=comb,
+            q_log2=q_log2,
+            level=level,
+            expansion=expansion,
+            singleton_charge=singleton_charge,
+            max_visible_tau=max_visible_tau,
+            cover_lift_mode=cover_lift_mode,
+            cover_kernel_lift=cover_kernel_lift,
+            term_limit=term_limit,
+            exclude_collapsed_active=exclude_collapsed_active,
+            kernel_cover_mode=kernel_cover_mode,
+            allowed_keys=last_level_keys if level == stop_level else None,
+        )
+        levels.append(
+            LevelData(
+                values={span: row[:] for span, row in values.items()},
+                choices=choices,
+                flag_table=flag_table,
+            )
+        )
+        stats_by_level.append(table_stats)
+        previous_choices = choices
+        previous_flag_table = flag_table
+        previous_values = {span: row[:] for span, row in values.items()}
+    return levels, stats_by_level
+
+
+def main() -> None:
+    parser = argparse.ArgumentParser()
+    parser.add_argument("--depth", type=int, default=5)
+    parser.add_argument(
+        "--stop-level",
+        type=int,
+        default=0,
+        help="if positive, build only through this level while keeping --depth as the pruning horizon",
+    )
+    parser.add_argument("--expansion", type=int, default=8)
+    parser.add_argument("--q-log2", type=float, default=128.0)
+    parser.add_argument("--security-bits", type=float, default=80.0)
+    parser.add_argument("--singleton-charge", default="endpoint-tau2-layer-incidence")
+    parser.add_argument("--max-visible-tau", type=int, default=2)
+    parser.add_argument("--cover-lift-mode", default="tau0")
+    parser.add_argument("--cover-kernel-lift", action="store_true")
+    parser.add_argument("--prune-to-final-span", type=int, default=1)
+    parser.add_argument("--term-limit", type=int, default=300)
+    parser.add_argument("--exclude-collapsed-active", action="store_true")
+    parser.add_argument(
+        "--kernel-cover-mode",
+        choices=("none", "posthoc", "unconsumed-container", "sibling-unconsumed"),
+        default="none",
+    )
+    parser.add_argument(
+        "--proof-shaped",
+        action="store_true",
+        help="alias for --exclude-collapsed-active --kernel-cover-mode sibling-unconsumed",
+    )
+    parser.add_argument(
+        "--report-flag-state",
+        type=parse_flag_state,
+        action="append",
+        default=[],
+    )
+    parser.add_argument(
+        "--last-level-report-only",
+        action="store_true",
+        help="at --stop-level, compute only the requested --report-flag-state table entries",
+    )
+    args = parser.parse_args()
+
+    if args.proof_shaped:
+        args.exclude_collapsed_active = True
+        args.kernel_cover_mode = "sibling-unconsumed"
+    stop_level = args.stop_level if args.stop_level > 0 else args.depth
+    if stop_level < 0 or stop_level > args.depth:
+        raise SystemExit("--stop-level must be between 0 and --depth")
+    last_level_keys = None
+    if args.last_level_report_only:
+        if not args.report_flag_state:
+            raise SystemExit("--last-level-report-only requires --report-flag-state")
+        last_level_keys = {
+            ((outer_span, outer_z), (inner_span, inner_z))
+            for outer_span, outer_z, inner_span, inner_z in args.report_flag_state
+        }
+
+    levels, stats_by_level = build_pair_levels(
+        depth=args.depth,
+        stop_level=stop_level,
+        expansion=args.expansion,
+        q_log2=args.q_log2,
+        singleton_charge=args.singleton_charge,
+        max_visible_tau=args.max_visible_tau,
+        cover_lift_mode=args.cover_lift_mode,
+        cover_kernel_lift=args.cover_kernel_lift,
+        prune_to_final_span=args.prune_to_final_span,
+        term_limit=args.term_limit,
+        exclude_collapsed_active=args.exclude_collapsed_active,
+        kernel_cover_mode=args.kernel_cover_mode,
+        last_level_keys=last_level_keys,
+    )
+
+    print(
+        "level,k,n,span_count,table_entries,improved_entries,best_saving_log2,"
+        "best_saving_qdim,best_state"
+    )
+    for level, data in enumerate(levels):
+        k = 1 << level
+        n = args.expansion * (1 << level)
+        stats = stats_by_level[level]
+        best_state = ""
+        if stats.best_state is not None:
+            outer_state, inner_state = stats.best_state
+            best_state = f"{format_state(outer_state)}>={format_state(inner_state)}"
+        print(
+            f"{level},{k},{n},{len(data.values)},"
+            f"{stats.entries},{stats.improved_entries},"
+            f"{stats.best_saving_log2:.8f},{stats.best_saving_log2 / args.q_log2:.8f},"
+            f"{best_state}"
+        )
+
+    final_values = levels[-1].values.get(1)
+    if final_values is not None:
+        crossing = first_crossing(final_values, args.security_bits)
+        print(f"final_span_1_crossing_z,{crossing if crossing is not None else ''}")
+
+    for target in args.report_flag_state:
+        outer_span, outer_z, inner_span, inner_z = target
+        print(
+            "flag_state_report_level,outer_span,outer_z,inner_span,inner_z,"
+            "table_log2,coarse_log2,saving_log2,saving_qdim"
+        )
+        key = ((outer_span, outer_z), (inner_span, inner_z))
+        for level, data in enumerate(levels):
+            table_value = data.flag_table.get(key, NEG_INF) if data.flag_table is not None else NEG_INF
+            if table_value > NEG_INF / 2:
+                _label, coarse, _outer_first, _inner_first = flag_child_bound_report(
+                    child_by_span=data.values,
+                    child_k=1 << level,
+                    child_n=args.expansion * (1 << level),
+                    outer_span=outer_span,
+                    inner_span=inner_span,
+                    outer_zeros=outer_z,
+                    inner_zeros=inner_z,
+                    q_log2=args.q_log2,
+                    mode="best",
+                )
+                saving = coarse - table_value if coarse > NEG_INF / 2 else NEG_INF
+                print(
+                    f"{level},{outer_span},{outer_z},{inner_span},{inner_z},"
+                    f"{table_value:.8f},"
+                    f"{coarse:.8f},"
+                    f"{saving:.8f},"
+                    f"{saving / args.q_log2:.8f}"
+                )
+
+
+if __name__ == "__main__":
+    main()

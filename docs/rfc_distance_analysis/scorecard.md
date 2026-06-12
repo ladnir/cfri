@@ -295,3 +295,12 @@ the coarse/table baseline, because consumed-kernel rows become dominant. Combini
 `--exclude-collapsed-active` gives `1071.43723477` bits against the `1187.19455102` baseline,
 saving `0.90435403` q-dimensions. This is the current proof-shaped closure: prove exact-flag
 collapsed-active rerouting, then cover only sibling-unconsumed kernel fibers.
+
+Pair-enumerated table recurrence added. The bounded command
+`rfc_pair_flag_table_recurrence.py --depth 5 --stop-level 3 --proof-shaped --term-limit 300
+--report-flag-state 4,7,2,8 --last-level-report-only` builds full pair tables through level 2 and
+reports the level-3 stress state as `810.94626976` bits. At that point the level-3 coarse flag
+bound is already `810.94626976`, so the improvement is coming from the child level-2 pair table.
+This is a partial win for the recurrence architecture. The new blocker is computational: full
+unpruned level-3 pair-table construction timed out, so the next version must be sparse or
+demand-driven.

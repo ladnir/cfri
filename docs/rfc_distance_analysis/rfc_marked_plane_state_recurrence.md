@@ -413,3 +413,45 @@ multiply by explicit current-fold split/root/lift profile constants.
 The audit's main warning is the same as above: no product of child moments, no scalar post-hoc
 discount, and no collapse of incomparable marked lines into a chain. The next proof step is to turn
 the marked-plane state into a small diagram recurrence with merge/equality rules.
+
+## Pair-Enumerated Flag Table Recurrence
+
+The script:
+
+```text
+scripts/rfc_distance_analysis/rfc_pair_flag_table_recurrence.py
+```
+
+turns the target-by-target pair enumeration into a table-level diagnostic. It builds pair-enumerated
+two-layer flag tables and feeds them into later scalar levels. The current bounded stress command is:
+
+```text
+python -B scripts/rfc_distance_analysis/rfc_pair_flag_table_recurrence.py \
+  --depth 5 \
+  --stop-level 3 \
+  --proof-shaped \
+  --term-limit 300 \
+  --report-flag-state 4,7,2,8 \
+  --last-level-report-only
+```
+
+The output is:
+
+```text
+level 2, (4,7)>=(2,8):
+  table_log2  = -2008.00842556
+  coarse_log2 = -1505.51820057
+  saving      = 502.49022500 bits = 3.92570488 q-dim
+
+level 3, (4,7)>=(2,8):
+  table_log2  = 810.94626976
+  coarse_log2 = 810.94626976
+```
+
+The level-3 equality is not a failure: the scalar values entering the level-3 coarse flag bound have
+already been improved by the level-2 pair table. This is stronger than the standalone classifier
+checkpoint for the displayed stress state.
+
+The current limitation is computational. A full unpruned level-3 pair table timed out in the Python
+diagnostic. The next implementation target is a sparse/demand-driven pair-table builder that
+computes only the flag states needed by the final distance trace and their recursive children.

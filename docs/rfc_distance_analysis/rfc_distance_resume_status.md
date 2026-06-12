@@ -149,7 +149,10 @@ docs/rfc_distance_analysis/rfc_marked_plane_state_recurrence.md
   Status: active finite-diagram recurrence target.
   Records the carried-flag and marked-plane route. The local q+1 two-lines-in-plane brick is real
   and saves at level 2, but a naive level-3 sum over flag-state expansion choices is worse than the
-  coarse table.
+  coarse table. Update: `rfc_pair_flag_table_recurrence.py` now builds pair-enumerated tables
+  through level 2 and reports the depth-5-pruned level-3 stress state `(4,7)>=(2,8)` at
+  `810.94626976` bits. Full unpruned level-3 pair-table construction timed out, so the next
+  implementation blocker is a sparse/demand-driven pair table.
 
 docs/rfc_distance_analysis/rfc_flag_bad_pair_classifier_level3_4_7_ge_2_8.csv
   Status: current obstruction classifier.
@@ -184,15 +187,21 @@ The live blockers are now narrow:
    collapsed-active exact-support rerouting, and sibling-unconsumed kernel-fiber covering after the
    canonical local quotient/root datum is fixed. Quotient-line and quotient-plane incidence remain
    counted. Consumed kernel subspaces must be carried or charged, not covered.
-2. Prove/finalize the shared-randomness-safe multi-layer flag transition theorem. The target note
+2. Sparse pair-enumerated table recurrence. The bounded diagnostic
+   `rfc_pair_flag_table_recurrence.py --depth 5 --stop-level 3 --proof-shaped --term-limit 300
+   --report-flag-state 4,7,2,8 --last-level-report-only` gives `810.94626976` bits for the
+   level-3 stress flag after level-2 pair-table improvements. A full unpruned level-3 pair table
+   timed out. The next implementation should compute only states demanded by the final trace and
+   their recursive child flags.
+3. Prove/finalize the shared-randomness-safe multi-layer flag transition theorem. The target note
    covers the joint marked-line/frame recurrence for the decomposable |A|=2,delta=2,comp=2 row,
    with the local marked-component certificate and uniform `(q+1)` frame-completion count written.
-3. Kernel-branch nested-flag truncation:
+4. Kernel-branch nested-flag truncation:
    prove length three is enough, or prove length-four theta_2=-1 chains are dominated.
-4. Direct proof of the delta=3 connected full-kernel endpoint used by the g=1 row, or a general
+5. Direct proof of the delta=3 connected full-kernel endpoint used by the g=1 row, or a general
    component/full-kernel theorem with constants.
-5. Higher-drop tau-two layers beyond the g=1 first-drop case.
-6. Finite constants: marked-line root-fiber constants, exact-support inversion, split counts, and
+6. Higher-drop tau-two layers beyond the g=1 first-drop case.
+7. Finite constants: marked-line root-fiber constants, exact-support inversion, split counts, and
    log-sum/state-count overhead. The determinant-1 nonzero-root normalization is now stated
    separately and is no longer a q-dimensional blocker at the target field size.
 ```
@@ -203,7 +212,9 @@ Finalize the two lemma package for the level-3 stress row: prove collapsed-activ
 rerouting, prove sibling-unconsumed kernel-fiber covering using
 `K_lower = W_lower cap K_upper`, then plug only those covered exponents into the finite
 marked-plane recurrence. The target checkpoint is the stricter diagnostic
-`1071.43723477 < 1187.19455102`, not the broader all-displayed-kernel cover.
+`1071.43723477 < 1187.19455102`, not the broader all-displayed-kernel cover. In parallel, the
+implementation target is item 2: make the pair-enumerated table sparse enough to push past the
+level-3 report-only checkpoint.
 
 After that, return to the theta_2=-1 kernel-chain truncation and the connected full-kernel local
 endpoint. Those remain real blockers, but they are not the first item on the active frontier.

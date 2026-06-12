@@ -29,6 +29,7 @@ rfc_marked_plane_state_diagnostic.py scans finite marked-line-in-plane state sav
 rfc_diagram_path_dp.py              follows bound trace with carried-flag and marked-plane savings
 rfc_flag_state_choice_diagnostic.py target flag-state joint expansion choice diagnostic
 rfc_flag_bad_pair_classifier.py     groups high-mass flag-state pair witnesses by structural keys
+rfc_pair_flag_table_recurrence.py   pair-enumerated two-layer flag-table recurrence diagnostic
 rfc_theta_chain_normal_slice.py     shortened-ambient/defect-slice checker with optimistic rho and strict hard-trace columns
 rfc_defect_conservation.py          fixed-witness rank-defect conservation checker for exposed shortened ambients
 rfc_shortened_rank_recurrence.py    optimistic rho_h(D,z) recurrence with paired-spine compression
@@ -282,6 +283,33 @@ level 3 target (4,7)>=(2,8):
 So the next proof object is not merely "flag states choose their own rows". It must include a
 canonical witness selection, exact-support grouping, or charging argument that prevents the large
 bad pair family from being summed.
+
+`rfc_pair_flag_table_recurrence.py` is the next table-level diagnostic. It builds two-layer flag
+tables by enumerating outer/inner expansion pairs and can feed those tables into later scalar
+levels. The current proof-shaped mode is:
+
+```text
+python -B scripts/rfc_distance_analysis/rfc_pair_flag_table_recurrence.py \
+  --depth 5 \
+  --stop-level 3 \
+  --proof-shaped \
+  --term-limit 300 \
+  --report-flag-state 4,7,2,8 \
+  --last-level-report-only
+```
+
+This builds full pair tables through level 2, then computes only the reported level-3 stress state.
+It reports:
+
+```text
+level 3, (4,7)>=(2,8):
+  table_log2  = 810.94626976
+  coarse_log2 = 810.94626976
+```
+
+The equality means the level-3 stress flag is already lowered by the level-2 pair table before the
+level-3 pair enumeration adds anything. A full unpruned level-3 pair table timed out in the current
+Python diagnostic, so the next implementation target is a sparse/demand-driven pair-table builder.
 
 `rfc_multicopy_falsification.py` is adversarial. It estimates whether broad one-copy near-families
 can intersect across many independent RFC copies often enough to threaten the target excess.

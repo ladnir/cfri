@@ -159,12 +159,26 @@ CSV_FIELDS = [
     "current_bound_log2",
     "carried_bound_log2",
     "saving_log2",
+    "diagram_bound_log2",
+    "diagram_saving_log2",
     "note",
 ]
 
 
 def emit_row(writer: csv.DictWriter, **row: object) -> None:
     writer.writerow({key: row.get(key, "") for key in CSV_FIELDS})
+
+
+def split_shape_log2(choice: Choice, child_n: int, comb: list[list[float]]) -> float:
+    p = choice[0]
+    singleton_count = choice[1]
+    visible_support_size = choice[2]
+    outer_zeros = choice[6]
+    return (
+        float(singleton_count)
+        + comb[outer_zeros][p]
+        + comb[child_n - outer_zeros][visible_support_size]
+    )
 
 
 def main() -> None:
@@ -274,6 +288,18 @@ def main() -> None:
     next_outer_choice = levels[2].choices.get(next_outer_state)
     next_inner_choice = levels[2].choices.get(next_inner_state)
     if next_outer_choice is not None and next_inner_choice is not None:
+        comb = log2_comb_table(args.expansion * (1 << args.depth))
+        inner_shape_log2 = split_shape_log2(
+            next_inner_choice,
+            args.expansion * (1 << 1),
+            comb,
+        )
+        outer_value = value_at(levels[2].values, next_outer_state)
+        # Diagnostic q-exponent replacement for the current q^4 ancestor factor: after the
+        # outer tau-two row fixes the child 2-plane and one marked line, the inner tau-zero
+        # child line ranges over at most q+1 lines in that plane.  The small split factor is
+        # included; finite root/constant refinements are deliberately not claimed here.
+        two_marked_line_bound = outer_value + args.q_log2 + inner_shape_log2
         emit_row(
             writer,
             kind="next_diagram",
@@ -288,9 +314,12 @@ def main() -> None:
                 f"inner={':'.join(str(x) for x in next_inner_choice)}"
             ),
             carried_child_flag="(2,0) with marked lines (1,4) and (1,3)",
+            current_bound_log2=f"{carried_bound:.8f}",
+            diagram_bound_log2=f"{two_marked_line_bound:.8f}",
+            diagram_saving_log2=f"{carried_bound - two_marked_line_bound:.8f}",
             note=(
                 "outer tau2 row and inner tau0 row create two marked child lines inside one "
-                "2-plane; line comparability is not known"
+                "2-plane; q+1 line-choice diagnostic includes inner split factor only"
             ),
         )
 

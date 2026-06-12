@@ -47,6 +47,7 @@ Open items are excluded from the denominator.
 | Quotient-incidence flag-lift recurrence | 0 | 2 | 0 | 0% | Keep as corrected candidate | Tau-zero duplicate-lift covering is safe; tau-positive branches must count quotient lines/planes via support-subcode/exterior incidence plus invisible-fiber dimensions. |
 | Tau-one fixed-flag quotient-line incidence | 0 | 1 | 0 | 0% | Safe local brick, not a closer | `rfc_tau1_quotient_line_incidence_lemma.md` proves the post-root exponent `f_A + m_A - 1 - |A|`; `--report-tau1-incidence` shows the `z=34` tau-one trace rows have `support_saving=0`. |
 | Carried two-layer flag merge | 1 | 1 | 0 | 50% | Keep, exposes next diagram | `rfc_carried_flag_diagnostic.py` carries `F_3((4,7),(2,8))`, improves `(4,3)>=(2,5)` to `(4,4)>=(2,5)`, and saves `251.98` bits; next state is a two-marked-line diagram. |
+| Two-marked-line plane diagram | 1 | 1 | 0 | 50% | Keep, local but insufficient | `rfc_two_marked_line_plane_lemma.md` replaces a coarse `q^4` ancestor choice by `q+1`, saving another `381.42` bits on the carried path. |
 | Kernel-lift-only cover | 0 | 0 | 1 | 0% | Not useful for current base seal | `--cover-kernel-lift` keeps quotient incidence and leaves depth-5 checkpoint at `z=137`; combined with safe tau-zero covering it still only reaches `z=135`. |
 | One-layer shortened child flag ambient | 0 | 0 | 1 | 0% | Not useful for current base seal | Diagnostic `--flag-bound best-shortened` leaves the depth-5 checkpoint at `z=137` and the `z=34` trace unchanged. |
 | High-kernel/local-incidence bonus | 0 | 0 | 0 | open | Next candidate | Need prove hard row carrying large shortened ambient pays more than uniform `q^-9`. |
@@ -187,3 +188,9 @@ next transition strengthens the level-2 child flag from `(4,3)>=(2,5)` to `(4,4)
 `251.98` bits in the current coarse evaluator. The following expansion creates a 2-plane with two
 marked lines `(1,4)` and `(1,3)`, which confirms the auditor's warning that the real state can be a
 small incidence diagram rather than a total chain.
+
+Two-marked-line plane lemma target written. In the exposed diagram, once the outer tau-two row fixes
+the child 2-plane and one marked line, the inner tau-zero line costs at most `q+1` choices in that
+plane rather than the coarse `q^4` ancestor choice. The diagnostic estimates another `381.42` bits
+of saving, for `633.39` bits combined with the carried-flag merge. This is real progress but still
+local; the full `z=34` gap remains much larger.

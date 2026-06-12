@@ -154,6 +154,8 @@ tau-two `theta_2=-1` rows through the outer/inner child graph.
 first carried-flag merge. It shows that carrying `F_3((4,7),(2,8))` changes the child flag from
 `(4,3)>=(2,5)` to `(4,4)>=(2,5)`, saving `251.97763219` bits in the current coarse child bound.
 The next expansion exposes a non-chain diagram: a 2-plane with marked lines `(1,4)` and `(1,3)`.
+Using the local two-marked-line plane bound, the script estimates another `381.41503750` bits of
+q-dimensional saving for that diagram, before finite constants.
 
 `rfc_multicopy_falsification.py` is adversarial. It estimates whether broad one-copy near-families
 can intersect across many independent RFC copies often enough to threaten the target excess.

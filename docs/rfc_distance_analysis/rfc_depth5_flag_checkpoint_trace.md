@@ -160,6 +160,24 @@ diagram:
 The two marked lines both lie in the same child 2-plane, but they are not known comparable or equal.
 So the next proof object is a small incidence diagram, not just a longer total chain.
 
+The local two-marked-line plane bound in:
+
+```text
+rfc_two_marked_line_plane_lemma.md
+```
+
+replaces the coarse `q^4` ancestor choice for the second line by a `q+1` line choice inside the
+fixed child plane, plus finite split constants. The diagnostic estimate is:
+
+```text
+carried merge saving:       251.97763219 bits
+two-marked-line saving:     381.41503750 bits
+combined local saving:      633.39266969 bits
+```
+
+This is material but still not enough to close `z=34`. It does, however, identify the next
+recurrence object: a finite incidence-diagram state for a plane with multiple marked lines.
+
 ## Kernel-Lift Cover Check
 
 The narrower diagnostic:

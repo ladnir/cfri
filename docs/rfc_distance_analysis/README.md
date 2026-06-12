@@ -75,6 +75,7 @@ rfc_g1_first_drop_endpoint_lemma.md           g=1 first-drop tau-two endpoint cl
 rfc_h2_cofactor_bound.md                      second rank-drop/cofactor route
 rfc_tau2_weighted_exterior_bound.md           tau-2 layer-codimension/root-line endpoint target
 rfc_u23_tau2_endpoint_lemma.md                direct |A|=3,delta=2,comp=1 endpoint proof
+rfc_two_marked_line_plane_lemma.md            local two-marked-line incidence diagram target
 rfc_theta_minus_one_chain_recurrence_target.md recurrence target for theta_2=-1 chains
 rfc_theta_minus_one_isolation_lemma.md        outer-chain isolation and kernel nested-flag target
 rfc_kernel_branch_nested_flag_recurrence.md   minimal nested-flag recurrence for kernel chains

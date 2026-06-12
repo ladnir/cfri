@@ -43,6 +43,7 @@ from rfc_flag_span_moment import (  # noqa: E402
 from rfc_diagram_state import (  # noqa: E402
     add_marked_line_in_plane,
     carrier_plane_with_line,
+    two_layer_child_diagram,
 )
 
 
@@ -62,6 +63,7 @@ CSV_FIELDS = [
     "saving_qdim",
     "carrier_diagram",
     "next_diagram",
+    "transition_diagram",
     "plane_zero_budget",
     "carrier_line_zero_budget",
     "extra_line_zero_budget",
@@ -208,6 +210,10 @@ def main() -> None:
                     line_name="N",
                     line_zeros=extra_line_zero_budget,
                 )
+                transition_diagram = two_layer_child_diagram(
+                    outer_choice=outer_choice,
+                    inner_choice=inner_choice,
+                )
                 line_choice = line_choice_qdim * args.q_log2
                 marked_plane_bound = outer_value + inner_local + line_choice
                 saving = coarse_bound - marked_plane_bound
@@ -234,6 +240,7 @@ def main() -> None:
                         "saving_qdim": f"{saving_qdim:.8f}",
                         "carrier_diagram": carrier_diagram.key(),
                         "next_diagram": next_diagram.key(),
+                        "transition_diagram": transition_diagram.key(),
                         "plane_zero_budget": plane_zero_budget,
                         "carrier_line_zero_budget": carrier_line_zero_budget,
                         "extra_line_zero_budget": extra_line_zero_budget,

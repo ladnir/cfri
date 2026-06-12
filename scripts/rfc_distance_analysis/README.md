@@ -164,7 +164,8 @@ q-dimensions above the `2^-80` target.
 `rfc_diagram_state.py` is the small reusable state skeleton behind the marked-plane route. It stores
 diagram nodes with dimensions and zero budgets, containment edges `child <= parent`, forced
 equal-dimension merges, and the safe `q+1` operation for adding an ordered marked line inside an
-already fixed child plane.
+already fixed child plane. It also derives the child inclusion diagram of one two-layer flag
+transition, so the non-chain shape is generated from containment rules rather than hand-labeled.
 
 `rfc_marked_plane_state_diagnostic.py` generalizes the next local diagram scan. It enumerates
 two-layer flags where the upper layer already carries a child 2-plane plus one marked line and the
@@ -178,9 +179,15 @@ python -B scripts/rfc_distance_analysis/rfc_marked_plane_state_diagnostic.py \
   --inner-state 2,5
 ```
 
-it reproduces the `381.41503750` bit two-marked-line saving. This script is still diagnostic: it
-uses the safe ordered-line `q+1` replacement, but it does not yet propagate a full diagram state
-through all levels.
+it reproduces the `381.41503750` bit two-marked-line saving and emits the generic transition
+diagram:
+
+```text
+I0:d1:z3;O0:d2:z0;O1:d1:z4|I0<=O0;O1<=O0
+```
+
+This script is still diagnostic: it uses the safe ordered-line `q+1` replacement, but it does not
+yet propagate a full diagram state through all levels.
 
 `rfc_multicopy_falsification.py` is adversarial. It estimates whether broad one-copy near-families
 can intersect across many independent RFC copies often enough to threaten the target excess.

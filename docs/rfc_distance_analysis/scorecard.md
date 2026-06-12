@@ -207,5 +207,8 @@ product of child moments.
 
 First diagram-state skeleton implemented. `rfc_diagram_state.py` now has node/edge state,
 same-dimension containment merging with max zero budget, and the ordered marked-line insertion
-operation. The marked-plane scanner now emits canonical carrier and successor diagram keys. This is
-still not the full DP: it only gives the state representation and one transition brick.
+operation. It also derives the child diagram of a two-layer flag transition; for the carried row
+this gives `I0:d1:z3;O0:d2:z0;O1:d1:z4|I0<=O0;O1<=O0`, matching the desired two-line-in-plane
+shape. The marked-plane scanner now emits canonical carrier, successor, and transition diagram
+keys. This is still not the full DP: it only gives the state representation and one transition
+brick.

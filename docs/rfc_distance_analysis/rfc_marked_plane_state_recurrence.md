@@ -135,6 +135,7 @@ node: dim, zero budget
 edge: child <= parent
 canonicalization: equal-dimension containment forces node merge
 line insertion: add a marked line under a fixed 2-plane for q+1 choices
+transition builder: derive the child diagram of a two-layer flag transition
 ```
 
 `scripts/rfc_distance_analysis/rfc_marked_plane_state_diagnostic.py` scans the current two-layer
@@ -156,6 +157,7 @@ marked-plane bound: -1124.45603175 bits
 saving:              381.41503750 bits
 carrier diagram:     M:d1:z4;P:d2:z0|M<=P
 next diagram:        M:d1:z4;N:d1:z3;P:d2:z0|M<=P;N<=P
+transition diagram:  I0:d1:z3;O0:d2:z0;O1:d1:z4|I0<=O0;O1<=O0
 ```
 
 This agrees with `rfc_carried_flag_diagnostic.py` and makes the next recurrence requirement

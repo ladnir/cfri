@@ -350,6 +350,17 @@ truncated table cannot yet exploit this cleanly, because filtered lower tables m
 their coarse baseline. The next theorem/implementation step is an exact demanded strong-bottom
 state, not another coarse scalar filter.
 
+The `--exact-filtered-empty` diagnostic confirms that filtered-empty entries can be handled
+exactly for small demanded states, but global application worsens the current depth-5 trace:
+
+```text
+1095.85967660 -> 1478.22313584 bits at z=34.
+```
+
+This is not evidence against the line-quotient impossibility. It means the current two-layer table
+does not have enough state to retain lower pair improvements after impossible quotient-line
+profiles are removed. The next recurrence needs to carry the filtered strong-bottom diagram itself.
+
 ## Tau-One Chain Rows
 
 The anti-conservative sensitivity:

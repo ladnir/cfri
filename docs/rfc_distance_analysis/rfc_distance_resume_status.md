@@ -331,6 +331,26 @@ So the next implementation target is not another scalar filter. We need exact/de
 filtered lower rows, or a richer strong-bottom state that preserves lower table improvements while
 excluding the impossible quotient-line profiles.
 
+Update: `--exact-filtered-empty` now verifies empty filtered table entries exhaustively before
+setting them to `-inf`. This works for the small lower state:
+
+```text
+level-2 (4,2)>=(2,4): -inf
+level-3 (4,2)>=(2,4): 932.89565663 -> 803.47579675 bits.
+```
+
+But applying the rule globally is not yet a win:
+
+```text
+full depth-5 z=34:
+  child-diamond mode only:          1095.85967660 bits
+  plus global exact-filtered-empty: 1478.22313584 bits
+```
+
+The path moves back through `(4,7)>=(2,8)` because the two-layer table loses lower improvements and
+falls back to coarse bounds. The next real implementation target is a richer filtered diagram
+state, not more global scalar filtering.
+
 After that, return to the theta_2=-1 kernel-chain truncation and the connected full-kernel local
 endpoint. Those remain real blockers, but they are not the first item on the active frontier.
 

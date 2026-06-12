@@ -354,3 +354,39 @@ So the line-quotient filter is a valid local proof target, but not yet a useful 
 mode in the current truncated table plumbing. The next implementation needs exact/demanded handling
 of filtered lower rows, or a richer state that preserves the lower table improvements while
 excluding the impossible line-quotient profiles.
+
+## Exact-Empty Fallback Diagnostic
+
+`--exact-filtered-empty` repairs one part of the table plumbing. When support-two line filtering
+leaves no pair rows for a demanded table entry, the script recomputes that entry exhaustively; if it
+is still empty, the entry is set to `-inf` instead of falling back to the coarse flag bound.
+
+For the small lower state this confirms the local impossibility:
+
+```text
+level-2 (4,2)>=(2,4): -inf
+```
+
+With exact-empty enabled, the level-3 strong-bottom state improves:
+
+```text
+(4,2)>=(2,4): 932.89565663 -> 803.47579675 bits.
+```
+
+However, enabling the same rule globally in the demanded depth-5 run is not a win:
+
+```text
+without line filter/exact-empty: 1095.85967660 bits
+with exact-empty globally:       1478.22313584 bits
+crossing:                       still z=133
+```
+
+The traced path moves back through `(4,7)>=(2,8)`, whose table value degrades to `548.77189886`
+bits because filtered lower entries no longer support the previous pair-table improvement and the
+recurrence falls back to coarse bounds.
+
+Interpretation: the local line-quotient impossibility appears sound, and exact-empty handling is
+correct for fully enumerated empty entries. The remaining problem is state sufficiency. The current
+two-layer table cannot preserve all lower improvements after impossible quotient-line profiles are
+removed. A proof-grade recurrence needs either a richer demanded diagram state or an exact filtered
+table construction that avoids coarse fallback for the affected lower families.

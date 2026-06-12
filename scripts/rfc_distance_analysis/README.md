@@ -452,6 +452,25 @@ level-3 (4,2)>=(2,4):  932.89565663 -> 1178.66844183 bits
 Treat the filter as a proof obligation and a diagnostic, not as a certificate mode until the
 demanded table can preserve lower improvements while removing impossible profiles.
 
+`--exact-filtered-empty` adds an exhaustive check before making an empty filtered table entry
+impossible. It confirms the small lower state:
+
+```text
+level-2 (4,2)>=(2,4): -inf
+level-3 (4,2)>=(2,4): 932.89565663 -> 803.47579675 bits
+```
+
+But the full demanded trace is worse when this is applied globally:
+
+```text
+child-diamond mode only:          z=34 value 1095.85967660
+plus global exact-filtered-empty: z=34 value 1478.22313584
+```
+
+So exact-empty is a local diagnostic, not yet the final recurrence. The missing object is a richer
+filtered diagram state that preserves lower pair-table improvements while excluding impossible
+quotient-line profiles.
+
 `rfc_multicopy_falsification.py` is adversarial. It estimates whether broad one-copy near-families
 can intersect across many independent RFC copies often enough to threaten the target excess.
 

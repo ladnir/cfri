@@ -131,6 +131,19 @@ def clean_csv_field(text: str) -> str:
     return text.replace(",", ";")
 
 
+def finite_label(value: float) -> str:
+    return "-inf" if value <= NEG_INF / 2 else f"{value:.8f}"
+
+
+def saving_labels(coarse: float, value: float, q_log2: float) -> tuple[str, str]:
+    if coarse <= NEG_INF / 2:
+        return "", ""
+    if value <= NEG_INF / 2:
+        return "inf", "inf"
+    saving = coarse - value
+    return f"{saving:.8f}", f"{saving / q_log2:.8f}"
+
+
 def finite_states(values_by_span: dict[int, list[float]]) -> list[State]:
     states: list[State] = []
     for span, values in values_by_span.items():
@@ -167,6 +180,7 @@ def compute_pair_enumerated_flag_table(
     consumed_kernel_mode: str,
     support2_diamond_mode: str,
     support2_line_filter: bool,
+    exact_filtered_empty: bool,
     allowed_keys: set[tuple[State, State]] | None = None,
 ) -> tuple[FlagTable, TableStats]:
     if allowed_keys is not None and len(allowed_keys) == 0:
@@ -180,11 +194,9 @@ def compute_pair_enumerated_flag_table(
     table: FlagTable = {}
     stats = TableStats()
     term_cache: dict[State, list[TermCandidate]] = {}
+    full_term_cache: dict[State, list[TermCandidate]] = {}
 
-    def terms_for_state(state: State) -> list[TermCandidate]:
-        cached = term_cache.get(state)
-        if cached is not None:
-            return cached
+    def enumerate_state_terms(state: State) -> list[TermCandidate]:
         terms = enumerate_terms_for_state(
             child_by_span=previous_values_by_span,
             child_flag_table=previous_flag_table,
@@ -199,8 +211,23 @@ def compute_pair_enumerated_flag_table(
             cover_lift_mode=cover_lift_mode,
             cover_kernel_lift=cover_kernel_lift,
         )
+        return terms
+
+    def terms_for_state(state: State) -> list[TermCandidate]:
+        cached = term_cache.get(state)
+        if cached is not None:
+            return cached
+        terms = enumerate_state_terms(state)
         cached = take_terms(terms, term_limit)
         term_cache[state] = cached
+        return cached
+
+    def full_terms_for_state(state: State) -> list[TermCandidate]:
+        cached = full_term_cache.get(state)
+        if cached is not None:
+            return cached
+        cached = enumerate_state_terms(state)
+        full_term_cache[state] = cached
         return cached
 
     for outer_state in states:
@@ -244,7 +271,38 @@ def compute_pair_enumerated_flag_table(
                 support2_diamond_mode=support2_diamond_mode,
                 support2_line_filter=support2_line_filter,
             )
-            value = min(baseline, pair_sum) if pair_sum > NEG_INF / 2 else baseline
+            exact_empty_impossible = False
+            if (
+                exact_filtered_empty
+                and support2_line_filter
+                and pair_sum <= NEG_INF / 2
+            ):
+                if term_limit > 0:
+                    outer_terms = full_terms_for_state(outer_state)
+                    inner_terms = full_terms_for_state(inner_state)
+                    _rows, pair_sum = build_pair_rows(
+                        outer_terms=outer_terms,
+                        inner_terms=inner_terms,
+                        child_values=previous_values_by_span,
+                        child_flag_table=previous_flag_table,
+                        child_k=previous_k,
+                        child_n=previous_n,
+                        q_log2=q_log2,
+                        outer_parent_span=outer_state[0],
+                        inner_parent_span=inner_state[0],
+                        exclude_collapsed_active=exclude_collapsed_active,
+                        kernel_cover_mode=kernel_cover_mode,
+                        nested_quotient_mode=nested_quotient_mode,
+                        nested_subspace_mode=nested_subspace_mode,
+                        consumed_kernel_mode=consumed_kernel_mode,
+                        support2_diamond_mode=support2_diamond_mode,
+                        support2_line_filter=support2_line_filter,
+                    )
+                exact_empty_impossible = pair_sum <= NEG_INF / 2
+            if exact_empty_impossible:
+                value = NEG_INF
+            else:
+                value = min(baseline, pair_sum) if pair_sum > NEG_INF / 2 else baseline
             table[key] = value
             stats.entries += 1
             saving = baseline - value
@@ -416,6 +474,7 @@ def build_pair_levels(
     consumed_kernel_mode: str,
     support2_diamond_mode: str,
     support2_line_filter: bool,
+    exact_filtered_empty: bool,
     last_level_keys: set[tuple[State, State]] | None,
     demand_next_level: bool,
 ) -> tuple[list[LevelData], list[TableStats]]:
@@ -482,6 +541,7 @@ def build_pair_levels(
             consumed_kernel_mode=consumed_kernel_mode,
             support2_diamond_mode=support2_diamond_mode,
             support2_line_filter=support2_line_filter,
+            exact_filtered_empty=exact_filtered_empty,
             allowed_keys=allowed_keys,
         )
         levels.append(
@@ -568,6 +628,14 @@ def main() -> None:
         ),
     )
     parser.add_argument(
+        "--exact-filtered-empty",
+        action="store_true",
+        help=(
+            "diagnostic: when support2-line filtering leaves no pair rows, "
+            "recompute that table entry exhaustively and set it to -inf if still empty"
+        ),
+    )
+    parser.add_argument(
         "--proof-shaped",
         action="store_true",
         help="alias for --exclude-collapsed-active --kernel-cover-mode sibling-unconsumed",
@@ -638,6 +706,7 @@ def main() -> None:
         consumed_kernel_mode=args.consumed_kernel_mode,
         support2_diamond_mode=args.support2_diamond_mode,
         support2_line_filter=args.support2_line_quotient_filter,
+        exact_filtered_empty=args.exact_filtered_empty,
         last_level_keys=last_level_keys,
         demand_next_level=args.demand_next_level,
     )
@@ -654,10 +723,15 @@ def main() -> None:
         if stats.best_state is not None:
             outer_state, inner_state = stats.best_state
             best_state = f"{format_state(outer_state)}>={format_state(inner_state)}"
+        best_saving = f"{stats.best_saving_log2:.8f}"
+        best_saving_qdim = f"{stats.best_saving_log2 / args.q_log2:.8f}"
+        if stats.best_value_log2 <= NEG_INF / 2 and stats.best_state is not None:
+            best_saving = "inf"
+            best_saving_qdim = "inf"
         print(
             f"{level},{k},{n},{len(data.values)},"
             f"{stats.entries},{stats.improved_entries},"
-            f"{stats.best_saving_log2:.8f},{stats.best_saving_log2 / args.q_log2:.8f},"
+            f"{best_saving},{best_saving_qdim},"
             f"{best_state}"
         )
 
@@ -679,26 +753,27 @@ def main() -> None:
         key = ((outer_span, outer_z), (inner_span, inner_z))
         for level, data in enumerate(levels):
             table_value = data.flag_table.get(key, NEG_INF) if data.flag_table is not None else NEG_INF
-            if table_value > NEG_INF / 2:
-                _label, coarse, _outer_first, _inner_first = flag_child_bound_report(
-                    child_by_span=data.values,
-                    child_k=1 << level,
-                    child_n=args.expansion * (1 << level),
-                    outer_span=outer_span,
-                    inner_span=inner_span,
-                    outer_zeros=outer_z,
-                    inner_zeros=inner_z,
-                    q_log2=args.q_log2,
-                    mode="best",
-                )
-                saving = coarse - table_value if coarse > NEG_INF / 2 else NEG_INF
-                print(
-                    f"{level},{outer_span},{outer_z},{inner_span},{inner_z},"
-                    f"{table_value:.8f},"
-                    f"{coarse:.8f},"
-                    f"{saving:.8f},"
-                    f"{saving / args.q_log2:.8f}"
-                )
+            if data.flag_table is None or key not in data.flag_table:
+                continue
+            _label, coarse, _outer_first, _inner_first = flag_child_bound_report(
+                child_by_span=data.values,
+                child_k=1 << level,
+                child_n=args.expansion * (1 << level),
+                outer_span=outer_span,
+                inner_span=inner_span,
+                outer_zeros=outer_z,
+                inner_zeros=inner_z,
+                q_log2=args.q_log2,
+                mode="best",
+            )
+            saving_label, saving_qdim_label = saving_labels(coarse, table_value, args.q_log2)
+            print(
+                f"{level},{outer_span},{outer_z},{inner_span},{inner_z},"
+                f"{finite_label(table_value)},"
+                f"{finite_label(coarse)},"
+                f"{saving_label},"
+                f"{saving_qdim_label}"
+            )
 
     for target in args.trace_table_state:
         level, outer_span, outer_z, inner_span, inner_z = target

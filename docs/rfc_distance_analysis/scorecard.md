@@ -54,7 +54,7 @@ Open items are excluded from the denominator.
 | Kernel-lift-only cover | 0 | 1 | 1 | 0% | Useful after richer state, still not enough | Earlier `--cover-kernel-lift` kept crossing at `z=137`; after nested diagnostics it lowers `z=34` to `924.69`, but crossing remains `z=133` and tau-two/tau-one quotient chains dominate. |
 | Support-two tau-two quotient-frame bound | 1 | 2 | 0 | 33% | Keep, but old stress row is no longer dominant | The decoded `(4,7)>=(2,8)` structural trace has outer `a=2,tau=2,charge=4,lift=12` and adjusted qdim `8`, while the nested inner tau-one line is already reduced to one remaining quotient dimension. `--support2-diamond-mode child-only` lowers that level-3 pair sum from `303.44` to `61.01` bits and full depth-5 `z=34` from `1232.89` to `1095.86`, but the new blocker is `(4,2)>=(2,4)` with a strong bottom/kernel zero budget. |
 | Strong-bottom positive-kernel containment | 0 | 1 | 0 | 0% | Local lemma plausible, not enough | `--consumed-kernel-mode inner-kernel-contained` charges a lower positive kernel inside the upper kernel. On `(4,2)>=(2,4)` it moves the table only from `932.90` to `931.48` bits before a codimension-one support-two line-quotient row takes over. |
-| Support-two line-quotient impossibility | 0 | 1 | 0 | 0% | Valid local filter, table plumbing incomplete | `--support2-line-quotient-filter` removes decomposable tau-two support rows with `dim(V/L)=1`, where nonempty root-line support is impossible. Applied globally in the current truncated table it loses lower pair-table improvements through coarse fallback (`level-3 (4,2)>=(2,4)` rises to `1178.67`), so it needs exact demanded handling before it can be a certificate rule. |
+| Support-two line-quotient impossibility | 0 | 2 | 0 | 0% | Valid local filter, state sufficiency blocker | `--support2-line-quotient-filter` removes decomposable tau-two support rows with `dim(V/L)=1`, where nonempty root-line support is impossible. `--exact-filtered-empty` proves the lower `(4,2)>=(2,4)` entry is empty and improves the strong-bottom table to `803.48`, but globally the depth-5 `z=34` value worsens to `1478.22` because other entries fall back to coarse bounds. Needs richer filtered diagram state. |
 | One-layer shortened child flag ambient | 0 | 0 | 1 | 0% | Not useful for current base seal | Diagnostic `--flag-bound best-shortened` leaves the depth-5 checkpoint at `z=137` and the `z=34` trace unchanged. |
 | High-kernel/local-incidence bonus | 0 | 0 | 0 | open | Next candidate | Need prove hard row carrying large shortened ambient pays more than uniform `q^-9`. |
 | Joint nested shortened-rank profile charge | 0 | 0 | 0 | open | Next candidate | May recover missing few dimensions by charging the whole nested profile, not max one edge. |
@@ -104,9 +104,10 @@ outer support-two tau-two plus lower tau-one strong-bottom row.
 
 Follow-up diagnostics found two local facts but no closure yet: positive-kernel containment gives
 only a tiny table improvement, and the support-two line-quotient impossibility filter is locally
-right but currently interacts badly with truncated lower table fallback. The next implementation
-target is exact/demanded handling of filtered lower rows or a richer state for the strong-bottom
-interaction.
+right. Exact-empty handling recovers the narrow strong-bottom table (`803.48` bits), but global
+application worsens the full trace because the two-layer table loses lower improvements and falls
+back to coarse bounds. The next implementation target is a richer filtered diagram state for the
+strong-bottom interaction.
 
 ## Update Rule
 

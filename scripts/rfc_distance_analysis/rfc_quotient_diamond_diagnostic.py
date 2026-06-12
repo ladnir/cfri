@@ -337,6 +337,7 @@ def main() -> None:
         consumed_kernel_mode=args.consumed_kernel_mode,
         support2_diamond_mode="none",
         support2_line_filter=False,
+        exact_filtered_empty=False,
         last_level_keys={target_key},
         demand_next_level=False,
     )

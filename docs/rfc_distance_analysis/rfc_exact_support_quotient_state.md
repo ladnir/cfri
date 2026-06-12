@@ -404,6 +404,10 @@ The cheaper span-3 child event exists, but the span-4 tau-one lift contributes t
 q-dimensions locally and must be counted. The proof must reduce or recursively amortize this
 tau-one quotient-line family; it cannot simply select the cheaper child branch.
 
+The carried-line state target is separated out in
+`rfc_tau1_carried_line_state.md`. That note records the first conditional child-table target:
+`(4,7)>=(2,8)` with dominant `outer_tau1_charged_postroot_qdim = 3`.
+
 ## Certificate Recurrence Shape
 
 For an atomic exact-support quotient profile `Phi`, the theorem should prove:

@@ -500,6 +500,19 @@ rank 4: child (3,7)>=(2,8), local  774.83289001, child 420.80863940, term 1195.6
 The span-4 tau-one branch has two extra q-dimensions of local lift count and must be charged or
 carried recursively.
 
+`--trace-table-state` now also reports tau-one line budgets for pair rows:
+
+```text
+outer_tau1_quotient_qdim
+outer_tau1_charged_postroot_qdim
+inner_tau1_quotient_qdim
+inner_tau1_charged_postroot_qdim
+```
+
+For the first carried-line target `(4,7)>=(2,8)`, the dominant row has
+`outer_tau1_charged_postroot_qdim=3`. The proof target is documented in
+`docs/rfc_distance_analysis/rfc_tau1_carried_line_state.md`.
+
 `rfc_multicopy_falsification.py` is adversarial. It estimates whether broad one-copy near-families
 can intersect across many independent RFC copies often enough to threaten the target excess.
 

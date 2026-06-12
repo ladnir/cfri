@@ -1155,6 +1155,8 @@ def main() -> None:
             "pair_adjusted_lift_minus_charge_qdim,"
             "outer_remaining_quotient_lift_qdim,"
             "inner_remaining_quotient_lift_qdim,"
+            "outer_tau1_quotient_qdim,outer_tau1_charged_postroot_qdim,"
+            "inner_tau1_quotient_qdim,inner_tau1_charged_postroot_qdim,"
             "outer_choice,inner_choice"
         )
         for rank, row in enumerate(rows[: args.trace_table_top], start=1):
@@ -1182,6 +1184,18 @@ def main() -> None:
                 choice_quotient_lift_qdim(inner_span, row.inner.choice)
                 - row.inner_nested_quotient_cover_qdim,
             )
+            outer_tau1 = tau1_incidence_profile(outer_span, row.outer.choice)
+            inner_tau1 = tau1_incidence_profile(inner_span, row.inner.choice)
+            outer_tau1_quotient = ""
+            outer_tau1_charged_postroot = ""
+            inner_tau1_quotient = ""
+            inner_tau1_charged_postroot = ""
+            if outer_tau1 is not None:
+                outer_tau1_quotient = str(outer_tau1[0])
+                outer_tau1_charged_postroot = str(outer_tau1[6])
+            if inner_tau1 is not None:
+                inner_tau1_quotient = str(inner_tau1[0])
+                inner_tau1_charged_postroot = str(inner_tau1[6])
             child_flag = clean_csv_field(">=".join(format_state(layer) for layer in row.child_layers))
             outer_choice = clean_csv_field(format_choice(row.outer.choice))
             inner_choice = clean_csv_field(format_choice(row.inner.choice))
@@ -1203,6 +1217,8 @@ def main() -> None:
                 f"{outer_adjusted_qdim + inner_adjusted_qdim},"
                 f"{outer_remaining_quotient},"
                 f"{inner_remaining_quotient},"
+                f"{outer_tau1_quotient},{outer_tau1_charged_postroot},"
+                f"{inner_tau1_quotient},{inner_tau1_charged_postroot},"
                 f"{outer_choice},{inner_choice}"
             )
 

@@ -377,6 +377,18 @@ The span-3 child flag is slightly cheaper, but the span-4 tau-one lift has two e
 of local mass and dominates the first moment. Therefore the remaining `1352.53125813` gap is not a
 trace-selection artifact. It is a real high-lift tau-one quotient-chain/counting problem.
 
+The proof target is now written in:
+
+```text
+docs/rfc_distance_analysis/rfc_tau1_carried_line_state.md
+```
+
+The note makes the key constraint explicit: the parent tau-one row must still pay for its
+root-compatible quotient line `R`; the hoped-for saving is only that the child table should not
+count a fresh independent tau-one line family when it is conditioned on that carried `R`. The first
+conditional row to analyze is `(4,7)>=(2,8)`, whose dominant child-table row has
+`outer_tau1_charged_postroot_qdim = 3`.
+
 After that, return to the theta_2=-1 kernel-chain truncation and the connected full-kernel local
 endpoint. Those remain real blockers, but they are not the first item on the active frontier.
 

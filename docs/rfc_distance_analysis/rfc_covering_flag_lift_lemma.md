@@ -634,6 +634,9 @@ top_outer_kernel_lift_qdim
 top_outer_quotient_lift_qdim
 top_inner_kernel_lift_qdim
 top_inner_quotient_lift_qdim
+top_outer_kernel_dim
+top_inner_kernel_dim
+top_outer_kernel_unconsumed_by_inner
 ```
 
 A diagnostic collapsed-active filter removes the exact-flag overcount where equal-dimensional child

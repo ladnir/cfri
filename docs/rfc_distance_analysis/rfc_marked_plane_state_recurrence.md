@@ -333,6 +333,29 @@ The old `--posthoc-cover-kernel-lift` flag is now also exposed as:
 which records the intended theorem guard: quotient incidence stays counted, and only duplicate
 kernel lifts are covered under the unconsumed-kernel condition.
 
+The classifier now also emits:
+
+```text
+top_outer_kernel_dim
+top_inner_kernel_dim
+top_outer_kernel_unconsumed_by_inner
+```
+
+For the dominant un-covered pair, these are:
+
+```text
+top_outer_kernel_lift_qdim = 15
+top_outer_kernel_dim = 3
+top_inner_kernel_dim = 0
+top_outer_kernel_unconsumed_by_inner = yes
+```
+
+The next two un-covered pairs have `top_inner_kernel_dim = 1` and are marked `no`, which is the
+expected consumed-kernel warning. After `--kernel-cover-mode unconsumed-container`, the top covered
+pairs again have `top_inner_kernel_dim = 0` and are marked `yes`. This does not prove descendant
+unconsumption, but it cleanly separates the easy sibling-unconsumed family from rows that must be
+carried or charged.
+
 The first option removes rows where a tau-positive exact flag would have equal-dimensional child
 containers and the lower container carries the active singleton zero. That alone removes the
 `lift=19` row, but leaves a `lift=13` tau-one row. The second option keeps the child table fixed and

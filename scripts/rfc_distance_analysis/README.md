@@ -253,7 +253,10 @@ diagnostic, not a certificate mode. The older `--posthoc-cover-kernel-lift` flag
 compatibility alias.
 The CSV also splits the top row's lift into `top_*_kernel_lift_qdim` and
 `top_*_quotient_lift_qdim` so the quotient-incidence part can be audited separately from duplicate
-kernel-lift multiplicity.
+kernel-lift multiplicity. It also emits `top_outer_kernel_dim`, `top_inner_kernel_dim`, and
+`top_outer_kernel_unconsumed_by_inner`; in the dominant baseline pair this marks the outer kernel
+fiber as unconsumed by the displayed lower layer (`outer kernel dim 3`, `inner kernel dim 0`),
+while the next two exact pairs are marked consumed-risk (`inner kernel dim 1`).
 The first table attempt, `--flag-bound best-two-layer-table`, confirms this: the level-2 table saves
 the expected marked-plane q-dimensions on states such as `(4,4)>=(2,5)`, but by level 3 the target
 flags report zero additional table saving because the scalar dominant choices have already routed

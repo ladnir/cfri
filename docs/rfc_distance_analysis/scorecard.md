@@ -280,3 +280,11 @@ datum, duplicate choices of `K_parent <= L+L` may be covered once only if no lat
 marks hidden subspace data inside that kernel lift. Quotient incidence remains event data. This is
 not yet scored as a win because the finite marked-plane recurrence still has to consume the covered
 exponent directly.
+
+Classifier sibling-consumption audit added. The dominant un-covered pair has outer kernel lift
+`15`, outer kernel dimension `3`, inner kernel dimension `0`, and is marked
+`top_outer_kernel_unconsumed_by_inner=yes`. The next two exact pairs have inner kernel dimension
+`1` and are marked `no`, so they fall into the consumed-kernel exception. Under
+`--kernel-cover-mode unconsumed-container`, the top covered rows are again marked `yes`. This is a
+partial proof signal, not a win: descendants below the displayed pair still need their own
+unconsumed/consumed split.

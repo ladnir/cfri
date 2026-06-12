@@ -64,6 +64,9 @@ CSV_FIELDS = [
     "top_outer_quotient_lift_qdim",
     "top_inner_kernel_lift_qdim",
     "top_inner_quotient_lift_qdim",
+    "top_outer_kernel_dim",
+    "top_inner_kernel_dim",
+    "top_outer_kernel_unconsumed_by_inner",
     "top_outer_choice",
     "top_inner_choice",
     "note",
@@ -173,11 +176,39 @@ def choice_kernel_lift_qdim(parent_span: int, choice: tuple[int, ...]) -> int:
     return kernel_dim * (2 * view.inner_span - kernel_dim)
 
 
+def choice_kernel_dim(parent_span: int, choice: tuple[int, ...]) -> int:
+    view = choice_view(choice)
+    return parent_span - view.tau
+
+
 def choice_quotient_lift_qdim(parent_span: int, choice: tuple[int, ...]) -> int:
     view = choice_view(choice)
     if view.tau <= 0:
         return 0
     return view.tau * (2 * view.outer_span - parent_span)
+
+
+def outer_kernel_unconsumed_by_inner(
+    *,
+    outer_parent_span: int,
+    inner_parent_span: int,
+    outer_choice: tuple[int, ...],
+    inner_choice: tuple[int, ...],
+) -> str:
+    """Conservative sibling-consumption audit for the displayed pair.
+
+    In a nested two-layer parent flag, a lower-layer kernel is the obvious
+    sibling datum that can consume hidden subspace inside the upper kernel
+    lift.  If the lower layer is fully visible, it has no such kernel datum.
+    This is only a diagnostic; descendants below the displayed pair still
+    need their own consumed-kernel check.
+    """
+
+    outer_kernel_dim = choice_kernel_dim(outer_parent_span, outer_choice)
+    if outer_kernel_dim <= 0:
+        return "vacuous"
+    inner_kernel_dim = choice_kernel_dim(inner_parent_span, inner_choice)
+    return "yes" if inner_kernel_dim == 0 else "no"
 
 
 def adjusted_local_log2(
@@ -385,6 +416,22 @@ def make_output_row(
         ),
         "top_inner_quotient_lift_qdim": (
             choice_quotient_lift_qdim(inner_parent_span, top.inner.choice) if top is not None else ""
+        ),
+        "top_outer_kernel_dim": (
+            choice_kernel_dim(outer_parent_span, top.outer.choice) if top is not None else ""
+        ),
+        "top_inner_kernel_dim": (
+            choice_kernel_dim(inner_parent_span, top.inner.choice) if top is not None else ""
+        ),
+        "top_outer_kernel_unconsumed_by_inner": (
+            outer_kernel_unconsumed_by_inner(
+                outer_parent_span=outer_parent_span,
+                inner_parent_span=inner_parent_span,
+                outer_choice=top.outer.choice,
+                inner_choice=top.inner.choice,
+            )
+            if top is not None
+            else ""
         ),
         "top_outer_choice": format_choice(top.outer.choice) if top is not None else "",
         "top_inner_choice": format_choice(top.inner.choice) if top is not None else "",

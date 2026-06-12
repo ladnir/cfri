@@ -98,6 +98,15 @@ Integrated into the demanded table, it moves the full depth-5 `z=34` value to `1
 exposes the next blocker:
 
 ```text
+strong positive-kernel + line-filter closure: z=34 value 1352.53125813
+level-4 (2,15) top term: child (4,7)>=(2,8), local 1030.83, child 423.08
+level-4 cheaper branch:  child (3,7)>=(2,8), local  774.83, child 420.81
+```
+
+The high-lift span-4 tau-one branch is real first-moment mass, not a trace-choice bug. The current
+frontier is to carry/amortize that tau-one quotient-line family recursively.
+
+```text
 (4,2)>=(2,4), top child flag (4,0)>=(2,4),
 outer support-two tau-two plus lower tau-one strong-bottom row.
 ```

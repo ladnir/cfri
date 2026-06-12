@@ -392,6 +392,18 @@ each level forgets the quotient line after one fold. The exact-support quotient 
 tau-one quotient lines recursively as event data, including their child container and any invisible
 fiber dimension.
 
+The `--trace-state-terms` diagnostic confirms that this is not merely a bad trace-following
+choice. In the strong positive-kernel run, level 4 state `(2,15)` contains:
+
+```text
+rank 1: child (4,7)>=(2,8), local 1030.83289001, child 423.08002115, term 1453.91291117
+rank 4: child (3,7)>=(2,8), local  774.83289001, child 420.80863940, term 1195.64152942
+```
+
+The cheaper span-3 child event exists, but the span-4 tau-one lift contributes two more
+q-dimensions locally and must be counted. The proof must reduce or recursively amortize this
+tau-one quotient-line family; it cannot simply select the cheaper child branch.
+
 ## Certificate Recurrence Shape
 
 For an atomic exact-support quotient profile `Phi`, the theorem should prove:

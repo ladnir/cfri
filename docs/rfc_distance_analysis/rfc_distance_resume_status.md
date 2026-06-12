@@ -365,6 +365,18 @@ A blunt `--full-table-until 3` run timed out, and two closure passes do not impr
 next real implementation target is a richer filtered diagram state for the positive-kernel
 extension, not more global scalar filtering.
 
+Update: `--trace-state-terms` now dumps the top scalar lift terms for a state. On the strong-mode
+`z=34` run, the level-4 state `(2,15)` is not choosing the wrong branch. The top terms are:
+
+```text
+rank 1: (4,7)>=(2,8), local=1030.83289001, child=423.08002115, term=1453.91291117
+rank 4: (3,7)>=(2,8), local= 774.83289001, child=420.80863940, term=1195.64152942
+```
+
+The span-3 child flag is slightly cheaper, but the span-4 tau-one lift has two extra q-dimensions
+of local mass and dominates the first moment. Therefore the remaining `1352.53125813` gap is not a
+trace-selection artifact. It is a real high-lift tau-one quotient-chain/counting problem.
+
 After that, return to the theta_2=-1 kernel-chain truncation and the connected full-kernel local
 endpoint. Those remain real blockers, but they are not the first item on the active frontier.
 

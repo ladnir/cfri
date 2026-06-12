@@ -488,6 +488,18 @@ So pair-child demand closure explains the `1478 -> 1352` recovery without making
 table complete, but it does not close the remaining gap. The next missing object is a richer
 filtered diagram state for the positive-kernel extension, not another scalar-only filter.
 
+`--trace-state-terms level,span,zeros` prints the top scalar lift terms for a state using the
+current pair table. For the strong positive-kernel closure run, `--trace-state-terms 4,2,15`
+shows the dominant mass is not a branch-selection artifact:
+
+```text
+rank 1: child (4,7)>=(2,8), local 1030.83289001, child 423.08002115, term 1453.91291117
+rank 4: child (3,7)>=(2,8), local  774.83289001, child 420.80863940, term 1195.64152942
+```
+
+The span-4 tau-one branch has two extra q-dimensions of local lift count and must be charged or
+carried recursively.
+
 `rfc_multicopy_falsification.py` is adversarial. It estimates whether broad one-copy near-families
 can intersect across many independent RFC copies often enough to threaten the target excess.
 

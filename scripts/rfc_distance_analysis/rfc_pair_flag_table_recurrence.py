@@ -129,6 +129,17 @@ def parse_table_state(text: str) -> tuple[int, int, int, int, int]:
     return level, outer_span, outer_z, inner_span, inner_z
 
 
+def parse_level_state(text: str) -> tuple[int, int, int]:
+    parts = text.split(",")
+    if len(parts) != 3:
+        raise argparse.ArgumentTypeError("state must be level,span,zeros")
+    try:
+        level, span, zeros = (int(part) for part in parts)
+    except ValueError as exc:
+        raise argparse.ArgumentTypeError("state entries must be integers") from exc
+    return level, span, zeros
+
+
 def clean_csv_field(text: str) -> str:
     return text.replace(",", ";")
 
@@ -888,6 +899,14 @@ def main() -> None:
         default=[],
     )
     parser.add_argument("--trace-table-top", type=int, default=8)
+    parser.add_argument(
+        "--trace-state-terms",
+        type=parse_level_state,
+        action="append",
+        default=[],
+        help="print top scalar lift terms for level,span,zeros",
+    )
+    parser.add_argument("--trace-state-top", type=int, default=12)
     parser.add_argument("--report-final-z", type=int, action="append", default=[])
     parser.add_argument("--trace-z", type=int, default=-1)
     parser.add_argument("--trace-span", type=int, default=1)
@@ -1185,6 +1204,96 @@ def main() -> None:
                 f"{outer_remaining_quotient},"
                 f"{inner_remaining_quotient},"
                 f"{outer_choice},{inner_choice}"
+            )
+
+    for target in args.trace_state_terms:
+        level, span, z = target
+        print(
+            "state_term_trace_level,span,z,state_log2,rank,term_log2,"
+            "local_log2,child_log2,p,s,a,tau,outer_span,inner_span,"
+            "outer_zeros,inner_zeros,local_charge,delta,comp,theta,"
+            "dominant_h,gamma,lift_qdim,tau1_quotient_qdim,"
+            "tau1_universal_postroot_qdim,tau1_support_saving_qdim,"
+            "tau1_charged_postroot_qdim,child_flag"
+        )
+        if level <= 0 or level >= len(levels):
+            print(f"{level},{span},{z},-inf,,,,,,,,,,,,,,,,,,,,")
+            continue
+        current = levels[level]
+        values = current.values.get(span)
+        state_value = NEG_INF
+        if values is not None and 0 <= z < len(values):
+            state_value = values[z]
+        state_label = finite_label(state_value)
+        child = levels[level - 1]
+        child_k = 1 << (level - 1)
+        child_n = args.expansion * (1 << (level - 1))
+        comb = log2_comb_table(args.expansion * (1 << args.depth))
+        terms = take_terms(
+            enumerate_terms_for_state(
+                child_by_span=child.values,
+                child_flag_table=child.flag_table,
+                comb=comb,
+                q_log2=args.q_log2,
+                child_k=child_k,
+                parent_span=span,
+                zeros=z,
+                singleton_charge_mode=args.singleton_charge,
+                flag_bound_mode="best-two-layer-table",
+                max_visible_tau=args.max_visible_tau,
+                cover_lift_mode=args.cover_lift_mode,
+                cover_kernel_lift=args.cover_kernel_lift,
+            ),
+            args.trace_state_top,
+        )
+        for rank, term in enumerate(terms, start=1):
+            (
+                p,
+                singleton_count,
+                visible_support_size,
+                visible_tau,
+                outer_span,
+                inner_span,
+                outer_zeros,
+                local_charge,
+                local_delta,
+                local_components,
+                _local_g,
+                local_theta,
+                local_h,
+                local_gamma,
+                lift_qdim,
+            ) = term.choice
+            inner_zeros = p + singleton_count
+            tau1_profile = tau1_incidence_profile(span, term.choice)
+            tau1_quotient_qdim = ""
+            tau1_universal_postroot_qdim = ""
+            tau1_support_saving_qdim = ""
+            tau1_charged_postroot_qdim = ""
+            if tau1_profile is not None:
+                (
+                    tau1_quotient_qdim,
+                    _tau1_quotient_ambient_dim,
+                    _tau1_visible_image_dim_bound,
+                    _tau1_invisible_fiber_dim_min,
+                    tau1_universal_postroot_qdim,
+                    tau1_support_saving_qdim,
+                    tau1_charged_postroot_qdim,
+                ) = tau1_profile
+            child_flag = clean_csv_field(
+                ">=".join(format_state(layer) for layer in term.child_layers)
+            )
+            print(
+                f"{level},{span},{z},{state_label},{rank},"
+                f"{term.term_log2:.8f},{term.local_log2:.8f},"
+                f"{term.child_log2:.8f},{p},{singleton_count},"
+                f"{visible_support_size},{visible_tau},{outer_span},"
+                f"{inner_span},{outer_zeros},{inner_zeros},"
+                f"{local_charge},{local_delta},{local_components},"
+                f"{local_theta},{local_h},{local_gamma},{lift_qdim},"
+                f"{tau1_quotient_qdim},{tau1_universal_postroot_qdim},"
+                f"{tau1_support_saving_qdim},{tau1_charged_postroot_qdim},"
+                f"{child_flag}"
             )
 
     if args.trace_z >= 0:

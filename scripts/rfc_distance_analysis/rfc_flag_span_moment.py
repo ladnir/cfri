@@ -43,6 +43,10 @@ import math
 NEG_INF = -1.0e300
 INF = 10**9
 DEFAULT_MAX_N = 512
+State = tuple[int, int]
+FlagKey = tuple[State, State]
+Choice = tuple[int, ...]
+FlagTable = dict[FlagKey, float]
 
 
 def log2_add(left: float, right: float) -> float:
@@ -220,7 +224,7 @@ def flag_child_bound(
         return outer + inner
     if mode == "outer-only":
         return outer + inner_span * (outer_span - inner_span) * q_log2
-    if mode not in ("best", "best-shortened", "best-marked-plane"):
+    if mode not in ("best", "best-shortened", "best-marked-plane", "best-two-layer-table"):
         raise ValueError(f"unknown flag bound mode {mode!r}")
 
     outer_first = outer + inner_span * (outer_span - inner_span) * q_log2
@@ -321,6 +325,26 @@ def choice_is_tau0_child_line(choice: tuple[int, ...]) -> bool:
     return choice[3] == 0 and choice[4] == 1 and choice[5] == 1
 
 
+def choice_child_layers(choice: Choice) -> list[State]:
+    p = choice[0]
+    singleton_count = choice[1]
+    outer_span = choice[4]
+    inner_span = choice[5]
+    outer_zeros = choice[6]
+    inner_zeros = p + singleton_count
+    layers = [(outer_span, outer_zeros)]
+    if inner_span > 0:
+        layers.append((inner_span, inner_zeros))
+    return layers
+
+
+def merge_equal_dimension_chain(layers: list[State]) -> list[State]:
+    by_dim: dict[int, int] = {}
+    for dim, zeros in layers:
+        by_dim[dim] = max(by_dim.get(dim, -1), zeros)
+    return sorted(by_dim.items(), reverse=True)
+
+
 def marked_plane_flag_child_bound(
     *,
     child_by_span: dict[int, list[float]],
@@ -351,6 +375,139 @@ def marked_plane_flag_child_bound(
     grandchild_n = child_n // 2
     inner_local = choice_local_row_log2(inner_choice, grandchild_n, comb, q_log2)
     return outer_value + inner_local + q_log2
+
+
+def flag_table_bound_for_layers(
+    *,
+    values_by_span: dict[int, list[float]],
+    flag_table: FlagTable | None,
+    child_k: int,
+    child_n: int,
+    q_log2: float,
+    layers: tuple[State, ...] | list[State],
+) -> float:
+    if len(layers) == 0:
+        return NEG_INF
+    if len(layers) == 1:
+        return get_child_value(values_by_span, child_n, layers[0][0], layers[0][1])
+    if len(layers) != 2:
+        return NEG_INF
+    outer_state, inner_state = layers
+    if flag_table is not None:
+        table_value = flag_table.get((outer_state, inner_state))
+        if table_value is not None:
+            return table_value
+    return flag_child_bound(
+        child_by_span=values_by_span,
+        child_k=child_k,
+        child_n=child_n,
+        outer_span=outer_state[0],
+        inner_span=inner_state[0],
+        outer_zeros=outer_state[1],
+        inner_zeros=inner_state[1],
+        q_log2=q_log2,
+        mode="best",
+    )
+
+
+def compute_two_layer_flag_table(
+    *,
+    values_by_span: dict[int, list[float]],
+    choices: dict[tuple[int, int], Choice | None],
+    previous_values_by_span: dict[int, list[float]] | None,
+    previous_flag_table: FlagTable | None,
+    comb: list[list[float]],
+    q_log2: float,
+    level: int,
+    expansion: int,
+) -> FlagTable:
+    """Diagnostic two-layer flag table with carried-child refinements.
+
+    The baseline is the usual coarse flag bound from scalar state values.  Two
+    refinements are allowed:
+
+    * carry both layers' selected child rows through an inner/outer-first collapse;
+    * use the marked-plane q+1 brick when the carried flag expands to two lines
+      under one child plane.
+    """
+
+    child_k = 1 << level
+    child_n = expansion * (1 << level)
+    previous_k = 1 << (level - 1) if level > 0 else 0
+    previous_n = expansion * (1 << (level - 1)) if level > 0 else 0
+    table: FlagTable = {}
+    states: list[State] = []
+    for span, values in values_by_span.items():
+        for zeros, value in enumerate(values):
+            if value > NEG_INF / 2:
+                states.append((span, zeros))
+
+    for outer_state in states:
+        for inner_state in states:
+            if inner_state[0] > outer_state[0] or inner_state[1] < outer_state[1]:
+                continue
+            label, baseline, _outer_first, _inner_first = flag_child_bound_report(
+                child_by_span=values_by_span,
+                child_k=child_k,
+                child_n=child_n,
+                outer_span=outer_state[0],
+                inner_span=inner_state[0],
+                outer_zeros=outer_state[1],
+                inner_zeros=inner_state[1],
+                q_log2=q_log2,
+                mode="best",
+            )
+            if baseline <= NEG_INF / 2:
+                continue
+            best = baseline
+            if level > 0 and previous_values_by_span is not None:
+                outer_choice = choices.get(outer_state)
+                inner_choice = choices.get(inner_state)
+                if outer_choice is not None and inner_choice is not None:
+                    carried_layers = tuple(
+                        merge_equal_dimension_chain(
+                            choice_child_layers(outer_choice) + choice_child_layers(inner_choice)
+                        )
+                    )
+                    if label in ("inner-first", "shortened-inner-first"):
+                        current_choice = inner_choice
+                    else:
+                        current_choice = outer_choice
+                    current_layers = tuple(merge_equal_dimension_chain(choice_child_layers(current_choice)))
+                    current_bound = flag_table_bound_for_layers(
+                        values_by_span=previous_values_by_span,
+                        flag_table=previous_flag_table,
+                        child_k=previous_k,
+                        child_n=previous_n,
+                        q_log2=q_log2,
+                        layers=current_layers,
+                    )
+                    carried_bound = flag_table_bound_for_layers(
+                        values_by_span=previous_values_by_span,
+                        flag_table=previous_flag_table,
+                        child_k=previous_k,
+                        child_n=previous_n,
+                        q_log2=q_log2,
+                        layers=carried_layers,
+                    )
+                    if current_bound > NEG_INF / 2 and carried_bound > NEG_INF / 2:
+                        saving = current_bound - carried_bound
+                        if saving > 0:
+                            best = min(best, baseline - saving)
+
+                    if choice_is_plane_carrier(outer_choice) and choice_is_tau0_child_line(inner_choice):
+                        outer_value = get_child_value(
+                            values_by_span,
+                            child_n,
+                            outer_state[0],
+                            outer_state[1],
+                        )
+                        inner_local = choice_local_row_log2(inner_choice, previous_n, comb, q_log2)
+                        marked_plane_bound = outer_value + inner_local + q_log2
+                        best = min(best, marked_plane_bound)
+
+            table[(outer_state, inner_state)] = best
+    return table
 
 
 def marked_line_child_bound(
@@ -398,6 +555,7 @@ def lift_flag_span_moment(
     cover_kernel_lift: bool,
     max_parent_span: int | None = None,
     child_choices: dict[tuple[int, int], tuple[int, ...] | None] | None = None,
+    child_flag_table: FlagTable | None = None,
 ) -> tuple[dict[int, list[float]], dict[tuple[int, int], tuple[int, ...] | None]]:
     child_n = len(next(iter(child_by_span.values()))) - 1
     parent_n = 2 * child_n
@@ -564,6 +722,7 @@ def lift_flag_span_moment(
                                         local_gamma = -2
                                 charge_log = -charge * q_log2
                                 marked_plane_child_used = False
+                                two_layer_table_used = False
                                 if visible_tau == 0:
                                     lift_log = parent_span * (2 * outer_span - parent_span) * q_log2
                                     if covers_lift(visible_tau):
@@ -597,6 +756,13 @@ def lift_flag_span_moment(
                                         q_log2=q_log2,
                                         mode=flag_bound_mode,
                                     )
+                                    if flag_bound_mode == "best-two-layer-table" and child_flag_table is not None:
+                                        table_log = child_flag_table.get(
+                                            ((outer_span, outer_zeros), (inner_span, inner_zeros))
+                                        )
+                                        if table_log is not None and table_log < child_log:
+                                            child_log = table_log
+                                            two_layer_table_used = True
                                     if flag_bound_mode == "best-marked-plane":
                                         marked_plane_log = marked_plane_flag_child_bound(
                                             child_by_span=child_by_span,
@@ -657,8 +823,24 @@ def lift_flag_span_moment(
                                         local_components,
                                         local_g,
                                         local_theta,
-                                        -5 if marked_plane_child_used else (-4 if marked_line_used else local_h),
-                                        -5 if marked_plane_child_used else (-4 if marked_line_used else local_gamma),
+                                        (
+                                            -6
+                                            if two_layer_table_used
+                                            else (
+                                                -5
+                                                if marked_plane_child_used
+                                                else (-4 if marked_line_used else local_h)
+                                            )
+                                        ),
+                                        (
+                                            -6
+                                            if two_layer_table_used
+                                            else (
+                                                -5
+                                                if marked_plane_child_used
+                                                else (-4 if marked_line_used else local_gamma)
+                                            )
+                                        ),
                                         int(round(lift_log / q_log2)),
                                     )
 
@@ -673,6 +855,17 @@ def first_crossing(values: list[float], security_bits: float) -> int | None:
         if value <= target:
             return z
     return None
+
+
+def parse_flag_state(text: str) -> tuple[int, int, int, int]:
+    parts = text.split(",")
+    if len(parts) != 4:
+        raise argparse.ArgumentTypeError("flag state must be outer_span,outer_z,inner_span,inner_z")
+    try:
+        outer_span, outer_z, inner_span, inner_z = (int(part) for part in parts)
+    except ValueError as exc:
+        raise argparse.ArgumentTypeError("flag state entries must be integers") from exc
+    return outer_span, outer_z, inner_span, inner_z
 
 
 def is_tau2_theta(choice: tuple[int, ...] | None, theta: int) -> bool:
@@ -808,7 +1001,14 @@ def main() -> None:
     )
     parser.add_argument(
         "--flag-bound",
-        choices=["best", "best-shortened", "best-marked-plane", "product", "outer-only"],
+        choices=[
+            "best",
+            "best-shortened",
+            "best-marked-plane",
+            "best-two-layer-table",
+            "product",
+            "outer-only",
+        ],
         default="best",
     )
     parser.add_argument("--max-visible-tau", type=int, default=2)
@@ -864,6 +1064,16 @@ def main() -> None:
         action="store_true",
         help="Report best-transition tau-one quotient-line incidence dimension diagnostics.",
     )
+    parser.add_argument(
+        "--report-flag-state",
+        type=parse_flag_state,
+        action="append",
+        default=[],
+        help=(
+            "Report two-layer flag-table values as outer_span,outer_z,inner_span,inner_z. "
+            "Useful with --flag-bound best-two-layer-table."
+        ),
+    )
     parser.add_argument("--report-limit", type=int, default=20)
     args = parser.parse_args()
 
@@ -899,10 +1109,15 @@ def main() -> None:
     values_by_level: list[dict[int, list[float]]] = [{span: values[:] for span, values in values_by_span.items()}]
     theta_reports: list[tuple[float, int, int, int, tuple[int, ...]]] = []
     tau1_reports: list[tuple[float, int, int, int, tuple[int, ...]]] = []
+    flag_table_reports: list[tuple[int, tuple[int, int, int, int], float, float]] = []
 
     print("level,k,n,span_count,min_log2,max_log2", flush=True)
     print(f"0,1,{args.expansion},1,0.00000000,0.00000000", flush=True)
     previous_choices: dict[tuple[int, int], tuple[int, ...] | None] | None = None
+    previous_flag_table: FlagTable | None = None
+    previous_values_by_span: dict[int, list[float]] | None = {
+        span: values[:] for span, values in values_by_span.items()
+    }
     for level in range(1, args.depth + 1):
         max_parent_span = None
         if args.prune_to_final_span > 0:
@@ -919,10 +1134,39 @@ def main() -> None:
             args.cover_kernel_lift,
             max_parent_span,
             previous_choices,
+            previous_flag_table,
         )
-        previous_choices = choices
         trace.append(choices)
         values_by_level.append({span: values[:] for span, values in values_by_span.items()})
+        if args.flag_bound == "best-two-layer-table":
+            previous_flag_table = compute_two_layer_flag_table(
+                values_by_span=values_by_span,
+                choices=choices,
+                previous_values_by_span=previous_values_by_span,
+                previous_flag_table=previous_flag_table,
+                comb=comb,
+                q_log2=args.q_log2,
+                level=level,
+                expansion=args.expansion,
+            )
+            for target in args.report_flag_state:
+                outer_span, outer_z, inner_span, inner_z = target
+                key = ((outer_span, outer_z), (inner_span, inner_z))
+                table_value = previous_flag_table.get(key, NEG_INF)
+                _label, coarse_value, _outer_first, _inner_first = flag_child_bound_report(
+                    child_by_span=values_by_span,
+                    child_k=1 << level,
+                    child_n=args.expansion * (1 << level),
+                    outer_span=outer_span,
+                    inner_span=inner_span,
+                    outer_zeros=outer_z,
+                    inner_zeros=inner_z,
+                    q_log2=args.q_log2,
+                    mode="best",
+                )
+                flag_table_reports.append((level, target, table_value, coarse_value))
+        previous_choices = choices
+        previous_values_by_span = {span: values[:] for span, values in values_by_span.items()}
         if args.report_local_theta is not None:
             for (span, z), choice in choices.items():
                 if choice is None:
@@ -1024,6 +1268,19 @@ def main() -> None:
                 f"{local_components},{local_g},{local_theta},{local_h},"
                 f"{local_gamma},{lift_qdim},{outer_next_tau},{outer_next_theta},"
                 f"{inner_next_tau},{inner_next_theta}"
+            )
+
+    if args.report_flag_state:
+        print("flag_table_report_level,outer_span,outer_z,inner_span,inner_z,table_log2,coarse_log2,saving_log2")
+        for level, target, table_value, coarse_value in flag_table_reports:
+            outer_span, outer_z, inner_span, inner_z = target
+            table_label = "-inf" if table_value <= NEG_INF / 2 else f"{table_value:.8f}"
+            coarse_label = "-inf" if coarse_value <= NEG_INF / 2 else f"{coarse_value:.8f}"
+            saving = coarse_value - table_value
+            saving_label = "" if table_value <= NEG_INF / 2 or coarse_value <= NEG_INF / 2 else f"{saving:.8f}"
+            print(
+                f"{level},{outer_span},{outer_z},{inner_span},{inner_z},"
+                f"{table_label},{coarse_label},{saving_label}"
             )
 
     if args.report_tau1_incidence:

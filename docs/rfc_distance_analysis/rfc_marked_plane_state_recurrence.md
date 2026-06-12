@@ -212,6 +212,32 @@ This is a key negative signal. The q+1 brick is valid and useful, but a scalar c
 cannot reproduce the full carried-path saving because it does not preserve the outer layer across an
 inner-first collapse. The next recurrence must carry the multi-layer diagram state itself.
 
+The next diagnostic table is:
+
+```text
+rfc_flag_span_moment.py --flag-bound best-two-layer-table
+```
+
+It builds a two-layer flag table after each scalar level and lets parent scalar rows query that
+table for child flags. This is closer to the desired recurrence, but it still uses scalar-state
+dominant choices when expanding a flag state. The result is another useful negative:
+
+```text
+depth 5, z=34 top vector moment: 2244.71357608 bits
+depth 5 crossing:                z=135
+depth 6 crossing:                z=305
+```
+
+The table report makes the failure mode visible:
+
+```text
+level 2, (4,4)>=(2,5): table saves 381.41503750 bits
+level 3, (4,7)>=(2,8): table saves   0.00000000 bits
+```
+
+So a value table alone is not the missing recurrence. The recurrence must choose and remember
+flag-state expansions, not just reuse scalar-state dominant choices.
+
 ## Audit Result
 
 A side audit agreed that the local rule is promising provided it is integrated as an atomic diagram

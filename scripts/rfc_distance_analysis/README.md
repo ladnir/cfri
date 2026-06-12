@@ -74,6 +74,12 @@ two-lines-under-plane `q+1` child replacement when the required child choices ar
 On the current depth-5 `z=34` checkpoint this mode is selected (`dominant_h=-5`) and improves the
 top vector moment to `2244.71357608` bits, but the crossing remains `z=135`. This is important:
 the local marked-plane brick alone does not replace the carried multi-layer diagram state.
+The diagnostic `--flag-bound best-two-layer-table` mode builds a two-layer flag table after each
+scalar level and lets parent scalar rows use that table for child flags. It is still based on
+scalar-state dominant choices, not true flag-state choices. On the current depth-5 checkpoint it is
+selected (`dominant_h=-6`) but gives the same top vector moment `2244.71357608` and crossing
+`z=135`; at depth 6 it leaves the crossing at `z=305`. Use `--report-flag-state
+outer_span,outer_z,inner_span,inner_z` to inspect table entries.
 
 `rfc_theta_chain_normal_slice.py` also reports the conservative strict hard-trace potential used by
 the current theorem target. These columns use `rfc_shortened_rank_recurrence.py` internally with
@@ -211,6 +217,10 @@ residual:        15.18484798 q-dimensions
 With `--flag-bound best-marked-plane`, the post-hoc positive rows disappear because the recurrence
 has already used the local q+1 brick where it can. The remaining gap shows that the next required
 object is a genuine multi-layer diagram DP, not another scalar child-flag tweak.
+The first table attempt, `--flag-bound best-two-layer-table`, confirms this: the level-2 table saves
+the expected marked-plane q-dimensions on states such as `(4,4)>=(2,5)`, but by level 3 the target
+flags report zero additional table saving because the scalar dominant choices have already routed
+around the carried outer-layer information.
 
 `rfc_multicopy_falsification.py` is adversarial. It estimates whether broad one-copy near-families
 can intersect across many independent RFC copies often enough to threaten the target excess.

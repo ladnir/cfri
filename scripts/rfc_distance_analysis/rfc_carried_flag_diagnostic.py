@@ -100,6 +100,7 @@ def build_levels(
             cover_kernel_lift,
             max_parent_span,
             previous_choices,
+            None,
         )
         previous_choices = choices
         levels.append(LevelData(values={span: row[:] for span, row in values.items()}, choices=choices))

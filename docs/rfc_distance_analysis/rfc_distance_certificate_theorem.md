@@ -297,6 +297,25 @@ constants. The local statement and diagnostic hook are recorded in:
 docs/rfc_distance_analysis/rfc_support_two_high_lift_component_plane_bound.md
 ```
 
+The analogous decomposable support-three row:
+
+```text
+|A| = 3,
+delta = 3,
+comp = 3,
+K = 0,
+dim V = 4,
+```
+
+has a safe component-plane stratification saving of two q-dimensions after `V` is fixed. The
+rank-3 active-restriction stratum saves four, but the theorem-grade route uses the two-dimensional
+uniform saving until the proportional-pair stratum is charged or carried. This local target is
+recorded in:
+
+```text
+docs/rfc_distance_analysis/rfc_support_three_component_plane_bound.md
+```
+
 The next boundary row:
 
 ```text

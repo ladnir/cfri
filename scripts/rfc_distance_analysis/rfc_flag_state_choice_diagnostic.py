@@ -41,6 +41,7 @@ from rfc_flag_span_moment import (  # noqa: E402
     merge_equal_dimension_chain,
     marked_line_child_bound,
     support2_component_plane_saving_qdim,
+    support3_component_plane_saving_qdim,
 )
 
 
@@ -133,7 +134,10 @@ def enumerate_terms_for_state(
     max_visible_tau: int,
     cover_lift_mode: str,
     cover_kernel_lift: bool,
+    exclude_collapsed_active: bool = False,
+    support2_line_filter: bool = False,
     support2_component_plane_mode: str = "none",
+    support3_component_plane_mode: str = "none",
 ) -> list[TermCandidate]:
     child_n = len(next(iter(child_by_span.values()))) - 1
     child_spans = sorted(child_by_span)
@@ -221,6 +225,14 @@ def enumerate_terms_for_state(
                     for outer_span in outer_span_candidates:
                         if outer_span == 0:
                             continue
+                        if (
+                            exclude_collapsed_active
+                            and visible_tau > 0
+                            and visible_support_size > 0
+                            and inner_span == outer_span
+                            and inner_zeros > outer_zeros
+                        ):
+                            continue
                         if incidence_mode:
                             quotient_delta_floor = (
                                 max(0, outer_span - inner_span)
@@ -250,6 +262,15 @@ def enumerate_terms_for_state(
                                 local_theta = 4 * local_delta - 4 - charge
                                 local_h = -2
                                 local_gamma = -2
+                        if (
+                            support2_line_filter
+                            and visible_tau == 2
+                            and visible_support_size == 2
+                            and local_delta == 2
+                            and local_components == 2
+                            and outer_span == inner_span + 1
+                        ):
+                            continue
                         if visible_tau == 0:
                             lift_log = parent_span * (2 * outer_span - parent_span) * q_log2
                             if covers_lift(cover_lift_mode, visible_tau):
@@ -271,6 +292,17 @@ def enumerate_terms_for_state(
                             else:
                                 component_plane_saving = support2_component_plane_saving_qdim(
                                     mode=support2_component_plane_mode,
+                                    parent_span=parent_span,
+                                    visible_tau=visible_tau,
+                                    visible_support_size=visible_support_size,
+                                    kernel_dim=kernel_dim,
+                                    inner_span=inner_span,
+                                    outer_span=outer_span,
+                                    local_delta=local_delta,
+                                    local_components=local_components,
+                                )
+                                component_plane_saving += support3_component_plane_saving_qdim(
+                                    mode=support3_component_plane_mode,
                                     parent_span=parent_span,
                                     visible_tau=visible_tau,
                                     visible_support_size=visible_support_size,

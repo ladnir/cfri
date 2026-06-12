@@ -583,6 +583,52 @@ def support2_component_plane_saving_qdim(
     return 0
 
 
+def support3_component_plane_saving_qdim(
+    *,
+    mode: str,
+    parent_span: int,
+    visible_tau: int,
+    visible_support_size: int,
+    kernel_dim: int,
+    inner_span: int,
+    outer_span: int,
+    local_delta: int,
+    local_components: int,
+) -> int:
+    """Diagnostic saving for the decomposable support-three high-lift row.
+
+    The live `a=3, delta=3, comp=3` tau-two row has three rank-one
+    components.  After the child 4-container is fixed, component `i` lies in
+    the slice zero on the other two active coordinates.  The safe mode allows
+    one proportional pair of active coordinate restrictions on the container:
+    then one component plane may live in a 3-space and cost `q^2`, while the
+    other two are contained in 2-spaces.  The exact-support local two-plane
+    still costs `q^2`, so the post-root component placement costs at most
+    `q^4` instead of the scalar `q^6`.
+
+    The rank3 mode is a sensitivity test for the pairwise-independent active
+    restriction stratum, where all three component planes are contained in
+    fixed 2-spaces and the post-root cost is only `q^2`.
+    """
+
+    if mode == "none":
+        return 0
+    if mode not in ("safe", "rank3"):
+        raise ValueError(f"unknown support3 component-plane mode: {mode}")
+    if (
+        parent_span == 2
+        and visible_tau == 2
+        and visible_support_size == 3
+        and kernel_dim == 0
+        and inner_span == 0
+        and outer_span == 4
+        and local_delta == 3
+        and local_components == 3
+    ):
+        return 2 if mode == "safe" else 4
+    return 0
+
+
 def lift_flag_span_moment(
     child_by_span: dict[int, list[float]],
     comb: list[list[float]],
@@ -598,6 +644,7 @@ def lift_flag_span_moment(
     child_flag_table: FlagTable | None = None,
     exclude_collapsed_active: bool = False,
     support2_component_plane_mode: str = "none",
+    support3_component_plane_mode: str = "none",
 ) -> tuple[dict[int, list[float]], dict[tuple[int, int], tuple[int, ...] | None]]:
     child_n = len(next(iter(child_by_span.values()))) - 1
     parent_n = 2 * child_n
@@ -798,6 +845,17 @@ def lift_flag_span_moment(
                                     else:
                                         component_plane_saving = support2_component_plane_saving_qdim(
                                             mode=support2_component_plane_mode,
+                                            parent_span=parent_span,
+                                            visible_tau=visible_tau,
+                                            visible_support_size=visible_support_size,
+                                            kernel_dim=kernel_dim,
+                                            inner_span=inner_span,
+                                            outer_span=outer_span,
+                                            local_delta=local_delta,
+                                            local_components=local_components,
+                                        )
+                                        component_plane_saving += support3_component_plane_saving_qdim(
+                                            mode=support3_component_plane_mode,
                                             parent_span=parent_span,
                                             visible_tau=visible_tau,
                                             visible_support_size=visible_support_size,

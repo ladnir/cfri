@@ -454,6 +454,31 @@ The remaining proof obligations are:
    exterior/root-line counts.
 ```
 
+### Latest Kernel-Lift Checkpoint
+
+The current scalar use of this subcase is the opt-in diagnostic:
+
+```text
+--cover-kernel-lift
+```
+
+It removes only the duplicate `K_parent <= L+L` kernel-lift factor after the child flag and
+quotient/root datum are fixed. It keeps tau-one and tau-two quotient incidence counted.
+
+Combined with the exact-support filters, support-two high-lift component planes, and the safe
+support-three component-plane saving, the depth-5 checkpoint reports:
+
+```text
+final_span_1_crossing_z,102
+final_span_1_z_report,34,565.92392782
+```
+
+The top level-5 row is then locally charged and feeds the child state `(2,15)`. Inside `(2,15)`,
+the large tau-one row is reduced by the kernel-lift cover, and the next visible obstruction is the
+level-3 table `(4,7)>=(1,8)`: an outer tau-zero child container together with an inner connected
+tau-one quotient-line row. This remaining row keeps quotient-line incidence; the missing state is
+a marked child line inside a fixed container, not another kernel-fiber cover.
+
 ### Canonical Quotient/Root Datum
 
 This subsection fixes the meaning of obligation 1 for the current transition.

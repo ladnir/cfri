@@ -980,6 +980,8 @@ def main() -> None:
         max_visible_tau=args.max_visible_tau,
         cover_lift_mode=args.cover_lift_mode,
         cover_kernel_lift=args.cover_kernel_lift,
+        exclude_collapsed_active=args.exclude_collapsed_active,
+        support2_line_filter=args.support2_line_quotient_filter,
     )[: args.term_limit]
     inner_terms = enumerate_terms_for_state(
         child_by_span=child.values,
@@ -994,6 +996,8 @@ def main() -> None:
         max_visible_tau=args.max_visible_tau,
         cover_lift_mode=args.cover_lift_mode,
         cover_kernel_lift=args.cover_kernel_lift,
+        exclude_collapsed_active=args.exclude_collapsed_active,
+        support2_line_filter=args.support2_line_quotient_filter,
     )[: args.term_limit]
 
     _label, coarse, _outer_first, _inner_first = flag_child_bound_report(

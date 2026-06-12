@@ -216,6 +216,16 @@ docs/rfc_distance_analysis/rfc_support_two_high_lift_component_plane_bound.md
   `--support2-component-plane-mode high-lift` moves the demanded depth-5 full-level-2 checkpoint
   to `final_span_1_z_report,34,967.01172212` and `crossing_z=130`. The new top blocker is
   `a=3,delta=3,comp=3` tau-two layer-codimension.
+
+docs/rfc_distance_analysis/rfc_support_three_component_plane_bound.md
+  Status: local theorem target and diagnostic.
+  Handles the decomposable `a=3,delta=3,comp=3` high-lift row exposed after the support-two
+  component-plane saving. The theorem-safe stratum saves two q-dimensions; the rank-3 sensitivity
+  saves four. Safe support-three alone moves state `(2,15)` from `1068.39337516` to
+  `1057.89054335` bits, exposing the adjacent tau-one full-line row. Safe support-three plus
+  scalar `--cover-kernel-lift` gives the current best end-to-end checkpoint:
+  `final_span_1_z_report,34,565.92392782` and `crossing_z=102`. The next blocker is the
+  marked-line-in-container interaction in `(4,7)>=(1,8)`.
 ```
 
 The external Fable audit was useful and found the product-of-first-moments bug. Its record is:
@@ -229,42 +239,31 @@ docs/rfc_distance_analysis/rfc_fable_audit_2026_06_10.md
 The live blockers are now narrow:
 
 ```text
-1. Exact-support quotient-incidence state. The old level-3 carried flag `(4,7)>=(2,8)` is no
-   longer the only active blocker. Scalar collapsed-active filtering changes its coarse baseline to
-   `549.21247145`, and nested quotient/subspace/consumed-kernel diagnostics give table value
-   `303.43723477`. End-to-end this lowers `z=34` from `1740.39750674` to `1232.88847175`.
-   Adding scalar kernel-lift cover lowers it further to `924.69069031`, but crossing remains
-   `z=133`. The theorem target is now a finite exact-support quotient state that proves:
-   collapsed-active rerouting, nested quotient data inside outer quotient data, lower subspaces
-   inside upper parent subspaces, and consumed-kernel containment for lower tau-zero rows. Quotient
-   line/plane incidence must remain counted.
-2. Sparse pair-enumerated table recurrence. The bounded diagnostic
-   `rfc_pair_flag_table_recurrence.py --depth 5 --stop-level 3 --proof-shaped --term-limit 300
-   --report-flag-state 4,7,2,8 --last-level-report-only` gives `810.94626976` bits for the
-   level-3 stress flag after level-2 pair-table improvements. A full unpruned level-3 pair table
-   timed out. The next implementation should compute only states demanded by the final trace and
-   their recursive child flags. Update: `--demand-next-level` now runs end-to-end through depth 5,
-   building 599 demanded level-2 table entries and 2076 demanded level-3 entries, and improves the
-   crossing to `z=133`. At the production floor it reports `final_span_1_z_report,34,1740.39750674`,
-   still `14.22185552` q-dimensions above the `2^-80` target. This is useful but not enough; the
-   next recurrence needs a richer demanded diagram state or a joint local theorem. The latest
-   structural modes show table plumbing can propagate real savings, but after the level-3 stress
-   row improves the dominant path moves to scalar tau-two and tau-one quotient-incidence rows. More
-   sparse plumbing alone is still not expected to close the gap.
-3. Prove/finalize the shared-randomness-safe multi-layer flag transition theorem. The target note
-   covers the joint marked-line/frame recurrence for the decomposable |A|=2,delta=2,comp=2 row,
-   with the local marked-component certificate and uniform `(q+1)` frame-completion count written.
-4. Kernel-branch nested-flag truncation:
+1. Formalize scalar kernel-lift container covering. The diagnostic `--cover-kernel-lift` now gives
+   a major safe-looking improvement while keeping quotient incidence counted. With exact-support
+   filters, support-two high-lift, and safe support-three component planes, the full depth-5
+   checkpoint is `final_span_1_z_report,34,565.92392782` and `crossing_z=102`.
+2. Add a marked child-line/container state for the new frontier. The current best trace is:
+   level 5 `(1,34)` -> child `(2,15)`, then level 4 `(2,15)` -> child flag `(4,7)>=(1,8)`,
+   then level 3 `(4,7)>=(1,8)` dominated by an outer tau-zero container and an inner connected
+   tau-one quotient-line row with `a=2,delta=1,comp=1,K=0,V=2` and one remaining q-dimension.
+   Merging this into the unmarked `(2,4)` container loses the line/support datum.
+3. Finish the support-three component-plane proof. Safe mode saves two q-dimensions uniformly; the
+   rank-3 stratum saves four but needs the proportional-pair stratum charged or carried.
+4. Prove/finalize the shared-randomness-safe multi-layer flag transition theorem. The target notes
+   cover quotient-frame, component-plane, and marked-line states, but the final finite recurrence
+   is still not written as a theorem.
+5. Kernel-branch nested-flag truncation:
    prove length three is enough, or prove length-four theta_2=-1 chains are dominated.
-5. Direct proof of the delta=3 connected full-kernel endpoint used by the g=1 row, or a general
+6. Direct proof of the delta=3 connected full-kernel endpoint used by the g=1 row, or a general
    component/full-kernel theorem with constants.
-6. Higher-drop tau-two layers beyond the g=1 first-drop case.
-7. Finite constants: marked-line root-fiber constants, exact-support inversion, split counts, and
+7. Higher-drop tau-two layers beyond the g=1 first-drop case.
+8. Finite constants: marked-line root-fiber constants, exact-support inversion, split counts, and
    log-sum/state-count overhead. The determinant-1 nonzero-root normalization is now stated
    separately and is no longer a q-dimensional blocker at the target field size.
 ```
 
-The best current next proof step is item 1, with the correction above:
+The best current next proof step is item 2, with item 1 being formalized in parallel:
 
 Use `rfc_exact_support_quotient_state.md` as the canonical proof contract and turn its diagnostic
 subcases into theorem statements:
@@ -273,15 +272,20 @@ subcases into theorem statements:
 1. scalar collapsed-active exact-support rerouting;
 2. nested quotient/subspace counting for W_inner <= W_outer;
 3. consumed-kernel containment when a lower tau-zero layer sits inside an upper kernel;
-4. small-support tau-two quotient-plane incidence;
-5. recursive tau-one quotient-chain state.
+4. scalar kernel-lift container covering with quotient incidence retained;
+5. marked child-line/container state for connected tau-one rows.
 ```
 
-The current best non-tau2-cover diagnostic still leaves
-`(924.69069031 + 80) / 128 = 7.849145` q-dimensions, and the anti-conservative tau-two-cover
-ceiling leaves `(567.15416718 + 80) / 128 = 5.055892` q-dimensions. So the next proof step must
-handle both tau-two and tau-one quotient incidence; solving only the old level-3 pair row is not
-enough.
+The current best diagnostic leaves:
+
+```text
+(565.92392782 + 80) / 128 = 5.04628069
+```
+
+q-dimensions above the `2^-80` target. This is now close to the old anti-conservative tau-two-cover
+ceiling, but the route is better structured because quotient incidence is still counted.
+
+## Historical Trace Updates
 
 Latest trace-budget refinement: `--trace-table-state` now decodes the residual q-dimensional
 budget after structural covers. In the level-3 `(4,7)>=(2,8)` stress state, the top nested row has:

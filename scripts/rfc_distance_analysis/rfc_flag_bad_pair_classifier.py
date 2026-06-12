@@ -29,6 +29,7 @@ from rfc_flag_span_moment import (  # noqa: E402
     State,
     flag_child_bound_report,
     flag_table_bound_for_layers,
+    get_child_value,
     log2_add,
     log2_comb_table,
     merge_equal_dimension_chain,
@@ -69,6 +70,7 @@ CSV_FIELDS = [
     "top_outer_consumed_kernel_cover_qdim",
     "top_inner_nested_quotient_cover_qdim",
     "top_inner_nested_subspace_cover_qdim",
+    "top_support2_diamond_saving_qdim",
     "top_outer_kernel_dim",
     "top_inner_kernel_dim",
     "top_outer_kernel_unconsumed_by_inner",
@@ -107,6 +109,7 @@ class PairRow:
     outer_consumed_kernel_cover_qdim: int
     inner_nested_quotient_cover_qdim: int
     inner_nested_subspace_cover_qdim: int
+    support2_diamond_saving_qdim: float
     joint_log2: float
 
 
@@ -349,6 +352,140 @@ def consumed_kernel_cover_qdim(
     return inner_parent_span * (ambient_dim - outer_kernel_dim)
 
 
+def qbinom_exponent(sub_dim: int, ambient_dim: int) -> int:
+    if sub_dim < 0 or sub_dim > ambient_dim:
+        return 10**9
+    return sub_dim * (ambient_dim - sub_dim)
+
+
+def three_layer_chain_bound(
+    *,
+    child_values: dict[int, list[float]],
+    child_flag_table,
+    child_k: int,
+    child_n: int,
+    q_log2: float,
+    top: State,
+    middle: State,
+    bottom: State,
+) -> float:
+    """Safe coarse bound for one chain `top >= middle >= bottom`.
+
+    The minimum ranges over scalar and two-layer flag anchors, extending missing
+    layers by Gaussian-binomial counts and ignoring their zero constraints.
+    """
+
+    d0, _z0 = top
+    d1, _z1 = middle
+    d2, _z2 = bottom
+    if not (d0 >= d1 >= d2):
+        return NEG_INF
+    candidates: list[float] = []
+
+    def add(value: float, qdim: int = 0) -> None:
+        if value > NEG_INF / 2 and qdim < 10**9:
+            candidates.append(value + qdim * q_log2)
+
+    top_value = get_child_value(child_values, child_n, d0, top[1])
+    middle_value = get_child_value(child_values, child_n, d1, middle[1])
+    bottom_value = get_child_value(child_values, child_n, d2, bottom[1])
+    top_middle = flag_table_bound_for_layers(
+        values_by_span=child_values,
+        flag_table=child_flag_table,
+        child_k=child_k,
+        child_n=child_n,
+        q_log2=q_log2,
+        layers=(top, middle),
+    )
+    middle_bottom = flag_table_bound_for_layers(
+        values_by_span=child_values,
+        flag_table=child_flag_table,
+        child_k=child_k,
+        child_n=child_n,
+        q_log2=q_log2,
+        layers=(middle, bottom),
+    )
+    top_bottom = flag_table_bound_for_layers(
+        values_by_span=child_values,
+        flag_table=child_flag_table,
+        child_k=child_k,
+        child_n=child_n,
+        q_log2=q_log2,
+        layers=(top, bottom),
+    )
+
+    add(top_bottom, qbinom_exponent(d1 - d2, d0 - d2))
+    add(top_middle, qbinom_exponent(d2, d1))
+    add(middle_bottom, qbinom_exponent(d0 - d1, child_k - d1))
+    add(top_value, qbinom_exponent(d1, d0) + qbinom_exponent(d2, d1))
+    add(
+        middle_value,
+        qbinom_exponent(d0 - d1, child_k - d1) + qbinom_exponent(d2, d1),
+    )
+    add(
+        bottom_value,
+        qbinom_exponent(d1 - d2, child_k - d2)
+        + qbinom_exponent(d0 - d1, child_k - d1),
+    )
+    return min(candidates) if candidates else NEG_INF
+
+
+def support2_diamond_child_bound(
+    *,
+    outer_parent_span: int,
+    outer_choice: tuple[int, ...],
+    child_layers: tuple[State, ...],
+    child_values: dict[int, list[float]],
+    child_flag_table,
+    child_k: int,
+    child_n: int,
+    q_log2: float,
+) -> float:
+    """Return the child-only quotient-diamond bound for decomposable tau-two rows."""
+
+    outer = choice_view(outer_choice)
+    kernel_dim = outer_parent_span - outer.tau
+    if not (
+        outer.tau == 2
+        and outer.visible_support == 2
+        and outer.delta == 2
+        and outer.components == 2
+        and kernel_dim == outer.inner_span
+        and outer.outer_span == outer.inner_span + 2
+    ):
+        return NEG_INF
+
+    top_dim = outer.outer_span
+    middle_dim = outer.inner_span + 1
+    bottom_dim = outer.inner_span
+    top_zeros = outer.outer_zeros
+    middle_zeros = outer.outer_zeros + 1
+    bottom_zeros = outer.outer_zeros + 2
+    for dim, zeros in child_layers:
+        if dim == top_dim:
+            top_zeros = max(top_zeros, zeros)
+        elif dim == middle_dim:
+            middle_zeros = max(middle_zeros, zeros)
+        elif dim == bottom_dim:
+            bottom_zeros = max(bottom_zeros, zeros)
+        else:
+            return NEG_INF
+
+    chain_bound = three_layer_chain_bound(
+        child_values=child_values,
+        child_flag_table=child_flag_table,
+        child_k=child_k,
+        child_n=child_n,
+        q_log2=q_log2,
+        top=(top_dim, top_zeros),
+        middle=(middle_dim, middle_zeros),
+        bottom=(bottom_dim, bottom_zeros),
+    )
+    if chain_bound <= NEG_INF / 2:
+        return NEG_INF
+    return chain_bound + q_log2
+
+
 def tau_key(row: PairRow) -> str:
     outer = choice_view(row.outer.choice)
     inner = choice_view(row.inner.choice)
@@ -436,7 +573,10 @@ def build_pair_rows(
     nested_quotient_mode: str = "none",
     nested_subspace_mode: str = "none",
     consumed_kernel_mode: str = "none",
+    support2_diamond_mode: str = "none",
 ) -> tuple[list[PairRow], float]:
+    if support2_diamond_mode not in ("none", "child-only"):
+        raise ValueError(f"unknown support2_diamond_mode: {support2_diamond_mode}")
     rows: list[PairRow] = []
     pair_sum = NEG_INF
     for outer in outer_terms:
@@ -493,17 +633,34 @@ def build_pair_rows(
                 nested_subspace_mode=nested_subspace_mode,
             )
             inner_local_log2 -= inner_nested_subspace_cover * q_log2
-            joint_log2 = outer_local_log2 + inner_local_log2 + child_flag_log2
+            support2_diamond_saving = 0.0
+            selected_child_flag_log2 = child_flag_log2
+            if support2_diamond_mode == "child-only":
+                diamond_child_log2 = support2_diamond_child_bound(
+                    outer_parent_span=outer_parent_span,
+                    outer_choice=outer.choice,
+                    child_layers=child_layers,
+                    child_values=child_values,
+                    child_flag_table=child_flag_table,
+                    child_k=child_k,
+                    child_n=child_n,
+                    q_log2=q_log2,
+                )
+                if diamond_child_log2 > NEG_INF / 2 and diamond_child_log2 < child_flag_log2:
+                    support2_diamond_saving = (child_flag_log2 - diamond_child_log2) / q_log2
+                    selected_child_flag_log2 = diamond_child_log2
+            joint_log2 = outer_local_log2 + inner_local_log2 + selected_child_flag_log2
             row = PairRow(
                 outer=outer,
                 inner=inner,
                 child_layers=child_layers,
-                child_flag_log2=child_flag_log2,
+                child_flag_log2=selected_child_flag_log2,
                 outer_local_log2=outer_local_log2,
                 inner_local_log2=inner_local_log2,
                 outer_consumed_kernel_cover_qdim=outer_consumed_kernel_cover,
                 inner_nested_quotient_cover_qdim=inner_nested_quotient_cover,
                 inner_nested_subspace_cover_qdim=inner_nested_subspace_cover,
+                support2_diamond_saving_qdim=support2_diamond_saving,
                 joint_log2=joint_log2,
             )
             rows.append(row)
@@ -603,6 +760,9 @@ def make_output_row(
         "top_inner_nested_subspace_cover_qdim": (
             top.inner_nested_subspace_cover_qdim if top is not None else ""
         ),
+        "top_support2_diamond_saving_qdim": (
+            f"{top.support2_diamond_saving_qdim:.8f}" if top is not None else ""
+        ),
         "top_outer_kernel_dim": (
             choice_kernel_dim(outer_parent_span, top.outer.choice) if top is not None else ""
         ),
@@ -686,6 +846,16 @@ def main() -> None:
         help=(
             "diagnostic: for a lower tau-zero row, count the upper kernel as "
             "containing W_inner instead of as a fresh kernel lift"
+        ),
+    )
+    parser.add_argument(
+        "--support2-diamond-mode",
+        choices=("none", "child-only"),
+        default="none",
+        help=(
+            "diagnostic: for decomposable support-two tau-two rows, keep quotient "
+            "incidence counted but replace the bare child flag by a quotient-diamond "
+            "chain bound"
         ),
     )
     parser.add_argument(
@@ -775,6 +945,7 @@ def main() -> None:
         nested_quotient_mode=args.nested_quotient_mode,
         nested_subspace_mode=args.nested_subspace_mode,
         consumed_kernel_mode=args.consumed_kernel_mode,
+        support2_diamond_mode=args.support2_diamond_mode,
     )
 
     writer = csv.DictWriter(sys.stdout, fieldnames=CSV_FIELDS, lineterminator="\n")
@@ -794,7 +965,8 @@ def main() -> None:
                 f"kernel_cover_mode={kernel_cover_mode},"
                 f"nested_quotient_mode={args.nested_quotient_mode},"
                 f"nested_subspace_mode={args.nested_subspace_mode},"
-                f"consumed_kernel_mode={args.consumed_kernel_mode}"
+                f"consumed_kernel_mode={args.consumed_kernel_mode},"
+                f"support2_diamond_mode={args.support2_diamond_mode}"
             ),
             stats=all_stats,
             coarse=coarse,

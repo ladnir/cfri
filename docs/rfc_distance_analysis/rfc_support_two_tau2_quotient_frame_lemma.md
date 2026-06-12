@@ -260,3 +260,52 @@ rows, other non-candidate rows dominate the aggregate, so the stronger quotient-
 not the next aggregate bottleneck for this level-3 table by itself. The next implementation target
 is therefore to integrate the child-only quotient-diamond query into the demanded pair table, then
 retrace the full depth-5 `z=34` path and identify the new dominant family.
+
+## Integrated Recurrence Diagnostic
+
+The child-only mode is now available in the pair-table recurrence as:
+
+```text
+--support2-diamond-mode child-only
+```
+
+On the old level-3 stress table it reproduces the standalone diagnostic:
+
+```text
+(4,7)>=(2,8):
+  303.43723477 -> 61.00503386 bits
+```
+
+On the full demanded depth-5 run, the production-floor value moves:
+
+```text
+1232.88847175 -> 1095.85967660 bits.
+```
+
+The crossing remains:
+
+```text
+z = 133.
+```
+
+The dominant path moves to:
+
+```text
+level 5: tau=1, child (2,15)
+level 4: tau=2, a=3, child (4,6), local charge 6, lift 12
+level 3: tau=2, a=2, child flag (4,2)>=(2,4)
+```
+
+The follow-up trace for `(4,2)>=(2,4)` shows the new top pair:
+
+```text
+outer: p=0, s=2, a=2, tau=2, child=(4,2), z_V=0, z_L=2
+inner: p=0, s=4, a=4, tau=1, child=(4,2), z_V=0, z_L=4
+child flag: (4,0)>=(2,4)
+support2 diamond saving: 0
+```
+
+The diamond has no effect here because the merged child diagram has a much stronger bottom/kernel
+zero requirement than the outer support-two frame supplies. The next local/state blocker is
+therefore a nested strong-bottom quotient/kernel interaction for `(4,2)>=(2,4)`, not another
+application of the same support-two diamond.

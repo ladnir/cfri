@@ -185,6 +185,8 @@ def quotient_diamond(
     kernel_name: str = "L",
     kernel_dim: int,
     top_zeros: int,
+    middle_zeros: int | None = None,
+    kernel_zeros: int | None = None,
 ) -> DiagramState:
     """Return the support-two quotient-frame diamond.
 
@@ -196,8 +198,10 @@ def quotient_diamond(
 
     middle_dim = kernel_dim + 1
     top_dim = kernel_dim + 2
-    kernel_zeros = top_zeros + 2
-    middle_zeros = top_zeros + 1
+    if middle_zeros is None:
+        middle_zeros = top_zeros + 1
+    if kernel_zeros is None:
+        kernel_zeros = top_zeros + 2
     return (
         DiagramState.empty()
         .with_node(top_name, top_dim, top_zeros)

@@ -282,6 +282,21 @@ aggregate because non-candidate rows dominate after the child-diamond saving. So
 implementation step is to integrate the child-only diamond query into the demanded pair table and
 then rerun the full depth-5 `z=34` trace.
 
+Update after integration: `--support2-diamond-mode child-only` lowers the full demanded depth-5
+`z=34` value from `1232.88847175` to `1095.85967660` bits, with crossing still `z=133`. The new
+dominant path is:
+
+```text
+level 5: tau=1, child (2,15)
+level 4: tau=2, a=3, child (4,6), charge 6, lift 12
+level 3: tau=2, a=2, child flag (4,2)>=(2,4)
+```
+
+Tracing `(4,2)>=(2,4)` shows the top row has child flag `(4,0)>=(2,4)` and zero
+`support2_diamond_saving_qdim`; the lower tau-one layer forces a much stronger bottom/kernel zero
+budget than the outer support-two diamond supplies. The next blocker is a nested strong-bottom
+quotient/kernel interaction, not the old `(4,7)>=(2,8)` row.
+
 After that, return to the theta_2=-1 kernel-chain truncation and the connected full-kernel local
 endpoint. Those remain real blockers, but they are not the first item on the active frontier.
 

@@ -165,6 +165,7 @@ def compute_pair_enumerated_flag_table(
     nested_quotient_mode: str,
     nested_subspace_mode: str,
     consumed_kernel_mode: str,
+    support2_diamond_mode: str,
     allowed_keys: set[tuple[State, State]] | None = None,
 ) -> tuple[FlagTable, TableStats]:
     if allowed_keys is not None and len(allowed_keys) == 0:
@@ -239,6 +240,7 @@ def compute_pair_enumerated_flag_table(
                 nested_quotient_mode=nested_quotient_mode,
                 nested_subspace_mode=nested_subspace_mode,
                 consumed_kernel_mode=consumed_kernel_mode,
+                support2_diamond_mode=support2_diamond_mode,
             )
             value = min(baseline, pair_sum) if pair_sum > NEG_INF / 2 else baseline
             table[key] = value
@@ -410,6 +412,7 @@ def build_pair_levels(
     nested_quotient_mode: str,
     nested_subspace_mode: str,
     consumed_kernel_mode: str,
+    support2_diamond_mode: str,
     last_level_keys: set[tuple[State, State]] | None,
     demand_next_level: bool,
 ) -> tuple[list[LevelData], list[TableStats]]:
@@ -474,6 +477,7 @@ def build_pair_levels(
             nested_quotient_mode=nested_quotient_mode,
             nested_subspace_mode=nested_subspace_mode,
             consumed_kernel_mode=consumed_kernel_mode,
+            support2_diamond_mode=support2_diamond_mode,
             allowed_keys=allowed_keys,
         )
         levels.append(
@@ -539,6 +543,15 @@ def main() -> None:
         help=(
             "diagnostic: for a lower tau-zero row, count the upper kernel as "
             "containing W_inner instead of as a fresh kernel lift"
+        ),
+    )
+    parser.add_argument(
+        "--support2-diamond-mode",
+        choices=("none", "child-only"),
+        default="none",
+        help=(
+            "diagnostic: route decomposable support-two tau-two rows through a "
+            "joint child-diamond chain bound while keeping quotient incidence counted"
         ),
     )
     parser.add_argument(
@@ -610,6 +623,7 @@ def main() -> None:
         nested_quotient_mode=args.nested_quotient_mode,
         nested_subspace_mode=args.nested_subspace_mode,
         consumed_kernel_mode=args.consumed_kernel_mode,
+        support2_diamond_mode=args.support2_diamond_mode,
         last_level_keys=last_level_keys,
         demand_next_level=args.demand_next_level,
     )
@@ -750,6 +764,7 @@ def main() -> None:
             nested_quotient_mode=args.nested_quotient_mode,
             nested_subspace_mode=args.nested_subspace_mode,
             consumed_kernel_mode=args.consumed_kernel_mode,
+            support2_diamond_mode=args.support2_diamond_mode,
         )
         baseline_label = "-inf" if baseline <= NEG_INF / 2 else f"{baseline:.8f}"
         table_label = "-inf" if table_value <= NEG_INF / 2 else f"{table_value:.8f}"
@@ -766,6 +781,7 @@ def main() -> None:
             "outer_covered_kernel_lift_qdim,inner_covered_kernel_lift_qdim,"
             "outer_consumed_kernel_cover_qdim,"
             "inner_nested_quotient_cover_qdim,inner_nested_subspace_cover_qdim,"
+            "support2_diamond_saving_qdim,"
             "outer_adjusted_lift_minus_charge_qdim,"
             "inner_adjusted_lift_minus_charge_qdim,"
             "pair_adjusted_lift_minus_charge_qdim,"
@@ -813,6 +829,7 @@ def main() -> None:
                 f"{row.outer_consumed_kernel_cover_qdim},"
                 f"{row.inner_nested_quotient_cover_qdim},"
                 f"{row.inner_nested_subspace_cover_qdim},"
+                f"{row.support2_diamond_saving_qdim:.8f},"
                 f"{outer_adjusted_qdim},"
                 f"{inner_adjusted_qdim},"
                 f"{outer_adjusted_qdim + inner_adjusted_qdim},"

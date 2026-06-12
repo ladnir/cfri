@@ -405,6 +405,24 @@ decomposable support-two row through the joint child diamond. The stronger `repl
 column is only a sensitivity target; after the child-diamond saving, other rows dominate the table
 anyway.
 
+The same child-only rule is integrated into `rfc_pair_flag_table_recurrence.py` as:
+
+```text
+--support2-diamond-mode child-only
+```
+
+With the structural modes above, it changes:
+
+```text
+level-3 (4,7)>=(2,8): 303.43723477 -> 61.00503386 bits
+full depth-5 z=34:    1232.88847175 -> 1095.85967660 bits
+crossing:             still z=133
+```
+
+The new traced blocker is the level-3 flag `(4,2)>=(2,4)`, whose top row has child flag
+`(4,0)>=(2,4)` and zero support-two-diamond saving. That row needs a different nested
+strong-bottom quotient/kernel state.
+
 `rfc_multicopy_falsification.py` is adversarial. It estimates whether broad one-copy near-families
 can intersect across many independent RFC copies often enough to threaten the target excess.
 

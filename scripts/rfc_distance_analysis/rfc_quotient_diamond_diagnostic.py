@@ -205,10 +205,24 @@ def quotient_frame_bounds_for_row(
         return None
     outer = choice_view(row.outer.choice)
     kernel_dim = outer.inner_span
-    z = outer.outer_zeros
-    top_state = (outer.outer_span, z)
-    middle_state = (kernel_dim + 1, z + 1)
-    bottom_state = (kernel_dim, z + 2)
+    top_dim = outer.outer_span
+    middle_dim = kernel_dim + 1
+    bottom_dim = kernel_dim
+    top_zeros = outer.outer_zeros
+    middle_zeros = outer.outer_zeros + 1
+    bottom_zeros = outer.outer_zeros + 2
+    for dim, zeros in row.child_layers:
+        if dim == top_dim:
+            top_zeros = max(top_zeros, zeros)
+        elif dim == middle_dim:
+            middle_zeros = max(middle_zeros, zeros)
+        elif dim == bottom_dim:
+            bottom_zeros = max(bottom_zeros, zeros)
+        else:
+            return None
+    top_state = (top_dim, top_zeros)
+    middle_state = (middle_dim, middle_zeros)
+    bottom_state = (bottom_dim, bottom_zeros)
     chain_bound, chain_label = three_layer_chain_bound(
         values_by_span=values_by_span,
         flag_table=flag_table,
@@ -225,7 +239,12 @@ def quotient_frame_bounds_for_row(
     child_only_joint = row.joint_log2 - row.child_flag_log2 + frame_bound
     outer_quotient_lift = choice_quotient_lift_qdim(outer_parent_span, row.outer.choice)
     replace_quotient_joint = child_only_joint - outer_quotient_lift * q_log2
-    diagram = quotient_diamond(kernel_dim=kernel_dim, top_zeros=z).key()
+    diagram = quotient_diamond(
+        kernel_dim=kernel_dim,
+        top_zeros=top_zeros,
+        middle_zeros=middle_zeros,
+        kernel_zeros=bottom_zeros,
+    ).key()
     return (
         chain_bound,
         chain_label,
@@ -358,6 +377,7 @@ def main() -> None:
         nested_quotient_mode=args.nested_quotient_mode,
         nested_subspace_mode=args.nested_subspace_mode,
         consumed_kernel_mode=args.consumed_kernel_mode,
+        support2_diamond_mode="none",
     )
 
     table_value = current.flag_table.get(target_key) if current.flag_table is not None else None

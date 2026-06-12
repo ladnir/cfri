@@ -323,8 +323,16 @@ flag by the diamond chain relaxation while keeping quotient incidence counted lo
 ```
 
 The stronger sensitivity that also removes the outer quotient-plane lift only lowers the aggregate
-to `50.66146631` bits, because other rows then dominate. Thus the next recurrence step is to carry
-the child diamond in the demanded table, not to rely on all-lift or quotient-lift deletion.
+to `50.66146631` bits, because other rows then dominate. The child-only rule is now integrated as
+`--support2-diamond-mode child-only`; on the full demanded depth-5 `z=34` run it lowers the value:
+
+```text
+1232.88847175 -> 1095.85967660 bits.
+```
+
+The new blocker is the level-3 flag `(4,2)>=(2,4)`, whose top row has child flag `(4,0)>=(2,4)`.
+The lower tau-one layer imposes a strong bottom/kernel zero budget that the support-two diamond
+does not explain.
 
 ## Tau-One Chain Rows
 

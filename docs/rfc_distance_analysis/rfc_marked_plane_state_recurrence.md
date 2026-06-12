@@ -485,3 +485,17 @@ This improves the previous two-layer-table crossing `z=137` to `z=133`, but it i
 production floor `z=34`. The next proof/implementation step is therefore not merely sparse table
 plumbing; it needs a richer demanded diagram state or additional local charge that can propagate
 past the level-3 table.
+
+With `--report-final-z 34`, the same sparse run reports:
+
+```text
+final_span_1_z_report,34,1740.39750674
+```
+
+Compared to the target `-80` bits, this is still about:
+
+```text
+(1740.39750674 + 80) / 128 = 14.22185552 q-dim
+```
+
+above the depth-5 base seal target.

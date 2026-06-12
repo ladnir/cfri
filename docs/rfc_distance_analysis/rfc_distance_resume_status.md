@@ -195,8 +195,9 @@ The live blockers are now narrow:
    timed out. The next implementation should compute only states demanded by the final trace and
    their recursive child flags. Update: `--demand-next-level` now runs end-to-end through depth 5,
    building 599 demanded level-2 table entries and 2076 demanded level-3 entries, and improves the
-   crossing to `z=133`. This is useful but not enough; the next recurrence likely needs a richer
-   demanded diagram state or additional local charge.
+   crossing to `z=133`. At the production floor it reports `final_span_1_z_report,34,1740.39750674`,
+   still `14.22185552` q-dimensions above the `2^-80` target. This is useful but not enough; the
+   next recurrence likely needs a richer demanded diagram state or additional local charge.
 3. Prove/finalize the shared-randomness-safe multi-layer flag transition theorem. The target note
    covers the joint marked-line/frame recurrence for the decomposable |A|=2,delta=2,comp=2 row,
    with the local marked-component certificate and uniform `(q+1)` frame-completion count written.

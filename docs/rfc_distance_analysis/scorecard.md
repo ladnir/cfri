@@ -309,4 +309,5 @@ Sparse pair-table demand mode added. `--demand-next-level` runs end-to-end throu
 proof-shaped filters and moves the crossing from `z=137` to `z=133`. It builds 599 demanded level-2
 entries and 2076 demanded level-3 entries. This is real but modest progress: the architecture
 propagates some pair-table savings, but it still does not approach the depth-5 base-seal floor
-`z=34`.
+`z=34`. The same run reports `final_span_1_z_report,34,1740.39750674`, still `14.22185552`
+q-dimensions above the `2^-80` target.

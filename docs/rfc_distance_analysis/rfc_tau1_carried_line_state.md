@@ -132,6 +132,9 @@ outer_tau1_invisible_fiber_qdim      = 3
 outer_tau1_universal_postroot_qdim   = 3
 outer_tau1_support_saving_qdim       = 0
 outer_tau1_charged_postroot_qdim     = 3
+outer_tau1_visible_fixed_cond_qdim   = 3
+outer_tau1_visible_only_saving_qdim  = 0
+outer_tau1_full_line_saving_qdim     = 3
 ```
 
 Thus the entire post-root budget in this child row is invisible-fiber budget. Carrying only the
@@ -148,6 +151,23 @@ projection to the active root coordinates. This is still compatible with the tau
 the parent row already paid for the full line family. The remaining theorem obligation is to show
 that the child's dominant tau-one row uses the same carried full line, or else to charge exactly the
 new fiber dimension by which it differs.
+
+The parent level-4 row has the same structure:
+
+```text
+state (2,15), rank-1 scalar row:
+tau1_quotient_qdim                 = 6
+tau1_visible_image_qdim            = 2
+tau1_invisible_fiber_qdim          = 5
+tau1_charged_postroot_qdim         = 5
+tau1_visible_fixed_cond_qdim       = 5
+tau1_visible_only_saving_qdim      = 0
+tau1_full_line_saving_qdim         = 5
+```
+
+So the line-carry theorem is not a small local patch. It must say that once the parent pays for the
+full ambient line, the relevant descendant rows are conditioned on that same full line, not only on
+the same visible root image.
 
 ## Next Diagnostic
 

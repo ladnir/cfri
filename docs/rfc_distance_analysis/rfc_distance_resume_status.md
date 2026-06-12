@@ -396,6 +396,8 @@ budget:
 outer_tau1_visible_image_qdim      = 2
 outer_tau1_invisible_fiber_qdim    = 3
 outer_tau1_charged_postroot_qdim   = 3
+outer_tau1_visible_only_saving_qdim = 0
+outer_tau1_full_line_saving_qdim    = 3
 ```
 
 Therefore carrying only the root-visible image of the line saves zero q-dimensions on this row.

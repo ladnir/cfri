@@ -157,6 +157,22 @@ def saving_labels(coarse: float, value: float, q_log2: float) -> tuple[str, str]
     return f"{saving:.8f}", f"{saving / q_log2:.8f}"
 
 
+def tau1_conditional_labels(
+    profile: tuple[int, int, int, int, int, int, int] | None,
+) -> tuple[str, str, str]:
+    if profile is None:
+        return "", "", ""
+    charged_postroot = profile[6]
+    visible_fixed_qdim = profile[3]
+    visible_only_saving = charged_postroot - visible_fixed_qdim
+    full_line_saving = charged_postroot
+    return (
+        str(visible_fixed_qdim),
+        str(visible_only_saving),
+        str(full_line_saving),
+    )
+
+
 def finite_states(values_by_span: dict[int, list[float]]) -> list[State]:
     states: list[State] = []
     for span, values in values_by_span.items():
@@ -1158,9 +1174,13 @@ def main() -> None:
             "outer_tau1_quotient_qdim,outer_tau1_visible_image_qdim,"
             "outer_tau1_invisible_fiber_qdim,outer_tau1_universal_postroot_qdim,"
             "outer_tau1_support_saving_qdim,outer_tau1_charged_postroot_qdim,"
+            "outer_tau1_visible_fixed_cond_qdim,outer_tau1_visible_only_saving_qdim,"
+            "outer_tau1_full_line_saving_qdim,"
             "inner_tau1_quotient_qdim,inner_tau1_visible_image_qdim,"
             "inner_tau1_invisible_fiber_qdim,inner_tau1_universal_postroot_qdim,"
             "inner_tau1_support_saving_qdim,inner_tau1_charged_postroot_qdim,"
+            "inner_tau1_visible_fixed_cond_qdim,inner_tau1_visible_only_saving_qdim,"
+            "inner_tau1_full_line_saving_qdim,"
             "outer_choice,inner_choice"
         )
         for rank, row in enumerate(rows[: args.trace_table_top], start=1):
@@ -1190,6 +1210,16 @@ def main() -> None:
             )
             outer_tau1 = tau1_incidence_profile(outer_span, row.outer.choice)
             inner_tau1 = tau1_incidence_profile(inner_span, row.inner.choice)
+            (
+                outer_tau1_visible_fixed_cond,
+                outer_tau1_visible_only_saving,
+                outer_tau1_full_line_saving,
+            ) = tau1_conditional_labels(outer_tau1)
+            (
+                inner_tau1_visible_fixed_cond,
+                inner_tau1_visible_only_saving,
+                inner_tau1_full_line_saving,
+            ) = tau1_conditional_labels(inner_tau1)
             outer_tau1_quotient = ""
             outer_tau1_visible_image = ""
             outer_tau1_invisible_fiber = ""
@@ -1240,9 +1270,13 @@ def main() -> None:
                 f"{outer_tau1_quotient},{outer_tau1_visible_image},"
                 f"{outer_tau1_invisible_fiber},{outer_tau1_universal_postroot},"
                 f"{outer_tau1_support_saving},{outer_tau1_charged_postroot},"
+                f"{outer_tau1_visible_fixed_cond},{outer_tau1_visible_only_saving},"
+                f"{outer_tau1_full_line_saving},"
                 f"{inner_tau1_quotient},{inner_tau1_visible_image},"
                 f"{inner_tau1_invisible_fiber},{inner_tau1_universal_postroot},"
                 f"{inner_tau1_support_saving},{inner_tau1_charged_postroot},"
+                f"{inner_tau1_visible_fixed_cond},{inner_tau1_visible_only_saving},"
+                f"{inner_tau1_full_line_saving},"
                 f"{outer_choice},{inner_choice}"
             )
 
@@ -1255,7 +1289,9 @@ def main() -> None:
             "dominant_h,gamma,lift_qdim,tau1_quotient_qdim,"
             "tau1_visible_image_qdim,tau1_invisible_fiber_qdim,"
             "tau1_universal_postroot_qdim,tau1_support_saving_qdim,"
-            "tau1_charged_postroot_qdim,child_flag"
+            "tau1_charged_postroot_qdim,tau1_visible_fixed_cond_qdim,"
+            "tau1_visible_only_saving_qdim,tau1_full_line_saving_qdim,"
+            "child_flag"
         )
         if level <= 0 or level >= len(levels):
             print(f"{level},{span},{z},-inf,,,,,,,,,,,,,,,,,,,,")
@@ -1307,6 +1343,11 @@ def main() -> None:
             ) = term.choice
             inner_zeros = p + singleton_count
             tau1_profile = tau1_incidence_profile(span, term.choice)
+            (
+                tau1_visible_fixed_cond_qdim,
+                tau1_visible_only_saving_qdim,
+                tau1_full_line_saving_qdim,
+            ) = tau1_conditional_labels(tau1_profile)
             tau1_quotient_qdim = ""
             tau1_visible_image_qdim = ""
             tau1_invisible_fiber_qdim = ""
@@ -1337,6 +1378,8 @@ def main() -> None:
                 f"{tau1_quotient_qdim},{tau1_visible_image_qdim},"
                 f"{tau1_invisible_fiber_qdim},{tau1_universal_postroot_qdim},"
                 f"{tau1_support_saving_qdim},{tau1_charged_postroot_qdim},"
+                f"{tau1_visible_fixed_cond_qdim},{tau1_visible_only_saving_qdim},"
+                f"{tau1_full_line_saving_qdim},"
                 f"{child_flag}"
             )
 

@@ -509,12 +509,18 @@ outer_tau1_invisible_fiber_qdim
 outer_tau1_universal_postroot_qdim
 outer_tau1_support_saving_qdim
 outer_tau1_charged_postroot_qdim
+outer_tau1_visible_fixed_cond_qdim
+outer_tau1_visible_only_saving_qdim
+outer_tau1_full_line_saving_qdim
 inner_tau1_quotient_qdim
 inner_tau1_visible_image_qdim
 inner_tau1_invisible_fiber_qdim
 inner_tau1_universal_postroot_qdim
 inner_tau1_support_saving_qdim
 inner_tau1_charged_postroot_qdim
+inner_tau1_visible_fixed_cond_qdim
+inner_tau1_visible_only_saving_qdim
+inner_tau1_full_line_saving_qdim
 ```
 
 For the first carried-line target `(4,7)>=(2,8)`, the dominant row has
@@ -525,6 +531,8 @@ fiber:
 outer_tau1_visible_image_qdim      = 2
 outer_tau1_invisible_fiber_qdim    = 3
 outer_tau1_charged_postroot_qdim   = 3
+outer_tau1_visible_only_saving_qdim = 0
+outer_tau1_full_line_saving_qdim    = 3
 ```
 
 So a carried state that remembers only the root-visible image would save zero on this row. The

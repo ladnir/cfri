@@ -585,7 +585,7 @@ python -B scripts/rfc_distance_analysis/rfc_flag_bad_pair_classifier.py \
   --outer-state 4,7 \
   --inner-state 2,8 \
   --term-limit 300 \
-  --posthoc-cover-kernel-lift
+  --kernel-cover-mode unconsumed-container
 ```
 
 It gives:
@@ -603,7 +603,8 @@ keep quotient incidence;
 cover duplicate kernel lifts.
 ```
 
-Concretely, for fixed child flag `L<=V` and fixed local quotient/root datum `R`, the recurrence
-should count the container tuple once and not multiply by the Gaussian number of possible
-`K <= L+L` kernel lifts. The proof still has to show that this container tuple is a valid
-first-moment event at intermediate flag states, not only at the final projective-line event.
+Concretely, for fixed child flag `L<=V` and fixed canonical local quotient/root datum `R`, the
+recurrence should count the container tuple once and not multiply by the Gaussian number of
+possible `K <= L+L` kernel lifts. The proof still has to show that this container tuple is a valid
+first-moment event at intermediate flag states and that no later/sibling profile consumes hidden
+subspace data inside the forgotten kernel lift.

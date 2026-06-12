@@ -324,6 +324,15 @@ Two finer diagnostics sharpen that target:
   saving over coarse = 246.34227875 bits = 1.92454905 q-dim
 ```
 
+The old `--posthoc-cover-kernel-lift` flag is now also exposed as:
+
+```text
+--kernel-cover-mode unconsumed-container
+```
+
+which records the intended theorem guard: quotient incidence stays counted, and only duplicate
+kernel lifts are covered under the unconsumed-kernel condition.
+
 The first option removes rows where a tau-positive exact flag would have equal-dimensional child
 containers and the lower container carries the active singleton zero. That alone removes the
 `lift=19` row, but leaves a `lift=13` tau-one row. The second option keeps the child table fixed and

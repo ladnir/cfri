@@ -245,10 +245,12 @@ of that mass is owned by one outer tau-one witness
 `p=3,s=1,a=1,tau=1,child=(4,4),z=3,charge=1,lift=19`. This script does not certify a bound; it
 identifies the witness family a canonical-selection or charging lemma must control.
 Use `--exclude-collapsed-active` to remove tau-positive equal-dimension child-container collapses;
-this cuts the level-3 loss to `4.08510402` q-dimensions. Use `--posthoc-cover-kernel-lift` to keep
-the child tables fixed but subtract tau-positive kernel-lift multiplicity; this closes the level-3
-stress row with `1.92454905` q-dimensions of slack. That option is a proof-target diagnostic, not a
-certificate mode.
+this cuts the level-3 loss to `4.08510402` q-dimensions. Use
+`--kernel-cover-mode unconsumed-container` to keep the child tables fixed but subtract
+tau-positive kernel-lift multiplicity while retaining quotient incidence; this closes the level-3
+stress row with `1.92454905` q-dimensions of slack. That option is a guarded proof-target
+diagnostic, not a certificate mode. The older `--posthoc-cover-kernel-lift` flag is kept as a
+compatibility alias.
 The CSV also splits the top row's lift into `top_*_kernel_lift_qdim` and
 `top_*_quotient_lift_qdim` so the quotient-incidence part can be audited separately from duplicate
 kernel-lift multiplicity.

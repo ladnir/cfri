@@ -48,6 +48,7 @@ CSV_FIELDS = [
     "section",
     "rank",
     "key",
+    "kernel_cover_mode",
     "count",
     "logsum_log2",
     "max_log2",
@@ -184,9 +185,9 @@ def adjusted_local_log2(
     *,
     parent_span: int,
     q_log2: float,
-    posthoc_cover_kernel_lift: bool,
+    kernel_cover_mode: str,
 ) -> float:
-    if not posthoc_cover_kernel_lift:
+    if kernel_cover_mode == "none":
         return term.local_log2
     return term.local_log2 - choice_kernel_lift_qdim(parent_span, term.choice) * q_log2
 
@@ -274,7 +275,7 @@ def build_pair_rows(
     outer_parent_span: int,
     inner_parent_span: int,
     exclude_collapsed_active: bool,
-    posthoc_cover_kernel_lift: bool,
+    kernel_cover_mode: str,
 ) -> tuple[list[PairRow], float]:
     rows: list[PairRow] = []
     pair_sum = NEG_INF
@@ -301,13 +302,13 @@ def build_pair_rows(
                 outer,
                 parent_span=outer_parent_span,
                 q_log2=q_log2,
-                posthoc_cover_kernel_lift=posthoc_cover_kernel_lift,
+                kernel_cover_mode=kernel_cover_mode,
             )
             inner_local_log2 = adjusted_local_log2(
                 inner,
                 parent_span=inner_parent_span,
                 q_log2=q_log2,
-                posthoc_cover_kernel_lift=posthoc_cover_kernel_lift,
+                kernel_cover_mode=kernel_cover_mode,
             )
             joint_log2 = outer_local_log2 + inner_local_log2 + child_flag_log2
             row = PairRow(
@@ -351,6 +352,7 @@ def make_output_row(
     q_log2: float,
     outer_parent_span: int,
     inner_parent_span: int,
+    kernel_cover_mode: str,
     note: str = "",
 ) -> dict[str, object]:
     top = stats.top
@@ -360,6 +362,7 @@ def make_output_row(
         "section": section,
         "rank": rank,
         "key": key,
+        "kernel_cover_mode": kernel_cover_mode,
         "count": stats.count,
         "logsum_log2": f"{stats.logsum_log2:.8f}" if stats.logsum_log2 > NEG_INF / 2 else "-inf",
         "max_log2": f"{stats.max_log2:.8f}" if stats.max_log2 > NEG_INF / 2 else "-inf",
@@ -416,6 +419,15 @@ def main() -> None:
         help="diagnostic: keep child tables fixed but subtract tau-positive kernel-lift q-dimensions from enumerated pair choices",
     )
     parser.add_argument(
+        "--kernel-cover-mode",
+        choices=("none", "posthoc", "unconsumed-container"),
+        default="none",
+        help=(
+            "kernel-lift adjustment mode; unconsumed-container is the theorem-mode diagnostic "
+            "that keeps quotient incidence counted and assumes no hidden consumed kernel datum"
+        ),
+    )
+    parser.add_argument(
         "--groupers",
         type=parse_groupers,
         default=parse_groupers(
@@ -425,6 +437,9 @@ def main() -> None:
         help="comma-separated grouping keys; include exact_pair for per-choice pairs",
     )
     args = parser.parse_args()
+    if args.posthoc_cover_kernel_lift and args.kernel_cover_mode != "none":
+        raise SystemExit("use either --posthoc-cover-kernel-lift or --kernel-cover-mode, not both")
+    kernel_cover_mode = "posthoc" if args.posthoc_cover_kernel_lift else args.kernel_cover_mode
 
     levels = build_levels(
         depth=args.depth,
@@ -495,7 +510,7 @@ def main() -> None:
         outer_parent_span=args.outer_state[0],
         inner_parent_span=args.inner_state[0],
         exclude_collapsed_active=args.exclude_collapsed_active,
-        posthoc_cover_kernel_lift=args.posthoc_cover_kernel_lift,
+        kernel_cover_mode=kernel_cover_mode,
     )
 
     writer = csv.DictWriter(sys.stdout, fieldnames=CSV_FIELDS, lineterminator="\n")
@@ -512,7 +527,7 @@ def main() -> None:
                 f"inner={format_state(args.inner_state)},"
                 f"outer_terms={len(outer_terms)},inner_terms={len(inner_terms)},"
                 f"exclude_collapsed_active={args.exclude_collapsed_active},"
-                f"posthoc_cover_kernel_lift={args.posthoc_cover_kernel_lift}"
+                f"kernel_cover_mode={kernel_cover_mode}"
             ),
             stats=all_stats,
             coarse=coarse,
@@ -520,7 +535,12 @@ def main() -> None:
             q_log2=args.q_log2,
             outer_parent_span=args.outer_state[0],
             inner_parent_span=args.inner_state[0],
-            note="truncated pair sum; omitted terms can only increase the full naive sum",
+            kernel_cover_mode=kernel_cover_mode,
+            note=(
+                "truncated pair sum; omitted terms can only increase the full naive sum"
+                if kernel_cover_mode == "none"
+                else "truncated pair sum; kernel cover subtracts only kernel-lift q-dimensions and keeps quotient incidence counted"
+            ),
         )
     )
 
@@ -538,6 +558,7 @@ def main() -> None:
             q_log2=args.q_log2,
             outer_parent_span=args.outer_state[0],
             inner_parent_span=args.inner_state[0],
+            kernel_cover_mode=kernel_cover_mode,
             note="how concentrated the visible top of the pair sum is",
         )
     )
@@ -556,6 +577,7 @@ def main() -> None:
                     q_log2=args.q_log2,
                     outer_parent_span=args.outer_state[0],
                     inner_parent_span=args.inner_state[0],
+                    kernel_cover_mode=kernel_cover_mode,
                 )
             )
 

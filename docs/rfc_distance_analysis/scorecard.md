@@ -267,9 +267,9 @@ are summed.
 Kernel-lift split tested on the same level-3 flag. The collapsed-active filter removes the
 equal-dimension exact-flag overcount and lowers the loss from `7.08758711` to `4.08510402`
 q-dimensions, but does not close the row. The fixed-table diagnostic
-`--posthoc-cover-kernel-lift` subtracts only the tau-positive kernel-lift factors while keeping
-child table values fixed; it changes the pair sum to `940.85227227` bits against the same
-`1187.19455102` bit coarse baseline, giving `1.92454905` q-dimensions of slack. This says the
+`--kernel-cover-mode unconsumed-container` subtracts only the tau-positive kernel-lift factors
+while keeping child table values fixed; it changes the pair sum to `940.85227227` bits against the
+same `1187.19455102` bit coarse baseline, giving `1.92454905` q-dimensions of slack. This says the
 quotient-line/plane incidence should remain counted; the next theorem target is duplicate
 kernel-lift covering after the child flag and local quotient/root datum are fixed. The dominant
 original outer row splits as `kernel_lift=15`, `quotient_lift=4`, making the target very specific.

@@ -188,6 +188,15 @@ docs/rfc_distance_analysis/rfc_flag_bad_pair_classifier_level3_4_7_ge_2_8_kernel
   Keeps child table values fixed and subtracts only tau-positive kernel-lift factors. The level-3
   pair sum drops to `940.85227227` bits against the same `1187.19455102` bit coarse baseline,
   giving `1.92454905` q-dimensions of slack.
+
+docs/rfc_distance_analysis/rfc_residual_trace_classification.md
+  Status: current residual classifier.
+  Re-runs the depth-5 `z=34` sparse trace in the current checkout and records the proof-obligation
+  labels now emitted by `rfc_pair_flag_table_recurrence.py`. The key classification is that the
+  level-3 stress table falls back to the scalar value because its pair sum is worse, while the top
+  pair rows are structurally `support2-quotient-diamond` plus `tau1-quotient-line`. This confirms
+  that the next proof work is a joint quotient-diagram theorem and the tau-one full-line transition
+  map, not more independent pair enumeration.
 ```
 
 The external Fable audit was useful and found the product-of-first-moments bug. Its record is:

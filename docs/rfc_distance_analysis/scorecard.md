@@ -50,6 +50,7 @@ Open items are excluded from the denominator.
 | Carried two-layer flag merge | 1 | 1 | 0 | 50% | Keep, exposes next diagram | `rfc_carried_flag_diagnostic.py` carries `F_3((4,7),(2,8))`, improves `(4,3)>=(2,5)` to `(4,4)>=(2,5)`, and saves `251.98` bits; next state is a two-marked-line diagram. |
 | Two-marked-line plane diagram | 1 | 1 | 0 | 50% | Keep, local but insufficient | `rfc_two_marked_line_plane_lemma.md` replaces a coarse `q^4` ancestor choice by `q+1`, saving another `381.42` bits on the carried path. |
 | Finite marked-plane state recurrence | 1 | 8 | 0 | 11% | Keep, frontier moved to quotient-incidence state | `rfc_marked_plane_state_recurrence.md`, `rfc_marked_plane_state_diagnostic.py`, `rfc_diagram_path_dp.py`, `rfc_flag_state_choice_diagnostic.py`, and `rfc_flag_bad_pair_classifier.py` turn the hand-expanded two-line diagram into a state scan/path diagnostic. Joint choices help at level 2; nested quotient/subspace/consumed-kernel diagnostics move depth-5 `z=34` from `1740.40` to `1232.89`, but do not close. |
+| Dominant-row proof-obligation labels | 0 | 1 | 0 | 0% | Useful classifier, not a bound | `rfc_pair_flag_table_recurrence.py` now labels traced choices as `support2-quotient-diamond`, `tau1-full-line-carry`, `support2-line-quotient-impossible`, etc. `rfc_residual_trace_classification.md` records that the baseline level-3 pair sum is worse than scalar fallback, so the missing work is a joint quotient-diagram theorem and tau-one transition map, not more independent pair enumeration. |
 | Scalar collapsed-active rerouting | 0 | 1 | 0 | 0% | Promising theorem plumbing | Applying the collapsed-active filter inside scalar lifts, not just pair tables, removes the dominant `(4,3)>=(4,4)` scalar overcount and tightens the `(4,7)>=(2,8)` baseline from `810.95` to `549.21`. Needs proof as exact-support rerouting. |
 | Nested quotient/subspace/consumed-kernel counting | 0 | 1 | 0 | 0% | Strong diagnostic, conditional theorem target | The three modes `inner-in-outer`, `inner-in-outer`, and `tau0-inner-contained` lower the level-3 stress table to `303.44` and full depth-5 `z=34` to `1232.89`. `rfc_exact_support_quotient_state.md` now states the needed compatibility labels, especially `K_lower = W_lower cap K_upper` for upper-visible nested quotient counting. Decoded trace columns show the top stress row still has remaining quotient lifts `outer=8, inner=1`, so the residual is the outer support-two tau-two frame count. |
 | Kernel-lift-only cover | 0 | 1 | 1 | 0% | Useful after richer state, still not enough | Earlier `--cover-kernel-lift` kept crossing at `z=137`; after nested diagnostics it lowers `z=34` to `924.69`, but crossing remains `z=133` and tau-two/tau-one quotient chains dominate. |
@@ -133,6 +134,17 @@ Evidence
 Also add a dated note below if the test changes the active frontier.
 
 ## Dated Notes
+
+### 2026-06-12
+
+Residual trace classifier added. The current proof-shaped sparse run reports
+`final_span_1_z_report,34,1478.66370843` in this checkout. The bound-following path has a
+level-4 tau-one full-line carry row and a level-3 support-two quotient-diamond row. A direct
+level-3 trace for `(4,7)>=(2,8)` shows the pair-enumerated sum is worse than scalar fallback
+(`943.43723477` versus `549.21247145`), while the top pair rows classify as
+`support2-quotient-diamond` plus `tau1-quotient-line`. This is a partial win for problem
+localization: the next proof work is a joint quotient-diagram theorem plus the tau-one
+`phi : E'_A -> E_A` transition/kernel computation, not more broad pair enumeration.
 
 ### 2026-06-11
 

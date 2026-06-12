@@ -32,6 +32,7 @@ from rfc_flag_bad_pair_classifier import (  # noqa: E402
     choice_has_support2_line_quotient_impossibility,
     choice_kernel_lift_qdim,
     choice_quotient_lift_qdim,
+    choice_view,
     covered_kernel_lift_qdims,
 )
 from rfc_flag_span_moment import (  # noqa: E402
@@ -171,6 +172,65 @@ def tau1_conditional_labels(
         str(visible_only_saving),
         str(full_line_saving),
     )
+
+
+def choice_family_label(parent_span: int, choice: tuple[int, ...]) -> str:
+    view = choice_view(choice)
+    if choice_has_collapsed_active_container(choice):
+        return "collapsed-active-reroute"
+    if view.tau == 0:
+        return "tau0-kernel-container"
+    if view.tau == 1:
+        profile = tau1_incidence_profile(parent_span, choice)
+        if profile is None:
+            return "tau1-quotient-line"
+        invisible_fiber = profile[3]
+        support_saving = profile[5]
+        charged_postroot = profile[6]
+        if charged_postroot <= 0:
+            return "tau1-locally-charged"
+        if charged_postroot == invisible_fiber and support_saving == 0:
+            return "tau1-full-line-carry"
+        return "tau1-quotient-line"
+    if view.tau == 2:
+        if choice_has_support2_line_quotient_impossibility(choice):
+            return "support2-line-quotient-impossible"
+        kernel_dim = parent_span - view.tau
+        if (
+            view.visible_support == 2
+            and view.delta == 2
+            and view.components == 2
+            and kernel_dim == view.inner_span
+            and view.outer_span == view.inner_span + 2
+        ):
+            return "support2-quotient-diamond"
+        if view.visible_support == 2 and view.delta == 2 and view.components == 2:
+            return "support2-quotient-frame"
+        return "tau2-layer-codimension"
+    return "tau-positive-higher"
+
+
+def choice_obligation_label(parent_span: int, choice: tuple[int, ...]) -> str:
+    family = choice_family_label(parent_span, choice)
+    if family == "collapsed-active-reroute":
+        return "canonical-exact-support-rerouting"
+    if family == "tau0-kernel-container":
+        return "child-container-event"
+    if family == "tau1-full-line-carry":
+        return "carry-full-line-compute-kappa_phi"
+    if family == "tau1-quotient-line":
+        return "count-quotient-line-incidence"
+    if family == "tau1-locally-charged":
+        return "local-root-charge-suffices"
+    if family == "support2-line-quotient-impossible":
+        return "exclude-impossible-exact-support-row"
+    if family == "support2-quotient-diamond":
+        return "joint-diamond-child-diagram"
+    if family == "support2-quotient-frame":
+        return "represented-support-two-frame-bound"
+    if family == "tau2-layer-codimension":
+        return "tau2-layer-codimension-theorem"
+    return "explicit-quotient-incidence-state"
 
 
 def finite_states(values_by_span: dict[int, list[float]]) -> list[State]:
@@ -1171,6 +1231,7 @@ def main() -> None:
             "pair_adjusted_lift_minus_charge_qdim,"
             "outer_remaining_quotient_lift_qdim,"
             "inner_remaining_quotient_lift_qdim,"
+            "outer_family,inner_family,outer_obligation,inner_obligation,"
             "outer_tau1_quotient_qdim,outer_tau1_visible_image_qdim,"
             "outer_tau1_invisible_fiber_qdim,outer_tau1_universal_postroot_qdim,"
             "outer_tau1_support_saving_qdim,outer_tau1_charged_postroot_qdim,"
@@ -1208,6 +1269,10 @@ def main() -> None:
                 choice_quotient_lift_qdim(inner_span, row.inner.choice)
                 - row.inner_nested_quotient_cover_qdim,
             )
+            outer_family = choice_family_label(outer_span, row.outer.choice)
+            inner_family = choice_family_label(inner_span, row.inner.choice)
+            outer_obligation = choice_obligation_label(outer_span, row.outer.choice)
+            inner_obligation = choice_obligation_label(inner_span, row.inner.choice)
             outer_tau1 = tau1_incidence_profile(outer_span, row.outer.choice)
             inner_tau1 = tau1_incidence_profile(inner_span, row.inner.choice)
             (
@@ -1267,6 +1332,7 @@ def main() -> None:
                 f"{outer_adjusted_qdim + inner_adjusted_qdim},"
                 f"{outer_remaining_quotient},"
                 f"{inner_remaining_quotient},"
+                f"{outer_family},{inner_family},{outer_obligation},{inner_obligation},"
                 f"{outer_tau1_quotient},{outer_tau1_visible_image},"
                 f"{outer_tau1_invisible_fiber},{outer_tau1_universal_postroot},"
                 f"{outer_tau1_support_saving},{outer_tau1_charged_postroot},"
@@ -1291,7 +1357,7 @@ def main() -> None:
             "tau1_universal_postroot_qdim,tau1_support_saving_qdim,"
             "tau1_charged_postroot_qdim,tau1_visible_fixed_cond_qdim,"
             "tau1_visible_only_saving_qdim,tau1_full_line_saving_qdim,"
-            "child_flag"
+            "choice_family,proof_obligation,child_flag"
         )
         if level <= 0 or level >= len(levels):
             print(f"{level},{span},{z},-inf,,,,,,,,,,,,,,,,,,,,")
@@ -1367,6 +1433,8 @@ def main() -> None:
             child_flag = clean_csv_field(
                 ">=".join(format_state(layer) for layer in term.child_layers)
             )
+            choice_family = choice_family_label(span, term.choice)
+            proof_obligation = choice_obligation_label(span, term.choice)
             print(
                 f"{level},{span},{z},{state_label},{rank},"
                 f"{term.term_log2:.8f},{term.local_log2:.8f},"
@@ -1380,6 +1448,7 @@ def main() -> None:
                 f"{tau1_support_saving_qdim},{tau1_charged_postroot_qdim},"
                 f"{tau1_visible_fixed_cond_qdim},{tau1_visible_only_saving_qdim},"
                 f"{tau1_full_line_saving_qdim},"
+                f"{choice_family},{proof_obligation},"
                 f"{child_flag}"
             )
 
@@ -1393,7 +1462,7 @@ def main() -> None:
             "merged_child_flag,merged_child_table_log2,selected_child_log2,"
             "shape_log2,charge_log2,lift_log2,term_log2,logsum_overhead_log2,"
             "coarse_child_choice,coarse_child_log2,coarse_outer_first_log2,"
-            "coarse_inner_first_log2"
+            "coarse_inner_first_log2,choice_family,proof_obligation"
         )
         span = args.trace_span
         z = args.trace_z
@@ -1528,6 +1597,8 @@ def main() -> None:
                 term_log2 = f"{term_value:.8f}"
                 if state_value > NEG_INF / 2:
                     logsum_overhead_log2 = f"{state_value - term_value:.8f}"
+            choice_family = choice_family_label(span, choice)
+            proof_obligation = choice_obligation_label(span, choice)
             print(
                 f"{level},{span},{z},{state_label},{p},{singleton_count},"
                 f"{visible_support_size},{visible_tau},{outer_span},{inner_span},"
@@ -1539,7 +1610,7 @@ def main() -> None:
                 f"{shape_log2:.8f},{charge_log2:.8f},{lift_log2:.8f},"
                 f"{term_log2},{logsum_overhead_log2},"
                 f"{coarse_child_choice},{coarse_child_log2},{coarse_outer_first_log2},"
-                f"{coarse_inner_first_log2}"
+                f"{coarse_inner_first_log2},{choice_family},{proof_obligation}"
             )
             next_span = outer_span
             next_z = outer_zeros

@@ -139,7 +139,9 @@ docs/rfc_distance_analysis/rfc_support_two_tau2_quotient_frame_lemma.md
   Status: local theorem target.
   Isolates the decomposable `|A|=2,delta=2,comp=2` quotient-frame row now exposed by the decoded
   structural trace. The target child object is a diamond
-  `V >= M_1,M_2 >= L`, not a product of child line moments.
+  `V >= M_1,M_2 >= L`, not a product of child line moments. The first diagnostic
+  `rfc_quotient_diamond_diagnostic.py` lowers the level-3 `(4,7)>=(2,8)` stress pair sum from
+  `303.43723477` to `61.00503386` bits in the child-only mode.
 
 docs/rfc_distance_analysis/rfc_covering_flag_lift_lemma.md
   Status: theorem target.
@@ -265,6 +267,20 @@ remaining quotient lifts: outer 8, inner 1
 So the nested tau-one quotient line is already mostly handled. The next local blocker is the outer
 support-two tau-two quotient-frame placement, not another kernel cover or independent tau-one line
 count.
+
+Update: the quotient-diamond diagnostic now confirms a proof-shaped local route for that blocker.
+Keeping quotient incidence counted but routing the decomposable support-two row through the joint
+child diamond changes the level-3 stress pair sum:
+
+```text
+current pair sum:       303.43723477
+child-only diamond:      61.00503386
+```
+
+The stronger sensitivity that also deletes the outer quotient lift reaches only `50.66146631` in
+aggregate because non-candidate rows dominate after the child-diamond saving. So the next concrete
+implementation step is to integrate the child-only diamond query into the demanded pair table and
+then rerun the full depth-5 `z=34` trace.
 
 After that, return to the theta_2=-1 kernel-chain truncation and the connected full-kernel local
 endpoint. Those remain real blockers, but they are not the first item on the active frontier.

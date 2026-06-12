@@ -314,6 +314,18 @@ the exact two-root support and child zero containers. The local statement is iso
 docs/rfc_distance_analysis/rfc_support_two_tau2_quotient_frame_lemma.md
 ```
 
+The first quotient-diamond diagnostic shows that the child-diagram route is already valuable
+without deleting the quotient lift. On the level-3 stress state, replacing the bare `V>=L` child
+flag by the diamond chain relaxation while keeping quotient incidence counted lowers the pair sum:
+
+```text
+303.43723477 -> 61.00503386 bits.
+```
+
+The stronger sensitivity that also removes the outer quotient-plane lift only lowers the aggregate
+to `50.66146631` bits, because other rows then dominate. Thus the next recurrence step is to carry
+the child diamond in the demanded table, not to rely on all-lift or quotient-lift deletion.
+
 ## Tau-One Chain Rows
 
 The anti-conservative sensitivity:

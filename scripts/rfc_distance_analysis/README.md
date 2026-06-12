@@ -371,6 +371,40 @@ the current level-3 stress state with the nested structural modes, the top row h
 points the next theorem target at the outer support-two tau-two quotient-frame count, rather than
 another kernel-fiber cover or an independent tau-one quotient-line fix.
 
+`rfc_quotient_diamond_diagnostic.py` probes that support-two quotient-frame target without changing
+the recurrence. It evaluates the child diamond:
+
+```text
+V >= M_1,M_2 >= L
+```
+
+through a safe three-layer chain relaxation. On the current level-3 stress state:
+
+```text
+python -B scripts/rfc_distance_analysis/rfc_quotient_diamond_diagnostic.py \
+  --depth 5 \
+  --level 3 \
+  --proof-shaped \
+  --nested-quotient-mode inner-in-outer \
+  --nested-subspace-mode inner-in-outer \
+  --consumed-kernel-mode tau0-inner-contained \
+  --term-limit 300 \
+  --table-state 4,7,2,8
+```
+
+it reports:
+
+```text
+current pair sum:             303.43723477
+child_only pair sum:           61.00503386
+replace_quotient pair sum:     50.66146631
+```
+
+The useful theorem-shaped result is `child_only`: keep quotient incidence counted, but route the
+decomposable support-two row through the joint child diamond. The stronger `replace_quotient`
+column is only a sensitivity target; after the child-diamond saving, other rows dominate the table
+anyway.
+
 `rfc_multicopy_falsification.py` is adversarial. It estimates whether broad one-copy near-families
 can intersect across many independent RFC copies often enough to threaten the target excess.
 

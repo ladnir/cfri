@@ -200,3 +200,63 @@ outer_remaining_quotient_lift_qdim = 8.
 
 That term should be replaced by a joint child diagram query plus at most one q-dimensional
 frame-completion factor. This is the concrete implementation test for the lemma.
+
+## First Diagnostic
+
+The script:
+
+```text
+scripts/rfc_distance_analysis/rfc_quotient_diamond_diagnostic.py
+```
+
+tests the level-3 stress state with the current nested structural modes:
+
+```text
+python -B scripts/rfc_distance_analysis/rfc_quotient_diamond_diagnostic.py \
+  --depth 5 \
+  --level 3 \
+  --proof-shaped \
+  --nested-quotient-mode inner-in-outer \
+  --nested-subspace-mode inner-in-outer \
+  --consumed-kernel-mode tau0-inner-contained \
+  --term-limit 300 \
+  --table-state 4,7,2,8
+```
+
+It prints two variants:
+
+```text
+child_only:
+  keep the current local quotient-lift exponent and only replace the child flag by the
+  quotient-diamond chain bound;
+
+replace_quotient:
+  additionally remove the outer quotient-plane lift. This is the stronger local theorem target,
+  not a certified rule.
+```
+
+Current output:
+
+```text
+current pair sum:             303.43723477
+child_only pair sum:           61.00503386
+child_only saving:              1.89400157 q-dim
+replace_quotient pair sum:     50.66146631
+replace_quotient saving:        1.97481069 q-dim
+candidate rows:              144
+```
+
+The top row itself has:
+
+```text
+current joint:                303.43723477
+child-only joint:              61.00392310
+replace-quotient joint:      -962.99607690
+```
+
+This is an important calibration. The quotient diamond state gives a real proof-shaped saving even
+without deleting the quotient-plane lift. Once that child-diagram saving is applied to all matching
+rows, other non-candidate rows dominate the aggregate, so the stronger quotient-lift deletion is
+not the next aggregate bottleneck for this level-3 table by itself. The next implementation target
+is therefore to integrate the child-only quotient-diamond query into the demanded pair table, then
+retrace the full depth-5 `z=34` path and identify the new dominant family.

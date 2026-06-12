@@ -177,6 +177,40 @@ def add_marked_line_in_plane(
     return next_state, 1, "q+1"
 
 
+def quotient_diamond(
+    *,
+    top_name: str = "V",
+    first_name: str = "M1",
+    second_name: str = "M2",
+    kernel_name: str = "L",
+    kernel_dim: int,
+    top_zeros: int,
+) -> DiagramState:
+    """Return the support-two quotient-frame diamond.
+
+    The intended shape is `V >= M1,M2 >= L`, where `dim(V/L)=2`
+    and each `Mi/L` is one component line of the decomposable support-two
+    tau-two quotient.  The two middle nodes are ordered and need not be
+    distinct; allowing ordered duplicates is a safe overcount for diagnostics.
+    """
+
+    middle_dim = kernel_dim + 1
+    top_dim = kernel_dim + 2
+    kernel_zeros = top_zeros + 2
+    middle_zeros = top_zeros + 1
+    return (
+        DiagramState.empty()
+        .with_node(top_name, top_dim, top_zeros)
+        .with_node(first_name, middle_dim, middle_zeros)
+        .with_node(second_name, middle_dim, middle_zeros)
+        .with_node(kernel_name, kernel_dim, kernel_zeros)
+        .with_edge(first_name, top_name)
+        .with_edge(second_name, top_name)
+        .with_edge(kernel_name, first_name)
+        .with_edge(kernel_name, second_name)
+    )
+
+
 def add_choice_child_chain(
     state: DiagramState,
     choice: Choice,

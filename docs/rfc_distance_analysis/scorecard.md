@@ -52,7 +52,7 @@ Open items are excluded from the denominator.
 | Scalar collapsed-active rerouting | 0 | 1 | 0 | 0% | Promising theorem plumbing | Applying the collapsed-active filter inside scalar lifts, not just pair tables, removes the dominant `(4,3)>=(4,4)` scalar overcount and tightens the `(4,7)>=(2,8)` baseline from `810.95` to `549.21`. Needs proof as exact-support rerouting. |
 | Nested quotient/subspace/consumed-kernel counting | 0 | 1 | 0 | 0% | Strong diagnostic, conditional theorem target | The three modes `inner-in-outer`, `inner-in-outer`, and `tau0-inner-contained` lower the level-3 stress table to `303.44` and full depth-5 `z=34` to `1232.89`. `rfc_exact_support_quotient_state.md` now states the needed compatibility labels, especially `K_lower = W_lower cap K_upper` for upper-visible nested quotient counting. Decoded trace columns show the top stress row still has remaining quotient lifts `outer=8, inner=1`, so the residual is the outer support-two tau-two frame count. |
 | Kernel-lift-only cover | 0 | 1 | 1 | 0% | Useful after richer state, still not enough | Earlier `--cover-kernel-lift` kept crossing at `z=137`; after nested diagnostics it lowers `z=34` to `924.69`, but crossing remains `z=133` and tau-two/tau-one quotient chains dominate. |
-| Support-two tau-two quotient-frame bound | 0 | 1 | 0 | 0% | New local theorem target | The decoded `(4,7)>=(2,8)` structural trace has outer `a=2,tau=2,charge=4,lift=12` and adjusted qdim `8`, while the nested inner tau-one line is already reduced to one remaining quotient dimension. `rfc_support_two_tau2_quotient_frame_lemma.md` states the needed diamond child diagram `V >= M_1,M_2 >= L`. |
+| Support-two tau-two quotient-frame bound | 1 | 1 | 0 | 50% | Promote child-diamond query into recurrence | The decoded `(4,7)>=(2,8)` structural trace has outer `a=2,tau=2,charge=4,lift=12` and adjusted qdim `8`, while the nested inner tau-one line is already reduced to one remaining quotient dimension. `rfc_quotient_diamond_diagnostic.py` routes the decomposable row through `V >= M_1,M_2 >= L` and lowers the level-3 stress pair sum from `303.44` to `61.01` bits in the child-only theorem-shaped mode. |
 | One-layer shortened child flag ambient | 0 | 0 | 1 | 0% | Not useful for current base seal | Diagnostic `--flag-bound best-shortened` leaves the depth-5 checkpoint at `z=137` and the `z=34` trace unchanged. |
 | High-kernel/local-incidence bonus | 0 | 0 | 0 | open | Next candidate | Need prove hard row carrying large shortened ambient pays more than uniform `q^-9`. |
 | Joint nested shortened-rank profile charge | 0 | 0 | 0 | open | Next candidate | May recover missing few dimensions by charging the whole nested profile, not max one edge. |
@@ -90,8 +90,10 @@ Three plausible ways to turn this into a win:
 The latest trace-budget decoder refines item 2: in the level-3 nested stress row the lower
 tau-one quotient has already been nested into the upper tau-two plane, leaving only one q-dimension
 for the line. The large remaining term is the outer support-two tau-two quotient-frame placement
-(`outer_remaining_quotient_lift_qdim=8`), so the next local theorem should attack that represented
-frame count directly.
+(`outer_remaining_quotient_lift_qdim=8`). The quotient-diamond diagnostic shows the proof-shaped
+child-diagram route is enough to move the level-3 pair sum from `303.44` to `61.01` bits; the next
+step is integrating that child-only query into the demanded table and retracing the full depth-5
+path.
 
 ## Update Rule
 

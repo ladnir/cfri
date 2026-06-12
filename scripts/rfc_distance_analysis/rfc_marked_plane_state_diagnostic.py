@@ -72,6 +72,18 @@ CSV_FIELDS = [
     "note",
 ]
 
+SUMMARY_FIELDS = [
+    "transition_diagram",
+    "count",
+    "best_saving_log2",
+    "best_saving_qdim",
+    "best_layer_level",
+    "best_outer_state",
+    "best_inner_state",
+    "best_marked_plane_bound_log2",
+    "best_coarse_bound_log2",
+]
+
 
 def format_choice(choice: Choice | None) -> str:
     if choice is None:
@@ -133,6 +145,7 @@ def main() -> None:
     parser.add_argument("--min-saving-qdim", type=float, default=-1.0e100)
     parser.add_argument("--outer-state", type=parse_state)
     parser.add_argument("--inner-state", type=parse_state)
+    parser.add_argument("--group-by-transition-diagram", action="store_true")
     args = parser.parse_args()
 
     levels = build_levels(
@@ -254,6 +267,36 @@ def main() -> None:
                 )
 
     rows.sort(key=lambda row: float(row["saving_log2"]), reverse=True)
+    if args.group_by_transition_diagram:
+        by_diagram: dict[str, list[dict[str, object]]] = {}
+        for row in rows:
+            by_diagram.setdefault(str(row["transition_diagram"]), []).append(row)
+        summary_rows: list[dict[str, object]] = []
+        for diagram, group in by_diagram.items():
+            best = max(group, key=lambda row: float(row["saving_log2"]))
+            summary_rows.append(
+                {
+                    "transition_diagram": diagram,
+                    "count": len(group),
+                    "best_saving_log2": best["saving_log2"],
+                    "best_saving_qdim": best["saving_qdim"],
+                    "best_layer_level": best["layer_level"],
+                    "best_outer_state": best["outer_state"],
+                    "best_inner_state": best["inner_state"],
+                    "best_marked_plane_bound_log2": best["marked_plane_bound_log2"],
+                    "best_coarse_bound_log2": best["coarse_bound_log2"],
+                }
+            )
+        summary_rows.sort(
+            key=lambda row: (float(row["best_saving_log2"]), int(row["count"])),
+            reverse=True,
+        )
+        writer = csv.DictWriter(sys.stdout, fieldnames=SUMMARY_FIELDS, lineterminator="\n")
+        writer.writeheader()
+        for row in summary_rows[: args.limit]:
+            writer.writerow(row)
+        return
+
     writer = csv.DictWriter(sys.stdout, fieldnames=CSV_FIELDS, lineterminator="\n")
     writer.writeheader()
     for row in rows[: args.limit]:

@@ -188,6 +188,9 @@ I0:d1:z3;O0:d2:z0;O1:d1:z4|I0<=O0;O1<=O0
 
 This script is still diagnostic: it uses the safe ordered-line `q+1` replacement, but it does not
 yet propagate a full diagram state through all levels.
+Use `--group-by-transition-diagram` to aggregate the matching rows by generated child diagram. On
+the current depth-5 defaults, the top positive groups are all two line nodes under a zero-budget
+child plane and show the expected `3.00000000` q-dimensional saving before finite constants.
 
 `rfc_multicopy_falsification.py` is adversarial. It estimates whether broad one-copy near-families
 can intersect across many independent RFC copies often enough to threaten the target excess.

@@ -212,3 +212,8 @@ this gives `I0:d1:z3;O0:d2:z0;O1:d1:z4|I0<=O0;O1<=O0`, matching the desired two-
 shape. The marked-plane scanner now emits canonical carrier, successor, and transition diagram
 keys. This is still not the full DP: it only gives the state representation and one transition
 brick.
+
+Marked-plane grouping mode added. Grouping positive rows by transition diagram shows a repeated
+family `I0:d1:z_a;O0:d2:z0;O1:d1:z_b|I0<=O0;O1<=O0`, with best rows saving exactly `3` q-dimensions
+before finite constants. This supports building a small finite diagram DP rather than chasing many
+unrelated special cases.

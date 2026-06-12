@@ -164,6 +164,24 @@ This agrees with `rfc_carried_flag_diagnostic.py` and makes the next recurrence 
 explicit: replace special-case hand carrying by a finite diagram state that can propagate multiple
 marked lines through recursive folds.
 
+The scanner also has a grouping mode:
+
+```text
+python -B scripts/rfc_distance_analysis/rfc_marked_plane_state_diagnostic.py \
+  --only-positive \
+  --group-by-transition-diagram
+```
+
+On the current depth-5 defaults, the top positive groups are all of the form:
+
+```text
+I0:d1:z_a;O0:d2:z0;O1:d1:z_b|I0<=O0;O1<=O0
+```
+
+and the best rows save exactly `3.00000000` q-dimensions before finite constants. This is useful
+evidence that the diagram recurrence has a small repeated state family, not just a single isolated
+repair.
+
 ## Audit Result
 
 A side audit agreed that the local rule is promising provided it is integrated as an atomic diagram

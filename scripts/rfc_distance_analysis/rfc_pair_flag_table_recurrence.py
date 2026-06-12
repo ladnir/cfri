@@ -477,6 +477,7 @@ def build_pair_levels(
     exact_filtered_empty: bool,
     last_level_keys: set[tuple[State, State]] | None,
     demand_next_level: bool,
+    full_table_until: int,
 ) -> tuple[list[LevelData], list[TableStats]]:
     total_n = expansion * (1 << depth)
     comb = log2_comb_table(total_n)
@@ -510,7 +511,12 @@ def build_pair_levels(
         allowed_keys = last_level_keys if level == stop_level else None
         if allowed_keys is None and level == depth and level == stop_level:
             allowed_keys = set()
-        if allowed_keys is None and demand_next_level and level < depth:
+        if (
+            allowed_keys is None
+            and demand_next_level
+            and level < depth
+            and level > full_table_until
+        ):
             next_max_parent_span = None
             if prune_to_final_span > 0:
                 next_max_parent_span = prune_to_final_span * (1 << (depth - (level + 1)))
@@ -671,6 +677,15 @@ def main() -> None:
         action="store_true",
         help="compute only table entries that can be queried by the next depth-pruned scalar lift",
     )
+    parser.add_argument(
+        "--full-table-until",
+        type=int,
+        default=0,
+        help=(
+            "diagnostic: with --demand-next-level, compute complete pair tables "
+            "through this level before switching to sparse demanded keys"
+        ),
+    )
     args = parser.parse_args()
 
     if args.proof_shaped:
@@ -679,6 +694,8 @@ def main() -> None:
     stop_level = args.stop_level if args.stop_level > 0 else args.depth
     if stop_level < 0 or stop_level > args.depth:
         raise SystemExit("--stop-level must be between 0 and --depth")
+    if args.full_table_until < 0 or args.full_table_until > args.depth:
+        raise SystemExit("--full-table-until must be between 0 and --depth")
     last_level_keys = None
     if args.last_level_report_only:
         if not args.report_flag_state:
@@ -709,6 +726,7 @@ def main() -> None:
         exact_filtered_empty=args.exact_filtered_empty,
         last_level_keys=last_level_keys,
         demand_next_level=args.demand_next_level,
+        full_table_until=args.full_table_until,
     )
 
     print(

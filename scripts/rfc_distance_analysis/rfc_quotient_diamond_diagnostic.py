@@ -340,6 +340,7 @@ def main() -> None:
         exact_filtered_empty=False,
         last_level_keys={target_key},
         demand_next_level=False,
+        full_table_until=0,
     )
 
     current = levels[args.level]

@@ -351,15 +351,19 @@ their coarse baseline. The next theorem/implementation step is an exact demanded
 state, not another coarse scalar filter.
 
 The `--exact-filtered-empty` diagnostic confirms that filtered-empty entries can be handled
-exactly for small demanded states, but global application worsens the current depth-5 trace:
+exactly for small demanded states. Under the fair `tau0-inner-contained` child-diamond baseline,
+global application gives a small improvement:
 
 ```text
-1095.85967660 -> 1478.22313584 bits at z=34.
+1095.85967660 -> 1094.25997103 bits at z=34.
 ```
 
-This is not evidence against the line-quotient impossibility. It means the current two-layer table
-does not have enough state to retain lower pair improvements after impossible quotient-line
-profiles are removed. The next recurrence needs to carry the filtered strong-bottom diagram itself.
+The earlier regression to `1478.22313584` occurs only with the stronger
+`inner-kernel-contained` positive-kernel diagnostic. That is not evidence against the line-quotient
+impossibility; it means the current sparse two-layer table does not have enough state to retain all
+lower pair improvements after impossible quotient-line profiles are removed. The next recurrence
+needs to carry the filtered strong-bottom diagram itself, or close sparse demanded tables under the
+pair-child flags they query.
 
 ## Tau-One Chain Rows
 

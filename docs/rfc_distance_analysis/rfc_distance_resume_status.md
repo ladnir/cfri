@@ -339,17 +339,23 @@ level-2 (4,2)>=(2,4): -inf
 level-3 (4,2)>=(2,4): 932.89565663 -> 803.47579675 bits.
 ```
 
-But applying the rule globally is not yet a win:
+Under the original child-diamond baseline, with
+`--consumed-kernel-mode tau0-inner-contained`, applying the rule globally is safe but tiny:
 
 ```text
 full depth-5 z=34:
-  child-diamond mode only:          1095.85967660 bits
-  plus global exact-filtered-empty: 1478.22313584 bits
+  child-diamond mode only:                         1095.85967660 bits
+  plus line filter / exact-empty, tau0 mode:       1094.25997103 bits
 ```
 
-The path moves back through `(4,7)>=(2,8)` because the two-layer table loses lower improvements and
-falls back to coarse bounds. The next real implementation target is a richer filtered diagram
-state, not more global scalar filtering.
+The large `1478.22313584` regression happens only after switching to the stronger
+`--consumed-kernel-mode inner-kernel-contained` diagnostic. In that mode the path moves back through
+`(4,7)>=(2,8)` because the sparse two-layer table loses lower improvements and falls back to coarse
+bounds. A new `--full-table-until 2` diagnostic confirms this is at least partly sparse-demand
+plumbing: it recovers the targeted `(4,7)>=(2,8)` value `423.08002115` and improves the strong-mode
+global report to `1352.53125813` bits. A blunt `--full-table-until 3` run timed out, so the next
+real implementation target is a sparse-demand closure or richer filtered diagram state for the
+positive-kernel extension, not more global scalar filtering.
 
 After that, return to the theta_2=-1 kernel-chain truncation and the connected full-kernel local
 endpoint. Those remain real blockers, but they are not the first item on the active frontier.

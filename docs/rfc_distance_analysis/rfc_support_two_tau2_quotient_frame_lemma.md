@@ -373,20 +373,25 @@ With exact-empty enabled, the level-3 strong-bottom state improves:
 (4,2)>=(2,4): 932.89565663 -> 803.47579675 bits.
 ```
 
-However, enabling the same rule globally in the demanded depth-5 run is not a win:
+Under the same `tau0-inner-contained` baseline used by the child-diamond run, enabling the same
+rule globally is safe but only a small win:
 
 ```text
-without line filter/exact-empty: 1095.85967660 bits
-with exact-empty globally:       1478.22313584 bits
-crossing:                       still z=133
+without line filter/exact-empty:        1095.85967660 bits
+with line filter/exact-empty, tau0 mode: 1094.25997103 bits
+crossing:                              still z=133
 ```
 
-The traced path moves back through `(4,7)>=(2,8)`, whose table value degrades to `548.77189886`
-bits because filtered lower entries no longer support the previous pair-table improvement and the
-recurrence falls back to coarse bounds.
+The large regression to `1478.22313584` happens after switching to
+`inner-kernel-contained`, the stronger positive-kernel diagnostic. There the traced path moves back
+through `(4,7)>=(2,8)`, whose table value can degrade to `548.77189886` bits because filtered lower
+entries no longer support the previous pair-table improvement and the recurrence falls back to
+coarse bounds. Keeping levels 1 and 2 complete with `--full-table-until 2` recovers the targeted
+`(4,7)>=(2,8)` value `423.08002115` and improves the strong-mode `z=34` report to
+`1352.53125813`; keeping level 3 complete was too expensive in the current Python driver.
 
 Interpretation: the local line-quotient impossibility appears sound, and exact-empty handling is
-correct for fully enumerated empty entries. The remaining problem is state sufficiency. The current
-two-layer table cannot preserve all lower improvements after impossible quotient-line profiles are
-removed. A proof-grade recurrence needs either a richer demanded diagram state or an exact filtered
-table construction that avoids coarse fallback for the affected lower families.
+correct for fully enumerated empty entries. The remaining problem is state sufficiency for the
+stronger positive-kernel extension. A proof-grade recurrence needs either a richer demanded diagram
+state or an exact filtered table construction that avoids coarse fallback for the affected lower
+families.

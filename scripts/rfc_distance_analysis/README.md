@@ -460,16 +460,22 @@ level-2 (4,2)>=(2,4): -inf
 level-3 (4,2)>=(2,4): 932.89565663 -> 803.47579675 bits
 ```
 
-But the full demanded trace is worse when this is applied globally:
+Under the same `tau0-inner-contained` structural baseline used for the `1095.85967660` run,
+the full demanded trace is not worse; exact-empty plus the line filter gives a small improvement:
 
 ```text
-child-diamond mode only:          z=34 value 1095.85967660
-plus global exact-filtered-empty: z=34 value 1478.22313584
+child-diamond mode only:                     z=34 value 1095.85967660
+plus line filter / exact-empty, tau0 mode:   z=34 value 1094.25997103
 ```
 
-So exact-empty is a local diagnostic, not yet the final recurrence. The missing object is a richer
-filtered diagram state that preserves lower pair-table improvements while excluding impossible
-quotient-line profiles.
+The earlier `1478.22313584` regression belongs to the stronger
+`--consumed-kernel-mode inner-kernel-contained` diagnostic. In that mode the sparse demanded table
+is not yet state-complete enough: it can drop lower pair-table improvements and then fall back to
+coarse flag bounds. `--full-table-until 2` is a diagnostic knob for this: with the stronger mode it
+recovers the targeted `(4,7)>=(2,8)` child value `423.08002115` and moves the global `z=34` report
+from `1478.22313584` to `1352.53125813`, but trying to keep level 3 fully complete timed out in
+the current Python driver. The next missing object is therefore a sparse-demand closure/richer
+filtered diagram state for the positive-kernel extension, not another scalar-only filter.
 
 `rfc_multicopy_falsification.py` is adversarial. It estimates whether broad one-copy near-families
 can intersect across many independent RFC copies often enough to threaten the target excess.

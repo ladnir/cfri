@@ -24,6 +24,7 @@ rfc_replica_span_moment.py          ordered-tuple span-aware diagnostic
 rfc_subspace_span_moment.py         subspace-span diagnostic exposing visible-kernel state
 rfc_flag_span_moment.py             two-layer flag diagnostic for kernel-zero propagation
 rfc_carried_flag_diagnostic.py      targeted carried-flag merge/diagram diagnostic for depth-5 trace
+rfc_diagram_state.py                finite incidence-diagram state skeleton and merge rules
 rfc_marked_plane_state_diagnostic.py scans finite marked-line-in-plane state savings
 rfc_theta_chain_normal_slice.py     shortened-ambient/defect-slice checker with optimistic rho and strict hard-trace columns
 rfc_defect_conservation.py          fixed-witness rank-defect conservation checker for exposed shortened ambients
@@ -160,9 +161,15 @@ q-dimensional saving for that diagram, before finite constants. Applying both lo
 displayed path leaves an adjusted vector moment of `1863.66054115` bits, still `15.18484798`
 q-dimensions above the `2^-80` target.
 
+`rfc_diagram_state.py` is the small reusable state skeleton behind the marked-plane route. It stores
+diagram nodes with dimensions and zero budgets, containment edges `child <= parent`, forced
+equal-dimension merges, and the safe `q+1` operation for adding an ordered marked line inside an
+already fixed child plane.
+
 `rfc_marked_plane_state_diagnostic.py` generalizes the next local diagram scan. It enumerates
 two-layer flags where the upper layer already carries a child 2-plane plus one marked line and the
-lower tau-zero layer only asks for another line inside that plane. For the carried-path row:
+lower tau-zero layer only asks for another line inside that plane. The CSV includes the carrier and
+successor diagram keys. For the carried-path row:
 
 ```text
 python -B scripts/rfc_distance_analysis/rfc_marked_plane_state_diagnostic.py \

@@ -128,8 +128,18 @@ independent directions in later folds.
 
 ## Diagnostic Contract
 
+`scripts/rfc_distance_analysis/rfc_diagram_state.py` implements the diagnostic state skeleton:
+
+```text
+node: dim, zero budget
+edge: child <= parent
+canonicalization: equal-dimension containment forces node merge
+line insertion: add a marked line under a fixed 2-plane for q+1 choices
+```
+
 `scripts/rfc_distance_analysis/rfc_marked_plane_state_diagnostic.py` scans the current two-layer
-flag recurrence for rows matching the transition pattern above. The exact carried-path row is:
+flag recurrence for rows matching the transition pattern above and emits the carrier and successor
+diagram keys. The exact carried-path row is:
 
 ```text
 python -B scripts/rfc_distance_analysis/rfc_marked_plane_state_diagnostic.py \
@@ -144,6 +154,8 @@ It reproduces:
 coarse bound:       -743.04099425 bits
 marked-plane bound: -1124.45603175 bits
 saving:              381.41503750 bits
+carrier diagram:     M:d1:z4;P:d2:z0|M<=P
+next diagram:        M:d1:z4;N:d1:z3;P:d2:z0|M<=P;N<=P
 ```
 
 This agrees with `rfc_carried_flag_diagnostic.py` and makes the next recurrence requirement

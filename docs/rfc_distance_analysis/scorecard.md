@@ -204,3 +204,8 @@ the hand calculation. The next required step is not another one-off local saving
 ordered marked-plane diagram states through the recurrence. Side audit agreed this is a real
 recurrence brick if used as a joint diagram transition, with explicit merge/equality rules and no
 product of child moments.
+
+First diagram-state skeleton implemented. `rfc_diagram_state.py` now has node/edge state,
+same-dimension containment merging with max zero budget, and the ordered marked-line insertion
+operation. The marked-plane scanner now emits canonical carrier and successor diagram keys. This is
+still not the full DP: it only gives the state representation and one transition brick.

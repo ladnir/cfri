@@ -40,6 +40,10 @@ from rfc_flag_span_moment import (  # noqa: E402
     flag_child_bound_report,
     log2_comb_table,
 )
+from rfc_diagram_state import (  # noqa: E402
+    add_marked_line_in_plane,
+    carrier_plane_with_line,
+)
 
 
 CSV_FIELDS = [
@@ -52,9 +56,12 @@ CSV_FIELDS = [
     "carrier_state_log2",
     "inner_local_log2",
     "line_choice_log2",
+    "line_factor",
     "marked_plane_bound_log2",
     "saving_log2",
     "saving_qdim",
+    "carrier_diagram",
+    "next_diagram",
     "plane_zero_budget",
     "carrier_line_zero_budget",
     "extra_line_zero_budget",
@@ -186,7 +193,22 @@ def main() -> None:
                     continue
 
                 inner_local = local_row_log2(inner_choice, child_n, comb, args.q_log2)
-                line_choice = args.q_log2
+                plane_zero_budget = outer_choice[6]
+                carrier_line_zero_budget = outer_choice[0] + outer_choice[1]
+                extra_line_zero_budget = inner_choice[6]
+                carrier_diagram = carrier_plane_with_line(
+                    plane_name="P",
+                    line_name="M",
+                    plane_zeros=plane_zero_budget,
+                    line_zeros=carrier_line_zero_budget,
+                )
+                next_diagram, line_choice_qdim, line_factor = add_marked_line_in_plane(
+                    carrier_diagram,
+                    plane_name="P",
+                    line_name="N",
+                    line_zeros=extra_line_zero_budget,
+                )
+                line_choice = line_choice_qdim * args.q_log2
                 marked_plane_bound = outer_value + inner_local + line_choice
                 saving = coarse_bound - marked_plane_bound
                 saving_qdim = saving / args.q_log2
@@ -206,12 +228,15 @@ def main() -> None:
                         "carrier_state_log2": f"{outer_value:.8f}",
                         "inner_local_log2": f"{inner_local:.8f}",
                         "line_choice_log2": f"{line_choice:.8f}",
+                        "line_factor": line_factor,
                         "marked_plane_bound_log2": f"{marked_plane_bound:.8f}",
                         "saving_log2": f"{saving:.8f}",
                         "saving_qdim": f"{saving_qdim:.8f}",
-                        "plane_zero_budget": outer_choice[6],
-                        "carrier_line_zero_budget": outer_choice[0] + outer_choice[1],
-                        "extra_line_zero_budget": inner_choice[6],
+                        "carrier_diagram": carrier_diagram.key(),
+                        "next_diagram": next_diagram.key(),
+                        "plane_zero_budget": plane_zero_budget,
+                        "carrier_line_zero_budget": carrier_line_zero_budget,
+                        "extra_line_zero_budget": extra_line_zero_budget,
                         "outer_choice": format_choice(outer_choice),
                         "inner_choice": format_choice(inner_choice),
                         "note": (

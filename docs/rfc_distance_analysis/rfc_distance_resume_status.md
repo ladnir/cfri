@@ -128,6 +128,13 @@ docs/rfc_distance_analysis/rfc_depth5_finite_flag_recurrence_target.md
   States the finite two-layer flag recurrence needed for the base seal, including tau=0/1/2
   branches and the depth-4 `B_4(2,u)` state table for `0<=u<=17`.
 
+docs/rfc_distance_analysis/rfc_exact_support_quotient_state.md
+  Status: canonical current theorem target.
+  Defines the exact-support quotient state needed after the nested diagnostics. It separates the
+  proof-safe subcases from diagnostic-only shortcuts: collapsed-active rerouting, upper-visible
+  nested quotient counting, nested parent-subspace counting, consumed-kernel containment, and the
+  remaining small-support tau-two / recursive tau-one quotient blockers.
+
 docs/rfc_distance_analysis/rfc_covering_flag_lift_lemma.md
   Status: theorem target.
   States the covering/projectivization lemma suggested by the cover-lift diagnostics. This is now
@@ -223,7 +230,8 @@ The live blockers are now narrow:
 
 The best current next proof step is item 1, with the correction above:
 
-Turn the diagnostic modes into theorem statements in the multi-layer transition note:
+Use `rfc_exact_support_quotient_state.md` as the canonical proof contract and turn its diagnostic
+subcases into theorem statements:
 
 ```text
 1. scalar collapsed-active exact-support rerouting;

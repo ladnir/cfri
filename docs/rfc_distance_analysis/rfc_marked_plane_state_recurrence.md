@@ -742,3 +742,14 @@ exact-support quotient-incidence state that simultaneously handles:
 4. small-support tau-two quotient-plane incidence;
 5. the remaining tau-one quotient chain after tau-two is idealized.
 ```
+
+The corresponding theorem contract is now isolated in:
+
+```text
+docs/rfc_distance_analysis/rfc_exact_support_quotient_state.md
+```
+
+That note is also where the upper-visible condition for nested quotient counting is made explicit:
+the lower quotient is counted inside the upper quotient only when
+`K_lower = W_lower cap K_upper`; otherwise the state must carry a consumed-kernel/quotient branch or
+use the independent quotient fallback.

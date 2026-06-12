@@ -349,6 +349,11 @@ moves it to `924.69069031`. The anti-conservative `--cover-lift-mode tau0tau2` c
 `567.15416718` and `crossing_z=41`, showing that tau-one quotient chains remain after tau-two is
 idealized.
 
+The proof contract for interpreting these modes is in
+`docs/rfc_distance_analysis/rfc_exact_support_quotient_state.md`. In particular, the nested quotient
+mode is only theorem-shaped after the state records whether the lower quotient is upper-visible;
+otherwise the safe fallback is independent quotient counting or a consumed-kernel/quotient branch.
+
 `rfc_multicopy_falsification.py` is adversarial. It estimates whether broad one-copy near-families
 can intersect across many independent RFC copies often enough to threaten the target excess.
 

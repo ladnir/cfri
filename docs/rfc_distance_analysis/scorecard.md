@@ -50,7 +50,7 @@ Open items are excluded from the denominator.
 | Two-marked-line plane diagram | 1 | 1 | 0 | 50% | Keep, local but insufficient | `rfc_two_marked_line_plane_lemma.md` replaces a coarse `q^4` ancestor choice by `q+1`, saving another `381.42` bits on the carried path. |
 | Finite marked-plane state recurrence | 1 | 8 | 0 | 11% | Keep, frontier moved to quotient-incidence state | `rfc_marked_plane_state_recurrence.md`, `rfc_marked_plane_state_diagnostic.py`, `rfc_diagram_path_dp.py`, `rfc_flag_state_choice_diagnostic.py`, and `rfc_flag_bad_pair_classifier.py` turn the hand-expanded two-line diagram into a state scan/path diagnostic. Joint choices help at level 2; nested quotient/subspace/consumed-kernel diagnostics move depth-5 `z=34` from `1740.40` to `1232.89`, but do not close. |
 | Scalar collapsed-active rerouting | 0 | 1 | 0 | 0% | Promising theorem plumbing | Applying the collapsed-active filter inside scalar lifts, not just pair tables, removes the dominant `(4,3)>=(4,4)` scalar overcount and tightens the `(4,7)>=(2,8)` baseline from `810.95` to `549.21`. Needs proof as exact-support rerouting. |
-| Nested quotient/subspace/consumed-kernel counting | 0 | 1 | 0 | 0% | Strong diagnostic, theorem target | The three modes `inner-in-outer`, `inner-in-outer`, and `tau0-inner-contained` lower the level-3 stress table to `303.44` and full depth-5 `z=34` to `1232.89`. They identify the needed joint parent-flag incidence theorem. |
+| Nested quotient/subspace/consumed-kernel counting | 0 | 1 | 0 | 0% | Strong diagnostic, conditional theorem target | The three modes `inner-in-outer`, `inner-in-outer`, and `tau0-inner-contained` lower the level-3 stress table to `303.44` and full depth-5 `z=34` to `1232.89`. `rfc_exact_support_quotient_state.md` now states the needed compatibility labels, especially `K_lower = W_lower cap K_upper` for upper-visible nested quotient counting. |
 | Kernel-lift-only cover | 0 | 1 | 1 | 0% | Useful after richer state, still not enough | Earlier `--cover-kernel-lift` kept crossing at `z=137`; after nested diagnostics it lowers `z=34` to `924.69`, but crossing remains `z=133` and tau-two/tau-one quotient chains dominate. |
 | One-layer shortened child flag ambient | 0 | 0 | 1 | 0% | Not useful for current base seal | Diagnostic `--flag-bound best-shortened` leaves the depth-5 checkpoint at `z=137` and the `z=34` trace unchanged. |
 | High-kernel/local-incidence bonus | 0 | 0 | 0 | open | Next candidate | Need prove hard row carrying large shortened ambient pays more than uniform `q^-9`. |
@@ -359,3 +359,10 @@ with anti-conservative tau0tau2 lift cover:      567.15416718
 The anti-conservative tau-two run reaches only `crossing_z=41`, so even an idealized tau-two lift
 removal would not finish the certificate. The next theorem has to carry exact-support quotient
 data recursively, including the remaining tau-one chain.
+
+Canonical quotient-state target added in `rfc_exact_support_quotient_state.md`. It turns the latest
+diagnostic modes into proof obligations and identifies where each one is safe: collapsed-active
+rerouting is an exact-support canonicalization, nested quotient counting requires an upper-visible
+compatibility label, nested subspace counting is a parent-flag containment count, and consumed
+kernel containment requires witness nesting that places a lower tau-zero layer inside the upper
+kernel.

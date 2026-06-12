@@ -1444,3 +1444,19 @@ crossing_z = 41.
 Thus proving only the old `(4,7)>=(2,8)` pair-table improvement cannot finish the certificate; the
 multi-layer quotient state must also control tau-two and tau-one quotient incidence over several
 levels.
+
+The refined state and the compatibility conditions for these diagnostics are now isolated in:
+
+```text
+docs/rfc_distance_analysis/rfc_exact_support_quotient_state.md
+```
+
+In particular, nested quotient counting is theorem-safe only after the state records whether the
+lower quotient is upper-visible:
+
+```text
+K_lower = W_lower cap K_upper.
+```
+
+If the equality fails, the missing part is consumed by the upper kernel and must be carried or
+charged separately.

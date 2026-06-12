@@ -169,6 +169,17 @@ So the line-carry theorem is not a small local patch. It must say that once the 
 full ambient line, the relevant descendant rows are conditioned on that same full line, not only on
 the same visible root image.
 
+The projective-fiber counting statement is now isolated in:
+
+```text
+docs/rfc_distance_analysis/rfc_tau1_full_line_carry_lemma.md
+```
+
+That lemma says an independent descendant tau-one line count can be replaced by a conditional count
+`q^kappa_phi`, where `kappa_phi` is the kernel dimension of the transition map from the descendant
+ambient to the already-carried parent ambient. The first target only improves if `kappa_phi < 3`,
+and it realizes the full diagnostic saving only if `kappa_phi = 0`.
+
 ## Next Diagnostic
 
 The next useful diagnostic should not globally set tau-one quotient cost to zero. Instead, it
@@ -177,7 +188,7 @@ should build a small conditional table for a flagged state with one marked quoti
 ```text
 unconditioned child row qdim
 conditioned-on-R child row qdim
-new fiber dimension
+kappa_phi for the transition map
 root/support compatibility loss
 ```
 
@@ -187,4 +198,5 @@ The first target is:
 state: (4,7)>=(2,8)
 dominant child row: outer tau-one, child flag (4,5)>=(3,4)
 budget to explain: outer_tau1_charged_postroot_qdim = 3
+needed next: compute/prove kappa_phi for this row
 ```

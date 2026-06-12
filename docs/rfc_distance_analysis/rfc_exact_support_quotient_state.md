@@ -410,6 +410,12 @@ The carried-line state target is separated out in
 that this is invisible-fiber budget, so the state must carry the full ambient quotient line `R`,
 not just the root-visible image, if it is to save those dimensions.
 
+The generic linear-algebra piece is in `rfc_tau1_full_line_carry_lemma.md`: after conditioning on a
+parent-paid full line `R`, a descendant line contributes `q^kappa_phi`, where `kappa_phi` is the
+kernel dimension of the transition map from the descendant line ambient to the carried parent
+ambient. The proof-safe recurrence must therefore carry `R` and track `kappa_phi`, not delete
+tau-one incidence wholesale.
+
 ## Certificate Recurrence Shape
 
 For an atomic exact-support quotient profile `Phi`, the theorem should prove:

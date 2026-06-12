@@ -347,6 +347,51 @@ no longer an unexplained local-algebra blocker, but it still contributes two liv
 2. control possible global chains of theta_2=-1 first-drop layers.
 ```
 
+### L3d. Tau-One Full-Line Carry Lemma
+
+The tau-one quotient-line incidence lemma counts full projective lines in the contained-support
+ambient `E_A`. For the recursive recurrence, the state must be able to carry such a full line:
+
+```text
+R <= E_A,
+```
+
+not merely its visible/root image. The linear-algebra lemma is:
+
+```text
+phi : E'_A -> E_A,
+R <= E_A fixed,
+K_phi = ker(phi).
+```
+
+The number of descendant projective lines `R' <= E'_A` satisfying:
+
+```text
+phi(R') = R
+```
+
+is:
+
+```text
+q^dim K_phi,
+```
+
+provided the preimage of `R` is nonempty. Thus a descendant tau-one line family already paid by a
+parent line may be replaced by a conditional fiber count. This is the theorem-safe version of the
+line-carry diagnostic: quotient-line incidence is not deleted; an independent line count is
+replaced by a conditional projective-fiber count.
+
+The first target row is documented in:
+
+```text
+docs/rfc_distance_analysis/rfc_tau1_full_line_carry_lemma.md
+docs/rfc_distance_analysis/rfc_tau1_carried_line_state.md
+```
+
+For `(4,7)>=(2,8)`, visible-only carrying has zero saving because the diagnostic budget is entirely
+invisible-fiber dimension. The recurrence must carry the full ambient line and prove the transition
+kernel dimension `kappa_phi` for the row.
+
 ### L4. Finite-Replica Multi-Layer Flag Recurrence
 
 The global recurrence tracks nested flag moments:

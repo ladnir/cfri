@@ -537,7 +537,9 @@ outer_tau1_full_line_saving_qdim    = 3
 
 So a carried state that remembers only the root-visible image would save zero on this row. The
 proof target must carry the full ambient quotient line `R <= E_A`, or explicitly charge the new
-fiber dimension. The target is documented in `docs/rfc_distance_analysis/rfc_tau1_carried_line_state.md`.
+fiber dimension. The projective-fiber lemma behind this interpretation is documented in
+`docs/rfc_distance_analysis/rfc_tau1_full_line_carry_lemma.md`; the row target is documented in
+`docs/rfc_distance_analysis/rfc_tau1_carried_line_state.md`.
 
 `rfc_multicopy_falsification.py` is adversarial. It estimates whether broad one-copy near-families
 can intersect across many independent RFC copies often enough to threaten the target excess.

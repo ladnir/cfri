@@ -404,6 +404,17 @@ Therefore carrying only the root-visible image of the line saves zero q-dimensio
 The state must carry the full ambient quotient line `R <= E_A`, or else explicitly pay the new
 fiber dimension by which the child line differs from `R`.
 
+The projective-fiber lemma is now written in:
+
+```text
+docs/rfc_distance_analysis/rfc_tau1_full_line_carry_lemma.md
+```
+
+It reduces the conditional descendant line count to `q^kappa_phi`, where `kappa_phi` is the kernel
+dimension of the transition map `phi : E'_A -> E_A` from the descendant quotient-line ambient to
+the carried parent ambient. The next concrete diagnostic/proof step is to identify `phi` and
+`kappa_phi` for the `(4,7)>=(2,8)` dominant row.
+
 After that, return to the theta_2=-1 kernel-chain truncation and the connected full-kernel local
 endpoint. Those remain real blockers, but they are not the first item on the active frontier.
 

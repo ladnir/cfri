@@ -601,6 +601,50 @@ included in the state and counted as event data. This is the same distinction us
 `rfc_tracked_kernel_chain_state.md`: unconsumed selected kernel lines are duplicate certificates,
 while consumed selected lines are real state.
 
+### Collapsed-Active Exact-Flag Rerouting
+
+This subsection gives the theorem form of the diagnostic `--exclude-collapsed-active`.
+
+In one active transition, the child containers satisfy:
+
+```text
+L <= V,
+V zero on P union (S \ A),
+L zero on P union S.
+```
+
+If:
+
+```text
+dim L = dim V,
+```
+
+then exact containment gives:
+
+```text
+L = V.
+```
+
+Consequently `V` is also zero on all of `S`. A tau-positive row whose active singleton support
+`A` is visible only through the distinction between `V` and `L` is therefore not an exact-support
+row of this shape. It must be rerouted to a canonical profile with either:
+
+```text
+tau = 0,
+```
+
+or a strictly smaller exact visible support after recomputing the singleton image.
+
+The recurrence consequence is:
+
+```text
+tau > 0, |A| > 0, dim L = dim V, and z_L > z_V
+```
+
+is a duplicate/inexact certificate, not a separate tau-positive event. Removing this family is not
+a distance discount. It is exact-support normalization: the same parent witness is counted in the
+profile where its actual visible singleton support is used.
+
 ### Two-Layer Sibling Consumption Test
 
 For a nested parent flag:

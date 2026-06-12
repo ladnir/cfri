@@ -177,12 +177,13 @@ The live blockers are now narrow:
 ```text
 1. Kernel-lift container cover for the level-3 carried flag `(4,7)>=(2,8)`. The bad mass is
    concentrated in high-lift rows, but a fixed-table diagnostic that removes only tau-positive
-   kernel-lift multiplicity closes the row with `1.92454905` q-dimensions of slack. The next theorem
-   target is: after fixing the child flag and canonical local quotient/root datum, count the
-   container tuple once instead of multiplying by the Gaussian family of `K <= L+L` kernel lifts.
-   Quotient-line and quotient-plane incidence must remain counted. If a descendant or sibling
-   profile consumes a marked subspace inside the parent kernel lift, that datum is no longer a
-   duplicate fiber and must be part of the state.
+   kernel-lift multiplicity closes the row with `1.92454905` q-dimensions of slack. The stricter
+   proof-shaped diagnostic is now:
+   `--exclude-collapsed-active --kernel-cover-mode sibling-unconsumed`, which closes with
+   `0.90435403` q-dimensions of slack. The theorem target is therefore two lemmas:
+   collapsed-active exact-support rerouting, and sibling-unconsumed kernel-fiber covering after the
+   canonical local quotient/root datum is fixed. Quotient-line and quotient-plane incidence remain
+   counted. Consumed kernel subspaces must be carried or charged, not covered.
 2. Prove/finalize the shared-randomness-safe multi-layer flag transition theorem. The target note
    covers the joint marked-line/frame recurrence for the decomposable |A|=2,delta=2,comp=2 row,
    with the local marked-component certificate and uniform `(q+1)` frame-completion count written.
@@ -198,11 +199,11 @@ The live blockers are now narrow:
 
 The best current next proof step is item 1:
 
-Finalize the unconsumed-kernel container cover inside the multi-layer flag transition theorem:
-define the canonical quotient/root datum, prove the forgetful map from parent kernel lifts to the
-same container certificate, and specify the consumed-kernel exception. Then plug the covered lift
-exponent into the finite marked-plane state recurrence and rerun the level-3 `(4,7)>=(2,8)` stress
-row as a theorem-driven certificate, not just a posthoc diagnostic.
+Finalize the two lemma package for the level-3 stress row: prove collapsed-active exact-support
+rerouting, prove sibling-unconsumed kernel-fiber covering using
+`K_lower = W_lower cap K_upper`, then plug only those covered exponents into the finite
+marked-plane recurrence. The target checkpoint is the stricter diagnostic
+`1071.43723477 < 1187.19455102`, not the broader all-displayed-kernel cover.
 
 After that, return to the theta_2=-1 kernel-chain truncation and the connected full-kernel local
 endpoint. Those remain real blockers, but they are not the first item on the active frontier.

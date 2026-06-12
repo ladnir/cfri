@@ -386,6 +386,20 @@ fiber. A lower layer with `dim W_j > tau_j` marks positive-dimensional data insi
 and must be treated as consumed kernel data unless that marked subspace is already represented in
 the carried container state.
 
+The same exact-flag normalization removes collapsed-active tau-positive rows. For an active layer:
+
+```text
+L_i <= V_i,
+V_i zero on P_i union (S_i \ A_i),
+L_i zero on P_i union S_i.
+```
+
+If `dim L_i = dim V_i`, then `L_i = V_i`, hence `V_i` is zero on all of `S_i`. A profile with
+`tau_i > 0` and nonempty exact support `A_i` cannot be charged as a distinct active-support event
+in this collapsed flag. It must be represented by the canonical row obtained after recomputing the
+actual singleton visible support, normally a tau-zero row or a smaller-support row. This is the
+proof version of the collapsed-active filter used in the diagnostics.
+
 ## Required Ingredients
 
 ### Exact Support Indexing

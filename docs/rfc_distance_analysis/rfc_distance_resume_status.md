@@ -141,6 +141,18 @@ docs/rfc_distance_analysis/rfc_depth5_flag_checkpoint_trace.md
   Records the corrected depth-5 traces. Safe tau-zero covering leaves z=34 far too large and moves
   the dominant path into tau-one quotient-incidence chains. Kernel-lift-only covering has no
   crossing effect.
+
+docs/rfc_distance_analysis/rfc_marked_plane_state_recurrence.md
+  Status: active finite-diagram recurrence target.
+  Records the carried-flag and marked-plane route. The local q+1 two-lines-in-plane brick is real
+  and saves at level 2, but a naive level-3 sum over flag-state expansion choices is worse than the
+  coarse table.
+
+docs/rfc_distance_analysis/rfc_flag_bad_pair_classifier_level3_4_7_ge_2_8.csv
+  Status: current obstruction classifier.
+  The level-3 bad pair mass is concentrated in one tau-one high-lift outer witness:
+  `p=3,s=1,a=1,tau=1,child=(4,4),z=3,charge=1,lift=19`. The top 12 pair products already equal
+  the displayed truncated pair sum.
 ```
 
 The external Fable audit was useful and found the product-of-first-moments bug. Its record is:
@@ -154,17 +166,19 @@ docs/rfc_distance_analysis/rfc_fable_audit_2026_06_10.md
 The live blockers are now narrow:
 
 ```text
-1. Prove/finalize the shared-randomness-safe multi-layer flag transition theorem. The target note
-   now covers both:
-   - the joint marked-line/frame recurrence for the decomposable |A|=2,delta=2,comp=2 row, with
-     the local marked-component certificate and uniform `(q+1)` frame-completion count written;
-   - kernel-branch theta_2=-1 nested-flag chains.
-2. Kernel-branch nested-flag truncation:
+1. High-lift tau-one selection/charge for the level-3 carried flag `(4,7)>=(2,8)`. The bad mass is
+   concentrated in the outer row `p=3,s=1,a=1,tau=1,child=(4,4),z=3,charge=1,lift=19`. The next
+   theorem target is to count that witness canonically once per parent flag, or charge the
+   `lift=19` multiplicity by exact zero/support data before summing inner refinements.
+2. Prove/finalize the shared-randomness-safe multi-layer flag transition theorem. The target note
+   covers the joint marked-line/frame recurrence for the decomposable |A|=2,delta=2,comp=2 row,
+   with the local marked-component certificate and uniform `(q+1)` frame-completion count written.
+3. Kernel-branch nested-flag truncation:
    prove length three is enough, or prove length-four theta_2=-1 chains are dominated.
-3. Direct proof of the delta=3 connected full-kernel endpoint used by the g=1 row, or a general
+4. Direct proof of the delta=3 connected full-kernel endpoint used by the g=1 row, or a general
    component/full-kernel theorem with constants.
-4. Higher-drop tau-two layers beyond the g=1 first-drop case.
-5. Finite constants: marked-line root-fiber constants, exact-support inversion, split counts, and
+5. Higher-drop tau-two layers beyond the g=1 first-drop case.
+6. Finite constants: marked-line root-fiber constants, exact-support inversion, split counts, and
    log-sum/state-count overhead. The determinant-1 nonzero-root normalization is now stated
    separately and is no longer a q-dimensional blocker at the target field size.
 ```

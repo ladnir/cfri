@@ -264,6 +264,46 @@ witnesses are summed naively. The next proof step must supply a canonical witnes
 exact-support grouping, or charging lemma that removes the high-mass duplicate/incompatible pair
 family. Without such a lemma, the marked-plane route does not close the level-3 carried flag.
 
+The next classifier is:
+
+```text
+scripts/rfc_distance_analysis/rfc_flag_bad_pair_classifier.py
+```
+
+It groups the same pair products by child flag, outer choice, inner choice, support profile, tau
+profile, and lift profile. The saved diagnostics are:
+
+```text
+docs/rfc_distance_analysis/rfc_flag_bad_pair_classifier_level2_4_4_ge_2_5.csv
+docs/rfc_distance_analysis/rfc_flag_bad_pair_classifier_level3_4_7_ge_2_8.csv
+```
+
+The important level-3 output is concentration, not improvement:
+
+```text
+level 3, (4,7)>=(2,8):
+  truncated pair sum:          2094.40570138 bits
+  coarse/table baseline:       1187.19455102 bits
+  naive loss:                  907.21115036 bits = 7.08758711 q-dim
+  top 12 pair products:        2094.40570138 bits
+  dominant outer-choice group: 2094.40570138 bits
+```
+
+The dominant outer choice is:
+
+```text
+p=3, s=1, a=1, tau=1,
+child=(4,4), z=3,
+charge=1, delta=1, comp=1,
+lift=19.
+```
+
+So the bad mass is not a broad failure of the marked-plane local brick. It is a high-lift tau-one
+outer witness family that admits many inner refinements whose child diagrams collapse back to
+`(4,4)` or a short two-layer flag. A proof now has a concrete target: either choose this witness
+canonically once per parent flag, or prove that the high-lift multiplicity is already charged by
+the exact zero/support data and should not be summed independently across these refinements.
+
 ## Audit Result
 
 A side audit agreed that the local rule is promising provided it is integrated as an atomic diagram

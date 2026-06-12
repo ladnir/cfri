@@ -28,6 +28,7 @@ rfc_diagram_state.py                finite incidence-diagram state skeleton and 
 rfc_marked_plane_state_diagnostic.py scans finite marked-line-in-plane state savings
 rfc_diagram_path_dp.py              follows bound trace with carried-flag and marked-plane savings
 rfc_flag_state_choice_diagnostic.py target flag-state joint expansion choice diagnostic
+rfc_flag_bad_pair_classifier.py     groups high-mass flag-state pair witnesses by structural keys
 rfc_theta_chain_normal_slice.py     shortened-ambient/defect-slice checker with optimistic rho and strict hard-trace columns
 rfc_defect_conservation.py          fixed-witness rank-defect conservation checker for exposed shortened ambients
 rfc_shortened_rank_recurrence.py    optimistic rho_h(D,z) recurrence with paired-spine compression
@@ -218,6 +219,30 @@ residual:        15.18484798 q-dimensions
 With `--flag-bound best-marked-plane`, the post-hoc positive rows disappear because the recurrence
 has already used the local q+1 brick where it can. The remaining gap shows that the next required
 object is a genuine multi-layer diagram DP, not another scalar child-flag tweak.
+
+`rfc_flag_bad_pair_classifier.py` groups the pair products from
+`rfc_flag_state_choice_diagnostic.py`. It is meant for the current level-3 stress state:
+
+```text
+python -B scripts/rfc_distance_analysis/rfc_flag_bad_pair_classifier.py \
+  --level 3 \
+  --outer-state 4,7 \
+  --inner-state 2,8 \
+  --term-limit 300
+```
+
+The saved classifier outputs are:
+
+```text
+docs/rfc_distance_analysis/rfc_flag_bad_pair_classifier_level2_4_4_ge_2_5.csv
+docs/rfc_distance_analysis/rfc_flag_bad_pair_classifier_level3_4_7_ge_2_8.csv
+```
+
+The level-2 row is healthy: the truncated pair sum saves `506.75207249` bits. The level-3 row is
+the obstruction: the top 12 pair products already equal the displayed truncated pair sum, and all
+of that mass is owned by one outer tau-one witness
+`p=3,s=1,a=1,tau=1,child=(4,4),z=3,charge=1,lift=19`. This script does not certify a bound; it
+identifies the witness family a canonical-selection or charging lemma must control.
 The first table attempt, `--flag-bound best-two-layer-table`, confirms this: the level-2 table saves
 the expected marked-plane q-dimensions on states such as `(4,4)>=(2,5)`, but by level 3 the target
 flags report zero additional table saving because the scalar dominant choices have already routed

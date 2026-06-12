@@ -93,6 +93,7 @@ scripts/rfc_distance_analysis/rfc_diagram_state.py incidence-diagram state skele
 scripts/rfc_distance_analysis/rfc_marked_plane_state_diagnostic.py marked-line-in-plane state scanner
 scripts/rfc_distance_analysis/rfc_diagram_path_dp.py carried-diagram path diagnostic
 scripts/rfc_distance_analysis/rfc_flag_state_choice_diagnostic.py target flag-state choice diagnostic
+scripts/rfc_distance_analysis/rfc_flag_bad_pair_classifier.py high-mass pair-family classifier
 scripts/rfc_distance_analysis/rfc_defect_conservation.py fixed-witness defect-conservation diagnostic
 scripts/rfc_distance_analysis/rfc_shortened_rank_recurrence.py optimistic shortened-kernel rank recurrence
 rfc_rank_pattern_induction_target.md          current finite-replica induction target
@@ -118,6 +119,8 @@ rfc_replica_rank1_profile.py    r=2 root-compatibility singleton profile
 rfc_replica_span_moment.py      ordered-tuple span-aware diagnostic
 rfc_subspace_span_moment.py     subspace-span diagnostic exposing visible-kernel state
 rfc_flag_span_moment.py         two-layer flag diagnostic for kernel-zero propagation
+rfc_flag_bad_pair_classifier_level2_4_4_ge_2_5.csv level-2 healthy marked-plane pair classification
+rfc_flag_bad_pair_classifier_level3_4_7_ge_2_8.csv level-3 high-lift tau-one obstruction classification
 rfc_theta_chain_normal_slice.py shortened-ambient and defect-slice checker for theta-chain truncation
 rfc_visible_span_profile.py     exact local visible-span subspace profiler with support summaries
 rfc_support_profile_bound.py    support-containment Gaussian bound from delta(A)

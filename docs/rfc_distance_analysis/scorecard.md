@@ -48,7 +48,7 @@ Open items are excluded from the denominator.
 | Tau-one fixed-flag quotient-line incidence | 0 | 1 | 0 | 0% | Safe local brick, not a closer | `rfc_tau1_quotient_line_incidence_lemma.md` proves the post-root exponent `f_A + m_A - 1 - |A|`; `--report-tau1-incidence` shows the `z=34` tau-one trace rows have `support_saving=0`. |
 | Carried two-layer flag merge | 1 | 1 | 0 | 50% | Keep, exposes next diagram | `rfc_carried_flag_diagnostic.py` carries `F_3((4,7),(2,8))`, improves `(4,3)>=(2,5)` to `(4,4)>=(2,5)`, and saves `251.98` bits; next state is a two-marked-line diagram. |
 | Two-marked-line plane diagram | 1 | 1 | 0 | 50% | Keep, local but insufficient | `rfc_two_marked_line_plane_lemma.md` replaces a coarse `q^4` ancestor choice by `q+1`, saving another `381.42` bits on the carried path. |
-| Finite marked-plane state recurrence | 1 | 4 | 0 | 20% | Keep, needs canonical witness selection | `rfc_marked_plane_state_recurrence.md`, `rfc_marked_plane_state_diagnostic.py`, `rfc_diagram_path_dp.py`, and `rfc_flag_state_choice_diagnostic.py` turn the hand-expanded two-line diagram into a state scan/path diagnostic. Joint choices help at level 2 but level-3 pair-sum is worse unless high-mass duplicate witnesses are charged or canonically selected. |
+| Finite marked-plane state recurrence | 1 | 5 | 0 | 17% | Keep, needs high-lift tau-one charge/selection | `rfc_marked_plane_state_recurrence.md`, `rfc_marked_plane_state_diagnostic.py`, `rfc_diagram_path_dp.py`, `rfc_flag_state_choice_diagnostic.py`, and `rfc_flag_bad_pair_classifier.py` turn the hand-expanded two-line diagram into a state scan/path diagnostic. Joint choices help at level 2; level-3 pair-sum is worse, but the classifier localizes the bad mass to one high-lift tau-one outer witness family. |
 | Kernel-lift-only cover | 0 | 0 | 1 | 0% | Not useful for current base seal | `--cover-kernel-lift` keeps quotient incidence and leaves depth-5 checkpoint at `z=137`; combined with safe tau-zero covering it still only reaches `z=135`. |
 | One-layer shortened child flag ambient | 0 | 0 | 1 | 0% | Not useful for current base seal | Diagnostic `--flag-bound best-shortened` leaves the depth-5 checkpoint at `z=137` and the `z=34` trace unchanged. |
 | High-kernel/local-incidence bonus | 0 | 0 | 0 | open | Next candidate | Need prove hard row carrying large shortened ambient pays more than uniform `q^-9`. |
@@ -250,3 +250,16 @@ summed strength locally. For the level-3 carried target `(4,7)>=(2,8)`, the trun
 This is the strongest warning so far: a proof needs canonical witness selection, exact-support
 grouping, or a charging argument for the high-mass pair family. Naively summing joint expansion
 choices is worse than the current baseline.
+
+Bad-pair classifier added. The level-3 high-mass family is sharply concentrated: the top 12 pair
+products already equal the displayed truncated pair sum, and the dominant outer-choice group alone
+has log2 mass `2094.40570138`. Its outer row is the tau-one high-lift witness
+
+```text
+p=3, s=1, a=1, tau=1, child=(4,4), z=3, charge=1, lift=19.
+```
+
+This changes the next proof obligation. We no longer need to explain a diffuse pair-sum failure
+first; we need to show that this high-lift tau-one witness is counted canonically once per parent
+flag or that its lift multiplicity is charged by exact support/zero data before inner refinements
+are summed.

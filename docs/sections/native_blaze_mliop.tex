@@ -764,6 +764,249 @@ query paths.  Those are possible ways to realize the two ideal layers:
 therefore not a second RAA protocol.  It is an implementation of the ideal
 calls used by this figure.
 
+\section{Blaze Proof Replay In Handle Form}
+
+\subsection{The Generic Proximity Gap Behind Row Folding}
+
+The extraction argument for the row fold needs one coding-theory input.  This is
+the point where it is tempting to reopen the internals of RAA, but we should not
+do that here.  For this step, the only RAA-specific fact we need is the setup
+event that the packed RAA code
+\[
+  \PRAA:\F^{\B^k}\to\F^{\B^n}
+\]
+is linear over \(\F\) and has relative distance \(d\).  Blaze proves this by
+its RAA distance analysis~[Blaze24, Section~9].  Once that event holds, the
+row-folding proximity argument is generic.
+
+\begin{lemma}[Row-folding proximity gap; cf. Blaze Corollary~2.6]
+\label{lem:row-fold-proximity-gap}
+Let \(C\subseteq\F^{\B^n}\) be any linear code with relative distance \(d\), and
+let \(C^L\subseteq\F^{\B^\ell\times\B^n}\) be its row-wise interleaving, where
+\(L=2^\ell\).  Let
+\[
+  c\in\F^{\B^\ell\times\B^n}
+\]
+be a committed matrix satisfying
+\[
+  \Delta(c,C^L)>\delta.
+\]
+If \(\varepsilon>0\) and \(\delta-\varepsilon<d/3\), then for a uniformly random
+\(\rho\in\F^{\B^\ell}\), the folded word
+\[
+  c_\star[b]
+  =
+  \sum_{h\in\B^\ell}\rho[h]\,c[h,b]
+  \qquad(b\in\B^n)
+\]
+satisfies
+\[
+  \Delta(c_\star,C)>\delta-\varepsilon
+\]
+except with probability at most \(1/(\varepsilon|\F|)\).
+\end{lemma}
+
+\begin{proof}[Proof input]
+This is the linear proximity-gap theorem used by Blaze as Corollary~2.6,
+derived from Ben-Sasson, Kopparty, and Saraf~[BKS18,Blaze24].  We use it as a
+black-box coding theorem with the hypotheses and conclusion stated above.  The
+surprising part is that the lemma uses only linearity and distance.  It does
+not use the fact that RAA was built from repetition, random permutations, and
+accumulators.
+
+Here is the proof intuition.  A random row fold samples a random vector from the
+row span of \(c\).  The bad event is not merely that a few coordinate errors
+cancel.  The bad event is that this random row-span vector lands unusually close
+to the code \(C\).  The proximity-gap theorem says that a linear code of
+distance \(d\) has no large medium-distance cloud below the \(d/3\) threshold:
+if an affine or linear space contains one vector far from the code, then almost
+every vector in that space is still far from the code.  Thus, once \(c\) is far
+from \(C^L\), a random row combination remains far from \(C\) with high
+probability.
+\end{proof}
+
+The actual Blaze soundness proof applies this generic lemma after normalizing
+the evaluation target.  If the prover sends row-evaluation values \(u\), Blaze
+looks at
+\[
+  c-u\otimes C(1),
+\]
+where \(C(1)\) is the encoding of the all-ones message.  This shifts the target
+evaluation to zero, so the distance question becomes distance from a linear
+space rather than an affine space.  After the random row fold, the proof shifts
+back and obtains a folded claim of the form
+\[
+  c_\star \text{ is close to some } C(m_\star)
+  \quad\text{with}\quad
+  \MLE(m_\star)(z_{\mathrm{in}})=v_\star.
+\]
+This is the proximity statement that the hybrid extractor will use.
+
+\subsection{The Hybrid Extractor}
+
+We now define the extractor before proving that it works.  The extractor is
+allowed to be computationally unbounded.  It runs in the
+\(\mathcal F_{\mathrm{MLIOP}}\)-hybrid model and treats
+\(\mathcal F_{\mathrm{MLIOP}}\) as a black box.  For an MLE handle
+\(\widehat O_h\), write
+\[
+  \mathsf{Ext}_{\mathrm{MLIOP}}(\widehat O_h)=h^\dagger
+\]
+for the tensor represented by that MLE handle.  The functionality is
+relation-agnostic: it does not know whether \(h^\dagger\) is an RAA stage, a
+product tree, or close to any code.  It only guarantees that
+\[
+  \mathcal F_{\mathrm{MLIOP}}.\mathsf{Eval}(\widehat O_h,r)
+  =
+  \MLE(h^\dagger)(r).
+\]
+All proximity claims below are proved outside \(\mathcal F_{\mathrm{MLIOP}}\),
+using the row fold and the generic proximity-gap lemma.
+
+For a matrix \(m\in\F^{\B^\ell\times\B^k}\), write \(\PRAA^L(m)\) for the
+row-wise interleaved packed RAA encoding:
+\[
+  \PRAA^L(m)[h,\ast]=\PRAA(m[h,\ast])
+  \qquad(h\in\B^\ell).
+\]
+
+\begin{protocolbox}{Extractor: Hybrid Blaze Extractor}{fig:extractor-hybrid-blaze}
+\small\raggedright
+\noindent Input: an accepting transcript \(T\) of
+Figure~\ref{fig:native-blaze-fmliop-hybrid}; the commitment handle
+\(C_m=R_c\); the verifier claim
+\((z_{\mathrm{slice}},z_{\mathrm{in}},v)\); the row-fold challenge
+\(\rho\in\F^{\B^\ell}\); and black-box access to
+\(\mathcal F_{\mathrm{MsgOracle}}\) and \(\mathcal F_{\mathrm{MLIOP}}\).
+
+\smallskip
+\noindent Output:
+\[
+  m\in\F^{\B^\ell\times\B^k},\quad
+  c_{\mathrm{near}}\in\F^{\B^\ell\times\B^n},\quad
+  m_\star\in\F^{\B^k},\quad
+  c_{\star,\mathrm{near}}\in\F^{\B^n}.
+\]
+
+\begin{enumerate}[leftmargin=0.24in,label=\textbf{E\arabic*.},itemsep=0.08em,topsep=0.1em,parsep=0pt]
+  \item Read the committed matrix \(c\in\F^{\B^\ell\times\B^n}\) from
+        \(R_c\) through \(\mathcal F_{\mathrm{MsgOracle}}\).
+  \item Define the actual folded committed word
+        \(c_\star\in\F^{\B^n}\) by
+        \[
+          c_\star[b]\gets
+          \sum_{h\in\B^\ell}\rho[h]\,c[h,b]
+          \qquad(b\in\B^n).
+        \]
+  \item From the transcript handles, set
+        \[
+        \begin{aligned}
+        u_i^\dagger&\gets
+        \mathsf{Ext}_{\mathrm{MLIOP}}(\widehat O_{u_i})
+        &&(i\in\{0,2,3,4,5\}),\\
+        f_j^\dagger&\gets
+        \mathsf{Ext}_{\mathrm{MLIOP}}(\widehat O_{f_j}),
+        \qquad
+        g_j^\dagger\gets
+        \mathsf{Ext}_{\mathrm{MLIOP}}(\widehat O_{g_j})
+        &&(j\in\{1,2\}).
+        \end{aligned}
+        \]
+  \item Set \(u_1^\dagger\gets F_{\mathrm{rep}}(u_0^\dagger)\).
+  \item Set
+        \[
+          m_\star\gets u_0^\dagger,
+          \qquad
+          c_{\star,\mathrm{near}}\gets\PRAA(m_\star).
+        \]
+  \item Choose
+        \[
+          m\in
+          \operatorname*{arg\,min}_{m'\in\F^{\B^\ell\times\B^k}}
+          \Delta\!\left(c,\PRAA^L(m')\right),
+        \]
+        and set \(c_{\mathrm{near}}\gets\PRAA^L(m)\).
+  \item Return
+        \((m,c_{\mathrm{near}},m_\star,c_{\star,\mathrm{near}})\).
+\end{enumerate}
+\end{protocolbox}
+
+Line E6 is deliberately unbounded: it is an extractor step, not an honest-prover
+algorithm.  The proof obligation is to show that, for accepting transcripts,
+the closest codeword chosen in E6 is actually close enough and has the claimed
+evaluation.
+
+\paragraph{Folded extraction.}
+First look at lines E2--E5.  The terminal evaluation request in
+Figure~\ref{fig:native-blaze-fmliop-hybrid} asks the verifier to check
+\[
+  \mathcal F_{\mathrm{MLIOP}}.\mathsf{Eval}
+  (\widehat O_{u_0},z_{\mathrm{in}})
+  =
+  v_\star.
+\]
+By the target functionality's contract, this means
+\[
+  \MLE(u_0^\dagger)(z_{\mathrm{in}})=v_\star.
+\]
+The accumulator, permutation, and six-sumcheck checks then force the extracted
+tensors to satisfy the RAA stage equations, except with the algebraic
+soundness error from the random challenges and sumcheck:
+\[
+  u_1^\dagger=F_{\mathrm{rep}}(u_0^\dagger),\quad
+  u_2^\dagger=M_{\pi_1}u_1^\dagger,\quad
+  u_3^\dagger=\Acc(u_2^\dagger),\quad
+  u_4^\dagger=M_{\pi_2}u_3^\dagger,\quad
+  u_5^\dagger=\Acc(u_4^\dagger).
+\]
+The handle \(\widehat O_{u_5}\) is the MLE handle committed from the virtual
+folded coordinate handle \(R_\star\).  Therefore the raw folded word
+\(c_\star\) from E2 and the extracted tensor \(u_5^\dagger\) are linked by the
+outer row-fold/proximity argument, not by a special RAA-aware MLIOP rule.
+Combining that proximity statement with the stage equations gives
+\[
+  c_\star \text{ is close to } \PRAA(m_\star),
+  \qquad
+  \MLE(m_\star)(z_{\mathrm{in}})=v_\star.
+\]
+This is what the local extractor learns from one accepting folded transcript.
+
+\paragraph{Global extraction.}
+Line E6 chooses a closest interleaved RAA codeword
+\[
+  c_{\mathrm{near}}=\PRAA^L(m)
+\]
+to the committed matrix \(c\).  Suppose, toward soundness, that \(c\) were far
+from every interleaved RAA codeword whose message evaluates to \(v\) at
+\((z_{\mathrm{slice}},z_{\mathrm{in}})\).  The prover's row-evaluation vector
+\(u\) must still pass the explicit interpolation check
+\[
+  v=
+  \sum_{h\in\B^\ell}\chi_h(z_{\mathrm{slice}})\,u[h].
+\]
+After the verifier samples \(\rho\), the folded value is
+\[
+  v_\star=\sum_{h\in\B^\ell}\rho[h]\,u[h].
+\]
+The generic proximity-gap lemma above says that a far committed matrix remains
+far after a random row fold, except with probability \(1/(\varepsilon|\F|)\).
+Equivalently, after Blaze's normalization by \(u\otimes C(1)\), the folded word
+\(c_\star\) is far from every \(\PRAA(m_\star)\) satisfying
+\[
+  \MLE(m_\star)(z_{\mathrm{in}})=v_\star.
+\]
+That contradicts the folded extraction conclusion unless one of the named
+soundness errors occurs.  Hence an accepting transcript implies that E6's
+closest codeword is close and that its decoded message \(m\) satisfies
+\[
+  \MLE(m)(z_{\mathrm{slice}},z_{\mathrm{in}})=v.
+\]
+
+This is the modular picture.  The folded extractor explains what a single
+accepting row fold certifies.  The global extractor uses the generic
+proximity-gap lemma to turn that folded certificate into a statement about the
+whole committed matrix.
+
 The Blaze paper uses a different presentation style.  It first constructs an
 MLIOP for \(\RMLE[\PRAA]\), then describes an MLIOP-to-IOPP transformation using
 encoded oracle strings, batching, and an IOPP for \(\RMLE[C]\)~[Blaze24,
@@ -791,29 +1034,1179 @@ translation:
 \end{array}
 \]
 
-\subsection{Boundary To The Compiled Protocol}
+\subsection{Self-Contained Import: Blaze Lemma~6.1 In Handle Form}
 
-The native section stops at
-Figure~\ref{fig:native-blaze-fmliop-hybrid}.  It has checked the native
-sumcheck transcript and all requested MLE evaluations inside the
-\(\mathcal F_{\mathrm{MLIOP}}\)-hybrid model.  A concrete protocol replaces the
-hybrid functionality by a real implementation.  The implementation described
-later realizes the needed Boolean-handle commits and MLE-evaluation calls using
-\(\MLEAuth\), \(\BackendRMLE\), BaseFold-style proximity, and coordinate
-openings.
+This subsection begins the proof import.  It is written as a local proof, not
+as a reading guide to the Blaze paper.  The reader should be able to follow the
+objects, the reduction, and the soundness argument from the definitions in this
+subsection.  Source labels such as ``Blaze Lemma~6.1'' and
+``Claim~6.1.x'' are provenance markers: they say which Blaze step we are
+mirroring, but the mathematical content is stated here before it is used.
+There is no intended divergence from Blaze in this subsection.
 
-This is why \(\EvalReqs\) remain the right internal boundary object for the RAA
-algebra.  A native MLIOP request says only, ``the verifier needs
-\(J(r)=v\).''  In the hybrid protocol, the final evaluation loop checks that
-request by calling \(\mathcal F_{\mathrm{MLIOP}}\).  In a concrete implementation, the
-realization of \(\mathcal F_{\mathrm{MLIOP}}\) adds coordinate-opening handles,
-batches such requests, and uses an RMLE backend to authenticate the batched MLE
-claim.  The RAA algebra does not need to know whether that handle is
-ordinary, composite, or virtual.
-
-This separation is the main invariant to preserve:
+\paragraph{Local statement.}
+\begin{lemma}[Interleaving RMLE reduction in handle form; cf. Blaze Lemma~6.1]
+\label{lem:blaze-interleaving-handle}
+Let
 \[
-  \text{RAA algebra creates evaluation requests;}
-  \qquad
-  \text{the backend authenticates them.}
+  C:\F^{\B^k}\to\F^{\B^n}
 \]
+be a linear code with relative distance \(\lambda\).  Assume there is a
+proximity protocol for \(\RMLE[C]\): on public \((z,v)\in\F^k\times\F\) and
+oracle access to a word \(y\in\F^{\B^n}\), the protocol rejects whenever \(y\)
+is far from every codeword \(C(m)\) with \(\MLE(m)(z)=v\), except with its
+soundness error.  The interleaving reduction below turns this base protocol
+into a proximity protocol for \(\RMLE[C^t]\).
+
+Fix a top-level proximity parameter
+\[
+  \delta<\lambda/3,
+  \qquad
+  \delta_{\mathrm{base}}=0.99\,\delta,
+  \qquad
+  \eta=\delta-\delta_{\mathrm{base}}.
+\]
+Blaze writes \(\delta'\) for \(\delta_{\mathrm{base}}\).  Lemma~6.1 runs the
+base protocol at proximity \(\delta_{\mathrm{base}}\).  If the base protocol's
+soundness error is \(\varepsilon(\delta_{\mathrm{base}},k)\), the interleaved
+protocol's soundness error is
+\[
+  \varepsilon(\delta_{\mathrm{base}},k)
+  +
+  \frac{1}{\eta|\F|}.
+\]
+The second term is the row-fold loss from the linear proximity-gap theorem
+stated below.  The other parameters are the base parameters evaluated at
+\(\delta_{\mathrm{base}}\), with the same
+index and proof alphabet \(\F\), one extra round, input queries lifted from one
+base coordinate to one interleaved column read, and the additional
+non-oracle communication for the prover's vector \(u\in\F^t\) and the
+verifier's fold vector \(\rho\in\F^t\).  This is Blaze's \(2t+\mathsf{cc}(k)\)
+term.  The prover time gains the \(O(tn)\) row-combination work, and the
+verifier time gains the \(O(t\cdot q_{\mathrm{input}})\) cost of emulating base
+input queries by reading columns of \(c\).  We will not need the full parameter
+table for the proof; all proof-relevant parameters are named above.
+\end{lemma}
+
+\begin{proof}
+This proof is our copy of the interleaving argument.  The source tie-back is
+Blaze Lemma~6.1; the proof below spells out the relation, the handle
+translation, and the three distance claims locally.
+
+\paragraph{The base relation and its proximity protocol.}
+For a message tensor \(m\in\F^{\B^k}\), the codeword is
+\[
+  y=C(m)\in\F^{\B^n}.
+\]
+For a point \(z\in\F^k\), \(\MLE(m)(z)\) is the multilinear extension of the
+message tensor evaluated at \(z\).  The exact \(\RMLE[C]\) relation is
+\[
+  ((z,v),y;m)\in\RMLE[C]
+  \qquad\Longleftrightarrow\qquad
+  y=C(m)\ \text{and}\ \MLE(m)(z)=v.
+\]
+The corresponding proximity protocol for \(\RMLE[C]\) has oracle access to a
+literal word \(y\in\F^{\B^n}\) and receives public \((z,v)\).  Its soundness
+promise is phrased as distance from the affine target
+\[
+  \mathcal A^C_{z,v}
+  =
+  \{C(m):m\in\F^{\B^k},\ \MLE(m)(z)=v\}.
+\]
+If \(y\) is farther than the chosen proximity parameter from this set, the base
+\(\RMLE[C]\)-IOPP rejects except with its soundness error.  The exact relation
+names the witness \(m\); the proximity statement is distance from the affine
+set \(\mathcal A^C_{z,v}\), not an extra nearest-neighbor decoding step inside
+Lemma~6.1.
+
+The construction below gives a proximity protocol for the row-wise interleaved
+relation \(\RMLE[C^t]\) for arbitrary \(t\).  Our protocol uses
+Boolean tensor notation, so here we specialize to \(t=2^\ell\); a non-power of
+two \(t\) would be handled by the usual padding convention before writing the
+slice index as \(\B^\ell\).  In this specialization,
+\[
+  m\in\F^{\B^\ell\times\B^k},
+  \qquad
+  c\in\F^{\B^\ell\times\B^n},
+  \qquad
+  C^t(m)[h,\ast]=C(m[h,\ast]).
+\]
+Blaze sometimes presents the input alphabet as \(F^t\) or as an extension-field
+alphabet.  Here we use the expanded column-vector view
+\(\F^{\B^\ell}\).  This is a notation translation, not a proof change: the
+Lemma~6.1 protocol and proof use the row decomposition of \(m,c\), verifier
+queries to columns of \(c\), and \(\F\)-linear row combinations.
+
+\paragraph{Linear-code facts used locally.}
+The proof uses only two code facts about \(C\).  First, \(C\) is linear:
+\[
+  C(a m_0+b m_1)=aC(m_0)+bC(m_1)
+  \qquad(a,b\in\F).
+\]
+Second, \(C\) has relative distance \(\lambda\): any two distinct codewords
+differ on at least a \(\lambda\)-fraction of coordinates.  Equivalently, every
+nonzero word in the linear code image of \(C\) has relative Hamming weight at
+least \(\lambda\).
+
+\paragraph{Our handle version of the input oracle.}
+Blaze gives the verifier oracle access to the interleaved input word \(c\).  In
+the fixed protocol above, the corresponding object is the handle
+\[
+  R_c:\B^n\to\F^{\B^\ell},
+  \qquad
+  R_c(b)=c[\ast,b].
+\]
+The literal matrix \(c\) is the expanded semantic object behind the handle.  In
+the honest commit path \(c=C^t(m)\).  In the proximity setting \(c\) may be a
+malicious literal matrix; the proof concerns whether it is close to an
+interleaved codeword with the claimed evaluation.
+
+The verifier's public opening claim is
+\[
+  z=(z_{\mathrm{slice}},z_{\mathrm{in}})
+  \in\F^\ell\times\F^k,
+  \qquad
+  v\in\F.
+\]
+Blaze writes this as \(z=(z_1,z_2)\).  The relation target is the affine set
+\[
+  \mathcal A_{z,v}
+  =
+  \{C^t(m'):\MLE(m')(z_{\mathrm{slice}},z_{\mathrm{in}})=v\}.
+\]
+For a word or matrix \(w\) and a set \(S\) of same-shaped words or matrices,
+write
+\[
+  \Delta(w,S)=\min_{s\in S}\Delta(w,s)
+\]
+for relative Hamming distance from \(S\).
+
+\paragraph{The reduction protocol.}
+The reduction protocol has five steps.  Each step names both the semantic word
+used in the proof and the handle-level object used by the fixed protocol.
+Source tie-back: these are the five steps of Blaze Lemma~6.1, written in our
+tensor and handle notation.
+
+\emph{Step 1: announce row evaluations.}
+The prover sends a full row-evaluation vector
+\[
+  u\in\F^{\B^\ell}.
+\]
+For an honest message \(m\),
+\[
+  u[h]=\MLE(m[h,\ast])(z_{\mathrm{in}})
+  \qquad(h\in\B^\ell).
+\]
+This is exactly Lines O1--O2 of Figure~\ref{fig:native-blaze-fmliop-hybrid}.
+
+\emph{Step 2: check the top-level value through \(u\).}
+The verifier views \(u\) as a Boolean tensor on \(\B^\ell\) and checks
+\[
+  \MLE(u)(z_{\mathrm{slice}})
+  =
+  v.
+\]
+This is Line O3.  This line checks consistency of the announced row
+evaluations with the public value.  It is not a proximity test for \(c\).
+
+\emph{Step 3: sample the random row fold.}
+The verifier samples a random row-combination vector
+\[
+  \rho\leftarrow\F^{\B^\ell}.
+\]
+Blaze calls this vector \(r\).  To avoid collision with later MLE evaluation
+points, this paper calls it \(\rho\).  Define
+\[
+  m_\star=\rho^\top m\in\F^{\B^k},
+  \qquad
+  c_\star=\rho^\top c\in\F^{\B^n},
+\]
+meaning
+\[
+  m_\star[a]=\sum_{h\in\B^\ell}\rho[h]m[h,a],
+  \qquad
+  c_\star[b]=\sum_{h\in\B^\ell}\rho[h]c[h,b].
+\]
+In our protocol \(c_\star\) is not sent as a fresh literal string.  It is the
+expanded semantics of the virtual handle
+\[
+  R_\star(b)=\sum_{h\in\B^\ell}\rho[h]R_c(b)[h].
+\]
+This is Lines O4--O7.
+
+\emph{Step 4: call the base \(\RMLE[C]\)-IOPP on the folded input.}
+Run the base \(\RMLE[C]\)-IOPP on public point
+\[
+  z_{\mathrm{in}}\in\F^k
+\]
+and public value
+\[
+  v_\star=\ip{\rho}{u}.
+\]
+The implicit base input oracle is \(c_\star\).  Since the verifier does not
+hold \(c_\star\) as a separately committed string, it emulates each query
+\(b\in\B^n\) by reading the column \(R_c(b)\) and returning
+\[
+  c_\star[b]=\sum_{h\in\B^\ell}\rho[h]R_c(b)[h].
+\]
+This is exactly what the virtual folded handle \(R_\star\) does.  When
+\(C=\PRAA\), Lines O8 onward are the inlined base \(\RMLE[\PRAA]\) checker.
+
+\emph{Step 5: accept only if both layers accept.}
+Accept if the row-evaluation check and the base \(\RMLE[C]\)-IOPP both accept.
+In the fixed protocol, the later native
+\(\RMLE[\PRAA]\) work and its MLE-evaluation checks implement this base call.
+
+\paragraph{Completeness.}
+Assume the exact interleaved relation holds:
+\[
+  c=C^t(m),
+  \qquad
+  \MLE(m)(z_{\mathrm{slice}},z_{\mathrm{in}})=v.
+\]
+The honest prover sends \(u[h]=\MLE(m[h,\ast])(z_{\mathrm{in}})\).  Recall the
+standard tensor expansion of the MLE:
+\[
+  \MLE(m)(z_{\mathrm{slice}},z_{\mathrm{in}})
+  =
+  \sum_{h\in\B^\ell}
+  \chi_h(z_{\mathrm{slice}})\MLE(m[h,\ast])(z_{\mathrm{in}}),
+\]
+where \(\chi_h\) is the equality-basis polynomial for the Boolean point
+\(h\in\B^\ell\).  Therefore
+\[
+  \MLE(u)(z_{\mathrm{slice}})
+  =
+  \sum_{h\in\B^\ell}\chi_h(z_{\mathrm{slice}})u[h]
+  =
+  \MLE(m)(z_{\mathrm{slice}},z_{\mathrm{in}})
+  =
+  v,
+\]
+so the row check passes.
+
+For every verifier challenge \(\rho\), linearity of \(C\) gives
+\[
+  c_\star
+  =
+  \rho^\top c
+  =
+  \rho^\top C^t(m)
+  =
+  C(\rho^\top m)
+  =
+  C(m_\star).
+\]
+The same expansion used above gives
+\[
+  \MLE(m_\star)(z_{\mathrm{in}})
+  =
+  \sum_{h\in\B^\ell}\rho[h]\MLE(m[h,\ast])(z_{\mathrm{in}})
+  =
+  \ip{\rho}{u}
+  =
+  v_\star.
+\]
+Thus the base \(\RMLE[C]\) instance is exact and the base protocol accepts by
+its completeness.  Source tie-back: this is the completeness proof of
+Blaze Lemma~6.1 translated through \(R_c\) and \(R_\star\).
+
+\paragraph{Soundness setup.}
+Fix \(z=(z_{\mathrm{slice}},z_{\mathrm{in}})\) and \(v\).  Let the malicious
+literal matrix behind \(R_c\) be
+\[
+  c\in\F^{\B^\ell\times\B^n}.
+\]
+Assume \(c\) is \(\delta\)-far from the affine target
+\[
+  \mathcal A_{z,v}
+  =
+  \{C^t(m'):\MLE(m')(z_{\mathrm{slice}},z_{\mathrm{in}})=v\}.
+\]
+Fix a deterministic cheating prover strategy.  Let its first message be
+\[
+  u\in\F^{\B^\ell}.
+\]
+If \(\MLE(u)(z_{\mathrm{slice}})\ne v\), the verifier rejects immediately, so
+the soundness proof conditions on
+\[
+  \MLE(u)(z_{\mathrm{slice}})=v.
+\]
+The goal is now to show that, for a random \(\rho\), the folded input
+\(\rho^\top c\) is far from the base affine target
+\[
+  \mathcal A^C_{z_{\mathrm{in}},\ip{\rho}{u}}
+  =
+  \{C(q):q\in\F^{\B^k},\
+  \MLE(q)(z_{\mathrm{in}})=\ip{\rho}{u}\},
+\]
+except with the row-fold error from Corollary~2.6.  Then the base
+\(\RMLE[C]\)-IOPP rejects this folded instance by its own soundness.
+
+We now convert the affine top-level distance statement into a linear
+zero-evaluation statement.  Define
+\[
+  \mathbf 1\in\F^{\B^k},
+  \qquad
+  \mathbf 1[a]=1,
+\]
+and let \(C(\mathbf 1)\in\F^{\B^n}\) be its encoding.  Also define
+\[
+  \mathcal L_{z_{\mathrm{in}}}
+  =
+  \{C(q):q\in\F^{\B^k},\ \MLE(q)(z_{\mathrm{in}})=0\}.
+\]
+The row-wise space \((\mathcal L_{z_{\mathrm{in}}})^t\) consists of matrices
+whose rows each lie in \(\mathcal L_{z_{\mathrm{in}}}\).
+Because \(C\) is linear, \(\mathcal L_{z_{\mathrm{in}}}\) is a linear subcode
+of \(C\).  Its distance is at least the distance \(\lambda\) of \(C\), so it
+satisfies the distance hypothesis needed for the row-fold theorem.
+
+\begin{claim}[First shift; cf. Blaze Claim~6.1.1]
+\label{claim:blaze-interleaving-first-shift}
+The shifted matrix is far from the row-wise zero-evaluation code:
+\[
+  \Delta\!\left(
+    c-u\otimes C(\mathbf 1),
+    (\mathcal L_{z_{\mathrm{in}}})^t
+  \right)>\delta,
+\]
+where
+\[
+  (u\otimes C(\mathbf 1))[h,b]=u[h]\,C(\mathbf 1)[b].
+\]
+\end{claim}
+
+\begin{proof}
+Suppose instead, toward a contradiction, that there exists
+\[
+  c'\in(\mathcal L_{z_{\mathrm{in}}})^t
+  \qquad\text{with}\qquad
+  \Delta(c-u\otimes C(\mathbf 1),c')\le\delta.
+\]
+Define
+\[
+  c''=c'+u\otimes C(\mathbf 1)
+\]
+so \(\Delta(c,c'')\le\delta\).  For each row \(h\in\B^\ell\), because
+\(c'[h,\ast]\in\mathcal L_{z_{\mathrm{in}}}\), choose
+\[
+  q'_h\in\F^{\B^k}
+  \quad\text{such that}\quad
+  C(q'_h)=c'[h,\ast],
+  \qquad
+  \MLE(q'_h)(z_{\mathrm{in}})=0.
+\]
+Define
+\[
+  q''_h=q'_h+u[h]\mathbf 1.
+\]
+By linearity of \(C\),
+\[
+  C(q''_h)
+  =
+  c'[h,\ast]+u[h]C(\mathbf 1)
+  =
+  c''[h,\ast].
+\]
+Also,
+\[
+  \MLE(q''_h)(z_{\mathrm{in}})
+  =
+  \MLE(q'_h)(z_{\mathrm{in}})
+  +
+  u[h]\MLE(\mathbf 1)(z_{\mathrm{in}})
+  =
+  u[h].
+\]
+Let \(q''\in\F^{\B^\ell\times\B^k}\) be the matrix of these row messages.  Then
+\[
+  c''=C^t(q'')
+\]
+and
+\[
+  \MLE(q'')(z_{\mathrm{slice}},z_{\mathrm{in}})
+  =
+  \sum_{h\in\B^\ell}\chi_h(z_{\mathrm{slice}})
+  \MLE(q''_h)(z_{\mathrm{in}})
+  =
+  \sum_{h\in\B^\ell}\chi_h(z_{\mathrm{slice}})u[h]
+  =
+  \MLE(u)(z_{\mathrm{slice}})
+  =
+  v.
+\]
+Thus \(c''\in\mathcal A_{z,v}\), while \(\Delta(c,c'')\le\delta\).  This
+contradicts the soundness assumption \(\Delta(c,\mathcal A_{z,v})>\delta\).
+\end{proof}
+
+\begin{claim}[Random fold preserves linear distance; cf. Blaze Claim~6.1.2]
+\label{claim:blaze-interleaving-random-fold}
+Except with probability at most \(1/(\eta|\F|)\) over
+\(\rho\leftarrow\F^{\B^\ell}\),
+\[
+  \Delta\!\left(
+    \rho^\top(c-u\otimes C(\mathbf 1)),
+    \mathcal L_{z_{\mathrm{in}}}
+  \right)>\delta_{\mathrm{base}}.
+\]
+\end{claim}
+
+\begin{proof}
+By Claim~\ref{claim:blaze-interleaving-first-shift},
+\[
+  c-u\otimes C(\mathbf 1)
+\]
+is far from the linear row-wise space \((\mathcal L_{z_{\mathrm{in}}})^t\).
+The only external coding-theory fact used in this layer is the following
+linear proximity-gap statement: if a matrix is
+\(\delta\)-far from the row-wise interleaving of a linear code of distance at
+least \(\lambda\), then a random row combination is
+\(\delta-\eta\)-far from the base code except with probability at most
+\(1/(\eta|\F|)\), provided \(\delta-\eta<\lambda/3\).  Here the base linear code
+is \(\mathcal L_{z_{\mathrm{in}}}\), whose distance is at least \(\lambda\).
+Since \(\delta-\eta=\delta_{\mathrm{base}}\), applying this theorem to the
+matrix \(c-u\otimes C(\mathbf 1)\) gives exactly the claimed bound.
+This is the proximity-preservation step.  It is not a coordinate spot check:
+the random fold is used together with the proximity-gap theorem behind
+Corollary~2.6.
+\end{proof}
+
+\begin{claim}[Second shift; cf. Blaze Claim~6.1.3]
+\label{claim:blaze-interleaving-second-shift}
+Condition on a challenge \(\rho\) for which
+Claim~\ref{claim:blaze-interleaving-random-fold} holds.  Define the base affine
+target
+\[
+  \mathcal A'_{z_{\mathrm{in}},v_\star}
+  =
+  \{C(q):\MLE(q)(z_{\mathrm{in}})=v_\star\},
+  \qquad
+  v_\star=\ip{\rho}{u}.
+\]
+Then
+\[
+  \Delta(\rho^\top c,\mathcal A'_{z_{\mathrm{in}},v_\star})
+  >
+  \delta_{\mathrm{base}}.
+\]
+\end{claim}
+
+\begin{proof}
+Suppose toward a contradiction that there exists
+\[
+  c'\in\mathcal A'_{z_{\mathrm{in}},v_\star}
+  \qquad\text{with}\qquad
+  \Delta(\rho^\top c,c')\le\delta_{\mathrm{base}}.
+\]
+Because \(c'\in\mathcal A'_{z_{\mathrm{in}},v_\star}\), choose
+\[
+  q'\in\F^{\B^k}
+  \quad\text{such that}\quad
+  C(q')=c',
+  \qquad
+  \MLE(q')(z_{\mathrm{in}})=v_\star.
+\]
+Define
+\[
+  q''=q'-v_\star\mathbf 1,
+  \qquad
+  c''=C(q'')=c'-v_\star C(\mathbf 1).
+\]
+Then
+\[
+  \MLE(q'')(z_{\mathrm{in}})
+  =
+  v_\star-v_\star\MLE(\mathbf 1)(z_{\mathrm{in}})
+  =
+  0,
+\]
+so \(c''\in\mathcal L_{z_{\mathrm{in}}}\).  Moreover,
+\[
+  \rho^\top(u\otimes C(\mathbf 1))
+  =
+  \left(\sum_{h\in\B^\ell}\rho[h]u[h]\right)C(\mathbf 1)
+  =
+  v_\star C(\mathbf 1).
+\]
+Therefore
+\[
+\begin{aligned}
+  \rho^\top(c-u\otimes C(\mathbf 1))-c''
+  &=
+  \rho^\top c-v_\star C(\mathbf 1)
+  -\bigl(c'-v_\star C(\mathbf 1)\bigr) \\
+  &=
+  \rho^\top c-c'.
+\end{aligned}
+\]
+Thus \(c''\in\mathcal L_{z_{\mathrm{in}}}\) is
+\(\delta_{\mathrm{base}}\)-close to
+\(\rho^\top(c-u\otimes C(\mathbf 1))\), contradicting the random-fold distance
+statement.
+\end{proof}
+
+\paragraph{Conclusion of Lemma~6.1.}
+For every good \(\rho\), the virtual folded input word
+\[
+  c_\star=\rho^\top c
+\]
+is \(\delta_{\mathrm{base}}\)-far from every base codeword \(C(q)\) whose
+message satisfies
+\[
+  \MLE(q)(z_{\mathrm{in}})=v_\star.
+\]
+Therefore the base \(\RMLE[C]\)-IOPP rejects the folded instance except with
+its own soundness error.  Adding the Corollary~2.6 row-fold loss gives the
+soundness bound stated at the beginning of this subsection.  Source tie-back:
+this completes our proof of Lemma~\ref{lem:blaze-interleaving-handle}, mirroring
+Blaze Lemma~6.1.
+
+Instantiating \(C=\PRAA\), the first imported arrow for our fixed protocol is
+\[
+  \RMLE[\PRAA^t]
+  \xrightarrow{\text{Blaze Lemma~6.1}}
+  \RMLE[\PRAA].
+\]
+In our API language, this says: the matrix behind \(R_c\) is reduced to the
+virtual folded handle \(R_\star\); if the literal matrix is far from every
+valid interleaved packed-RAA codeword with the claimed top-level MLE value,
+then, except for the Lemma~6.1 row-fold loss, the folded base instance is far
+from \(\RMLE[\PRAA]\) and must be rejected by the base protocol imported next.
+\end{proof}
+
+\subsection{Self-Contained Import: Native RAA And Compiler Lemmas}
+
+This subsection continues the lemma pass.  The protocol boxes above remain
+fixed.  The purpose here is to give this paper its own named statements for the
+Blaze Section~5 native MLIOP, the Section~4 compiler, and the Section~7
+composition.  Blaze lemma and proposition numbers appear as provenance in the
+statement titles; the objects used by the proof are restated in our tensor and
+handle notation.
+
+\paragraph{Native accumulator relation.}
+\begin{proposition}[Accumulator reduction; cf. Blaze Propositions~5.2 and~5.3]
+\label{prop:native-accumulator-reduction}
+Let \(x,y\in\F^{\B^n}\), and let
+\[
+  A:\B^n\times\B^n\to\F
+\]
+be the accumulator matrix with \(A[b,a]=1\) exactly when
+\(\Int(b)\ge \Int(a)\).  Let
+\(\widehat A:\F^n\times\F^n\to\F\) be its multilinear extension.  For
+\(r\in\F^n\), define the projected accumulator identity
+\[
+  \MLE(y)(r)
+  =
+  \sum_{X\in\B^n}\widehat A(r,X)x[X].
+\]
+If \(y=\Acc(x)\), this identity holds for every \(r\in\F^n\).  If
+\(y\ne\Acc(x)\), then the identity fails for a random \(r\leftarrow\F^n\)
+except with probability at most \(n/|\F|\).  Moreover, the vector
+\((\widehat A(r,X))_{X\in\B^n}\) can be generated in \(O(N)\) time and
+\(\widehat A(r,s)\) can be evaluated at a single field point in \(O(n)\) field
+operations, where \(N=2^n\).
+\end{proposition}
+
+\begin{proof}
+The tensor \(y-\Acc(x)\) is zero exactly when \(y=\Acc(x)\).  Its multilinear
+extension at \(r\) is the difference between the two sides of the displayed
+identity.  If the tensor is nonzero, this difference is a nonzero multilinear
+polynomial in \(n\) variables, so Schwartz--Zippel bounds its zero probability
+by \(n/|\F|\).  The efficient computation of \(\widehat A\) is the explicit
+accumulator-kernel computation stated in Blaze Proposition~5.3 and used by
+Figure~\ref{fig:native-accumulate-reduce}.
+\end{proof}
+
+\paragraph{Native permutation relation.}
+\begin{proposition}[Permutation product-tree reduction; cf. Blaze Proposition~5.4]
+\label{prop:native-permutation-reduction}
+Let \(\pi:\B^n\to\B^n\) be a public permutation and let
+\[
+  x,y\in\F^{\B^n}.
+\]
+Use the push-forward convention fixed above:
+\[
+  y[\pi(b)]=x[b]\qquad(b\in\B^n).
+\]
+For verifier challenges \(\alpha,\beta\in\F\), define the intended tagged
+leaf values
+\[
+  f[\mathsf{leaf}(b)]
+  =
+  \alpha-\bigl(x[b]+\beta\,\Idx(\pi(b))\bigr),
+  \qquad
+  g[\mathsf{leaf}(a)]
+  =
+  \alpha-\bigl(y[a]+\beta\,\Idx(a)\bigr).
+\]
+If \(y=M_\pi x\), then there exist product-tree tensors
+\[
+  f,g\in\F^{\B^{n+1}}
+\]
+whose roots agree, whose leaves are the two displayed tagged lists, and whose
+tree residuals vanish on every Boolean internal coordinate.  If
+\(y\ne M_\pi x\), then, except with probability at most \((N+1)/|\F|\) over
+\((\alpha,\beta)\), every choice of \(f,g\) fails at least one of the root,
+leaf, or tree-residual tests for all but a \(10n/|\F|\)-fraction of
+\(r\in\F^n\).
+\end{proposition}
+
+\begin{proof}
+When \(y[\pi(b)]=x[b]\), the two tagged leaf multisets are equal after the
+change of variable \(a=\pi(b)\).  The prover can therefore build product trees
+over the two equal multisets; the roots match and every parent-child residual
+is zero.  When the permutation relation is false, the tagged products agree as
+polynomials in \((\alpha,\beta)\) only with the failure probability stated
+above, and the product-tree zero tests reduce the remaining global product
+claims to the displayed root, leaf, and residual equations.  This is the
+push-forward-coordinate copy of Blaze Proposition~5.4; with the pullback
+convention one replaces \(\pi\) by \(\pi^{-1}\) in the leaf tag.
+\end{proof}
+
+\paragraph{Native \(\RMLE[\PRAA]\) MLIOP.}
+\begin{lemma}[Native packed-RAA RMLE MLIOP; cf. Blaze Lemma~5.1 and Proposition~5.5]
+\label{lem:native-praa-mliop}
+Let
+\[
+  y\in\F^{\B^n},\qquad z\in\F^k,\qquad v\in\F
+\]
+be a base folded \(\RMLE[\PRAA]\) claim.  In the
+\(\mathcal F_{\mathrm{MLIOP}}\)-hybrid model, the fixed protocol
+Figure~\ref{fig:native-blaze-fmliop-hybrid}, restricted to Lines O8 onward
+after the folded word \(R_\star\) has been formed, is a native MLIOP for the
+exact relation
+\[
+  y=\PRAA(m)
+  \qquad\text{and}\qquad
+  \MLE(m)(z)=v.
+\]
+Completeness is perfect.  Soundness is the native algebraic soundness of Blaze
+Proposition~5.5: if the represented MLIOP tensors do not satisfy the displayed
+relation, the verifier rejects except with probability at most
+\[
+  \frac{N+13n+7}{|\F|},
+  \qquad N=2^n.
+\]
+This is an exact native-MLIOP statement about represented tensors and requested
+MLE evaluations.  It is not yet a proximity statement about a literal backend
+encoded string.
+\end{lemma}
+
+\begin{proof}
+The prover's represented input tensor is \(u_0\in\F^{\B^k}\).  The verifier
+gets \(u_1\) as the derived repetition view \(F_{\mathrm{rep}}u_0\), receives
+handles for \(u_2,u_3,u_4\), and treats the input folded word as
+\[
+  u_5=y.
+\]
+The direct endpoint request
+\[
+  (\widehat O_{u_0},z,v)
+\]
+enforces \(\MLE(u_0)(z)=v\) in the hybrid model.
+
+The remaining checks force the RAA stage equations.  Proposition
+\ref{prop:native-accumulator-reduction} is applied to
+\[
+  u_3=\Acc(u_2)
+  \qquad\text{and}\qquad
+  u_5=\Acc(u_4),
+\]
+using the two calls to \(\AccReduce\).  Proposition
+\ref{prop:native-permutation-reduction} is applied to
+\[
+  u_2=M_{\pi_1}u_1
+  \qquad\text{and}\qquad
+  u_4=M_{\pi_2}u_3,
+\]
+using the two calls to \(\PermuteCommit\) and \(\PermuteReduce\).  The six
+Boolean-sum claims returned by these four reductions are batched by
+\(\RAASixSumcheck\).  If any one of those Boolean-sum identities is false, the
+scalar-power batch hides it only with the usual low-degree error, and the
+sumcheck endpoint values are then checked through \(\mathcal F_{\mathrm{MLIOP}}\).
+
+Therefore, except for the native soundness error bounded in Blaze
+Proposition~5.5, acceptance implies
+\[
+  u_1=F_{\mathrm{rep}}u_0,\quad
+  u_2=M_{\pi_1}u_1,\quad
+  u_3=\Acc(u_2),\quad
+  u_4=M_{\pi_2}u_3,\quad
+  u_5=\Acc(u_4).
+\]
+Since \(u_5=y\), this is exactly \(y=\PRAA(u_0)\), and the direct endpoint
+request gives \(\MLE(u_0)(z)=v\).
+\end{proof}
+
+\paragraph{Compiler from native MLIOP to backend RMLE.}
+\begin{lemma}[MLIOP-to-RMLE IOPP compiler in handle form; cf. Blaze Lemma~4.2 and Proposition~4.4]
+\label{lem:mliop-to-rmle-compiler-handle}
+Let \(\Pi\) be a native MLIOP whose verifier makes MLE evaluation requests
+\[
+  \MLE(h)(r)=w
+\]
+against finitely many native oracle tensors \(h\in\F^{\B^d}\).  Let
+\[
+  C_{\mathrm{backend}}:\F^{\B^d}\to\F^{D}
+\]
+be the systematic backend code used to authenticate those native tensors, and
+assume we have a backend \(\RMLE[C_{\mathrm{backend}}]\)-IOPP.  Replacing each
+native oracle handle by a literal backend string
+\[
+  y_h\in\F^D
+\]
+and each native evaluation request by the backend claim
+\[
+  y_h\approx C_{\mathrm{backend}}(h)
+  \qquad\text{and}\qquad
+  \MLE(h)(r)=w
+\]
+gives an IOPP for the same relation as \(\Pi\), with soundness equal to the
+native MLIOP soundness plus the backend RMLE and batching errors.
+\end{lemma}
+
+\begin{proof}
+Completeness follows by encoding every honest native tensor \(h\) as
+\(C_{\mathrm{backend}}(h)\) and answering the same MLE values as the native
+MLIOP.  For soundness, fix a deterministic compiled prover and expand every
+authentication handle into its literal backend string \(y_h\).  There are two
+cases.
+
+First, if some \(y_h\) is far from the backend code, the corresponding backend
+\(\RMLE[C_{\mathrm{backend}}]\)-IOPP rejects except with its proximity
+soundness error.  Second, if every \(y_h\) is close to the backend code, an
+unbounded extractor decodes each nearby codeword to an effective tensor
+\[
+  h^\dagger\in\F^{\B^d}.
+\]
+The compiled verifier's accepted backend openings then imply that every native
+request \(\MLE(h)(r)=w\) is true for the effective tensor
+\(h^\dagger\), except with backend and batching error.  The extracted effective
+tensors therefore define a native MLIOP transcript for \(\Pi\).  If the
+underlying relation is false for those tensors, native MLIOP soundness rejects.
+This is the literal/effective split in Blaze Proposition~4.4.
+\end{proof}
+
+\begin{proposition}[Batched backend RMLE requests; cf. Blaze Remark~4.3 and Proposition~4.5]
+\label{prop:batched-backend-rmle}
+The per-oracle backend checks in Lemma~\ref{lem:mliop-to-rmle-compiler-handle}
+can be batched: the verifier reduces all native requests
+\[
+  \MLE(h_j)(r_j)=w_j
+\]
+to one virtual multilinear evaluation claim, and one query to the virtual
+backend word is emulated by the corresponding queries to the literal backend
+strings \(y_{h_j}\).  The batching changes the proximity parameter and adds the
+batching soundness term stated in Blaze Proposition~4.5, but it does not change
+the semantic split: far backend strings are rejected, and close backend strings
+decode to effective native tensors.
+\end{proposition}
+
+\begin{proof}
+The batching protocol is linear in the claimed evaluations and in the virtual
+oracle construction.  Thus an honest batch is complete.  If a batch accepts
+while some constituent evaluation is false for the effective tensors, the
+batching polynomial in the verifier challenge has a nonzero error coefficient
+and vanishes only with the standard batching probability.  The resulting single
+virtual claim is then checked by the same backend
+\(\RMLE[C_{\mathrm{backend}}]\)-IOPP as in
+Lemma~\ref{lem:mliop-to-rmle-compiler-handle}.
+\end{proof}
+
+\paragraph{Composed theorem.}
+\begin{theorem}[Interleaved packed-RAA RMLE IOPP in handle form; cf. Blaze Theorem~7.1]
+\label{thm:interleaved-praa-rmle-iopp-handle}
+Instantiate Lemma~\ref{lem:blaze-interleaving-handle} with \(C=\PRAA\).  Then
+instantiate the base \(\RMLE[\PRAA]\) protocol by
+Lemma~\ref{lem:native-praa-mliop} and compile its native evaluation requests by
+Lemma~\ref{lem:mliop-to-rmle-compiler-handle}, using the batching of
+Proposition~\ref{prop:batched-backend-rmle}.  The result is an
+\(\RMLE[\PRAA^t]\)-IOPP for the fixed handle-level protocol above:
+the literal matrix behind \(R_c\) is checked for proximity to an interleaved
+packed-RAA codeword \(\PRAA^t(m)\), and the effective message satisfies
+\[
+  \MLE(m)(z_{\mathrm{slice}},z_{\mathrm{in}})=v.
+\]
+\end{theorem}
+
+\begin{proof}
+Lemma~\ref{lem:blaze-interleaving-handle} reduces a bad top-level interleaved
+claim to a bad folded base claim, except for the row-fold error from
+Lemma~\ref{lem:row-fold-proximity-gap}.  Lemma~\ref{lem:native-praa-mliop}
+proves the folded base claim in the native MLIOP model by enforcing the RAA
+stage equations and the terminal value \(\MLE(m_\star)(z_{\mathrm{in}})=v_\star\).
+Lemma~\ref{lem:mliop-to-rmle-compiler-handle} and
+Proposition~\ref{prop:batched-backend-rmle} replace the ideal native MLE
+handles by backend encoded strings and backend \(\RMLE[C_{\mathrm{backend}}]\)
+checks.  Adding the stated soundness errors gives the theorem.  Appendix~A of
+Blaze supplies the round-by-round soundness form needed when this IOPP is later
+compiled with Merkle commitments and Fiat--Shamir.
+\end{proof}
+
+\subsection{Rewrite Scaffold: Blaze Proof Replay}
+
+This subsection is an editorial scaffold for the rewrite, not finished proof
+prose.  It lives at the end so the fixed protocol presentation above remains
+undisturbed while we rebuild the proof narrative.  Delete this scaffold once
+the finished proof has absorbed its checklist and lemma-by-lemma template.
+
+\paragraph{Objective.}
+Rewrite the Blaze part of the paper so that its proof spine mirrors the Blaze
+paper's theorem chain:
+\[
+  \RMLE[\PRAA^t]
+  \xrightarrow{\text{interleaving reduction}}
+  \RMLE[\PRAA]
+  \xrightarrow{\text{native RAA MLIOP plus compiler}}
+  \RMLE[C_{\mathrm{backend}}].
+\]
+Here an \(\RMLE[C]\)-IOPP should always be read operationally as a proximity
+opening protocol for an encoded MLE claim:
+\[
+  y\approx C(m)
+  \qquad\text{and}\qquad
+  \MLE(m)(z)=v.
+\]
+The exact relation underneath the protocol is
+\[
+  y=C(m)
+  \qquad\text{and}\qquad
+  \MLE(m)(z)=v.
+\]
+The writeup must keep both views visible: Blaze's explicit relation view names
+\((z,v),y,m\), while our API view may hide \(y\) behind a handle.
+
+\paragraph{Mirror-Blaze rule.}
+The Blaze proof is normative for this rewrite.  Each finished proof subsection
+must mirror the corresponding Blaze lemma, proposition, claim, and theorem in
+the same logical order, using Blaze's hypotheses and conclusion as the spine.
+Our extra material may define objects locally, expand compressed steps, and tie
+the proof to the fixed protocol boxes above, but it must not silently replace
+Blaze's argument with a different one.
+
+If a proposed rewrite needs to deviate from Blaze--for example by changing the
+order of reductions, strengthening or weakening a conclusion, replacing a
+source lemma with a different argument, or relying on a property not named in
+the Blaze step--the text must mark this as a \emph{divergence from Blaze} and
+the edit should not be finalized until the user explicitly approves the
+divergence.  In ordinary cases, prefer the more literal Blaze replay and add
+our handle/API translation as explanatory scaffolding around it.
+
+\paragraph{Writing invariant.}
+Every major proof step must include four pieces:
+\begin{enumerate}[label=\textbf{R\arabic*.},leftmargin=*]
+  \item \textbf{Our API view.}  State the handle-level call, for example
+  \(R_y\gets \MLEAuth.\mathsf{Commit}(m;C)\) and
+  \(\MLEAuth.\mathsf{Open}(R_y,z,v)\).
+  \item \textbf{Expanded semantics.}  Name the literal oracle string
+  \(y=C(m)\) in the honest case, and distinguish it from a malicious literal
+  string that may only be close to a valid codeword.
+  \item \textbf{Blaze relation view.}  Translate the same object to
+  \(((z,v),y;m)\in\RMLE[C]\), and say whether the step is using
+  \(\RMLE[\PRAA^t]\), \(\RMLE[\PRAA]\), or
+  \(\RMLE[C_{\mathrm{backend}}]\).
+  \item \textbf{Source tie-back.}  Name the Blaze lemma, proposition, claim, or
+  appendix paragraph that handles the step.
+\end{enumerate}
+
+\paragraph{Step 1 TODO: interleaving reduces
+\(\RMLE[\PRAA^t]\) to \(\RMLE[\PRAA]\).}
+This step should explain Blaze Section~6 before any native RAA internals.
+The caller-facing object is a committed matrix
+\[
+  c\in\F^{\B^\ell\times\B^n},
+  \qquad
+  z=(z_{\mathrm{slice}},z_{\mathrm{in}})\in\F^\ell\times\F^k,
+  \qquad
+  v\in\F.
+\]
+The intended proximity statement is
+\[
+  c\approx \PRAA^t(m)
+  \qquad\text{and}\qquad
+  \MLE(m)(z_{\mathrm{slice}},z_{\mathrm{in}})=v.
+\]
+TODOs:
+\begin{enumerate}[label=\textbf{I\arabic*.},leftmargin=*]
+  \item Define the row-evaluation vector
+  \(u\in\F^{\B^\ell}\) by
+  \(u[h]=\MLE(m[h,\ast])(z_{\mathrm{in}})\) in the honest case.
+  \item State the verifier's direct check
+  \(\MLE(u)(z_{\mathrm{slice}})=v\).
+  \item Define the verifier's random fold
+  \(\rho\in\F^{\B^\ell}\), the virtual folded word
+  \(c_\star=\rho^\top c\), and the folded value
+  \(v_\star=\ip{\rho}{u}\).
+  \item State the produced base claim:
+  \(c_\star\approx\PRAA(m_\star)\) and
+  \(\MLE(m_\star)(z_{\mathrm{in}})=v_\star\).
+  \item Tie soundness to Blaze Lemma~6.1, Claims~6.1.1--6.1.3, and
+  Corollary~2.6.  The text must say that this is a proximity statement about
+  the literal matrix \(c\), not an exact statement about every coordinate.
+\end{enumerate}
+
+\paragraph{Step 2 TODO: native RAA reduces \(\RMLE[\PRAA]\) to MLE requests.}
+This step should explain Blaze Section~5.3 after the interleaving reduction has
+produced the folded base instance
+\[
+  y=c_\star,\qquad z=z_{\mathrm{in}},\qquad v=v_\star.
+\]
+The exact native relation is
+\[
+  y=\PRAA(m)
+  \qquad\text{and}\qquad
+  \MLE(m)(z)=v.
+\]
+TODOs:
+\begin{enumerate}[label=\textbf{N\arabic*.},leftmargin=*]
+  \item Define the RAA stage tensors
+  \[
+    u_1=F_{\mathrm{rep}}m,\quad
+    u_2=M_{\pi_1}u_1,\quad
+    u_3=\Acc(u_2),\quad
+    u_4=M_{\pi_2}u_3,\quad
+    u_5=\Acc(u_4)=y.
+  \]
+  \item Explain accumulator checks through Blaze Propositions~5.2 and~5.3.
+  These handle \(u_3=\Acc(u_2)\) and \(u_5=\Acc(u_4)\).
+  \item Explain permutation checks through Blaze Proposition~5.4.  These
+  introduce \(f_1,g_1,f_2,g_2\) and handle
+  \(u_2=M_{\pi_1}u_1\) and \(u_4=M_{\pi_2}u_3\).
+  \item Explain the batched sumcheck endpoint requests.  The text must name
+  which MLE evaluations survive to the backend layer.
+  \item Tie exact native soundness to Blaze Lemma~5.1 and
+  Proposition~5.5.  The exact conclusion is about the represented MLIOP
+  tensors; it is not yet a Merkle/proximity claim about a literal committed
+  string.
+\end{enumerate}
+
+\paragraph{Step 3 TODO: backend RMLE authenticates the native MLE requests.}
+This step should explain Blaze Section~4.1 only after the native RAA requests
+have been named.  The native MLIOP has produced tensors such as
+\[
+  m,u_2,u_3,u_4,f_1,g_1,f_2,g_2
+\]
+and evaluation requests of the form
+\[
+  \MLE(h)(r)=w.
+\]
+The backend replaces ideal access to \(h\) with a literal encoded string
+\[
+  y_h\approx C_{\mathrm{backend}}(h).
+\]
+TODOs:
+\begin{enumerate}[label=\textbf{B\arabic*.},leftmargin=*]
+  \item State the backend RMLE claim for each native request:
+  \(y_h\approx C_{\mathrm{backend}}(h)\) and \(\MLE(h)(r)=w\).
+  \item Explain the literal/effective split from Blaze Proposition~4.4:
+  if \(y_h\) is far from the backend code, reject; if it is close, decode an
+  effective tensor \(h\) and simulate the native MLIOP using that tensor.
+  \item Explain batching via Blaze Remark~4.3 and Proposition~4.5 only after
+  the unbatched request set is clear.
+  \item State that \(C_{\mathrm{backend}}\) may be RS/BaseFold or another
+  suitable foldable-code backend.  The backend authenticates native MLIOP
+  oracles; it does not directly re-encode the whole PRAA codeword as one
+  monolithic object.
+\end{enumerate}
+
+\paragraph{Step 4 TODO: final composition and PCS bridge.}
+After the three reductions are explained, state the composition exactly:
+\[
+  \RMLE[\PRAA^t]
+  \overset{\text{Blaze Lemma 6.1}}{\longrightarrow}
+  \RMLE[\PRAA]
+  \overset{\text{Blaze Lemma 5.1 + Lemma 4.2}}{\longrightarrow}
+  \RMLE[C_{\mathrm{backend}}].
+\]
+TODOs:
+\begin{enumerate}[label=\textbf{C\arabic*.},leftmargin=*]
+  \item State that Blaze Theorem~7.1 is precisely this composition.
+  \item State the final proximity meaning:
+  \(c\approx \PRAA^t(m)\) and \(\MLE(m)(z)=v\).
+  \item Explain that Appendix~A supplies round-by-round soundness for the
+  building blocks, the MLIOP-to-IOPP compiler, and the interleaving reduction.
+  \item Only then mention Merkle commitments and Fiat-Shamir as the PCS bridge.
+\end{enumerate}
+
+\paragraph{Audit checklist before replacing this scaffold.}
+\begin{enumerate}[label=\textbf{A\arabic*.},leftmargin=*]
+  \item No bare use of ``IOPP'' without saying which language it is an IOPP
+  for: code proximity, \(\RMLE[C]\), \(\RMLE[\PRAA]\), or
+  \(\RMLE[\PRAA^t]\).
+  \item No statement that literal committed strings are exact codewords in the
+  compiled/PCS setting.  Use proximity and decoded/effective objects there.
+  \item No statement that spot checks alone prove proximity.  Proximity comes
+  from the RMLE IOPP and, for interleaving, from Corollary~2.6.
+  \item Every API statement has a Blaze relation tie-back, and every Blaze
+  relation has an API/handle interpretation.
+  \item The variables \(m,y,c,u,\rho,c_\star,v_\star,h,y_h\) are locally
+  defined before use, with domains.
+\end{enumerate}
+
+\paragraph{Proof replay rule.}
+The protocol boxes above are fixed.  The proof prose should explain why those
+boxes are an implementation-shaped presentation of the Blaze proof stack.  The
+guiding principle is: first restate the Blaze lemma nearly as written, then add
+the smallest possible dictionary from Blaze's explicit oracle notation to our
+handle notation.
+
+\paragraph{Global dictionary.}
+Use the following translation every time Blaze names an oracle or relation:
+\[
+\begin{array}{c|c|c}
+\text{Blaze object} & \text{our protocol object} & \text{expanded semantics} \\
+\hline
+\text{input oracle }c &
+R_c &
+\text{literal matrix }c\in\F^{\B^\ell\times\B^n} \\
+c_{\mathrm{combo}}=\rho^\top c &
+R_\star &
+c_\star[b]=\sum_h\rho[h]c[h,b] \\
+\text{MLIOP oracle }\widehat H &
+\widehat O_h &
+\text{MLE handle for }h\in\F^{\B^d} \\
+\widehat H(r)=w &
+(\widehat O_h,r,w)\in\EvalReqs &
+\MLE(h)(r)=w \\
+\text{encoded oracle }y_h &
+\MLEAuth\text{ backend handle} &
+y_h\approx C_{\mathrm{backend}}(h)
+\end{array}
+\]
+When this outline is expanded, each row should become prose that says who knows
+the object, who commits to it, which challenges are verifier-sampled, and which
+values are merely opened/evaluated later.
+
+\paragraph{Template for each lemma layer.}
+Each layer below should be written in the same four-part form:
+\begin{enumerate}[label=\textbf{L\arabic*.},leftmargin=*]
+  \item \textbf{Blaze statement.}  State the lemma/proposition in Blaze's
+  relation language, preserving the exact source object and conclusion.
+  \item \textbf{Our protocol lines.}  Point to the fixed protocol lines or
+  subroutines that implement the same interaction.
+  \item \textbf{Expanded semantic object.}  Name the literal string/tensor
+  behind each handle and, in the compiled setting, the effective decoded object
+  used by the proof.
+  \item \textbf{Soundness hook.}  State the exact contradiction or rejection
+  step supplied by the Blaze source.  Do not replace it by intuition.
+\end{enumerate}
+
+\paragraph{Layer 1 outline: interleaving, Blaze Lemma~6.1.}
+This is the outer reduction
+\[
+  \RMLE[\PRAA^t]\longrightarrow\RMLE[\PRAA].
+\]
+Fill this layer by replaying Blaze Lemma~6.1 almost verbatim, with \(C=\PRAA\)
+only after the generic statement has been explained.
+\begin{enumerate}[label=\textbf{I\arabic*.},leftmargin=*]
+  \item Define the caller-facing claim:
+  \(c\in\F^{\B^\ell\times\B^n}\),
+  \(z=(z_{\mathrm{slice}},z_{\mathrm{in}})\in\F^\ell\times\F^k\), and
+  \(v\in\F\).  In our protocol, \(c\) is the literal matrix behind \(R_c\).
+  \item Restate the exact Blaze relation:
+  \(((z,v),c;m)\in\RMLE[\PRAA^t]\) means
+  \(c=\PRAA^t(m)\) and
+  \(\MLE(m)(z_{\mathrm{slice}},z_{\mathrm{in}})=v\).  Then separately state
+  the proximity version \(c\approx\PRAA^t(m)\).
+  \item Replay Blaze's prover message
+  \(u\in\F^{\B^\ell}\), where honestly
+  \(u[h]=\MLE(m[h,\ast])(z_{\mathrm{in}})\), and the verifier check
+  \(\MLE(u)(z_{\mathrm{slice}})=v\).
+  \item Replay the random fold:
+  \(\rho\leftarrow\F^{\B^\ell}\),
+  \(c_\star=\rho^\top c\),
+  \(v_\star=\ip{\rho}{u}\), and honestly
+  \(m_\star=\rho^\top m\).  Translate \(c_\star\) to the virtual handle
+  \(R_\star\).
+  \item State that the produced base claim is an
+  \(\RMLE[\PRAA]\)-IOPP claim for
+  \((z_{\mathrm{in}},v_\star,c_\star)\), not a new top-level protocol.
+  \item Fill in the soundness proof as Blaze does:
+  Claim~6.1.1 normalizes by \(u\otimes C(\mathbf 1)\);
+  Claim~6.1.2 uses Corollary~2.6 for random-fold proximity; and
+  Claim~6.1.3 shifts back to the affine target
+  \(\MLE(m_\star)(z_{\mathrm{in}})=v_\star\).
+\end{enumerate}
+
+\paragraph{Layer 2 outline: native RAA MLIOP, Blaze Lemma~5.1 and
+Proposition~5.5.}
+This is the base reduction
+\[
+  \RMLE[\PRAA]\longrightarrow\text{native MLIOP evaluation requests}.
+\]
+Fill this layer only after Layer~1 has produced the folded instance
+\[
+  y=c_\star,\qquad z=z_{\mathrm{in}},\qquad v=v_\star.
+\]
+\begin{enumerate}[label=\textbf{N\arabic*.},leftmargin=*]
+  \item Restate the exact base relation:
+  \(y=\PRAA(m)\) and \(\MLE(m)(z)=v\), where
+  \(y\in\F^{\B^n}\) is the literal folded word behind \(R_\star\).
+  \item Map the fixed protocol's stage tensors to Blaze's RAA stages:
+  \(u_1=F_{\mathrm{rep}}m\),
+  \(u_2=M_{\pi_1}u_1\),
+  \(u_3=\Acc(u_2)\),
+  \(u_4=M_{\pi_2}u_3\),
+  \(u_5=\Acc(u_4)=y\).
+  \item Attach accumulator checks to Blaze Propositions~5.2 and~5.3.
+  State which fixed subroutine calls produce the claims for
+  \(u_3=\Acc(u_2)\) and \(u_5=\Acc(u_4)\).
+  \item Attach permutation checks to Blaze Proposition~5.4.  State where the
+  helper tensors \(f_1,g_1,f_2,g_2\) enter and which permutation equalities
+  they certify.
+  \item Attach the six batched Boolean-sum claims and terminal endpoint
+  requests to Proposition~5.5.  The final prose should list the native MLE
+  requests that survive to the backend layer.
+\end{enumerate}
+
+\paragraph{Layer 3 outline: MLIOP-to-IOPP compiler, Blaze Lemma~4.2 and
+Proposition~4.4.}
+This layer turns native MLE handles into backend encoded-oracle claims:
+\[
+  \MLE(h)(r)=w
+  \quad\leadsto\quad
+  y_h\approx C_{\mathrm{backend}}(h)
+  \ \text{and}\quad
+  \MLE(h)(r)=w.
+\]
+\begin{enumerate}[label=\textbf{B\arabic*.},leftmargin=*]
+  \item Restate the compiler input: a native MLIOP whose verifier asks finitely
+  many evaluations \((\widehat O_h,r,w)\in\EvalReqs\).
+  \item Translate \(\widehat O_h\) into a literal backend oracle string
+  \(y_h\).  In our API this string is hidden behind an authentication handle;
+  in Blaze's relation view it is the explicit \(y\) in
+  \(((r,w),y_h;h)\in\RMLE[C_{\mathrm{backend}}]\).
+  \item State the literal/effective split from Proposition~4.4:
+  if \(y_h\) is far from the backend code, the backend
+  \(\RMLE[C_{\mathrm{backend}}]\)-IOPP rejects; if close, decode an effective
+  tensor \(h^\dagger\) and run the native MLIOP proof over those effective
+  tensors.
+  \item Add batching only after the unbatched mapping is clear.  Tie this to
+  Blaze Remark~4.3 and Proposition~4.5.
+\end{enumerate}
+
+\paragraph{Layer 4 outline: final composition, Blaze Theorem~7.1 and
+Appendix~A.}
+This is the final theorem statement we want the finished prose to justify:
+\[
+  \RMLE[\PRAA^t]
+  \overset{\text{Lemma 6.1}}{\longrightarrow}
+  \RMLE[\PRAA]
+  \overset{\text{Lemma 5.1}}{\longrightarrow}
+  \text{native MLIOP}
+  \overset{\text{Lemma 4.2}}{\longrightarrow}
+  \RMLE[C_{\mathrm{backend}}].
+\]
+\begin{enumerate}[label=\textbf{C\arabic*.},leftmargin=*]
+  \item State that Blaze Theorem~7.1 is this composition instantiated with
+  \(C=\PRAA\) and then with the backend code used to authenticate native
+  oracles.
+  \item State the final proximity meaning in our API:
+  the literal matrix behind \(R_c\) is close to a valid interleaved
+  \(\PRAA^t\) codeword, and the decoded/effective message evaluates to
+  \(v\) at \((z_{\mathrm{slice}},z_{\mathrm{in}})\).
+  \item Explain that Appendix~A supplies round-by-round soundness for composing
+  these interactive ingredients and for the later Merkle/Fiat-Shamir PCS
+  bridge.  This should appear after, not before, the lemma chain.
+\end{enumerate}

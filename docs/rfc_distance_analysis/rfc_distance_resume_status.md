@@ -297,6 +297,40 @@ Tracing `(4,2)>=(2,4)` shows the top row has child flag `(4,0)>=(2,4)` and zero
 budget than the outer support-two diamond supplies. The next blocker is a nested strong-bottom
 quotient/kernel interaction, not the old `(4,7)>=(2,8)` row.
 
+Strong-bottom follow-up:
+
+```text
+--consumed-kernel-mode inner-kernel-contained
+```
+
+extends consumed-kernel counting to positive lower kernels. It is locally plausible for the
+strong-bottom row, where a lower tau-one kernel sits inside the upper tau-two kernel, but by itself
+it barely moves the table:
+
+```text
+(4,2)>=(2,4): 932.89565663 -> 931.47579675 bits.
+```
+
+The next diagnostic:
+
+```text
+--support2-line-quotient-filter
+```
+
+excludes decomposable support-two tau-two rows with `dim(V/L)=1`, because a tau-two quotient in a
+doubled child line has rank-two active coordinate projections and cannot satisfy a nonempty
+root-line support condition. This is a valid local proof target, but applying it globally in the
+current truncated pair table loses lower-level table improvements through the coarse fallback:
+
+```text
+level-2 (4,2)>=(2,4): -624.28575448 -> -121.19264508 bits
+level-3 (4,2)>=(2,4):  932.89565663 -> 1178.66844183 bits
+```
+
+So the next implementation target is not another scalar filter. We need exact/demanded handling of
+filtered lower rows, or a richer strong-bottom state that preserves lower table improvements while
+excluding the impossible quotient-line profiles.
+
 After that, return to the theta_2=-1 kernel-chain truncation and the connected full-kernel local
 endpoint. Those remain real blockers, but they are not the first item on the active frontier.
 

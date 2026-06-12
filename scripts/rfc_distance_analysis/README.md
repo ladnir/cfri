@@ -423,6 +423,35 @@ The new traced blocker is the level-3 flag `(4,2)>=(2,4)`, whose top row has chi
 `(4,0)>=(2,4)` and zero support-two-diamond saving. That row needs a different nested
 strong-bottom quotient/kernel state.
 
+Two follow-up diagnostics target this strong-bottom row:
+
+```text
+--consumed-kernel-mode inner-kernel-contained
+--support2-line-quotient-filter
+```
+
+The first counts a positive lower kernel inside the upper kernel when the displayed child
+containers are compatible. The second excludes decomposable support-two tau-two rows with
+`dim(V/L)=1`; such a quotient is the whole doubled child line and has rank-two active coordinate
+projections, so it cannot satisfy a nonempty root-line support condition.
+
+On the narrow `(4,2)>=(2,4)` table, positive-kernel containment alone gives only:
+
+```text
+932.89565663 -> 931.47579675 bits.
+```
+
+Adding the line-quotient filter is locally sensible but currently not a global win in the truncated
+table, because lower filtered tables can fall back to their coarse baseline:
+
+```text
+level-2 (4,2)>=(2,4): -624.28575448 -> -121.19264508 bits
+level-3 (4,2)>=(2,4):  932.89565663 -> 1178.66844183 bits
+```
+
+Treat the filter as a proof obligation and a diagnostic, not as a certificate mode until the
+demanded table can preserve lower improvements while removing impossible profiles.
+
 `rfc_multicopy_falsification.py` is adversarial. It estimates whether broad one-copy near-families
 can intersect across many independent RFC copies often enough to threaten the target excess.
 

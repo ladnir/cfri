@@ -334,6 +334,22 @@ The new blocker is the level-3 flag `(4,2)>=(2,4)`, whose top row has child flag
 The lower tau-one layer imposes a strong bottom/kernel zero budget that the support-two diamond
 does not explain.
 
+Two narrow diagnostics now bracket this row. Positive lower-kernel containment is algebraically
+available when the lower witness contains the upper singleton witness:
+
+```text
+K_lower <= K_upper,
+saving = dim K_lower * (2 dim L_upper - dim K_upper).
+```
+
+For the top strong-bottom row this is `2` q-dimensions locally, but the table barely moves because
+a codimension-one support-two line-quotient row takes over. That line-quotient row should itself be
+impossible: if `dim(V/L)=1`, then a tau-two quotient with nonempty exact root-line support is the
+whole doubled child line and has rank-two coordinate projections on active coordinates. The current
+truncated table cannot yet exploit this cleanly, because filtered lower tables may fall back to
+their coarse baseline. The next theorem/implementation step is an exact demanded strong-bottom
+state, not another coarse scalar filter.
+
 ## Tau-One Chain Rows
 
 The anti-conservative sensitivity:

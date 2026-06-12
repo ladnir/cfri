@@ -179,6 +179,27 @@ def choice_has_collapsed_active_container(choice: tuple[int, ...]) -> bool:
     )
 
 
+def choice_has_support2_line_quotient_impossibility(choice: tuple[int, ...]) -> bool:
+    """Return true for the decomposable support-two tau-two line-quotient overcount.
+
+    If `dim(V/L)=1`, then a tau-two quotient injects into the doubled child
+    line `(V/L)+(V/L)` and is therefore the whole two-dimensional doubled line.
+    At every active coordinate where the child quotient line is nonzero, the
+    coordinate projection has rank two, so it cannot be compatible with a
+    singleton root line.  Thus the exact support-two decomposable row is not a
+    real tau-two visible-support row.
+    """
+
+    view = choice_view(choice)
+    return (
+        view.tau == 2
+        and view.visible_support == 2
+        and view.delta == 2
+        and view.components == 2
+        and view.outer_span == view.inner_span + 1
+    )
+
+
 def choice_kernel_lift_qdim(parent_span: int, choice: tuple[int, ...]) -> int:
     view = choice_view(choice)
     if view.tau <= 0:
@@ -337,19 +358,26 @@ def consumed_kernel_cover_qdim(
 
     if consumed_kernel_mode == "none":
         return 0
-    if consumed_kernel_mode != "tau0-inner-contained":
+    if consumed_kernel_mode not in ("tau0-inner-contained", "inner-kernel-contained"):
         raise ValueError(f"unknown consumed_kernel_mode: {consumed_kernel_mode}")
     outer = choice_view(outer_choice)
     inner = choice_view(inner_choice)
-    if inner.tau != 0:
+    if consumed_kernel_mode == "tau0-inner-contained" and inner.tau != 0:
         return 0
     outer_kernel_dim = outer_parent_span - outer.tau
-    if inner_parent_span > outer_kernel_dim:
+    inner_kernel_dim = inner_parent_span - inner.tau
+    if inner_kernel_dim <= 0:
+        return 0
+    if consumed_kernel_mode == "tau0-inner-contained":
+        inner_kernel_dim = inner_parent_span
+    if inner_kernel_dim > outer_kernel_dim:
+        return 0
+    if consumed_kernel_mode == "inner-kernel-contained" and inner.inner_span > outer.inner_span:
         return 0
     ambient_dim = 2 * outer.inner_span
     if ambient_dim < outer_kernel_dim:
         return 0
-    return inner_parent_span * (ambient_dim - outer_kernel_dim)
+    return inner_kernel_dim * (ambient_dim - outer_kernel_dim)
 
 
 def qbinom_exponent(sub_dim: int, ambient_dim: int) -> int:
@@ -574,6 +602,7 @@ def build_pair_rows(
     nested_subspace_mode: str = "none",
     consumed_kernel_mode: str = "none",
     support2_diamond_mode: str = "none",
+    support2_line_filter: bool = False,
 ) -> tuple[list[PairRow], float]:
     if support2_diamond_mode not in ("none", "child-only"):
         raise ValueError(f"unknown support2_diamond_mode: {support2_diamond_mode}")
@@ -582,8 +611,12 @@ def build_pair_rows(
     for outer in outer_terms:
         if exclude_collapsed_active and choice_has_collapsed_active_container(outer.choice):
             continue
+        if support2_line_filter and choice_has_support2_line_quotient_impossibility(outer.choice):
+            continue
         for inner in inner_terms:
             if exclude_collapsed_active and choice_has_collapsed_active_container(inner.choice):
+                continue
+            if support2_line_filter and choice_has_support2_line_quotient_impossibility(inner.choice):
                 continue
             child_layers = tuple(
                 merge_equal_dimension_chain(list(outer.child_layers) + list(inner.child_layers))
@@ -841,11 +874,12 @@ def main() -> None:
     )
     parser.add_argument(
         "--consumed-kernel-mode",
-        choices=("none", "tau0-inner-contained"),
+        choices=("none", "tau0-inner-contained", "inner-kernel-contained"),
         default="none",
         help=(
-            "diagnostic: for a lower tau-zero row, count the upper kernel as "
-            "containing W_inner instead of as a fresh kernel lift"
+            "diagnostic: count the upper kernel as containing a lower kernel "
+            "subspace instead of as a fresh kernel lift; tau0-inner-contained "
+            "applies only to lower tau-zero rows"
         ),
     )
     parser.add_argument(
@@ -856,6 +890,14 @@ def main() -> None:
             "diagnostic: for decomposable support-two tau-two rows, keep quotient "
             "incidence counted but replace the bare child flag by a quotient-diamond "
             "chain bound"
+        ),
+    )
+    parser.add_argument(
+        "--support2-line-quotient-filter",
+        action="store_true",
+        help=(
+            "diagnostic: exclude decomposable support-two tau-two rows with "
+            "dim(V/L)=1, where a nonempty exact root-line support is impossible"
         ),
     )
     parser.add_argument(
@@ -946,6 +988,7 @@ def main() -> None:
         nested_subspace_mode=args.nested_subspace_mode,
         consumed_kernel_mode=args.consumed_kernel_mode,
         support2_diamond_mode=args.support2_diamond_mode,
+        support2_line_filter=args.support2_line_quotient_filter,
     )
 
     writer = csv.DictWriter(sys.stdout, fieldnames=CSV_FIELDS, lineterminator="\n")
@@ -966,7 +1009,8 @@ def main() -> None:
                 f"nested_quotient_mode={args.nested_quotient_mode},"
                 f"nested_subspace_mode={args.nested_subspace_mode},"
                 f"consumed_kernel_mode={args.consumed_kernel_mode},"
-                f"support2_diamond_mode={args.support2_diamond_mode}"
+                f"support2_diamond_mode={args.support2_diamond_mode},"
+                f"support2_line_quotient_filter={args.support2_line_quotient_filter}"
             ),
             stats=all_stats,
             coarse=coarse,

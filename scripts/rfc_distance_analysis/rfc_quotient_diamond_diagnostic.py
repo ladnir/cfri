@@ -297,7 +297,7 @@ def main() -> None:
     )
     parser.add_argument(
         "--consumed-kernel-mode",
-        choices=("none", "tau0-inner-contained"),
+        choices=("none", "tau0-inner-contained", "inner-kernel-contained"),
         default="none",
     )
     parser.add_argument("--proof-shaped", action="store_true")
@@ -335,6 +335,8 @@ def main() -> None:
         nested_quotient_mode=args.nested_quotient_mode,
         nested_subspace_mode=args.nested_subspace_mode,
         consumed_kernel_mode=args.consumed_kernel_mode,
+        support2_diamond_mode="none",
+        support2_line_filter=False,
         last_level_keys={target_key},
         demand_next_level=False,
     )
@@ -378,6 +380,7 @@ def main() -> None:
         nested_subspace_mode=args.nested_subspace_mode,
         consumed_kernel_mode=args.consumed_kernel_mode,
         support2_diamond_mode="none",
+        support2_line_filter=False,
     )
 
     table_value = current.flag_table.get(target_key) if current.flag_table is not None else None

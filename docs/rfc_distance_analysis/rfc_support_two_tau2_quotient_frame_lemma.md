@@ -309,3 +309,48 @@ The diamond has no effect here because the merged child diagram has a much stron
 zero requirement than the outer support-two frame supplies. The next local/state blocker is
 therefore a nested strong-bottom quotient/kernel interaction for `(4,2)>=(2,4)`, not another
 application of the same support-two diamond.
+
+## Strong-Bottom Follow-Up
+
+Two additional diagnostics now target the `(4,2)>=(2,4)` row.
+
+First, `--consumed-kernel-mode inner-kernel-contained` extends the old lower tau-zero consumed
+kernel diagnostic to positive lower kernels. In the top strong-bottom row, the lower tau-one layer
+has a one-dimensional kernel. Because the lower zero witness contains the upper singleton witness,
+that lower kernel should be counted inside the upper tau-two kernel rather than independently. The
+local saving is:
+
+```text
+dim K_lower * (2 dim L_upper - dim K_upper) = 1 * (4 - 2) = 2 q-dim.
+```
+
+Second, `--support2-line-quotient-filter` excludes the decomposable support-two tau-two row with:
+
+```text
+dim(V/L) = 1.
+```
+
+Reason: the tau-two quotient injects into the doubled child line `(V/L)+(V/L)`, hence is the whole
+two-dimensional doubled line. At any active coordinate where the child quotient line is nonzero,
+the coordinate projection has rank two, so it cannot be compatible with a singleton root line.
+Thus a nonempty exact support-two root-line event is impossible in this quotient-line case.
+
+The narrow diagnostic is mixed. With positive-kernel containment alone, `(4,2)>=(2,4)` only moves:
+
+```text
+932.89565663 -> 931.47579675 bits.
+```
+
+The old top row is charged, but a codimension-one support-two line-quotient row takes over. Adding
+the line-quotient filter removes that row, but the current truncated lower table then falls back to
+the coarse level-2 baseline:
+
+```text
+level-2 (4,2)>=(2,4): -624.28575448 -> -121.19264508 bits
+level-3 (4,2)>=(2,4):  932.89565663 -> 1178.66844183 bits
+```
+
+So the line-quotient filter is a valid local proof target, but not yet a useful global recurrence
+mode in the current truncated table plumbing. The next implementation needs exact/demanded handling
+of filtered lower rows, or a richer state that preserves the lower table improvements while
+excluding the impossible line-quotient profiles.

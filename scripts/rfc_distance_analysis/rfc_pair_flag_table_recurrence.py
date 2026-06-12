@@ -166,6 +166,7 @@ def compute_pair_enumerated_flag_table(
     nested_subspace_mode: str,
     consumed_kernel_mode: str,
     support2_diamond_mode: str,
+    support2_line_filter: bool,
     allowed_keys: set[tuple[State, State]] | None = None,
 ) -> tuple[FlagTable, TableStats]:
     if allowed_keys is not None and len(allowed_keys) == 0:
@@ -241,6 +242,7 @@ def compute_pair_enumerated_flag_table(
                 nested_subspace_mode=nested_subspace_mode,
                 consumed_kernel_mode=consumed_kernel_mode,
                 support2_diamond_mode=support2_diamond_mode,
+                support2_line_filter=support2_line_filter,
             )
             value = min(baseline, pair_sum) if pair_sum > NEG_INF / 2 else baseline
             table[key] = value
@@ -413,6 +415,7 @@ def build_pair_levels(
     nested_subspace_mode: str,
     consumed_kernel_mode: str,
     support2_diamond_mode: str,
+    support2_line_filter: bool,
     last_level_keys: set[tuple[State, State]] | None,
     demand_next_level: bool,
 ) -> tuple[list[LevelData], list[TableStats]]:
@@ -478,6 +481,7 @@ def build_pair_levels(
             nested_subspace_mode=nested_subspace_mode,
             consumed_kernel_mode=consumed_kernel_mode,
             support2_diamond_mode=support2_diamond_mode,
+            support2_line_filter=support2_line_filter,
             allowed_keys=allowed_keys,
         )
         levels.append(
@@ -538,11 +542,12 @@ def main() -> None:
     )
     parser.add_argument(
         "--consumed-kernel-mode",
-        choices=("none", "tau0-inner-contained"),
+        choices=("none", "tau0-inner-contained", "inner-kernel-contained"),
         default="none",
         help=(
-            "diagnostic: for a lower tau-zero row, count the upper kernel as "
-            "containing W_inner instead of as a fresh kernel lift"
+            "diagnostic: count the upper kernel as containing a lower kernel "
+            "subspace instead of as a fresh kernel lift; tau0-inner-contained "
+            "applies only to lower tau-zero rows"
         ),
     )
     parser.add_argument(
@@ -552,6 +557,14 @@ def main() -> None:
         help=(
             "diagnostic: route decomposable support-two tau-two rows through a "
             "joint child-diamond chain bound while keeping quotient incidence counted"
+        ),
+    )
+    parser.add_argument(
+        "--support2-line-quotient-filter",
+        action="store_true",
+        help=(
+            "diagnostic: exclude decomposable support-two tau-two rows with "
+            "dim(V/L)=1, where nonempty exact root-line support is impossible"
         ),
     )
     parser.add_argument(
@@ -624,6 +637,7 @@ def main() -> None:
         nested_subspace_mode=args.nested_subspace_mode,
         consumed_kernel_mode=args.consumed_kernel_mode,
         support2_diamond_mode=args.support2_diamond_mode,
+        support2_line_filter=args.support2_line_quotient_filter,
         last_level_keys=last_level_keys,
         demand_next_level=args.demand_next_level,
     )
@@ -765,6 +779,7 @@ def main() -> None:
             nested_subspace_mode=args.nested_subspace_mode,
             consumed_kernel_mode=args.consumed_kernel_mode,
             support2_diamond_mode=args.support2_diamond_mode,
+            support2_line_filter=args.support2_line_quotient_filter,
         )
         baseline_label = "-inf" if baseline <= NEG_INF / 2 else f"{baseline:.8f}"
         table_label = "-inf" if table_value <= NEG_INF / 2 else f"{table_value:.8f}"

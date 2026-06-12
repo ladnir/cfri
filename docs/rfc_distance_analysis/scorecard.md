@@ -304,3 +304,9 @@ bound is already `810.94626976`, so the improvement is coming from the child lev
 This is a partial win for the recurrence architecture. The new blocker is computational: full
 unpruned level-3 pair-table construction timed out, so the next version must be sparse or
 demand-driven.
+
+Sparse pair-table demand mode added. `--demand-next-level` runs end-to-end through depth 5 with
+proof-shaped filters and moves the crossing from `z=137` to `z=133`. It builds 599 demanded level-2
+entries and 2076 demanded level-3 entries. This is real but modest progress: the architecture
+propagates some pair-table savings, but it still does not approach the depth-5 base-seal floor
+`z=34`.

@@ -455,3 +455,33 @@ checkpoint for the displayed stress state.
 The current limitation is computational. A full unpruned level-3 pair table timed out in the Python
 diagnostic. The next implementation target is a sparse/demand-driven pair-table builder that
 computes only the flag states needed by the final distance trace and their recursive children.
+
+Sparse demand mode has now been added:
+
+```text
+python -B scripts/rfc_distance_analysis/rfc_pair_flag_table_recurrence.py \
+  --depth 5 \
+  --proof-shaped \
+  --term-limit 300 \
+  --demand-next-level
+```
+
+This computes only table entries that can be queried by the next depth-pruned scalar lift. It runs
+through depth five and reports:
+
+```text
+final_span_1_crossing_z,133
+```
+
+The table summary is:
+
+```text
+level 2:  599 entries,  402 improved
+level 3: 2076 entries, 1143 improved
+level 4:    0 entries,    0 improved
+```
+
+This improves the previous two-layer-table crossing `z=137` to `z=133`, but it is not close to the
+production floor `z=34`. The next proof/implementation step is therefore not merely sparse table
+plumbing; it needs a richer demanded diagram state or additional local charge that can propagate
+past the level-3 table.

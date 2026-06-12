@@ -152,7 +152,8 @@ docs/rfc_distance_analysis/rfc_marked_plane_state_recurrence.md
   coarse table. Update: `rfc_pair_flag_table_recurrence.py` now builds pair-enumerated tables
   through level 2 and reports the depth-5-pruned level-3 stress state `(4,7)>=(2,8)` at
   `810.94626976` bits. Full unpruned level-3 pair-table construction timed out, so the next
-  implementation blocker is a sparse/demand-driven pair table.
+  implementation blocker is a sparse/demand-driven pair table. Sparse demand mode now runs through
+  depth 5 and moves the crossing from `z=137` to `z=133`.
 
 docs/rfc_distance_analysis/rfc_flag_bad_pair_classifier_level3_4_7_ge_2_8.csv
   Status: current obstruction classifier.
@@ -192,7 +193,10 @@ The live blockers are now narrow:
    --report-flag-state 4,7,2,8 --last-level-report-only` gives `810.94626976` bits for the
    level-3 stress flag after level-2 pair-table improvements. A full unpruned level-3 pair table
    timed out. The next implementation should compute only states demanded by the final trace and
-   their recursive child flags.
+   their recursive child flags. Update: `--demand-next-level` now runs end-to-end through depth 5,
+   building 599 demanded level-2 table entries and 2076 demanded level-3 entries, and improves the
+   crossing to `z=133`. This is useful but not enough; the next recurrence likely needs a richer
+   demanded diagram state or additional local charge.
 3. Prove/finalize the shared-randomness-safe multi-layer flag transition theorem. The target note
    covers the joint marked-line/frame recurrence for the decomposable |A|=2,delta=2,comp=2 row,
    with the local marked-component certificate and uniform `(q+1)` frame-completion count written.

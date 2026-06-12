@@ -28,12 +28,15 @@ sys.path.insert(0, str(Path(__file__).resolve().parent))
 
 from rfc_flag_bad_pair_classifier import build_pair_rows  # noqa: E402
 from rfc_flag_span_moment import (  # noqa: E402
+    INF,
     NEG_INF,
     FlagTable,
     State,
     first_crossing,
     flag_child_bound_report,
+    get_child_value,
     lift_flag_span_moment,
+    local_visible_trace_profile,
     log2_comb_table,
 )
 from rfc_flag_state_choice_diagnostic import (  # noqa: E402
@@ -106,6 +109,9 @@ def compute_pair_enumerated_flag_table(
     kernel_cover_mode: str,
     allowed_keys: set[tuple[State, State]] | None = None,
 ) -> tuple[FlagTable, TableStats]:
+    if allowed_keys is not None and len(allowed_keys) == 0:
+        return {}, TableStats()
+
     child_k = 1 << level
     child_n = expansion * (1 << level)
     previous_k = 1 << (level - 1)
@@ -187,6 +193,145 @@ def compute_pair_enumerated_flag_table(
     return table, stats
 
 
+def collect_next_lift_flag_keys(
+    *,
+    child_by_span: dict[int, list[float]],
+    child_k: int,
+    singleton_charge: str,
+    max_visible_tau: int,
+    max_parent_span: int | None,
+) -> set[tuple[State, State]]:
+    """Collect two-layer child flag keys that the next scalar lift may query."""
+
+    child_n = len(next(iter(child_by_span.values()))) - 1
+    parent_n = 2 * child_n
+    parent_k = 2 * child_k
+    if max_parent_span is None:
+        max_parent_span = parent_k
+    max_parent_span = max(0, min(max_parent_span, parent_k))
+    child_spans = sorted(child_by_span)
+    incidence_mode = singleton_charge == "endpoint-tau2-layer-incidence"
+    keys: set[tuple[State, State]] = set()
+    local_profile_cache: dict[
+        tuple[int, int, int, int], tuple[int, int, int, int, int, int, int]
+    ] = {}
+
+    def cached_local_profile(
+        visible_tau: int,
+        outer_zero_count: int,
+        visible_support_size: int,
+        quotient_delta_floor: int = 0,
+    ) -> tuple[int, int, int, int, int, int, int]:
+        key = (visible_tau, outer_zero_count, visible_support_size, quotient_delta_floor)
+        if key not in local_profile_cache:
+            local_profile_cache[key] = local_visible_trace_profile(
+                visible_tau=visible_tau,
+                child_k=child_k,
+                outer_zero_count=outer_zero_count,
+                visible_support_size=visible_support_size,
+                singleton_charge_mode=singleton_charge,
+                quotient_delta_floor=quotient_delta_floor,
+            )
+        return local_profile_cache[key]
+
+    for parent_span in range(1, max_parent_span + 1):
+        for z in range(parent_n + 1):
+            for p in range(z // 2 + 1):
+                singleton_count = z - 2 * p
+                if p + singleton_count > child_n:
+                    continue
+                max_visible_support = min(singleton_count, child_n - p)
+                for visible_support_size in range(max_visible_support + 1):
+                    outer_zeros = p + singleton_count - visible_support_size
+                    inner_zeros = p + singleton_count
+                    if outer_zeros > child_n:
+                        continue
+                    if visible_support_size > child_n - outer_zeros:
+                        continue
+                    max_tau = min(parent_span, max_visible_tau)
+                    for visible_tau in range(1, max_tau + 1):
+                        if visible_support_size == 0:
+                            continue
+                        kernel_dim = parent_span - visible_tau
+                        (
+                            charge,
+                            _local_delta,
+                            _local_components,
+                            _local_g,
+                            _local_theta,
+                            _local_h,
+                            _local_gamma,
+                        ) = cached_local_profile(
+                            visible_tau,
+                            outer_zeros,
+                            visible_support_size,
+                        )
+                        if charge >= INF and not incidence_mode:
+                            continue
+                        if kernel_dim == 0:
+                            inner_span_candidates = [0]
+                        else:
+                            inner_span_candidates = [
+                                r0
+                                for r0 in child_spans
+                                if kernel_dim <= 2 * r0 and r0 <= 2 * kernel_dim
+                            ]
+                        for inner_span in inner_span_candidates:
+                            outer_span_candidates = [
+                                r1
+                                for r1 in child_spans
+                                if inner_span <= r1
+                                and parent_span <= 2 * r1
+                                and r1 <= 2 * parent_span
+                            ]
+                            for outer_span in outer_span_candidates:
+                                if outer_span == 0:
+                                    continue
+                                if incidence_mode:
+                                    quotient_delta_floor = (
+                                        max(0, outer_span - inner_span)
+                                        if visible_tau == 2
+                                        else 0
+                                    )
+                                    (
+                                        charge,
+                                        _local_delta,
+                                        _local_components,
+                                        _local_g,
+                                        _local_theta,
+                                        _local_h,
+                                        _local_gamma,
+                                    ) = cached_local_profile(
+                                        visible_tau,
+                                        outer_zeros,
+                                        visible_support_size,
+                                        quotient_delta_floor,
+                                    )
+                                    if charge >= INF:
+                                        continue
+                                outer_value = get_child_value(
+                                    child_by_span,
+                                    child_n,
+                                    outer_span,
+                                    outer_zeros,
+                                )
+                                inner_value = get_child_value(
+                                    child_by_span,
+                                    child_n,
+                                    inner_span,
+                                    inner_zeros,
+                                )
+                                if outer_value <= NEG_INF / 2 or inner_value <= NEG_INF / 2:
+                                    continue
+                                keys.add(
+                                    (
+                                        (outer_span, outer_zeros),
+                                        (inner_span, inner_zeros),
+                                    )
+                                )
+    return keys
+
+
 def build_pair_levels(
     *,
     depth: int,
@@ -202,6 +347,7 @@ def build_pair_levels(
     exclude_collapsed_active: bool,
     kernel_cover_mode: str,
     last_level_keys: set[tuple[State, State]] | None,
+    demand_next_level: bool,
 ) -> tuple[list[LevelData], list[TableStats]]:
     total_n = expansion * (1 << depth)
     comb = log2_comb_table(total_n)
@@ -231,6 +377,20 @@ def build_pair_levels(
             previous_choices,
             previous_flag_table,
         )
+        allowed_keys = last_level_keys if level == stop_level else None
+        if allowed_keys is None and level == depth and level == stop_level:
+            allowed_keys = set()
+        if allowed_keys is None and demand_next_level and level < depth:
+            next_max_parent_span = None
+            if prune_to_final_span > 0:
+                next_max_parent_span = prune_to_final_span * (1 << (depth - (level + 1)))
+            allowed_keys = collect_next_lift_flag_keys(
+                child_by_span=values,
+                child_k=1 << level,
+                singleton_charge=singleton_charge,
+                max_visible_tau=max_visible_tau,
+                max_parent_span=next_max_parent_span,
+            )
         flag_table, table_stats = compute_pair_enumerated_flag_table(
             current_values_by_span=values,
             previous_values_by_span=previous_values,
@@ -246,7 +406,7 @@ def build_pair_levels(
             term_limit=term_limit,
             exclude_collapsed_active=exclude_collapsed_active,
             kernel_cover_mode=kernel_cover_mode,
-            allowed_keys=last_level_keys if level == stop_level else None,
+            allowed_keys=allowed_keys,
         )
         levels.append(
             LevelData(
@@ -297,10 +457,16 @@ def main() -> None:
         action="append",
         default=[],
     )
+    parser.add_argument("--report-final-z", type=int, action="append", default=[])
     parser.add_argument(
         "--last-level-report-only",
         action="store_true",
         help="at --stop-level, compute only the requested --report-flag-state table entries",
+    )
+    parser.add_argument(
+        "--demand-next-level",
+        action="store_true",
+        help="compute only table entries that can be queried by the next depth-pruned scalar lift",
     )
     args = parser.parse_args()
 
@@ -333,6 +499,7 @@ def main() -> None:
         exclude_collapsed_active=args.exclude_collapsed_active,
         kernel_cover_mode=args.kernel_cover_mode,
         last_level_keys=last_level_keys,
+        demand_next_level=args.demand_next_level,
     )
 
     print(
@@ -358,6 +525,10 @@ def main() -> None:
     if final_values is not None:
         crossing = first_crossing(final_values, args.security_bits)
         print(f"final_span_1_crossing_z,{crossing if crossing is not None else ''}")
+        for z in args.report_final_z:
+            value = final_values[z] if 0 <= z < len(final_values) else NEG_INF
+            value_label = "-inf" if value <= NEG_INF / 2 else f"{value:.8f}"
+            print(f"final_span_1_z_report,{z},{value_label}")
 
     for target in args.report_flag_state:
         outer_span, outer_z, inner_span, inner_z = target

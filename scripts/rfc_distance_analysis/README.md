@@ -311,6 +311,26 @@ The equality means the level-3 stress flag is already lowered by the level-2 pai
 level-3 pair enumeration adds anything. A full unpruned level-3 pair table timed out in the current
 Python diagnostic, so the next implementation target is a sparse/demand-driven pair-table builder.
 
+The first sparse mode is `--demand-next-level`, which computes only table entries queried by the
+next depth-pruned scalar lift. End-to-end depth five now runs:
+
+```text
+python -B scripts/rfc_distance_analysis/rfc_pair_flag_table_recurrence.py \
+  --depth 5 \
+  --proof-shaped \
+  --term-limit 300 \
+  --demand-next-level
+```
+
+It reports:
+
+```text
+final_span_1_crossing_z,133
+```
+
+against `z=137` for `rfc_flag_span_moment.py --flag-bound best-two-layer-table`. So sparse
+pair-enumerated tables help, but they do not yet close the depth-5 base seal.
+
 `rfc_multicopy_falsification.py` is adversarial. It estimates whether broad one-copy near-families
 can intersect across many independent RFC copies often enough to threaten the target excess.
 

@@ -156,7 +156,11 @@ docs/rfc_distance_analysis/rfc_marked_plane_state_recurrence.md
   depth 5 and moves the crossing from `z=137` to `z=133`. The new trace diagnostics show that the
   current `z=34` residual has zero scalar log-sum overhead and that the selected level-3 flag
   `(4,7)>=(2,8)` is still using the improved coarse outer-first bound `810.94626976`, because the
-  proof-shaped pair sum is worse at `943.43723477`.
+  proof-shaped pair sum is worse at `943.43723477`. Update: scalar collapsed-active filtering plus
+  nested quotient/subspace/consumed-kernel diagnostics lower the level-3 stress state to
+  `303.43723477` and full depth-5 `z=34` to `1232.88847175`; adding scalar kernel-lift cover gives
+  `924.69069031`. The remaining trace is now a tau-two/tau-one quotient-incidence chain, not the
+  old pair-table row alone.
 
 docs/rfc_distance_analysis/rfc_flag_bad_pair_classifier_level3_4_7_ge_2_8.csv
   Status: current obstruction classifier.
@@ -182,20 +186,15 @@ docs/rfc_distance_analysis/rfc_fable_audit_2026_06_10.md
 The live blockers are now narrow:
 
 ```text
-1. Nested tau-positive local counting for the level-3 carried flag `(4,7)>=(2,8)`. The bad mass is
-   concentrated in high-lift rows, but a fixed-table diagnostic that removes only tau-positive
-   kernel-lift multiplicity closes the row with `1.92454905` q-dimensions of slack. The stricter
-   proof-shaped diagnostic is now:
-   `--exclude-collapsed-active --kernel-cover-mode sibling-unconsumed`, which closes with
-   `0.90435403` q-dimensions of slack. The theorem target is therefore two lemmas:
-   collapsed-active exact-support rerouting, and sibling-unconsumed kernel-fiber covering after the
-   canonical local quotient/root datum is fixed. Quotient-line and quotient-plane incidence remain
-   counted. Consumed kernel subspaces must be carried or charged, not covered. New correction: once
-   level-2 pair-table improvements are propagated, the coarse outer-first baseline for
-   `(4,7)>=(2,8)` improves to `810.94626976`, while the proof-shaped pair sum is
-   `943.43723477`. Therefore the kernel-cover package is useful but no longer sufficient for the
-   depth-5 base seal by itself; the next proof step must count the nested tau-positive local data
-   more sharply or carry a richer diagram state.
+1. Exact-support quotient-incidence state. The old level-3 carried flag `(4,7)>=(2,8)` is no
+   longer the only active blocker. Scalar collapsed-active filtering changes its coarse baseline to
+   `549.21247145`, and nested quotient/subspace/consumed-kernel diagnostics give table value
+   `303.43723477`. End-to-end this lowers `z=34` from `1740.39750674` to `1232.88847175`.
+   Adding scalar kernel-lift cover lowers it further to `924.69069031`, but crossing remains
+   `z=133`. The theorem target is now a finite exact-support quotient state that proves:
+   collapsed-active rerouting, nested quotient data inside outer quotient data, lower subspaces
+   inside upper parent subspaces, and consumed-kernel containment for lower tau-zero rows. Quotient
+   line/plane incidence must remain counted.
 2. Sparse pair-enumerated table recurrence. The bounded diagnostic
    `rfc_pair_flag_table_recurrence.py --depth 5 --stop-level 3 --proof-shaped --term-limit 300
    --report-flag-state 4,7,2,8 --last-level-report-only` gives `810.94626976` bits for the
@@ -205,10 +204,10 @@ The live blockers are now narrow:
    building 599 demanded level-2 table entries and 2076 demanded level-3 entries, and improves the
    crossing to `z=133`. At the production floor it reports `final_span_1_z_report,34,1740.39750674`,
    still `14.22185552` q-dimensions above the `2^-80` target. This is useful but not enough; the
-   next recurrence needs a richer demanded diagram state or a joint local theorem. The focused
-   table trace has `baseline_log2 = table_log2 = 810.94626976`, `pair_sum_log2 = 943.43723477`, and
-   `row_count = 4432` for `(4,7)>=(2,8)`, so more sparse plumbing alone is not expected to close
-   the gap.
+   next recurrence needs a richer demanded diagram state or a joint local theorem. The latest
+   structural modes show table plumbing can propagate real savings, but after the level-3 stress
+   row improves the dominant path moves to scalar tau-two and tau-one quotient-incidence rows. More
+   sparse plumbing alone is still not expected to close the gap.
 3. Prove/finalize the shared-randomness-safe multi-layer flag transition theorem. The target note
    covers the joint marked-line/frame recurrence for the decomposable |A|=2,delta=2,comp=2 row,
    with the local marked-component certificate and uniform `(q+1)` frame-completion count written.
@@ -224,13 +223,21 @@ The live blockers are now narrow:
 
 The best current next proof step is item 1, with the correction above:
 
-Finalize the local lemma package for nested tau-positive rows. The old two-lemma package
-(collapsed-active exact-support rerouting plus sibling-unconsumed kernel-fiber covering using
-`K_lower = W_lower cap K_upper`) remains a prerequisite, but the new checkpoint is stricter:
-explain why the top `(4,7)>=(2,8)` pair row with local logs `1037.25029842` and `906.66533592`
-should be charged or counted jointly enough to beat the improved `810.94626976` coarse baseline.
-If that cannot be done locally, the implementation target is a richer diagram state that avoids
-paying the full outer-first extension for this flag.
+Turn the diagnostic modes into theorem statements in the multi-layer transition note:
+
+```text
+1. scalar collapsed-active exact-support rerouting;
+2. nested quotient/subspace counting for W_inner <= W_outer;
+3. consumed-kernel containment when a lower tau-zero layer sits inside an upper kernel;
+4. small-support tau-two quotient-plane incidence;
+5. recursive tau-one quotient-chain state.
+```
+
+The current best non-tau2-cover diagnostic still leaves
+`(924.69069031 + 80) / 128 = 7.849145` q-dimensions, and the anti-conservative tau-two-cover
+ceiling leaves `(567.15416718 + 80) / 128 = 5.055892` q-dimensions. So the next proof step must
+handle both tau-two and tau-one quotient incidence; solving only the old level-3 pair row is not
+enough.
 
 After that, return to the theta_2=-1 kernel-chain truncation and the connected full-kernel local
 endpoint. Those remain real blockers, but they are not the first item on the active frontier.

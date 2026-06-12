@@ -135,6 +135,9 @@ def compute_pair_enumerated_flag_table(
     term_limit: int,
     exclude_collapsed_active: bool,
     kernel_cover_mode: str,
+    nested_quotient_mode: str,
+    nested_subspace_mode: str,
+    consumed_kernel_mode: str,
     allowed_keys: set[tuple[State, State]] | None = None,
 ) -> tuple[FlagTable, TableStats]:
     if allowed_keys is not None and len(allowed_keys) == 0:
@@ -206,6 +209,9 @@ def compute_pair_enumerated_flag_table(
                 inner_parent_span=inner_state[0],
                 exclude_collapsed_active=exclude_collapsed_active,
                 kernel_cover_mode=kernel_cover_mode,
+                nested_quotient_mode=nested_quotient_mode,
+                nested_subspace_mode=nested_subspace_mode,
+                consumed_kernel_mode=consumed_kernel_mode,
             )
             value = min(baseline, pair_sum) if pair_sum > NEG_INF / 2 else baseline
             table[key] = value
@@ -374,6 +380,9 @@ def build_pair_levels(
     term_limit: int,
     exclude_collapsed_active: bool,
     kernel_cover_mode: str,
+    nested_quotient_mode: str,
+    nested_subspace_mode: str,
+    consumed_kernel_mode: str,
     last_level_keys: set[tuple[State, State]] | None,
     demand_next_level: bool,
 ) -> tuple[list[LevelData], list[TableStats]]:
@@ -404,6 +413,7 @@ def build_pair_levels(
             max_parent_span,
             previous_choices,
             previous_flag_table,
+            exclude_collapsed_active=exclude_collapsed_active,
         )
         allowed_keys = last_level_keys if level == stop_level else None
         if allowed_keys is None and level == depth and level == stop_level:
@@ -434,6 +444,9 @@ def build_pair_levels(
             term_limit=term_limit,
             exclude_collapsed_active=exclude_collapsed_active,
             kernel_cover_mode=kernel_cover_mode,
+            nested_quotient_mode=nested_quotient_mode,
+            nested_subspace_mode=nested_subspace_mode,
+            consumed_kernel_mode=consumed_kernel_mode,
             allowed_keys=allowed_keys,
         )
         levels.append(
@@ -473,6 +486,33 @@ def main() -> None:
         "--kernel-cover-mode",
         choices=("none", "posthoc", "unconsumed-container", "sibling-unconsumed"),
         default="none",
+    )
+    parser.add_argument(
+        "--nested-quotient-mode",
+        choices=("none", "inner-in-outer"),
+        default="none",
+        help=(
+            "diagnostic: count a compatible inner tau-positive quotient inside the "
+            "already-counted outer visible quotient"
+        ),
+    )
+    parser.add_argument(
+        "--nested-subspace-mode",
+        choices=("none", "inner-in-outer"),
+        default="none",
+        help=(
+            "diagnostic: after the upper parent row is fixed, cap remaining lower "
+            "lift multiplicity by the Grassmann count of W_inner <= W_outer"
+        ),
+    )
+    parser.add_argument(
+        "--consumed-kernel-mode",
+        choices=("none", "tau0-inner-contained"),
+        default="none",
+        help=(
+            "diagnostic: for a lower tau-zero row, count the upper kernel as "
+            "containing W_inner instead of as a fresh kernel lift"
+        ),
     )
     parser.add_argument(
         "--proof-shaped",
@@ -540,6 +580,9 @@ def main() -> None:
         term_limit=args.term_limit,
         exclude_collapsed_active=args.exclude_collapsed_active,
         kernel_cover_mode=args.kernel_cover_mode,
+        nested_quotient_mode=args.nested_quotient_mode,
+        nested_subspace_mode=args.nested_subspace_mode,
+        consumed_kernel_mode=args.consumed_kernel_mode,
         last_level_keys=last_level_keys,
         demand_next_level=args.demand_next_level,
     )
@@ -677,6 +720,9 @@ def main() -> None:
             inner_parent_span=inner_span,
             exclude_collapsed_active=args.exclude_collapsed_active,
             kernel_cover_mode=args.kernel_cover_mode,
+            nested_quotient_mode=args.nested_quotient_mode,
+            nested_subspace_mode=args.nested_subspace_mode,
+            consumed_kernel_mode=args.consumed_kernel_mode,
         )
         baseline_label = "-inf" if baseline <= NEG_INF / 2 else f"{baseline:.8f}"
         table_label = "-inf" if table_value <= NEG_INF / 2 else f"{table_value:.8f}"
@@ -691,6 +737,8 @@ def main() -> None:
             "outer_kernel_lift_qdim,outer_quotient_lift_qdim,"
             "inner_kernel_lift_qdim,inner_quotient_lift_qdim,"
             "outer_covered_kernel_lift_qdim,inner_covered_kernel_lift_qdim,"
+            "outer_consumed_kernel_cover_qdim,"
+            "inner_nested_quotient_cover_qdim,inner_nested_subspace_cover_qdim,"
             "outer_choice,inner_choice"
         )
         for rank, row in enumerate(rows[: args.trace_table_top], start=1):
@@ -712,7 +760,11 @@ def main() -> None:
                 f"{choice_quotient_lift_qdim(outer_span, row.outer.choice)},"
                 f"{choice_kernel_lift_qdim(inner_span, row.inner.choice)},"
                 f"{choice_quotient_lift_qdim(inner_span, row.inner.choice)},"
-                f"{outer_covered},{inner_covered},{outer_choice},{inner_choice}"
+                f"{outer_covered},{inner_covered},"
+                f"{row.outer_consumed_kernel_cover_qdim},"
+                f"{row.inner_nested_quotient_cover_qdim},"
+                f"{row.inner_nested_subspace_cover_qdim},"
+                f"{outer_choice},{inner_choice}"
             )
 
     if args.trace_z >= 0:

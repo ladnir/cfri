@@ -66,6 +66,9 @@ CSV_FIELDS = [
     "top_inner_quotient_lift_qdim",
     "top_outer_covered_kernel_lift_qdim",
     "top_inner_covered_kernel_lift_qdim",
+    "top_outer_consumed_kernel_cover_qdim",
+    "top_inner_nested_quotient_cover_qdim",
+    "top_inner_nested_subspace_cover_qdim",
     "top_outer_kernel_dim",
     "top_inner_kernel_dim",
     "top_outer_kernel_unconsumed_by_inner",
@@ -101,6 +104,9 @@ class PairRow:
     child_flag_log2: float
     outer_local_log2: float
     inner_local_log2: float
+    outer_consumed_kernel_cover_qdim: int
+    inner_nested_quotient_cover_qdim: int
+    inner_nested_subspace_cover_qdim: int
     joint_log2: float
 
 
@@ -190,6 +196,72 @@ def choice_quotient_lift_qdim(parent_span: int, choice: tuple[int, ...]) -> int:
     return view.tau * (2 * view.outer_span - parent_span)
 
 
+def nested_quotient_cover_qdim(
+    *,
+    outer_parent_span: int,
+    inner_parent_span: int,
+    outer_choice: tuple[int, ...],
+    inner_choice: tuple[int, ...],
+    nested_quotient_mode: str,
+) -> int:
+    """Diagnostic quotient nesting adjustment for a nested pair of local rows.
+
+    In a parent flag W_inner <= W_outer, tau-positive quotient data should not
+    always be chosen independently.  The conservative diagnostic here keeps the
+    outer quotient datum fully counted, then lets the inner quotient be chosen
+    inside the already-fixed outer visible quotient whenever the displayed
+    dimensions are compatible.  It still pays the Grassmann exponent for a
+    tau_inner-subspace inside a tau_outer-space, so quotient incidence is not
+    erased.
+    """
+
+    if nested_quotient_mode == "none":
+        return 0
+    if nested_quotient_mode != "inner-in-outer":
+        raise ValueError(f"unknown nested_quotient_mode: {nested_quotient_mode}")
+
+    outer = choice_view(outer_choice)
+    inner = choice_view(inner_choice)
+    if outer.tau <= 0 or inner.tau <= 0:
+        return 0
+    if inner.tau > outer.tau:
+        return 0
+    if inner.outer_span > outer.outer_span or inner.inner_span > outer.inner_span:
+        return 0
+
+    independent_qdim = choice_quotient_lift_qdim(inner_parent_span, inner_choice)
+    nested_qdim = inner.tau * (outer.tau - inner.tau)
+    return max(0, independent_qdim - nested_qdim)
+
+
+def nested_subspace_cover_qdim(
+    *,
+    outer_parent_span: int,
+    inner_parent_span: int,
+    inner_choice: tuple[int, ...],
+    already_covered_lift_qdim: int,
+    nested_subspace_mode: str,
+) -> int:
+    """Diagnostic cap for choosing the lower parent subspace inside the upper one.
+
+    After a parent flag fixes W_outer, the lower layer W_inner is a
+    dim(W_inner)-subspace of W_outer.  This diagnostic caps the lower row's
+    remaining lift multiplicity by the Grassmann exponent for such subspaces.
+    Local root/support charges are still paid separately.
+    """
+
+    if nested_subspace_mode == "none":
+        return 0
+    if nested_subspace_mode != "inner-in-outer":
+        raise ValueError(f"unknown nested_subspace_mode: {nested_subspace_mode}")
+    if inner_parent_span > outer_parent_span:
+        return 0
+
+    counted_lift_qdim = max(0, choice_view(inner_choice).lift_qdim - already_covered_lift_qdim)
+    nested_qdim = inner_parent_span * (outer_parent_span - inner_parent_span)
+    return max(0, counted_lift_qdim - nested_qdim)
+
+
 def outer_kernel_unconsumed_by_inner(
     *,
     outer_parent_span: int,
@@ -241,6 +313,40 @@ def covered_kernel_lift_qdims(
             outer_cover = outer_kernel_lift
         return outer_cover, 0
     raise ValueError(f"unknown kernel_cover_mode: {kernel_cover_mode}")
+
+
+def consumed_kernel_cover_qdim(
+    *,
+    outer_parent_span: int,
+    inner_parent_span: int,
+    outer_choice: tuple[int, ...],
+    inner_choice: tuple[int, ...],
+    consumed_kernel_mode: str,
+) -> int:
+    """Diagnostic for a lower tau-zero layer carried inside an upper kernel.
+
+    This is deliberately narrower than the general consumed-kernel theorem.  If
+    the displayed lower layer is tau zero and has dimension at most the upper
+    kernel dimension, then a conditional recurrence could count the upper
+    kernel as a kappa_outer-subspace containing W_inner instead of as an
+    arbitrary kappa_outer-subspace of L_outer+L_outer.
+    """
+
+    if consumed_kernel_mode == "none":
+        return 0
+    if consumed_kernel_mode != "tau0-inner-contained":
+        raise ValueError(f"unknown consumed_kernel_mode: {consumed_kernel_mode}")
+    outer = choice_view(outer_choice)
+    inner = choice_view(inner_choice)
+    if inner.tau != 0:
+        return 0
+    outer_kernel_dim = outer_parent_span - outer.tau
+    if inner_parent_span > outer_kernel_dim:
+        return 0
+    ambient_dim = 2 * outer.inner_span
+    if ambient_dim < outer_kernel_dim:
+        return 0
+    return inner_parent_span * (ambient_dim - outer_kernel_dim)
 
 
 def tau_key(row: PairRow) -> str:
@@ -327,6 +433,9 @@ def build_pair_rows(
     inner_parent_span: int,
     exclude_collapsed_active: bool,
     kernel_cover_mode: str,
+    nested_quotient_mode: str = "none",
+    nested_subspace_mode: str = "none",
+    consumed_kernel_mode: str = "none",
 ) -> tuple[list[PairRow], float]:
     rows: list[PairRow] = []
     pair_sum = NEG_INF
@@ -358,6 +467,32 @@ def build_pair_rows(
             )
             outer_local_log2 = outer.local_log2 - outer_covered_kernel * q_log2
             inner_local_log2 = inner.local_log2 - inner_covered_kernel * q_log2
+            outer_consumed_kernel_cover = consumed_kernel_cover_qdim(
+                outer_parent_span=outer_parent_span,
+                inner_parent_span=inner_parent_span,
+                outer_choice=outer.choice,
+                inner_choice=inner.choice,
+                consumed_kernel_mode=consumed_kernel_mode,
+            )
+            outer_local_log2 -= outer_consumed_kernel_cover * q_log2
+            inner_nested_quotient_cover = nested_quotient_cover_qdim(
+                outer_parent_span=outer_parent_span,
+                inner_parent_span=inner_parent_span,
+                outer_choice=outer.choice,
+                inner_choice=inner.choice,
+                nested_quotient_mode=nested_quotient_mode,
+            )
+            inner_local_log2 -= inner_nested_quotient_cover * q_log2
+            inner_nested_subspace_cover = nested_subspace_cover_qdim(
+                outer_parent_span=outer_parent_span,
+                inner_parent_span=inner_parent_span,
+                inner_choice=inner.choice,
+                already_covered_lift_qdim=(
+                    inner_covered_kernel + inner_nested_quotient_cover
+                ),
+                nested_subspace_mode=nested_subspace_mode,
+            )
+            inner_local_log2 -= inner_nested_subspace_cover * q_log2
             joint_log2 = outer_local_log2 + inner_local_log2 + child_flag_log2
             row = PairRow(
                 outer=outer,
@@ -366,6 +501,9 @@ def build_pair_rows(
                 child_flag_log2=child_flag_log2,
                 outer_local_log2=outer_local_log2,
                 inner_local_log2=inner_local_log2,
+                outer_consumed_kernel_cover_qdim=outer_consumed_kernel_cover,
+                inner_nested_quotient_cover_qdim=inner_nested_quotient_cover,
+                inner_nested_subspace_cover_qdim=inner_nested_subspace_cover,
                 joint_log2=joint_log2,
             )
             rows.append(row)
@@ -456,6 +594,15 @@ def make_output_row(
             if top is not None
             else ""
         ),
+        "top_outer_consumed_kernel_cover_qdim": (
+            top.outer_consumed_kernel_cover_qdim if top is not None else ""
+        ),
+        "top_inner_nested_quotient_cover_qdim": (
+            top.inner_nested_quotient_cover_qdim if top is not None else ""
+        ),
+        "top_inner_nested_subspace_cover_qdim": (
+            top.inner_nested_subspace_cover_qdim if top is not None else ""
+        ),
         "top_outer_kernel_dim": (
             choice_kernel_dim(outer_parent_span, top.outer.choice) if top is not None else ""
         ),
@@ -512,6 +659,33 @@ def main() -> None:
             "kernel-lift adjustment mode; unconsumed-container covers all displayed kernel lifts, "
             "while sibling-unconsumed covers only an upper kernel lift whose displayed lower layer "
             "is fully visible"
+        ),
+    )
+    parser.add_argument(
+        "--nested-quotient-mode",
+        choices=("none", "inner-in-outer"),
+        default="none",
+        help=(
+            "diagnostic: keep outer quotient incidence counted but choose a nested inner "
+            "tau-positive quotient inside the outer visible quotient when dimensions permit"
+        ),
+    )
+    parser.add_argument(
+        "--nested-subspace-mode",
+        choices=("none", "inner-in-outer"),
+        default="none",
+        help=(
+            "diagnostic: after the upper parent row is fixed, cap remaining lower "
+            "lift multiplicity by the Grassmann count of W_inner <= W_outer"
+        ),
+    )
+    parser.add_argument(
+        "--consumed-kernel-mode",
+        choices=("none", "tau0-inner-contained"),
+        default="none",
+        help=(
+            "diagnostic: for a lower tau-zero row, count the upper kernel as "
+            "containing W_inner instead of as a fresh kernel lift"
         ),
     )
     parser.add_argument(
@@ -598,6 +772,9 @@ def main() -> None:
         inner_parent_span=args.inner_state[0],
         exclude_collapsed_active=args.exclude_collapsed_active,
         kernel_cover_mode=kernel_cover_mode,
+        nested_quotient_mode=args.nested_quotient_mode,
+        nested_subspace_mode=args.nested_subspace_mode,
+        consumed_kernel_mode=args.consumed_kernel_mode,
     )
 
     writer = csv.DictWriter(sys.stdout, fieldnames=CSV_FIELDS, lineterminator="\n")
@@ -614,7 +791,10 @@ def main() -> None:
                 f"inner={format_state(args.inner_state)},"
                 f"outer_terms={len(outer_terms)},inner_terms={len(inner_terms)},"
                 f"exclude_collapsed_active={args.exclude_collapsed_active},"
-                f"kernel_cover_mode={kernel_cover_mode}"
+                f"kernel_cover_mode={kernel_cover_mode},"
+                f"nested_quotient_mode={args.nested_quotient_mode},"
+                f"nested_subspace_mode={args.nested_subspace_mode},"
+                f"consumed_kernel_mode={args.consumed_kernel_mode}"
             ),
             stats=all_stats,
             coarse=coarse,

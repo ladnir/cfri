@@ -556,6 +556,7 @@ def lift_flag_span_moment(
     max_parent_span: int | None = None,
     child_choices: dict[tuple[int, int], tuple[int, ...] | None] | None = None,
     child_flag_table: FlagTable | None = None,
+    exclude_collapsed_active: bool = False,
 ) -> tuple[dict[int, list[float]], dict[tuple[int, int], tuple[int, ...] | None]]:
     child_n = len(next(iter(child_by_span.values()))) - 1
     parent_n = 2 * child_n
@@ -687,6 +688,14 @@ def lift_flag_span_moment(
 
                             for outer_span in outer_span_candidates:
                                 if outer_span == 0:
+                                    continue
+                                if (
+                                    exclude_collapsed_active
+                                    and visible_tau > 0
+                                    and visible_support_size > 0
+                                    and inner_span == outer_span
+                                    and inner_zeros > outer_zeros
+                                ):
                                     continue
                                 if incidence_mode:
                                     quotient_delta_floor = (
@@ -1039,6 +1048,14 @@ def main() -> None:
         ),
     )
     parser.add_argument(
+        "--exclude-collapsed-active",
+        action="store_true",
+        help=(
+            "Diagnostic/proof target: skip tau-positive rows whose equal-dimension child "
+            "containers force the active support into the kernel row."
+        ),
+    )
+    parser.add_argument(
         "--prune-to-final-span",
         type=int,
         default=0,
@@ -1135,6 +1152,7 @@ def main() -> None:
             max_parent_span,
             previous_choices,
             previous_flag_table,
+            exclude_collapsed_active=args.exclude_collapsed_active,
         )
         trace.append(choices)
         values_by_level.append({span: values[:] for span, values in values_by_span.items()})

@@ -48,8 +48,10 @@ Open items are excluded from the denominator.
 | Tau-one fixed-flag quotient-line incidence | 0 | 1 | 0 | 0% | Safe local brick, not a closer | `rfc_tau1_quotient_line_incidence_lemma.md` proves the post-root exponent `f_A + m_A - 1 - |A|`; `--report-tau1-incidence` shows the `z=34` tau-one trace rows have `support_saving=0`. |
 | Carried two-layer flag merge | 1 | 1 | 0 | 50% | Keep, exposes next diagram | `rfc_carried_flag_diagnostic.py` carries `F_3((4,7),(2,8))`, improves `(4,3)>=(2,5)` to `(4,4)>=(2,5)`, and saves `251.98` bits; next state is a two-marked-line diagram. |
 | Two-marked-line plane diagram | 1 | 1 | 0 | 50% | Keep, local but insufficient | `rfc_two_marked_line_plane_lemma.md` replaces a coarse `q^4` ancestor choice by `q+1`, saving another `381.42` bits on the carried path. |
-| Finite marked-plane state recurrence | 1 | 7 | 0 | 13% | Keep, needs nested tau-positive local theorem | `rfc_marked_plane_state_recurrence.md`, `rfc_marked_plane_state_diagnostic.py`, `rfc_diagram_path_dp.py`, `rfc_flag_state_choice_diagnostic.py`, and `rfc_flag_bad_pair_classifier.py` turn the hand-expanded two-line diagram into a state scan/path diagnostic. Joint choices help at level 2; level-3 pair-sum is worse, and after sparse level-2 table improvements the `(4,7)>=(2,8)` pair sum `943.44` is still worse than the improved coarse baseline `810.95`. |
-| Kernel-lift-only cover | 0 | 0 | 1 | 0% | Not useful for current base seal | `--cover-kernel-lift` keeps quotient incidence and leaves depth-5 checkpoint at `z=137`; combined with safe tau-zero covering it still only reaches `z=135`. |
+| Finite marked-plane state recurrence | 1 | 8 | 0 | 11% | Keep, frontier moved to quotient-incidence state | `rfc_marked_plane_state_recurrence.md`, `rfc_marked_plane_state_diagnostic.py`, `rfc_diagram_path_dp.py`, `rfc_flag_state_choice_diagnostic.py`, and `rfc_flag_bad_pair_classifier.py` turn the hand-expanded two-line diagram into a state scan/path diagnostic. Joint choices help at level 2; nested quotient/subspace/consumed-kernel diagnostics move depth-5 `z=34` from `1740.40` to `1232.89`, but do not close. |
+| Scalar collapsed-active rerouting | 0 | 1 | 0 | 0% | Promising theorem plumbing | Applying the collapsed-active filter inside scalar lifts, not just pair tables, removes the dominant `(4,3)>=(4,4)` scalar overcount and tightens the `(4,7)>=(2,8)` baseline from `810.95` to `549.21`. Needs proof as exact-support rerouting. |
+| Nested quotient/subspace/consumed-kernel counting | 0 | 1 | 0 | 0% | Strong diagnostic, theorem target | The three modes `inner-in-outer`, `inner-in-outer`, and `tau0-inner-contained` lower the level-3 stress table to `303.44` and full depth-5 `z=34` to `1232.89`. They identify the needed joint parent-flag incidence theorem. |
+| Kernel-lift-only cover | 0 | 1 | 1 | 0% | Useful after richer state, still not enough | Earlier `--cover-kernel-lift` kept crossing at `z=137`; after nested diagnostics it lowers `z=34` to `924.69`, but crossing remains `z=133` and tau-two/tau-one quotient chains dominate. |
 | One-layer shortened child flag ambient | 0 | 0 | 1 | 0% | Not useful for current base seal | Diagnostic `--flag-bound best-shortened` leaves the depth-5 checkpoint at `z=137` and the `z=34` trace unchanged. |
 | High-kernel/local-incidence bonus | 0 | 0 | 0 | open | Next candidate | Need prove hard row carrying large shortened ambient pays more than uniform `q^-9`. |
 | Joint nested shortened-rank profile charge | 0 | 0 | 0 | open | Next candidate | May recover missing few dimensions by charging the whole nested profile, not max one edge. |
@@ -61,26 +63,27 @@ Open items are excluded from the denominator.
 The current pressure point is:
 
 ```text
-depth 5, z=34,
-sparse pair-table value = 1740.39750674 bits,
-target = -80 bits,
-gap = 14.22185552 q-dimensions.
+depth 5, z=34:
+baseline sparse pair-table value:              1740.39750674 bits
+with nested quotient/subspace/kernel modes:    1232.88847175 bits
+with additional scalar kernel-cover diagnostic: 924.69069031 bits
+target:                                         -80 bits
 ```
 
-The dominant displayed scalar path has zero log-sum overhead. The immediate child flag selected at
-level 4 is `(4,7)>=(2,8)`, whose current table value is the coarse outer-first bound `810.94626976`.
-The proof-shaped pair sum for that same state is `943.43723477`, so pair enumeration is not selected
-after the level-2 table improvements.
+The old level-3 pair-table obstruction is no longer the only frontier. After scalar
+collapsed-active filtering and nested parent-flag diagnostics, the remaining trace is dominated by
+a scalar tau-two quotient-plane row and then, under anti-conservative tau-two covering, by a
+tau-one quotient chain.
 
 Three plausible ways to turn this into a win:
 
 ```text
-1. prove a joint local theorem for nested tau-positive/tau-positive rows that counts shared
-   singleton/root/quotient data once;
-2. carry a richer diagram state that reduces the coarse outer-first extension cost for
-   (4,7)>=(2,8);
-3. find a new charge for the dominant pair row with outer kernel/quotient lift 4+8 and inner
-   kernel/quotient lift 3+6.
+1. prove scalar collapsed-active exact-support rerouting and the nested quotient/subspace/
+   consumed-kernel parent-flag incidence bounds;
+2. prove a small-support tau-two quotient-plane incidence theorem for rows like
+   p=8,s=2,a=2,tau=2,K=0,outer_span=4;
+3. upgrade the tau-one quotient chain from one-layer line incidence into a recursive exact-support
+   quotient state.
 ```
 
 ## Update Rule
@@ -334,3 +337,25 @@ The top pair row has local logs `1037.25029842` and `906.66533592`, child flag
 `(4,3)>=(2,5)` at `-1000.47839956`, and no sibling-unconsumed kernel cover. This shifts the
 frontier from sparse pair-table plumbing to a nested tau-positive local theorem or richer diagram
 state.
+
+Nested quotient/subspace/kernel diagnostics added. The level-3 stress state now has a proof-target
+ladder:
+
+```text
+original sparse proof-shaped table: 810.94626976
+scalar collapsed-active baseline:  549.21247145
+nested structural table value:     303.43723477
+```
+
+End-to-end depth-5 `z=34` moves as follows:
+
+```text
+original sparse proof-shaped:                   1740.39750674
+with nested quotient/subspace/consumed-kernel:  1232.88847175
+with additional scalar kernel-cover diagnostic:  924.69069031
+with anti-conservative tau0tau2 lift cover:      567.15416718
+```
+
+The anti-conservative tau-two run reaches only `crossing_z=41`, so even an idealized tau-two lift
+removal would not finish the certificate. The next theorem has to carry exact-support quotient
+data recursively, including the remaining tau-one chain.

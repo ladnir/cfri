@@ -331,6 +331,24 @@ final_span_1_crossing_z,133
 against `z=137` for `rfc_flag_span_moment.py --flag-bound best-two-layer-table`. So sparse
 pair-enumerated tables help, but they do not yet close the depth-5 base seal.
 
+The same driver has several off-by-default structural diagnostics for the current nested
+quotient-incidence frontier:
+
+```text
+--nested-quotient-mode inner-in-outer
+--nested-subspace-mode inner-in-outer
+--consumed-kernel-mode tau0-inner-contained
+```
+
+These are proof-target diagnostics, not certificate modes. They keep root/support charge and
+quotient incidence visible while testing whether nested parent flags can avoid independent lift
+counts. `--proof-shaped` also now applies collapsed-active rerouting inside scalar lifts, matching
+the exact-support theorem target. On the depth-5 `z=34` sparse run, the three structural modes move
+the log2 moment to `1232.88847175`; adding the separate scalar `--cover-kernel-lift` sensitivity
+moves it to `924.69069031`. The anti-conservative `--cover-lift-mode tau0tau2` ceiling reaches
+`567.15416718` and `crossing_z=41`, showing that tau-one quotient chains remain after tau-two is
+idealized.
+
 `rfc_multicopy_falsification.py` is adversarial. It estimates whether broad one-copy near-families
 can intersect across many independent RFC copies often enough to threaten the target excess.
 

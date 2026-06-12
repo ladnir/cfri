@@ -1383,8 +1383,64 @@ is now reduced to the single-layer Gaussian lift lemma plus independent overcoun
 layers. The remaining theorem-grade work is to sharpen only the rows that consume too much slack:
 
 ```text
-1. prove theta_2=-1 kernel-chain truncation or length-four domination;
-2. close finite constants for the |A|=2 decomposable row: determinant-1 root fiber and
-   exact-support inversion;
-3. mixed-fiber tau-one/tau-two rows.
+1. scalar collapsed-active exact-support rerouting:
+   if pi(K_i) and pi(V_i) have the same dimension, the active support is not genuinely visible
+   in the quotient row and must be routed to the canonical smaller-support/kernel row;
+
+2. nested quotient counting:
+   for V_j <= V_i, after the quotient datum of the upper layer is fixed, any compatible lower
+   quotient datum is counted inside that upper quotient datum, paying only the internal
+   Grassmann exponent rather than a fresh ambient quotient lift;
+
+3. nested parent-subspace counting:
+   after W_i is fixed, W_j <= W_i is counted inside W_i when the lower layer is being refined,
+   with the remaining local root/support charge applied conditionally;
+
+4. consumed-kernel containment:
+   when a lower tau-zero layer is carried inside an upper kernel, count the upper kernel as a
+   kappa_i-subspace containing W_j, rather than as an arbitrary kappa_i-subspace of
+   pi(K_i)+pi(K_i);
+
+5. small-support tau-two quotient-plane incidence:
+   rows such as p=8,s=2,a=2,tau=2,K=0,outer_span=4 remain large even after the nested flag
+   corrections, so the quotient-plane incidence theorem must handle small exact supports, not only
+   large-support/full-cover rows;
+
+6. recursive tau-one quotient-chain state:
+   after anti-conservative tau-two lift removal, the depth-5 z=34 diagnostic is still above target
+   and dominated by tau-one quotient chains. The tau-one line lemma is locally safe but must be
+   carried recursively as exact quotient data.
+
+7. prove theta_2=-1 kernel-chain truncation or length-four domination;
+
+8. close finite constants for the |A|=2 decomposable row: determinant-1 root fiber and
+   exact-support inversion.
 ```
+
+Current diagnostics in `rfc_pair_flag_table_recurrence.py` expose these obligations separately:
+
+```text
+--exclude-collapsed-active
+--nested-quotient-mode inner-in-outer
+--nested-subspace-mode inner-in-outer
+--consumed-kernel-mode tau0-inner-contained
+--cover-kernel-lift
+--cover-lift-mode tau0tau2   # anti-conservative sensitivity only
+```
+
+The best non-tau2-cover depth-5 diagnostic currently has:
+
+```text
+z=34 log2 moment = 924.69069031
+```
+
+with scalar kernel-lift covering included. The anti-conservative tau-two-cover ceiling is:
+
+```text
+z=34 log2 moment = 567.15416718
+crossing_z = 41.
+```
+
+Thus proving only the old `(4,7)>=(2,8)` pair-table improvement cannot finish the certificate; the
+multi-layer quotient state must also control tau-two and tau-one quotient incidence over several
+levels.

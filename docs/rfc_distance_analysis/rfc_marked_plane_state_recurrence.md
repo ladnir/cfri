@@ -597,3 +597,148 @@ the standalone classifier, but after the level-2 table improvements the improved
 is stronger than the pair-enumerated sum. Closing the base seal now needs a joint local theorem for
 nested tau-positive rows, or a richer diagram state that reduces the coarse outer-first extension
 for `(4,7)>=(2,8)`. More sparse table plumbing alone is not expected to close the `z=34` gap.
+
+## Nested Quotient And Kernel Diagnostics
+
+The next diagnostics test three structural corrections that are not certificate rules yet:
+
+```text
+--nested-quotient-mode inner-in-outer
+--nested-subspace-mode inner-in-outer
+--consumed-kernel-mode tau0-inner-contained
+```
+
+Their intended meanings are:
+
+```text
+nested quotient:
+  after an outer tau-positive quotient datum is fixed, count a compatible inner quotient
+  inside the outer visible quotient, paying the Grassmann exponent inside that quotient
+  rather than a fresh ambient quotient lift;
+
+nested subspace:
+  after W_outer is fixed, cap the lower row's remaining lift multiplicity by the
+  Grassmann count of W_inner <= W_outer;
+
+consumed kernel:
+  for a lower tau-zero row, count the upper kernel as containing W_inner rather than
+  as a fresh arbitrary kernel lift.
+```
+
+All three keep the local root/support charges and quotient incidence visible; they do not use the
+retired all-lift shortcut.
+
+On the narrow level-3 stress state, with scalar collapsed-active rows also removed, the command:
+
+```text
+python -B scripts/rfc_distance_analysis/rfc_pair_flag_table_recurrence.py \
+  --depth 5 \
+  --stop-level 3 \
+  --proof-shaped \
+  --nested-quotient-mode inner-in-outer \
+  --nested-subspace-mode inner-in-outer \
+  --consumed-kernel-mode tau0-inner-contained \
+  --term-limit 300 \
+  --report-flag-state 4,7,2,8 \
+  --trace-table-state 3,4,7,2,8 \
+  --trace-table-top 12 \
+  --last-level-report-only
+```
+
+reports:
+
+```text
+state:        (4,7)>=(2,8)
+baseline:     549.21247145
+table value:  303.43723477
+pair sum:     303.43723477
+saving:       245.77523667 bits = 1.92011904 q-dim
+```
+
+The top row after these corrections is:
+
+```text
+outer: tau=2, kernel lift 4, quotient lift 8
+inner: tau=1, kernel lift 3, quotient lift 6
+inner nested quotient cover: 5 q-dim
+child flag: (4,3)>=(2,5)
+```
+
+This is the first diagnostic where the level-3 stress flag is genuinely better than its improved
+coarse baseline after scalar collapsed-active rerouting.
+
+End-to-end depth five with those three structural diagnostics gives:
+
+```text
+final_span_1_crossing_z,133
+final_span_1_z_report,34,1232.88847175
+```
+
+So the production floor is still:
+
+```text
+(1232.88847175 + 80) / 128 = 10.25694119 q-dim
+```
+
+above the `2^-80` target. The dominant trace has moved:
+
+```text
+level 5: tau=1, child (2,15), value 1334.27012479
+level 4: tau=1, child flag (4,7)>=(2,8), table value 303.43723477
+level 3: tau=2, child flag (4,3)>=(2,5), table value -1000.47839956
+```
+
+Adding the existing scalar `--cover-kernel-lift` diagnostic, which is a separate proof target for
+unconsumed scalar kernel fibers, gives:
+
+```text
+final_span_1_crossing_z,133
+final_span_1_z_report,34,924.69069031
+```
+
+The new dominant trace then has a small-support tau-two quotient-plane row:
+
+```text
+level 4:
+  p=8, s=2, a=2, tau=2,
+  K=0, outer_span=4,
+  local_charge=4, lift_qdim=12,
+  child state (4,8) = -121.19264508.
+```
+
+Finally, the anti-conservative sensitivity run:
+
+```text
+--cover-lift-mode tau0tau2
+```
+
+with the same structural diagnostics and scalar kernel cover reports:
+
+```text
+final_span_1_crossing_z,41
+final_span_1_z_report,34,567.15416718
+```
+
+This is not a certificate mode because tau-two quotient-plane incidence is real event data. Its
+value is diagnostic: even perfect tau-two lift removal would leave about
+
+```text
+(567.15416718 + 80) / 128 = 5.05589193 q-dim
+```
+
+above target, now dominated by a tau-one quotient chain:
+
+```text
+level 5 tau=1 -> level 4 tau=1 -> level 3 tau=0.
+```
+
+Therefore the next proof object is broader than the old level-3 pair table. We need a finite
+exact-support quotient-incidence state that simultaneously handles:
+
+```text
+1. scalar collapsed-active rerouting;
+2. nested quotient/subspace counting for parent flags;
+3. consumed-kernel containment when a lower tau-zero layer sits inside an upper kernel;
+4. small-support tau-two quotient-plane incidence;
+5. the remaining tau-one quotient chain after tau-two is idealized.
+```

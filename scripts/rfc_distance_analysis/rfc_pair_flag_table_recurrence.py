@@ -57,6 +57,33 @@ from rfc_flag_state_choice_diagnostic import (  # noqa: E402
 )
 
 
+def adjusted_lift_minus_charge_qdim(
+    choice: tuple[int, ...],
+    *,
+    covered_kernel_qdim: int = 0,
+    consumed_kernel_qdim: int = 0,
+    nested_quotient_qdim: int = 0,
+    nested_subspace_qdim: int = 0,
+) -> int:
+    """Return the q-dimensional local exponent after diagnostic adjustments.
+
+    This intentionally ignores finite split-shape factors.  It is a trace
+    decoder for understanding which quotient/kernel part remains load-bearing,
+    not a recurrence rule.
+    """
+
+    local_charge = choice[7]
+    lift_qdim = choice[14]
+    return (
+        lift_qdim
+        - local_charge
+        - covered_kernel_qdim
+        - consumed_kernel_qdim
+        - nested_quotient_qdim
+        - nested_subspace_qdim
+    )
+
+
 @dataclass(frozen=True)
 class LevelData:
     values: dict[int, list[float]]
@@ -739,6 +766,11 @@ def main() -> None:
             "outer_covered_kernel_lift_qdim,inner_covered_kernel_lift_qdim,"
             "outer_consumed_kernel_cover_qdim,"
             "inner_nested_quotient_cover_qdim,inner_nested_subspace_cover_qdim,"
+            "outer_adjusted_lift_minus_charge_qdim,"
+            "inner_adjusted_lift_minus_charge_qdim,"
+            "pair_adjusted_lift_minus_charge_qdim,"
+            "outer_remaining_quotient_lift_qdim,"
+            "inner_remaining_quotient_lift_qdim,"
             "outer_choice,inner_choice"
         )
         for rank, row in enumerate(rows[: args.trace_table_top], start=1):
@@ -748,6 +780,23 @@ def main() -> None:
                 outer_choice=row.outer.choice,
                 inner_choice=row.inner.choice,
                 kernel_cover_mode=args.kernel_cover_mode,
+            )
+            outer_adjusted_qdim = adjusted_lift_minus_charge_qdim(
+                row.outer.choice,
+                covered_kernel_qdim=outer_covered,
+                consumed_kernel_qdim=row.outer_consumed_kernel_cover_qdim,
+            )
+            inner_adjusted_qdim = adjusted_lift_minus_charge_qdim(
+                row.inner.choice,
+                covered_kernel_qdim=inner_covered,
+                nested_quotient_qdim=row.inner_nested_quotient_cover_qdim,
+                nested_subspace_qdim=row.inner_nested_subspace_cover_qdim,
+            )
+            outer_remaining_quotient = choice_quotient_lift_qdim(outer_span, row.outer.choice)
+            inner_remaining_quotient = max(
+                0,
+                choice_quotient_lift_qdim(inner_span, row.inner.choice)
+                - row.inner_nested_quotient_cover_qdim,
             )
             child_flag = clean_csv_field(">=".join(format_state(layer) for layer in row.child_layers))
             outer_choice = clean_csv_field(format_choice(row.outer.choice))
@@ -764,6 +813,11 @@ def main() -> None:
                 f"{row.outer_consumed_kernel_cover_qdim},"
                 f"{row.inner_nested_quotient_cover_qdim},"
                 f"{row.inner_nested_subspace_cover_qdim},"
+                f"{outer_adjusted_qdim},"
+                f"{inner_adjusted_qdim},"
+                f"{outer_adjusted_qdim + inner_adjusted_qdim},"
+                f"{outer_remaining_quotient},"
+                f"{inner_remaining_quotient},"
                 f"{outer_choice},{inner_choice}"
             )
 

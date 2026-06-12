@@ -354,6 +354,23 @@ The proof contract for interpreting these modes is in
 mode is only theorem-shaped after the state records whether the lower quotient is upper-visible;
 otherwise the safe fallback is independent quotient counting or a consumed-kernel/quotient branch.
 
+`--trace-table-state` also prints residual budget decoder columns:
+
+```text
+outer_adjusted_lift_minus_charge_qdim
+inner_adjusted_lift_minus_charge_qdim
+pair_adjusted_lift_minus_charge_qdim
+outer_remaining_quotient_lift_qdim
+inner_remaining_quotient_lift_qdim
+```
+
+These are diagnostic columns only. They subtract the local root/support charge and the enabled
+structural covers from the displayed pair row so the remaining q-dimensional load is visible. On
+the current level-3 stress state with the nested structural modes, the top row has
+`pair_adjusted_lift_minus_charge_qdim=10` and remaining quotient lifts `outer=8, inner=1`. That
+points the next theorem target at the outer support-two tau-two quotient-frame count, rather than
+another kernel-fiber cover or an independent tau-one quotient-line fix.
+
 `rfc_multicopy_falsification.py` is adversarial. It estimates whether broad one-copy near-families
 can intersect across many independent RFC copies often enough to threaten the target excess.
 

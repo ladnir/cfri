@@ -247,6 +247,19 @@ ceiling leaves `(567.15416718 + 80) / 128 = 5.055892` q-dimensions. So the next 
 handle both tau-two and tau-one quotient incidence; solving only the old level-3 pair row is not
 enough.
 
+Latest trace-budget refinement: `--trace-table-state` now decodes the residual q-dimensional
+budget after structural covers. In the level-3 `(4,7)>=(2,8)` stress state, the top nested row has:
+
+```text
+outer adjusted lift-minus-charge: 8
+inner adjusted lift-minus-charge: 2
+remaining quotient lifts: outer 8, inner 1
+```
+
+So the nested tau-one quotient line is already mostly handled. The next local blocker is the outer
+support-two tau-two quotient-frame placement, not another kernel cover or independent tau-one line
+count.
+
 After that, return to the theta_2=-1 kernel-chain truncation and the connected full-kernel local
 endpoint. Those remain real blockers, but they are not the first item on the active frontier.
 

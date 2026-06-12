@@ -271,6 +271,45 @@ is too weak here. The final proof needs a small-support tau-two theorem that use
 quotient matroid of `Q`, not only the ambient dimension. This is the next local blocker after the
 nested state lemmas.
 
+The latest decoded level-3 trace makes the shape sharper. For the stress state:
+
+```text
+(4,7) >= (2,8)
+```
+
+under collapsed-active rerouting and the nested quotient/subspace/consumed-kernel diagnostics, the
+top pair row is:
+
+```text
+outer: p=2, s=3, a=2, tau=2, child=(4,2), z=3, charge=4, lift=12
+inner: p=3, s=2, a=2, tau=1, child=(4,2), z=3, charge=2, lift=9
+```
+
+The trace columns report:
+
+```text
+outer kernel lift:                   4
+outer quotient lift:                 8
+inner kernel lift:                   3
+inner quotient lift:                 6
+inner nested quotient saving:        5
+outer adjusted lift-minus-charge:    8
+inner adjusted lift-minus-charge:    2
+remaining quotient lifts:            outer 8, inner 1
+```
+
+Thus the nested line-in-plane rule is already doing its expected job: the lower tau-one quotient is
+being counted as a line inside the upper tau-two quotient plane, costing one q-dimension instead of
+a fresh six-dimensional quotient-line lift. The residual is mainly the upper represented
+support-two quotient plane in its ambient quotient, not an unconsumed kernel fiber and not an
+independent lower quotient-line count.
+
+The next tau-two theorem should therefore be phrased as a represented support-two quotient-frame
+bound. It must count the outer plane together with the root-compatible support-two frame and any
+carried marked quotient lines as one quotient diagram. It may not delete quotient-plane incidence
+altogether; the target is to replace the crude ambient plane count by the sharper count forced by
+the exact two-root support and child zero containers.
+
 ## Tau-One Chain Rows
 
 The anti-conservative sensitivity:
@@ -329,4 +368,3 @@ The current scripts implement diagnostic shadows of `NestedLift(Phi)`. The missi
 to define `QuotientLabels(Phi)` precisely enough that every diagnostic saving is attached to a
 valid compatibility label, and to prove the tau-two/tau-one root-incidence bounds for the remaining
 dominant rows.
-

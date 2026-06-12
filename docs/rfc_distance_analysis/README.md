@@ -121,6 +121,7 @@ rfc_subspace_span_moment.py     subspace-span diagnostic exposing visible-kernel
 rfc_flag_span_moment.py         two-layer flag diagnostic for kernel-zero propagation
 rfc_flag_bad_pair_classifier_level2_4_4_ge_2_5.csv level-2 healthy marked-plane pair classification
 rfc_flag_bad_pair_classifier_level3_4_7_ge_2_8.csv level-3 high-lift tau-one obstruction classification
+rfc_flag_bad_pair_classifier_level3_4_7_ge_2_8_kernel_cover.csv fixed-table kernel-cover closure diagnostic
 rfc_theta_chain_normal_slice.py shortened-ambient and defect-slice checker for theta-chain truncation
 rfc_visible_span_profile.py     exact local visible-span subspace profiler with support summaries
 rfc_support_profile_bound.py    support-containment Gaussian bound from delta(A)

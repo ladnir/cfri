@@ -89,6 +89,8 @@ class PairRow:
     inner: TermCandidate
     child_layers: tuple[State, ...]
     child_flag_log2: float
+    outer_local_log2: float
+    inner_local_log2: float
     joint_log2: float
 
 
@@ -134,6 +136,48 @@ def compact_choice_key(choice: tuple[int, ...]) -> str:
         f"charge={view.charge},delta={view.delta},comp={view.components},"
         f"h={view.h},gamma={view.gamma},lift={view.lift_qdim}"
     )
+
+
+def choice_has_collapsed_active_container(choice: tuple[int, ...]) -> bool:
+    """Return true for tau-positive rows whose child flag collapses the active support.
+
+    If the kernel child container has the same dimension as the outer child
+    container but a strictly stronger zero budget, then the two containers are
+    equal in an exact flag.  For tau > 0 and nonempty visible support this means
+    the outer container is already zero on the claimed active singleton support.
+    Such a row is a safe coarse-container overcount, but a canonical exact
+    recurrence should route the event through a smaller kernel container or a
+    tau-zero row.
+    """
+
+    view = choice_view(choice)
+    inner_zeros = view.p + view.singletons
+    return (
+        view.tau > 0
+        and view.visible_support > 0
+        and view.inner_span == view.outer_span
+        and inner_zeros > view.outer_zeros
+    )
+
+
+def choice_kernel_lift_qdim(parent_span: int, choice: tuple[int, ...]) -> int:
+    view = choice_view(choice)
+    if view.tau <= 0:
+        return 0
+    kernel_dim = parent_span - view.tau
+    return kernel_dim * (2 * view.inner_span - kernel_dim)
+
+
+def adjusted_local_log2(
+    term: TermCandidate,
+    *,
+    parent_span: int,
+    q_log2: float,
+    posthoc_cover_kernel_lift: bool,
+) -> float:
+    if not posthoc_cover_kernel_lift:
+        return term.local_log2
+    return term.local_log2 - choice_kernel_lift_qdim(parent_span, term.choice) * q_log2
 
 
 def tau_key(row: PairRow) -> str:
@@ -216,11 +260,19 @@ def build_pair_rows(
     child_k: int,
     child_n: int,
     q_log2: float,
+    outer_parent_span: int,
+    inner_parent_span: int,
+    exclude_collapsed_active: bool,
+    posthoc_cover_kernel_lift: bool,
 ) -> tuple[list[PairRow], float]:
     rows: list[PairRow] = []
     pair_sum = NEG_INF
     for outer in outer_terms:
+        if exclude_collapsed_active and choice_has_collapsed_active_container(outer.choice):
+            continue
         for inner in inner_terms:
+            if exclude_collapsed_active and choice_has_collapsed_active_container(inner.choice):
+                continue
             child_layers = tuple(
                 merge_equal_dimension_chain(list(outer.child_layers) + list(inner.child_layers))
             )
@@ -234,12 +286,26 @@ def build_pair_rows(
             )
             if child_flag_log2 <= NEG_INF / 2:
                 continue
-            joint_log2 = outer.local_log2 + inner.local_log2 + child_flag_log2
+            outer_local_log2 = adjusted_local_log2(
+                outer,
+                parent_span=outer_parent_span,
+                q_log2=q_log2,
+                posthoc_cover_kernel_lift=posthoc_cover_kernel_lift,
+            )
+            inner_local_log2 = adjusted_local_log2(
+                inner,
+                parent_span=inner_parent_span,
+                q_log2=q_log2,
+                posthoc_cover_kernel_lift=posthoc_cover_kernel_lift,
+            )
+            joint_log2 = outer_local_log2 + inner_local_log2 + child_flag_log2
             row = PairRow(
                 outer=outer,
                 inner=inner,
                 child_layers=child_layers,
                 child_flag_log2=child_flag_log2,
+                outer_local_log2=outer_local_log2,
+                inner_local_log2=inner_local_log2,
                 joint_log2=joint_log2,
             )
             rows.append(row)
@@ -289,8 +355,8 @@ def make_output_row(
         "saving_qdim": f"{saving / q_log2:.8f}" if stats.logsum_log2 > NEG_INF / 2 else "",
         "share_vs_pair_sum_log2": f"{share:.8f}" if pair_sum > NEG_INF / 2 else "",
         "top_child_flag": format_flag(top.child_layers) if top is not None else "",
-        "top_outer_local_log2": f"{top.outer.local_log2:.8f}" if top is not None else "",
-        "top_inner_local_log2": f"{top.inner.local_log2:.8f}" if top is not None else "",
+        "top_outer_local_log2": f"{top.outer_local_log2:.8f}" if top is not None else "",
+        "top_inner_local_log2": f"{top.inner_local_log2:.8f}" if top is not None else "",
         "top_child_flag_log2": f"{top.child_flag_log2:.8f}" if top is not None else "",
         "top_outer_choice": format_choice(top.outer.choice) if top is not None else "",
         "top_inner_choice": format_choice(top.inner.choice) if top is not None else "",
@@ -314,6 +380,16 @@ def main() -> None:
     parser.add_argument("--term-limit", type=int, default=300)
     parser.add_argument("--top-groups", type=int, default=8)
     parser.add_argument("--top-pairs", type=int, default=8)
+    parser.add_argument(
+        "--exclude-collapsed-active",
+        action="store_true",
+        help="diagnostic: drop tau-positive rows where equal-dimension child containers merge away the active support",
+    )
+    parser.add_argument(
+        "--posthoc-cover-kernel-lift",
+        action="store_true",
+        help="diagnostic: keep child tables fixed but subtract tau-positive kernel-lift q-dimensions from enumerated pair choices",
+    )
     parser.add_argument(
         "--groupers",
         type=parse_groupers,
@@ -391,6 +467,10 @@ def main() -> None:
         child_k=child_k,
         child_n=child_n,
         q_log2=args.q_log2,
+        outer_parent_span=args.outer_state[0],
+        inner_parent_span=args.inner_state[0],
+        exclude_collapsed_active=args.exclude_collapsed_active,
+        posthoc_cover_kernel_lift=args.posthoc_cover_kernel_lift,
     )
 
     writer = csv.DictWriter(sys.stdout, fieldnames=CSV_FIELDS, lineterminator="\n")
@@ -405,7 +485,9 @@ def main() -> None:
             key=(
                 f"level={args.level},outer={format_state(args.outer_state)},"
                 f"inner={format_state(args.inner_state)},"
-                f"outer_terms={len(outer_terms)},inner_terms={len(inner_terms)}"
+                f"outer_terms={len(outer_terms)},inner_terms={len(inner_terms)},"
+                f"exclude_collapsed_active={args.exclude_collapsed_active},"
+                f"posthoc_cover_kernel_lift={args.posthoc_cover_kernel_lift}"
             ),
             stats=all_stats,
             coarse=coarse,

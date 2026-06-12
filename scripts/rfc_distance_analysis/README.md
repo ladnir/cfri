@@ -236,6 +236,7 @@ The saved classifier outputs are:
 ```text
 docs/rfc_distance_analysis/rfc_flag_bad_pair_classifier_level2_4_4_ge_2_5.csv
 docs/rfc_distance_analysis/rfc_flag_bad_pair_classifier_level3_4_7_ge_2_8.csv
+docs/rfc_distance_analysis/rfc_flag_bad_pair_classifier_level3_4_7_ge_2_8_kernel_cover.csv
 ```
 
 The level-2 row is healthy: the truncated pair sum saves `506.75207249` bits. The level-3 row is
@@ -243,6 +244,11 @@ the obstruction: the top 12 pair products already equal the displayed truncated 
 of that mass is owned by one outer tau-one witness
 `p=3,s=1,a=1,tau=1,child=(4,4),z=3,charge=1,lift=19`. This script does not certify a bound; it
 identifies the witness family a canonical-selection or charging lemma must control.
+Use `--exclude-collapsed-active` to remove tau-positive equal-dimension child-container collapses;
+this cuts the level-3 loss to `4.08510402` q-dimensions. Use `--posthoc-cover-kernel-lift` to keep
+the child tables fixed but subtract tau-positive kernel-lift multiplicity; this closes the level-3
+stress row with `1.92454905` q-dimensions of slack. That option is a proof-target diagnostic, not a
+certificate mode.
 The first table attempt, `--flag-bound best-two-layer-table`, confirms this: the level-2 table saves
 the expected marked-plane q-dimensions on states such as `(4,4)>=(2,5)`, but by level 3 the target
 flags report zero additional table saving because the scalar dominant choices have already routed

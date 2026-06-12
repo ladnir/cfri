@@ -367,3 +367,65 @@ local quotient/root datum count,
 ```
 
 not just zero out lift factors globally.
+
+## Level-3 Flag Stress Row
+
+The marked-plane recurrence diagnostics now isolate a concrete stress row:
+
+```text
+level 3 flag: (4,7)>=(2,8)
+baseline truncated pair sum: 2094.40570138 bits
+coarse/table baseline:       1187.19455102 bits
+naive loss:                   907.21115036 bits = 7.08758711 q-dim
+```
+
+The dominant bad outer witness is:
+
+```text
+p=3, s=1, a=1, tau=1,
+child=(4,4), z=3,
+charge=1, lift=19.
+```
+
+This `lift=19` splits as:
+
+```text
+kernel_lift   = kappa(2r0-kappa) = 3(8-3) = 15,
+quotient_lift = tau(2r1-t)       = 1(8-4) = 4.
+```
+
+A diagnostic collapsed-active filter removes the exact-flag overcount where equal-dimensional child
+containers force the active singleton support to vanish. That cuts the displayed loss to
+`4.08510402` q-dimensions but does not close the row; the next bad row still has a tau-one
+kernel-lift factor.
+
+The decisive diagnostic is the fixed-table kernel-cover what-if:
+
+```text
+python -B scripts/rfc_distance_analysis/rfc_flag_bad_pair_classifier.py \
+  --level 3 \
+  --outer-state 4,7 \
+  --inner-state 2,8 \
+  --term-limit 300 \
+  --posthoc-cover-kernel-lift
+```
+
+It gives:
+
+```text
+pair sum:              940.85227227 bits
+coarse/table baseline: 1187.19455102 bits
+saving:                246.34227875 bits = 1.92454905 q-dim
+```
+
+This is strong evidence for the intended division of labor:
+
+```text
+keep quotient incidence;
+cover duplicate kernel lifts.
+```
+
+Concretely, for fixed child flag `L<=V` and fixed local quotient/root datum `R`, the recurrence
+should count the container tuple once and not multiply by the Gaussian number of possible
+`K <= L+L` kernel lifts. The proof still has to show that this container tuple is a valid
+first-moment event at intermediate flag states, not only at the final projective-line event.

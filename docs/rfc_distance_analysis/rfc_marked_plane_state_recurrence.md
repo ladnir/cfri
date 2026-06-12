@@ -276,6 +276,7 @@ profile, and lift profile. The saved diagnostics are:
 ```text
 docs/rfc_distance_analysis/rfc_flag_bad_pair_classifier_level2_4_4_ge_2_5.csv
 docs/rfc_distance_analysis/rfc_flag_bad_pair_classifier_level3_4_7_ge_2_8.csv
+docs/rfc_distance_analysis/rfc_flag_bad_pair_classifier_level3_4_7_ge_2_8_kernel_cover.csv
 ```
 
 The important level-3 output is concentration, not improvement:
@@ -303,6 +304,32 @@ outer witness family that admits many inner refinements whose child diagrams col
 `(4,4)` or a short two-layer flag. A proof now has a concrete target: either choose this witness
 canonically once per parent flag, or prove that the high-lift multiplicity is already charged by
 the exact zero/support data and should not be summed independently across these refinements.
+
+Two finer diagnostics sharpen that target:
+
+```text
+--exclude-collapsed-active:
+  pair sum = 1710.08786604 bits
+  remaining loss = 522.89331502 bits = 4.08510402 q-dim
+
+--posthoc-cover-kernel-lift:
+  pair sum = 940.85227227 bits
+  saving over coarse = 246.34227875 bits = 1.92454905 q-dim
+```
+
+The first option removes rows where a tau-positive exact flag would have equal-dimensional child
+containers and the lower container carries the active singleton zero. That alone removes the
+`lift=19` row, but leaves a `lift=13` tau-one row. The second option keeps the child table fixed and
+subtracts only the kernel-lift part of tau-positive rows:
+
+```text
+kappa(2 r_0 - kappa),  kappa = t - tau.
+```
+
+This closes the level-3 stress row with about `1.92` q-dimensions of slack. The current best proof
+target is therefore not to erase quotient-line or quotient-plane incidence. It is to prove a
+kernel-lift container-cover lemma: after fixing the child flag and the local quotient/root datum,
+the Gaussian family of kernel lifts is duplicate certificate data for this existence recurrence.
 
 ## Audit Result
 

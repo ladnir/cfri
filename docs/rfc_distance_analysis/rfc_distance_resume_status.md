@@ -153,6 +153,12 @@ docs/rfc_distance_analysis/rfc_flag_bad_pair_classifier_level3_4_7_ge_2_8.csv
   The level-3 bad pair mass is concentrated in one tau-one high-lift outer witness:
   `p=3,s=1,a=1,tau=1,child=(4,4),z=3,charge=1,lift=19`. The top 12 pair products already equal
   the displayed truncated pair sum.
+
+docs/rfc_distance_analysis/rfc_flag_bad_pair_classifier_level3_4_7_ge_2_8_kernel_cover.csv
+  Status: current best closure diagnostic.
+  Keeps child table values fixed and subtracts only tau-positive kernel-lift factors. The level-3
+  pair sum drops to `940.85227227` bits against the same `1187.19455102` bit coarse baseline,
+  giving `1.92454905` q-dimensions of slack.
 ```
 
 The external Fable audit was useful and found the product-of-first-moments bug. Its record is:
@@ -166,10 +172,12 @@ docs/rfc_distance_analysis/rfc_fable_audit_2026_06_10.md
 The live blockers are now narrow:
 
 ```text
-1. High-lift tau-one selection/charge for the level-3 carried flag `(4,7)>=(2,8)`. The bad mass is
-   concentrated in the outer row `p=3,s=1,a=1,tau=1,child=(4,4),z=3,charge=1,lift=19`. The next
-   theorem target is to count that witness canonically once per parent flag, or charge the
-   `lift=19` multiplicity by exact zero/support data before summing inner refinements.
+1. Kernel-lift container cover for the level-3 carried flag `(4,7)>=(2,8)`. The bad mass is
+   concentrated in high-lift rows, but a fixed-table diagnostic that removes only tau-positive
+   kernel-lift multiplicity closes the row with `1.92454905` q-dimensions of slack. The next theorem
+   target is: after fixing the child flag and local quotient/root datum, count the container tuple
+   once instead of multiplying by the Gaussian family of `K <= L+L` kernel lifts. Quotient-line and
+   quotient-plane incidence must remain counted.
 2. Prove/finalize the shared-randomness-safe multi-layer flag transition theorem. The target note
    covers the joint marked-line/frame recurrence for the decomposable |A|=2,delta=2,comp=2 row,
    with the local marked-component certificate and uniform `(q+1)` frame-completion count written.

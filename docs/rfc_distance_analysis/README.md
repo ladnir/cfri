@@ -92,6 +92,7 @@ scripts/rfc_distance_analysis/rfc_carried_flag_diagnostic.py carried-flag merge 
 scripts/rfc_distance_analysis/rfc_diagram_state.py incidence-diagram state skeleton
 scripts/rfc_distance_analysis/rfc_marked_plane_state_diagnostic.py marked-line-in-plane state scanner
 scripts/rfc_distance_analysis/rfc_diagram_path_dp.py carried-diagram path diagnostic
+scripts/rfc_distance_analysis/rfc_flag_state_choice_diagnostic.py target flag-state choice diagnostic
 scripts/rfc_distance_analysis/rfc_defect_conservation.py fixed-witness defect-conservation diagnostic
 scripts/rfc_distance_analysis/rfc_shortened_rank_recurrence.py optimistic shortened-kernel rank recurrence
 rfc_rank_pattern_induction_target.md          current finite-replica induction target

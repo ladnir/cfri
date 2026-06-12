@@ -238,6 +238,32 @@ level 3, (4,7)>=(2,8): table saves   0.00000000 bits
 So a value table alone is not the missing recurrence. The recurrence must choose and remember
 flag-state expansions, not just reuse scalar-state dominant choices.
 
+`scripts/rfc_distance_analysis/rfc_flag_state_choice_diagnostic.py` then tests exactly that next
+idea for one target flag at a time. It enumerates outer and inner scalar expansion candidates,
+combines them into a carried child flag, and reports both:
+
+```text
+pair_sum:         log-sum over the enumerated pair products
+optimistic_best:  minimum enumerated pair
+dominant_i:       largest enumerated pair contributions
+```
+
+The signal splits by level:
+
+```text
+level 2, (4,4)>=(2,5):
+  pair_sum saves 506.75207249 bits = 3.95900057 q-dim
+
+level 3, (4,7)>=(2,8):
+  pair_sum loses 907.21115036 bits = 7.08758711 q-dim
+  optimistic_best saves thousands of bits, but is not safe by itself
+```
+
+This sharpens the blocker. A flag state choosing its own rows is still not enough if all row-pair
+witnesses are summed naively. The next proof step must supply a canonical witness selection,
+exact-support grouping, or charging lemma that removes the high-mass duplicate/incompatible pair
+family. Without such a lemma, the marked-plane route does not close the level-3 carried flag.
+
 ## Audit Result
 
 A side audit agreed that the local rule is promising provided it is integrated as an atomic diagram

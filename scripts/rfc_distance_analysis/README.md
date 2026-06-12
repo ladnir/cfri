@@ -27,6 +27,7 @@ rfc_carried_flag_diagnostic.py      targeted carried-flag merge/diagram diagnost
 rfc_diagram_state.py                finite incidence-diagram state skeleton and merge rules
 rfc_marked_plane_state_diagnostic.py scans finite marked-line-in-plane state savings
 rfc_diagram_path_dp.py              follows bound trace with carried-flag and marked-plane savings
+rfc_flag_state_choice_diagnostic.py target flag-state joint expansion choice diagnostic
 rfc_theta_chain_normal_slice.py     shortened-ambient/defect-slice checker with optimistic rho and strict hard-trace columns
 rfc_defect_conservation.py          fixed-witness rank-defect conservation checker for exposed shortened ambients
 rfc_shortened_rank_recurrence.py    optimistic rho_h(D,z) recurrence with paired-spine compression
@@ -221,6 +222,23 @@ The first table attempt, `--flag-bound best-two-layer-table`, confirms this: the
 the expected marked-plane q-dimensions on states such as `(4,4)>=(2,5)`, but by level 3 the target
 flags report zero additional table saving because the scalar dominant choices have already routed
 around the carried outer-layer information.
+
+`rfc_flag_state_choice_diagnostic.py` tests the next idea target-by-target: let a flag state
+enumerate outer and inner scalar expansion candidates and combine them as a joint child flag. The
+result is mixed and important:
+
+```text
+level 2 target (4,4)>=(2,5):
+  truncated pair sum saves 506.75207249 bits = 3.95900057 q-dim
+
+level 3 target (4,7)>=(2,8):
+  truncated pair sum loses 907.21115036 bits = 7.08758711 q-dim
+  optimistic best pair saves thousands of bits but is not safe without a canonical selection rule
+```
+
+So the next proof object is not merely "flag states choose their own rows". It must include a
+canonical witness selection, exact-support grouping, or charging argument that prevents the large
+bad pair family from being summed.
 
 `rfc_multicopy_falsification.py` is adversarial. It estimates whether broad one-copy near-families
 can intersect across many independent RFC copies often enough to threaten the target excess.

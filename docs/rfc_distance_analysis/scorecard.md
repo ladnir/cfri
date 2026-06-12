@@ -48,7 +48,7 @@ Open items are excluded from the denominator.
 | Tau-one fixed-flag quotient-line incidence | 0 | 1 | 0 | 0% | Safe local brick, not a closer | `rfc_tau1_quotient_line_incidence_lemma.md` proves the post-root exponent `f_A + m_A - 1 - |A|`; `--report-tau1-incidence` shows the `z=34` tau-one trace rows have `support_saving=0`. |
 | Carried two-layer flag merge | 1 | 1 | 0 | 50% | Keep, exposes next diagram | `rfc_carried_flag_diagnostic.py` carries `F_3((4,7),(2,8))`, improves `(4,3)>=(2,5)` to `(4,4)>=(2,5)`, and saves `251.98` bits; next state is a two-marked-line diagram. |
 | Two-marked-line plane diagram | 1 | 1 | 0 | 50% | Keep, local but insufficient | `rfc_two_marked_line_plane_lemma.md` replaces a coarse `q^4` ancestor choice by `q+1`, saving another `381.42` bits on the carried path. |
-| Finite marked-plane state recurrence | 1 | 3 | 0 | 25% | Keep, but value table alone is not enough | `rfc_marked_plane_state_recurrence.md`, `rfc_marked_plane_state_diagnostic.py`, and `rfc_diagram_path_dp.py` turn the hand-expanded two-line diagram into an ordered-line state scan and path diagnostic. Inline scalar and dominant-choice two-layer-table modes improve `z=34` but crossings stay `135`/`305`, so flag-state expansion choices are still required. |
+| Finite marked-plane state recurrence | 1 | 4 | 0 | 20% | Keep, needs canonical witness selection | `rfc_marked_plane_state_recurrence.md`, `rfc_marked_plane_state_diagnostic.py`, `rfc_diagram_path_dp.py`, and `rfc_flag_state_choice_diagnostic.py` turn the hand-expanded two-line diagram into a state scan/path diagnostic. Joint choices help at level 2 but level-3 pair-sum is worse unless high-mass duplicate witnesses are charged or canonically selected. |
 | Kernel-lift-only cover | 0 | 0 | 1 | 0% | Not useful for current base seal | `--cover-kernel-lift` keeps quotient incidence and leaves depth-5 checkpoint at `z=137`; combined with safe tau-zero covering it still only reaches `z=135`. |
 | One-layer shortened child flag ambient | 0 | 0 | 1 | 0% | Not useful for current base seal | Diagnostic `--flag-bound best-shortened` leaves the depth-5 checkpoint at `z=137` and the `z=34` trace unchanged. |
 | High-kernel/local-incidence bonus | 0 | 0 | 0 | open | Next candidate | Need prove hard row carrying large shortened ambient pays more than uniform `q^-9`. |
@@ -242,3 +242,11 @@ additional table saving because the table is still driven by scalar-state domina
 mode gives the same depth-5 top vector moment `2244.71357608`, same depth-5 crossing `z=135`, and
 same depth-6 crossing `z=305`. Next version must store flag-state expansion choices, not just
 flag-state values.
+
+Targeted flag-state choice diagnostic added. For `(4,4)>=(2,5)` at level 2, the truncated pair sum
+saves `506.75207249` bits (`3.95900057` q-dim), agreeing that the marked-plane brick has real
+summed strength locally. For the level-3 carried target `(4,7)>=(2,8)`, the truncated pair sum loses
+`907.21115036` bits (`7.08758711` q-dim) even though the optimistic best pair is extremely small.
+This is the strongest warning so far: a proof needs canonical witness selection, exact-support
+grouping, or a charging argument for the high-mass pair family. Naively summing joint expansion
+choices is worse than the current baseline.

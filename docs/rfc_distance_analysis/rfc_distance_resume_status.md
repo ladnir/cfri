@@ -135,6 +135,12 @@ docs/rfc_distance_analysis/rfc_exact_support_quotient_state.md
   nested quotient counting, nested parent-subspace counting, consumed-kernel containment, and the
   remaining small-support tau-two / recursive tau-one quotient blockers.
 
+docs/rfc_distance_analysis/rfc_support_two_tau2_quotient_frame_lemma.md
+  Status: local theorem target.
+  Isolates the decomposable `|A|=2,delta=2,comp=2` quotient-frame row now exposed by the decoded
+  structural trace. The target child object is a diamond
+  `V >= M_1,M_2 >= L`, not a product of child line moments.
+
 docs/rfc_distance_analysis/rfc_covering_flag_lift_lemma.md
   Status: theorem target.
   States the covering/projectivization lemma suggested by the cover-lift diagnostics. This is now

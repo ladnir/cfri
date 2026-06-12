@@ -308,7 +308,11 @@ The next tau-two theorem should therefore be phrased as a represented support-tw
 bound. It must count the outer plane together with the root-compatible support-two frame and any
 carried marked quotient lines as one quotient diagram. It may not delete quotient-plane incidence
 altogether; the target is to replace the crude ambient plane count by the sharper count forced by
-the exact two-root support and child zero containers.
+the exact two-root support and child zero containers. The local statement is isolated in:
+
+```text
+docs/rfc_distance_analysis/rfc_support_two_tau2_quotient_frame_lemma.md
+```
 
 ## Tau-One Chain Rows
 

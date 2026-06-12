@@ -121,7 +121,12 @@ Tau-one branch:
   kappa_phi on the dominant row.
 ```
 
-The second branch is the current narrow algebraic blocker. The first row to resolve remains:
+Update: the first row below is now resolved by a different exact-support mechanism. It has a lower
+tau-zero sibling whose projected child container has the same dimension as the upper tau-one
+container. Nested witnesses therefore force the upper active support to be zero in that container.
+See `rfc_nested_tau0_equal_container_filter.md`.
+
+The old row was:
 
 ```text
 state: (4,7)>=(2,8)
@@ -131,6 +136,10 @@ dominant descendant tau-one row:
 target:
   replace that dimension by kappa_phi, not by zero unless kappa_phi=0 is proved.
 ```
+
+After enabling `--nested-tau0-equal-container-filter`, the strong table value for `(4,7)>=(2,8)`
+moves to `27.05765334` bits. Later tau-one rows may still need a full-line transition map, but this
+specific top row should be rerouted before a `kappa_phi` calculation.
 
 ## Diagnostic Code Update
 

@@ -34,6 +34,7 @@ from rfc_flag_bad_pair_classifier import (  # noqa: E402
     choice_quotient_lift_qdim,
     choice_view,
     covered_kernel_lift_qdims,
+    pair_has_nested_tau0_equal_container_active_collapse,
 )
 from rfc_flag_span_moment import (  # noqa: E402
     INF,
@@ -269,6 +270,7 @@ def compute_pair_enumerated_flag_table(
     consumed_kernel_mode: str,
     support2_diamond_mode: str,
     support2_line_filter: bool,
+    nested_tau0_equal_container_filter: bool,
     exact_filtered_empty: bool,
     allowed_keys: set[tuple[State, State]] | None = None,
 ) -> tuple[FlagTable, TableStats]:
@@ -359,6 +361,7 @@ def compute_pair_enumerated_flag_table(
                 consumed_kernel_mode=consumed_kernel_mode,
                 support2_diamond_mode=support2_diamond_mode,
                 support2_line_filter=support2_line_filter,
+                nested_tau0_equal_container_filter=nested_tau0_equal_container_filter,
             )
             exact_empty_impossible = False
             if (
@@ -386,6 +389,7 @@ def compute_pair_enumerated_flag_table(
                         consumed_kernel_mode=consumed_kernel_mode,
                         support2_diamond_mode=support2_diamond_mode,
                         support2_line_filter=support2_line_filter,
+                        nested_tau0_equal_container_filter=nested_tau0_equal_container_filter,
                     )
                 exact_empty_impossible = pair_sum <= NEG_INF / 2
             if exact_empty_impossible:
@@ -426,6 +430,7 @@ def collect_pair_row_child_flag_keys(
     consumed_kernel_mode: str,
     support2_diamond_mode: str,
     support2_line_filter: bool,
+    nested_tau0_equal_container_filter: bool,
     demanded_keys: set[tuple[State, State]],
 ) -> set[tuple[State, State]]:
     """Collect lower two-layer keys queried by pair rows for demanded entries."""
@@ -495,6 +500,14 @@ def collect_pair_row_child_flag_keys(
                 if (
                     support2_line_filter
                     and choice_has_support2_line_quotient_impossibility(inner.choice)
+                ):
+                    continue
+                if (
+                    nested_tau0_equal_container_filter
+                    and pair_has_nested_tau0_equal_container_active_collapse(
+                        outer.choice,
+                        inner.choice,
+                    )
                 ):
                     continue
                 child_layers = tuple(
@@ -675,6 +688,7 @@ def _build_pair_levels_once(
     consumed_kernel_mode: str,
     support2_diamond_mode: str,
     support2_line_filter: bool,
+    nested_tau0_equal_container_filter: bool,
     exact_filtered_empty: bool,
     last_level_keys: set[tuple[State, State]] | None,
     demand_next_level: bool,
@@ -763,6 +777,7 @@ def _build_pair_levels_once(
             consumed_kernel_mode=consumed_kernel_mode,
             support2_diamond_mode=support2_diamond_mode,
             support2_line_filter=support2_line_filter,
+            nested_tau0_equal_container_filter=nested_tau0_equal_container_filter,
             exact_filtered_empty=exact_filtered_empty,
             allowed_keys=allowed_keys,
         )
@@ -799,6 +814,7 @@ def build_pair_levels(
     consumed_kernel_mode: str,
     support2_diamond_mode: str,
     support2_line_filter: bool,
+    nested_tau0_equal_container_filter: bool,
     exact_filtered_empty: bool,
     last_level_keys: set[tuple[State, State]] | None,
     demand_next_level: bool,
@@ -829,6 +845,7 @@ def build_pair_levels(
             consumed_kernel_mode=consumed_kernel_mode,
             support2_diamond_mode=support2_diamond_mode,
             support2_line_filter=support2_line_filter,
+            nested_tau0_equal_container_filter=nested_tau0_equal_container_filter,
             exact_filtered_empty=exact_filtered_empty,
             last_level_keys=last_level_keys,
             demand_next_level=demand_next_level,
@@ -866,6 +883,7 @@ def build_pair_levels(
                 consumed_kernel_mode=consumed_kernel_mode,
                 support2_diamond_mode=support2_diamond_mode,
                 support2_line_filter=support2_line_filter,
+                nested_tau0_equal_container_filter=nested_tau0_equal_container_filter,
                 demanded_keys=demanded_keys,
             )
             if not child_keys:
@@ -947,6 +965,14 @@ def main() -> None:
         help=(
             "diagnostic: exclude decomposable support-two tau-two rows with "
             "dim(V/L)=1, where nonempty exact root-line support is impossible"
+        ),
+    )
+    parser.add_argument(
+        "--nested-tau0-equal-container-filter",
+        action="store_true",
+        help=(
+            "diagnostic: exclude upper tau-positive rows whose active support is "
+            "collapsed by a lower tau-zero sibling with the same child container"
         ),
     )
     parser.add_argument(
@@ -1058,6 +1084,7 @@ def main() -> None:
         consumed_kernel_mode=args.consumed_kernel_mode,
         support2_diamond_mode=args.support2_diamond_mode,
         support2_line_filter=args.support2_line_quotient_filter,
+        nested_tau0_equal_container_filter=args.nested_tau0_equal_container_filter,
         exact_filtered_empty=args.exact_filtered_empty,
         last_level_keys=last_level_keys,
         demand_next_level=args.demand_next_level,
@@ -1209,6 +1236,7 @@ def main() -> None:
             consumed_kernel_mode=args.consumed_kernel_mode,
             support2_diamond_mode=args.support2_diamond_mode,
             support2_line_filter=args.support2_line_quotient_filter,
+            nested_tau0_equal_container_filter=args.nested_tau0_equal_container_filter,
         )
         baseline_label = "-inf" if baseline <= NEG_INF / 2 else f"{baseline:.8f}"
         table_label = "-inf" if table_value <= NEG_INF / 2 else f"{table_value:.8f}"

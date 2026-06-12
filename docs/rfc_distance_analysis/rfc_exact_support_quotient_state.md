@@ -114,6 +114,36 @@ This justifies the scalar and pair-table diagnostic filter:
 
 provided the final proof states the canonical exact-support tie-breaking rule.
 
+### Nested Tau-Zero Equal-Container Collapse
+
+There is a cross-layer version of the same exact-support rerouting. Suppose `W_j <= W_i`, the upper
+row `i` has nonempty active singleton support, and the lower row `j` is tau zero. Since `W_j` is a
+subspace of `W_i`, the lower zero witness may be chosen to contain the upper zero witness. Thus the
+lower tau-zero child projection is zero on every upper active singleton child coordinate.
+
+If the displayed child projections satisfy:
+
+```text
+pi(W_j) <= pi(W_i),
+dim pi(W_j) = dim pi(W_i),
+```
+
+then `pi(W_j)=pi(W_i)`, so the upper child projection is already zero on the claimed active
+support. The upper tau-positive support was not exact and must be rerouted to a smaller support
+profile.
+
+This is the theorem target behind:
+
+```text
+--nested-tau0-equal-container-filter
+```
+
+and is isolated in:
+
+```text
+docs/rfc_distance_analysis/rfc_nested_tau0_equal_container_filter.md
+```
+
 ## Nested Quotient Counting
 
 Let `W_j <= W_i`. There is always a map:

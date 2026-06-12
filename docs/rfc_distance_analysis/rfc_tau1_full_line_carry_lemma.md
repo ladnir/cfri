@@ -201,7 +201,8 @@ For every recurrence row that uses this lemma, the proof must specify:
    implied by the carried line, disjoint from it, or incompatible.
 ```
 
-The row is proof-safe only after these labels are part of the state. The first row to verify is:
+The row is proof-safe only after these labels are part of the state. The original first row to
+verify was:
 
 ```text
 state: (4,7)>=(2,8)
@@ -215,3 +216,10 @@ target:
 
 The certificate only improves if this row has `kappa_phi < 3`; it fully realizes the diagnostic
 saving only if `kappa_phi = 0`.
+
+Update: this particular row is now superseded by the nested tau-zero equal-container filter in
+`rfc_nested_tau0_equal_container_filter.md`. Its lower tau-zero sibling has the same child
+projection dimension as the upper tau-one row, so exact-support nesting forces the upper active
+coordinate to be zero in the upper child container. The row should be rerouted/excluded before any
+`kappa_phi` calculation. The full-line carry lemma remains available for later tau-one rows that
+survive this exact-support collapse test.

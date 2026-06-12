@@ -31,6 +31,7 @@ rfc_flag_state_choice_diagnostic.py target flag-state joint expansion choice dia
 rfc_flag_bad_pair_classifier.py     groups high-mass flag-state pair witnesses by structural keys
 rfc_pair_flag_table_recurrence.py   pair-enumerated two-layer flag-table recurrence diagnostic
 docs/rfc_distance_analysis/rfc_residual_trace_classification.md current z=34 proof-obligation note
+docs/rfc_distance_analysis/rfc_nested_tau0_equal_container_filter.md exact-support sibling-collapse note
 rfc_theta_chain_normal_slice.py     shortened-ambient/defect-slice checker with optimistic rho and strict hard-trace columns
 rfc_defect_conservation.py          fixed-witness rank-defect conservation checker for exposed shortened ambients
 rfc_shortened_rank_recurrence.py    optimistic rho_h(D,z) recurrence with paired-spine compression

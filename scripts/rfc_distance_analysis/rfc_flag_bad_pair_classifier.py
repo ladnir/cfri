@@ -200,6 +200,32 @@ def choice_has_support2_line_quotient_impossibility(choice: tuple[int, ...]) -> 
     )
 
 
+def pair_has_nested_tau0_equal_container_active_collapse(
+    outer_choice: tuple[int, ...],
+    inner_choice: tuple[int, ...],
+) -> bool:
+    """Return true when a lower tau-zero equal container collapses upper support.
+
+    In an exact nested flag witness, the lower zero set may be chosen to contain
+    the upper zero set because `W_inner <= W_outer`.  If the upper row has
+    nonempty active singleton support and the lower row is tau zero, then the
+    lower child projection is zero on those active child coordinates.  When the
+    lower projected container has the same dimension as the upper projected
+    container, containment forces equality, so the upper container is already
+    zero on its claimed active support.  That row belongs to a smaller
+    exact-support profile rather than the tau-positive row being counted here.
+    """
+
+    outer = choice_view(outer_choice)
+    inner = choice_view(inner_choice)
+    return (
+        outer.tau > 0
+        and outer.visible_support > 0
+        and inner.tau == 0
+        and inner.outer_span == outer.outer_span
+    )
+
+
 def choice_kernel_lift_qdim(parent_span: int, choice: tuple[int, ...]) -> int:
     view = choice_view(choice)
     if view.tau <= 0:
@@ -603,6 +629,7 @@ def build_pair_rows(
     consumed_kernel_mode: str = "none",
     support2_diamond_mode: str = "none",
     support2_line_filter: bool = False,
+    nested_tau0_equal_container_filter: bool = False,
 ) -> tuple[list[PairRow], float]:
     if support2_diamond_mode not in ("none", "child-only"):
         raise ValueError(f"unknown support2_diamond_mode: {support2_diamond_mode}")
@@ -617,6 +644,14 @@ def build_pair_rows(
             if exclude_collapsed_active and choice_has_collapsed_active_container(inner.choice):
                 continue
             if support2_line_filter and choice_has_support2_line_quotient_impossibility(inner.choice):
+                continue
+            if (
+                nested_tau0_equal_container_filter
+                and pair_has_nested_tau0_equal_container_active_collapse(
+                    outer.choice,
+                    inner.choice,
+                )
+            ):
                 continue
             child_layers = tuple(
                 merge_equal_dimension_chain(list(outer.child_layers) + list(inner.child_layers))

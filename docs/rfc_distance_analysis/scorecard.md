@@ -52,6 +52,7 @@ Open items are excluded from the denominator.
 | Finite marked-plane state recurrence | 1 | 8 | 0 | 11% | Keep, frontier moved to quotient-incidence state | `rfc_marked_plane_state_recurrence.md`, `rfc_marked_plane_state_diagnostic.py`, `rfc_diagram_path_dp.py`, `rfc_flag_state_choice_diagnostic.py`, and `rfc_flag_bad_pair_classifier.py` turn the hand-expanded two-line diagram into a state scan/path diagnostic. Joint choices help at level 2; nested quotient/subspace/consumed-kernel diagnostics move depth-5 `z=34` from `1740.40` to `1232.89`, but do not close. |
 | Dominant-row proof-obligation labels | 0 | 1 | 0 | 0% | Useful classifier, not a bound | `rfc_pair_flag_table_recurrence.py` now labels traced choices as `support2-quotient-diamond`, `tau1-full-line-carry`, `support2-line-quotient-impossible`, etc. `rfc_residual_trace_classification.md` records that the baseline level-3 pair sum is worse than scalar fallback, so the missing work is a joint quotient-diagram theorem and tau-one transition map, not more independent pair enumeration. |
 | Scalar collapsed-active rerouting | 0 | 1 | 0 | 0% | Promising theorem plumbing | Applying the collapsed-active filter inside scalar lifts, not just pair tables, removes the dominant `(4,3)>=(4,4)` scalar overcount and tightens the `(4,7)>=(2,8)` baseline from `810.95` to `549.21`. Needs proof as exact-support rerouting. |
+| Nested tau-zero equal-container collapse | 1 | 1 | 0 | 50% | Strong new exact-support filter, not final | The lemma in `rfc_nested_tau0_equal_container_filter.md` reroutes upper tau-positive rows when a lower tau-zero sibling has the same child projection container. It improves the strong `(4,7)>=(2,8)` table from `423.08` to `27.06` bits and the demanded depth-5 no-closure `z=34` checkpoint to `1080.36` bits. It does not close the certificate; support-two frame and tau-two rows take over. |
 | Nested quotient/subspace/consumed-kernel counting | 0 | 1 | 0 | 0% | Strong diagnostic, conditional theorem target | The three modes `inner-in-outer`, `inner-in-outer`, and `tau0-inner-contained` lower the level-3 stress table to `303.44` and full depth-5 `z=34` to `1232.89`. `rfc_exact_support_quotient_state.md` now states the needed compatibility labels, especially `K_lower = W_lower cap K_upper` for upper-visible nested quotient counting. Decoded trace columns show the top stress row still has remaining quotient lifts `outer=8, inner=1`, so the residual is the outer support-two tau-two frame count. |
 | Kernel-lift-only cover | 0 | 1 | 1 | 0% | Useful after richer state, still not enough | Earlier `--cover-kernel-lift` kept crossing at `z=137`; after nested diagnostics it lowers `z=34` to `924.69`, but crossing remains `z=133` and tau-two/tau-one quotient chains dominate. |
 | Support-two tau-two quotient-frame bound | 1 | 2 | 0 | 33% | Keep, but old stress row is no longer dominant | The decoded `(4,7)>=(2,8)` structural trace has outer `a=2,tau=2,charge=4,lift=12` and adjusted qdim `8`, while the nested inner tau-one line is already reduced to one remaining quotient dimension. `--support2-diamond-mode child-only` lowers that level-3 pair sum from `303.44` to `61.01` bits and full depth-5 `z=34` from `1232.89` to `1095.86`, but the new blocker is `(4,2)>=(2,4)` with a strong bottom/kernel zero budget. |
@@ -145,6 +146,15 @@ level-3 trace for `(4,7)>=(2,8)` shows the pair-enumerated sum is worse than sca
 `support2-quotient-diamond` plus `tau1-quotient-line`. This is a partial win for problem
 localization: the next proof work is a joint quotient-diagram theorem plus the tau-one
 `phi : E'_A -> E_A` transition/kernel computation, not more broad pair enumeration.
+
+Nested tau-zero equal-container collapse added. The old first tau-one full-line target row has an
+inner tau-zero sibling with the same child projection dimension; exact nested witnesses therefore
+force the upper active support to be zero in that container. With
+`--nested-tau0-equal-container-filter`, the strong `(4,7)>=(2,8)` table improves from
+`423.08002115` to `27.05765334` bits. The demanded depth-5 no-closure checkpoint improves to
+`final_span_1_z_report,34,1080.36409460`. This is a real exact-support win, but the certificate is
+still open; the next visible competitors are support-two quotient-frame and tau-two
+layer-codimension rows at state `(2,15)`.
 
 ### 2026-06-11
 

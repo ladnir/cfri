@@ -197,6 +197,16 @@ docs/rfc_distance_analysis/rfc_residual_trace_classification.md
   pair rows are structurally `support2-quotient-diamond` plus `tau1-quotient-line`. This confirms
   that the next proof work is a joint quotient-diagram theorem and the tau-one full-line transition
   map, not more independent pair enumeration.
+
+docs/rfc_distance_analysis/rfc_nested_tau0_equal_container_filter.md
+  Status: local exact-support lemma and diagnostic.
+  The attempted tau-one full-line transition exposed a stronger cross-layer collapse: if an upper
+  tau-positive row has a lower tau-zero sibling with the same projected child-container dimension,
+  nested witnesses force the upper active support to be zero in that same container. The row is
+  rerouted/excluded by exact support. The first target `(4,7)>=(2,8)` improves from
+  `423.08002115` to `27.05765334` bits in the strong table. The demanded depth-5 no-closure
+  checkpoint with `--nested-tau0-equal-container-filter` reports `z=34` at `1080.36409460` bits;
+  still not closed.
 ```
 
 The external Fable audit was useful and found the product-of-first-moments bug. Its record is:

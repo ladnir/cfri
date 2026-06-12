@@ -4,6 +4,14 @@ Scope: original non-systematic RFC, determinant-1 fold, `T` uniform in `F^*`.
 
 Status: proof target and diagnostic interpretation. This is not yet a certificate theorem.
 
+Update: the first dominant child-table row below is now better classified as a nested tau-zero
+equal-container active-support collapse, not as a genuine full-line carry row. See
+`rfc_nested_tau0_equal_container_filter.md`. The full-line carry lemma remains a valid proof
+component for later tau-one chains, but the specific row with outer choice
+`3:1:1:1:4:3:3:1:1:1:0:-1:-1:-1:13` and inner tau-zero choice
+`3:2:0:0:4:4:5:0:0:0:0:-1:-1:0:0` should be rerouted/excluded by exact-support
+canonicalization.
+
 ## Purpose
 
 The current strong-mode depth-5 `z=34` blocker is a high-lift tau-one quotient-line family. The

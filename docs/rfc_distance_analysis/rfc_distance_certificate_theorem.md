@@ -473,6 +473,16 @@ R_{h-1}(dim H(B_i), |B_i|)
   = Pr_child[dim H(B_i) is at least this large].
 ```
 
+The exact-support routing rules also include the nested tau-zero equal-container collapse. If a
+lower tau-zero layer has the same projected child-container dimension as an upper tau-positive
+layer, then nested zero witnesses force the upper active singleton support to be zero in that
+container. Such rows are not exact tau-positive support rows and must be rerouted to the smaller
+support profile. The local lemma is:
+
+```text
+docs/rfc_distance_analysis/rfc_nested_tau0_equal_container_filter.md
+```
+
 The rank-tail codimension
 
 ```text

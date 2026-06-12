@@ -356,6 +356,35 @@ pairs again have `top_inner_kernel_dim = 0` and are marked `yes`. This does not 
 unconsumption, but it cleanly separates the easy sibling-unconsumed family from rows that must be
 carried or charged.
 
+The stricter diagnostic is:
+
+```text
+--kernel-cover-mode sibling-unconsumed
+```
+
+It covers only an upper-layer kernel lift when the displayed lower layer is fully visible; it does
+not cover the lower layer's own kernel lift because that requires a descendant audit. By itself it
+does not close the row:
+
+```text
+pair sum = 2092.28967759 bits
+remaining loss = 905.09512656 bits = 7.07105568 q-dim
+top row has top_inner_kernel_dim = 1 and is marked no
+```
+
+However, combining the exact-flag collapse routing with the sibling-unconsumed cover gives:
+
+```text
+--exclude-collapsed-active --kernel-cover-mode sibling-unconsumed:
+  pair sum = 1071.43723477 bits
+  saving over coarse = 115.75731625 bits = 0.90435403 q-dim
+```
+
+This is the current proof-shaped closure of the level-3 stress row. It uses two separate
+statements: collapsed-active rows are rerouted as exact-flag support collapses, and only
+sibling-unconsumed kernel fibers are covered. Consumed-kernel rows remain in the sum, but after the
+collapsed-active rerouting they are below the coarse/table baseline.
+
 The first option removes rows where a tau-positive exact flag would have equal-dimensional child
 containers and the lower container carries the active singleton zero. That alone removes the
 `lift=19` row, but leaves a `lift=13` tau-one row. The second option keeps the child table fixed and

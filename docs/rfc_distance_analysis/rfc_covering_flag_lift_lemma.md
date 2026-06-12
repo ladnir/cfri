@@ -707,11 +707,53 @@ coarse/table baseline: 1187.19455102 bits
 saving:                246.34227875 bits = 1.92454905 q-dim
 ```
 
+The stricter sibling-safe diagnostic does not cover every displayed kernel lift. It covers only an
+upper kernel fiber when the displayed lower layer is fully visible:
+
+```text
+python -B scripts/rfc_distance_analysis/rfc_flag_bad_pair_classifier.py \
+  --level 3 \
+  --outer-state 4,7 \
+  --inner-state 2,8 \
+  --term-limit 300 \
+  --kernel-cover-mode sibling-unconsumed
+```
+
+By itself this leaves the consumed-kernel rows dominant:
+
+```text
+pair sum:              2092.28967759 bits
+remaining loss:        905.09512656 bits = 7.07105568 q-dim
+top_inner_kernel_dim:  1
+top_outer_kernel_unconsumed_by_inner: no
+```
+
+But after exact-flag collapsed-active rerouting:
+
+```text
+python -B scripts/rfc_distance_analysis/rfc_flag_bad_pair_classifier.py \
+  --level 3 \
+  --outer-state 4,7 \
+  --inner-state 2,8 \
+  --term-limit 300 \
+  --exclude-collapsed-active \
+  --kernel-cover-mode sibling-unconsumed
+```
+
+the row closes:
+
+```text
+pair sum:              1071.43723477 bits
+coarse/table baseline: 1187.19455102 bits
+saving:                115.75731625 bits = 0.90435403 q-dim
+```
+
 This is strong evidence for the intended division of labor:
 
 ```text
 keep quotient incidence;
-cover duplicate kernel lifts.
+reroute collapsed active exact flags;
+cover only sibling-unconsumed duplicate kernel lifts.
 ```
 
 Concretely, for fixed child flag `L<=V` and fixed canonical local quotient/root datum `R`, the

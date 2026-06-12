@@ -64,6 +64,8 @@ CSV_FIELDS = [
     "top_outer_quotient_lift_qdim",
     "top_inner_kernel_lift_qdim",
     "top_inner_quotient_lift_qdim",
+    "top_outer_covered_kernel_lift_qdim",
+    "top_inner_covered_kernel_lift_qdim",
     "top_outer_kernel_dim",
     "top_inner_kernel_dim",
     "top_outer_kernel_unconsumed_by_inner",
@@ -211,16 +213,34 @@ def outer_kernel_unconsumed_by_inner(
     return "yes" if inner_kernel_dim == 0 else "no"
 
 
-def adjusted_local_log2(
-    term: TermCandidate,
+def covered_kernel_lift_qdims(
     *,
-    parent_span: int,
-    q_log2: float,
+    outer_parent_span: int,
+    inner_parent_span: int,
+    outer_choice: tuple[int, ...],
+    inner_choice: tuple[int, ...],
     kernel_cover_mode: str,
-) -> float:
+) -> tuple[int, int]:
     if kernel_cover_mode == "none":
-        return term.local_log2
-    return term.local_log2 - choice_kernel_lift_qdim(parent_span, term.choice) * q_log2
+        return 0, 0
+    outer_kernel_lift = choice_kernel_lift_qdim(outer_parent_span, outer_choice)
+    inner_kernel_lift = choice_kernel_lift_qdim(inner_parent_span, inner_choice)
+    if kernel_cover_mode in ("posthoc", "unconsumed-container"):
+        return outer_kernel_lift, inner_kernel_lift
+    if kernel_cover_mode == "sibling-unconsumed":
+        outer_cover = 0
+        if (
+            outer_kernel_unconsumed_by_inner(
+                outer_parent_span=outer_parent_span,
+                inner_parent_span=inner_parent_span,
+                outer_choice=outer_choice,
+                inner_choice=inner_choice,
+            )
+            == "yes"
+        ):
+            outer_cover = outer_kernel_lift
+        return outer_cover, 0
+    raise ValueError(f"unknown kernel_cover_mode: {kernel_cover_mode}")
 
 
 def tau_key(row: PairRow) -> str:
@@ -329,18 +349,15 @@ def build_pair_rows(
             )
             if child_flag_log2 <= NEG_INF / 2:
                 continue
-            outer_local_log2 = adjusted_local_log2(
-                outer,
-                parent_span=outer_parent_span,
-                q_log2=q_log2,
+            outer_covered_kernel, inner_covered_kernel = covered_kernel_lift_qdims(
+                outer_parent_span=outer_parent_span,
+                inner_parent_span=inner_parent_span,
+                outer_choice=outer.choice,
+                inner_choice=inner.choice,
                 kernel_cover_mode=kernel_cover_mode,
             )
-            inner_local_log2 = adjusted_local_log2(
-                inner,
-                parent_span=inner_parent_span,
-                q_log2=q_log2,
-                kernel_cover_mode=kernel_cover_mode,
-            )
+            outer_local_log2 = outer.local_log2 - outer_covered_kernel * q_log2
+            inner_local_log2 = inner.local_log2 - inner_covered_kernel * q_log2
             joint_log2 = outer_local_log2 + inner_local_log2 + child_flag_log2
             row = PairRow(
                 outer=outer,
@@ -417,6 +434,28 @@ def make_output_row(
         "top_inner_quotient_lift_qdim": (
             choice_quotient_lift_qdim(inner_parent_span, top.inner.choice) if top is not None else ""
         ),
+        "top_outer_covered_kernel_lift_qdim": (
+            covered_kernel_lift_qdims(
+                outer_parent_span=outer_parent_span,
+                inner_parent_span=inner_parent_span,
+                outer_choice=top.outer.choice,
+                inner_choice=top.inner.choice,
+                kernel_cover_mode=kernel_cover_mode,
+            )[0]
+            if top is not None
+            else ""
+        ),
+        "top_inner_covered_kernel_lift_qdim": (
+            covered_kernel_lift_qdims(
+                outer_parent_span=outer_parent_span,
+                inner_parent_span=inner_parent_span,
+                outer_choice=top.outer.choice,
+                inner_choice=top.inner.choice,
+                kernel_cover_mode=kernel_cover_mode,
+            )[1]
+            if top is not None
+            else ""
+        ),
         "top_outer_kernel_dim": (
             choice_kernel_dim(outer_parent_span, top.outer.choice) if top is not None else ""
         ),
@@ -467,11 +506,12 @@ def main() -> None:
     )
     parser.add_argument(
         "--kernel-cover-mode",
-        choices=("none", "posthoc", "unconsumed-container"),
+        choices=("none", "posthoc", "unconsumed-container", "sibling-unconsumed"),
         default="none",
         help=(
-            "kernel-lift adjustment mode; unconsumed-container is the theorem-mode diagnostic "
-            "that keeps quotient incidence counted and assumes no hidden consumed kernel datum"
+            "kernel-lift adjustment mode; unconsumed-container covers all displayed kernel lifts, "
+            "while sibling-unconsumed covers only an upper kernel lift whose displayed lower layer "
+            "is fully visible"
         ),
     )
     parser.add_argument(
@@ -586,7 +626,7 @@ def main() -> None:
             note=(
                 "truncated pair sum; omitted terms can only increase the full naive sum"
                 if kernel_cover_mode == "none"
-                else "truncated pair sum; kernel cover subtracts only kernel-lift q-dimensions and keeps quotient incidence counted"
+                else "truncated pair sum; kernel cover subtracts selected kernel-lift q-dimensions and keeps quotient incidence counted"
             ),
         )
     )

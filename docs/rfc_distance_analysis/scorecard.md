@@ -288,3 +288,10 @@ Classifier sibling-consumption audit added. The dominant un-covered pair has out
 `--kernel-cover-mode unconsumed-container`, the top covered rows are again marked `yes`. This is a
 partial proof signal, not a win: descendants below the displayed pair still need their own
 unconsumed/consumed split.
+
+Stricter sibling-only cover tested. `--kernel-cover-mode sibling-unconsumed` alone does not close
+the level-3 stress row; the pair sum is `2092.28967759` bits, still `7.07105568` q-dimensions over
+the coarse/table baseline, because consumed-kernel rows become dominant. Combining it with
+`--exclude-collapsed-active` gives `1071.43723477` bits against the `1187.19455102` baseline,
+saving `0.90435403` q-dimensions. This is the current proof-shaped closure: prove exact-flag
+collapsed-active rerouting, then cover only sibling-unconsumed kernel fibers.

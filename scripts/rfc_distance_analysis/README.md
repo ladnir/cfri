@@ -251,6 +251,10 @@ tau-positive kernel-lift multiplicity while retaining quotient incidence; this c
 stress row with `1.92454905` q-dimensions of slack. That option is a guarded proof-target
 diagnostic, not a certificate mode. The older `--posthoc-cover-kernel-lift` flag is kept as a
 compatibility alias.
+Use `--kernel-cover-mode sibling-unconsumed` for the stricter displayed-sibling audit. Alone it
+leaves the consumed-kernel rows dominant (`7.07105568` q-dimensions over baseline), but combined
+with `--exclude-collapsed-active` it closes the row with `0.90435403` q-dimensions of slack. This
+is the current proof-shaped diagnostic.
 The CSV also splits the top row's lift into `top_*_kernel_lift_qdim` and
 `top_*_quotient_lift_qdim` so the quotient-incidence part can be audited separately from duplicate
 kernel-lift multiplicity. It also emits `top_outer_kernel_dim`, `top_inner_kernel_dim`, and

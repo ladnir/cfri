@@ -48,6 +48,7 @@ Open items are excluded from the denominator.
 | Tau-one fixed-flag quotient-line incidence | 0 | 1 | 0 | 0% | Safe local brick, not a closer | `rfc_tau1_quotient_line_incidence_lemma.md` proves the post-root exponent `f_A + m_A - 1 - |A|`; `--report-tau1-incidence` shows the `z=34` tau-one trace rows have `support_saving=0`. |
 | Carried two-layer flag merge | 1 | 1 | 0 | 50% | Keep, exposes next diagram | `rfc_carried_flag_diagnostic.py` carries `F_3((4,7),(2,8))`, improves `(4,3)>=(2,5)` to `(4,4)>=(2,5)`, and saves `251.98` bits; next state is a two-marked-line diagram. |
 | Two-marked-line plane diagram | 1 | 1 | 0 | 50% | Keep, local but insufficient | `rfc_two_marked_line_plane_lemma.md` replaces a coarse `q^4` ancestor choice by `q+1`, saving another `381.42` bits on the carried path. |
+| Finite marked-plane state recurrence | 0 | 1 | 0 | 0% | Next candidate | `rfc_marked_plane_state_recurrence.md` and `rfc_marked_plane_state_diagnostic.py` turn the hand-expanded two-line diagram into an ordered-line state scan; still needs recursive propagation through all diagram nodes. |
 | Kernel-lift-only cover | 0 | 0 | 1 | 0% | Not useful for current base seal | `--cover-kernel-lift` keeps quotient incidence and leaves depth-5 checkpoint at `z=137`; combined with safe tau-zero covering it still only reaches `z=135`. |
 | One-layer shortened child flag ambient | 0 | 0 | 1 | 0% | Not useful for current base seal | Diagnostic `--flag-bound best-shortened` leaves the depth-5 checkpoint at `z=137` and the `z=34` trace unchanged. |
 | High-kernel/local-incidence bonus | 0 | 0 | 0 | open | Next candidate | Need prove hard row carrying large shortened ambient pays more than uniform `q^-9`. |
@@ -195,3 +196,11 @@ plane rather than the coarse `q^4` ancestor choice. The diagnostic estimates ano
 of saving, for `633.39` bits combined with the carried-flag merge. Applying both to the displayed
 path leaves vector log2 moment `1863.66`, still `15.18` q-dimensions above the `2^-80` target. This
 is real progress but still local; the full `z=34` gap remains much larger.
+
+Finite marked-plane state target added. The new scanner enumerates rows where a carrier child plane
+with one marked line can absorb an additional tau-zero child line for `q+1` choices. On the exact
+carried-path row `(4,4)>=(2,5)` at layer level 2, it reproduces the `381.41503750` bit saving from
+the hand calculation. The next required step is not another one-off local saving, but propagation of
+ordered marked-plane diagram states through the recurrence. Side audit agreed this is a real
+recurrence brick if used as a joint diagram transition, with explicit merge/equality rules and no
+product of child moments.

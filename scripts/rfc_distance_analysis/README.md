@@ -24,6 +24,7 @@ rfc_replica_span_moment.py          ordered-tuple span-aware diagnostic
 rfc_subspace_span_moment.py         subspace-span diagnostic exposing visible-kernel state
 rfc_flag_span_moment.py             two-layer flag diagnostic for kernel-zero propagation
 rfc_carried_flag_diagnostic.py      targeted carried-flag merge/diagram diagnostic for depth-5 trace
+rfc_marked_plane_state_diagnostic.py scans finite marked-line-in-plane state savings
 rfc_theta_chain_normal_slice.py     shortened-ambient/defect-slice checker with optimistic rho and strict hard-trace columns
 rfc_defect_conservation.py          fixed-witness rank-defect conservation checker for exposed shortened ambients
 rfc_shortened_rank_recurrence.py    optimistic rho_h(D,z) recurrence with paired-spine compression
@@ -158,6 +159,21 @@ Using the local two-marked-line plane bound, the script estimates another `381.4
 q-dimensional saving for that diagram, before finite constants. Applying both local savings to the
 displayed path leaves an adjusted vector moment of `1863.66054115` bits, still `15.18484798`
 q-dimensions above the `2^-80` target.
+
+`rfc_marked_plane_state_diagnostic.py` generalizes the next local diagram scan. It enumerates
+two-layer flags where the upper layer already carries a child 2-plane plus one marked line and the
+lower tau-zero layer only asks for another line inside that plane. For the carried-path row:
+
+```text
+python -B scripts/rfc_distance_analysis/rfc_marked_plane_state_diagnostic.py \
+  --layer-level 2 \
+  --outer-state 4,4 \
+  --inner-state 2,5
+```
+
+it reproduces the `381.41503750` bit two-marked-line saving. This script is still diagnostic: it
+uses the safe ordered-line `q+1` replacement, but it does not yet propagate a full diagram state
+through all levels.
 
 `rfc_multicopy_falsification.py` is adversarial. It estimates whether broad one-copy near-families
 can intersect across many independent RFC copies often enough to threaten the target excess.

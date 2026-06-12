@@ -76,6 +76,7 @@ rfc_h2_cofactor_bound.md                      second rank-drop/cofactor route
 rfc_tau2_weighted_exterior_bound.md           tau-2 layer-codimension/root-line endpoint target
 rfc_u23_tau2_endpoint_lemma.md                direct |A|=3,delta=2,comp=1 endpoint proof
 rfc_two_marked_line_plane_lemma.md            local two-marked-line incidence diagram target
+rfc_marked_plane_state_recurrence.md          finite marked-plane recurrence state target
 rfc_theta_minus_one_chain_recurrence_target.md recurrence target for theta_2=-1 chains
 rfc_theta_minus_one_isolation_lemma.md        outer-chain isolation and kernel nested-flag target
 rfc_kernel_branch_nested_flag_recurrence.md   minimal nested-flag recurrence for kernel chains
@@ -88,6 +89,7 @@ rfc_depth5_finite_flag_recurrence_target.md   finite flag DP/theorem target for 
 rfc_covering_flag_lift_lemma.md               covering/projectivization lemma target for quotient lifts
 rfc_depth5_flag_checkpoint_trace.md           corrected trace showing quotient-incidence blocker
 scripts/rfc_distance_analysis/rfc_carried_flag_diagnostic.py carried-flag merge and next diagram diagnostic
+scripts/rfc_distance_analysis/rfc_marked_plane_state_diagnostic.py marked-line-in-plane state scanner
 scripts/rfc_distance_analysis/rfc_defect_conservation.py fixed-witness defect-conservation diagnostic
 scripts/rfc_distance_analysis/rfc_shortened_rank_recurrence.py optimistic shortened-kernel rank recurrence
 rfc_rank_pattern_induction_target.md          current finite-replica induction target

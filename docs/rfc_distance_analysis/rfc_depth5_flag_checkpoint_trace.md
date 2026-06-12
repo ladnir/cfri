@@ -117,6 +117,49 @@ After additionally removing duplicate kernel lifts, the upper trace switches to 
 but the crossing remains `z=135`. Thus neither the tau-one local count nor a single kernel-lift
 factor is the missing lever. The next target is a true recursive joint child flag/diagram state.
 
+## Carried-Flag Merge Check
+
+The targeted diagnostic:
+
+```text
+python scripts/rfc_distance_analysis/rfc_carried_flag_diagnostic.py
+```
+
+reconstructs the corrected safe-tau-zero trace and carries the first inner-first flag:
+
+```text
+F_3((4,7),(2,8)).
+```
+
+The current one-layer collapse follows the inner layer into:
+
+```text
+(4,3) >= (2,5).
+```
+
+Carrying the outer layer's own child kernel zero budget merges the equal four-dimensional projected
+layers and strengthens the child flag to:
+
+```text
+(4,4) >= (2,5).
+```
+
+Under the current coarse child-bound evaluator this saves:
+
+```text
+251.97763219 bits.
+```
+
+This is real but not enough by itself. The next expansion of `(4,4) >= (2,5)` exposes a non-chain
+diagram:
+
+```text
+2-plane with marked lines (1,4) and (1,3).
+```
+
+The two marked lines both lie in the same child 2-plane, but they are not known comparable or equal.
+So the next proof object is a small incidence diagram, not just a longer total chain.
+
 ## Kernel-Lift Cover Check
 
 The narrower diagnostic:

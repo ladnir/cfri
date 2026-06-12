@@ -23,6 +23,7 @@ rfc_replica_zero_moment.py          loose/optimistic aggregate replica recurrenc
 rfc_replica_span_moment.py          ordered-tuple span-aware diagnostic
 rfc_subspace_span_moment.py         subspace-span diagnostic exposing visible-kernel state
 rfc_flag_span_moment.py             two-layer flag diagnostic for kernel-zero propagation
+rfc_carried_flag_diagnostic.py      targeted carried-flag merge/diagram diagnostic for depth-5 trace
 rfc_theta_chain_normal_slice.py     shortened-ambient/defect-slice checker with optimistic rho and strict hard-trace columns
 rfc_defect_conservation.py          fixed-witness rank-defect conservation checker for exposed shortened ambients
 rfc_shortened_rank_recurrence.py    optimistic rho_h(D,z) recurrence with paired-spine compression
@@ -148,6 +149,11 @@ to recover the older outer-projection spine; that path is useful for orientation
 the dominant recurrence branch.
 Use `--report-theta-chains -1` to summarize the longest consecutive best-transition chain of
 tau-two `theta_2=-1` rows through the outer/inner child graph.
+
+`rfc_carried_flag_diagnostic.py` reconstructs the corrected safe-tau-zero `z=34` path and tests the
+first carried-flag merge. It shows that carrying `F_3((4,7),(2,8))` changes the child flag from
+`(4,3)>=(2,5)` to `(4,4)>=(2,5)`, saving `251.97763219` bits in the current coarse child bound.
+The next expansion exposes a non-chain diagram: a 2-plane with marked lines `(1,4)` and `(1,3)`.
 
 `rfc_multicopy_falsification.py` is adversarial. It estimates whether broad one-copy near-families
 can intersect across many independent RFC copies often enough to threaten the target excess.

@@ -153,7 +153,10 @@ docs/rfc_distance_analysis/rfc_marked_plane_state_recurrence.md
   through level 2 and reports the depth-5-pruned level-3 stress state `(4,7)>=(2,8)` at
   `810.94626976` bits. Full unpruned level-3 pair-table construction timed out, so the next
   implementation blocker is a sparse/demand-driven pair table. Sparse demand mode now runs through
-  depth 5 and moves the crossing from `z=137` to `z=133`.
+  depth 5 and moves the crossing from `z=137` to `z=133`. The new trace diagnostics show that the
+  current `z=34` residual has zero scalar log-sum overhead and that the selected level-3 flag
+  `(4,7)>=(2,8)` is still using the improved coarse outer-first bound `810.94626976`, because the
+  proof-shaped pair sum is worse at `943.43723477`.
 
 docs/rfc_distance_analysis/rfc_flag_bad_pair_classifier_level3_4_7_ge_2_8.csv
   Status: current obstruction classifier.
@@ -179,7 +182,7 @@ docs/rfc_distance_analysis/rfc_fable_audit_2026_06_10.md
 The live blockers are now narrow:
 
 ```text
-1. Kernel-lift container cover for the level-3 carried flag `(4,7)>=(2,8)`. The bad mass is
+1. Nested tau-positive local counting for the level-3 carried flag `(4,7)>=(2,8)`. The bad mass is
    concentrated in high-lift rows, but a fixed-table diagnostic that removes only tau-positive
    kernel-lift multiplicity closes the row with `1.92454905` q-dimensions of slack. The stricter
    proof-shaped diagnostic is now:
@@ -187,7 +190,12 @@ The live blockers are now narrow:
    `0.90435403` q-dimensions of slack. The theorem target is therefore two lemmas:
    collapsed-active exact-support rerouting, and sibling-unconsumed kernel-fiber covering after the
    canonical local quotient/root datum is fixed. Quotient-line and quotient-plane incidence remain
-   counted. Consumed kernel subspaces must be carried or charged, not covered.
+   counted. Consumed kernel subspaces must be carried or charged, not covered. New correction: once
+   level-2 pair-table improvements are propagated, the coarse outer-first baseline for
+   `(4,7)>=(2,8)` improves to `810.94626976`, while the proof-shaped pair sum is
+   `943.43723477`. Therefore the kernel-cover package is useful but no longer sufficient for the
+   depth-5 base seal by itself; the next proof step must count the nested tau-positive local data
+   more sharply or carry a richer diagram state.
 2. Sparse pair-enumerated table recurrence. The bounded diagnostic
    `rfc_pair_flag_table_recurrence.py --depth 5 --stop-level 3 --proof-shaped --term-limit 300
    --report-flag-state 4,7,2,8 --last-level-report-only` gives `810.94626976` bits for the
@@ -197,7 +205,10 @@ The live blockers are now narrow:
    building 599 demanded level-2 table entries and 2076 demanded level-3 entries, and improves the
    crossing to `z=133`. At the production floor it reports `final_span_1_z_report,34,1740.39750674`,
    still `14.22185552` q-dimensions above the `2^-80` target. This is useful but not enough; the
-   next recurrence likely needs a richer demanded diagram state or additional local charge.
+   next recurrence needs a richer demanded diagram state or a joint local theorem. The focused
+   table trace has `baseline_log2 = table_log2 = 810.94626976`, `pair_sum_log2 = 943.43723477`, and
+   `row_count = 4432` for `(4,7)>=(2,8)`, so more sparse plumbing alone is not expected to close
+   the gap.
 3. Prove/finalize the shared-randomness-safe multi-layer flag transition theorem. The target note
    covers the joint marked-line/frame recurrence for the decomposable |A|=2,delta=2,comp=2 row,
    with the local marked-component certificate and uniform `(q+1)` frame-completion count written.
@@ -211,15 +222,15 @@ The live blockers are now narrow:
    separately and is no longer a q-dimensional blocker at the target field size.
 ```
 
-The best current next proof step is item 1:
+The best current next proof step is item 1, with the correction above:
 
-Finalize the two lemma package for the level-3 stress row: prove collapsed-active exact-support
-rerouting, prove sibling-unconsumed kernel-fiber covering using
-`K_lower = W_lower cap K_upper`, then plug only those covered exponents into the finite
-marked-plane recurrence. The target checkpoint is the stricter diagnostic
-`1071.43723477 < 1187.19455102`, not the broader all-displayed-kernel cover. In parallel, the
-implementation target is item 2: make the pair-enumerated table sparse enough to push past the
-level-3 report-only checkpoint.
+Finalize the local lemma package for nested tau-positive rows. The old two-lemma package
+(collapsed-active exact-support rerouting plus sibling-unconsumed kernel-fiber covering using
+`K_lower = W_lower cap K_upper`) remains a prerequisite, but the new checkpoint is stricter:
+explain why the top `(4,7)>=(2,8)` pair row with local logs `1037.25029842` and `906.66533592`
+should be charged or counted jointly enough to beat the improved `810.94626976` coarse baseline.
+If that cannot be done locally, the implementation target is a richer diagram state that avoids
+paying the full outer-first extension for this flag.
 
 After that, return to the theta_2=-1 kernel-chain truncation and the connected full-kernel local
 endpoint. Those remain real blockers, but they are not the first item on the active frontier.

@@ -48,7 +48,7 @@ Open items are excluded from the denominator.
 | Tau-one fixed-flag quotient-line incidence | 0 | 1 | 0 | 0% | Safe local brick, not a closer | `rfc_tau1_quotient_line_incidence_lemma.md` proves the post-root exponent `f_A + m_A - 1 - |A|`; `--report-tau1-incidence` shows the `z=34` tau-one trace rows have `support_saving=0`. |
 | Carried two-layer flag merge | 1 | 1 | 0 | 50% | Keep, exposes next diagram | `rfc_carried_flag_diagnostic.py` carries `F_3((4,7),(2,8))`, improves `(4,3)>=(2,5)` to `(4,4)>=(2,5)`, and saves `251.98` bits; next state is a two-marked-line diagram. |
 | Two-marked-line plane diagram | 1 | 1 | 0 | 50% | Keep, local but insufficient | `rfc_two_marked_line_plane_lemma.md` replaces a coarse `q^4` ancestor choice by `q+1`, saving another `381.42` bits on the carried path. |
-| Finite marked-plane state recurrence | 1 | 6 | 0 | 14% | Keep, needs kernel-lift container cover | `rfc_marked_plane_state_recurrence.md`, `rfc_marked_plane_state_diagnostic.py`, `rfc_diagram_path_dp.py`, `rfc_flag_state_choice_diagnostic.py`, and `rfc_flag_bad_pair_classifier.py` turn the hand-expanded two-line diagram into a state scan/path diagnostic. Joint choices help at level 2; level-3 pair-sum is worse, but the classifier localizes the bad mass and the fixed-table kernel-cover what-if closes it with `1.92` q-dim slack. |
+| Finite marked-plane state recurrence | 1 | 7 | 0 | 13% | Keep, needs nested tau-positive local theorem | `rfc_marked_plane_state_recurrence.md`, `rfc_marked_plane_state_diagnostic.py`, `rfc_diagram_path_dp.py`, `rfc_flag_state_choice_diagnostic.py`, and `rfc_flag_bad_pair_classifier.py` turn the hand-expanded two-line diagram into a state scan/path diagnostic. Joint choices help at level 2; level-3 pair-sum is worse, and after sparse level-2 table improvements the `(4,7)>=(2,8)` pair sum `943.44` is still worse than the improved coarse baseline `810.95`. |
 | Kernel-lift-only cover | 0 | 0 | 1 | 0% | Not useful for current base seal | `--cover-kernel-lift` keeps quotient incidence and leaves depth-5 checkpoint at `z=137`; combined with safe tau-zero covering it still only reaches `z=135`. |
 | One-layer shortened child flag ambient | 0 | 0 | 1 | 0% | Not useful for current base seal | Diagnostic `--flag-bound best-shortened` leaves the depth-5 checkpoint at `z=137` and the `z=34` trace unchanged. |
 | High-kernel/local-incidence bonus | 0 | 0 | 0 | open | Next candidate | Need prove hard row carrying large shortened ambient pays more than uniform `q^-9`. |
@@ -61,18 +61,26 @@ Open items are excluded from the denominator.
 The current pressure point is:
 
 ```text
-child_k=32,
-zeros=(34,39,44),
-b=14,
-gap = 3 q-dimensions after one boundary charge.
+depth 5, z=34,
+sparse pair-table value = 1740.39750674 bits,
+target = -80 bits,
+gap = 14.22185552 q-dimensions.
 ```
+
+The dominant displayed scalar path has zero log-sum overhead. The immediate child flag selected at
+level 4 is `(4,7)>=(2,8)`, whose current table value is the coarse outer-first bound `810.94626976`.
+The proof-shaped pair sum for that same state is `943.43723477`, so pair enumeration is not selected
+after the level-2 table improvements.
 
 Three plausible ways to turn this into a win:
 
 ```text
-1. prove a disjoint boundary row for the failing high-defect state;
-2. prove a high-kernel/local-incidence bonus of at least 3 q-dimensions;
-3. seal the finite k<=32,e=2 base case directly via rank-pattern induction.
+1. prove a joint local theorem for nested tau-positive/tau-positive rows that counts shared
+   singleton/root/quotient data once;
+2. carry a richer diagram state that reduces the coarse outer-first extension cost for
+   (4,7)>=(2,8);
+3. find a new charge for the dominant pair row with outer kernel/quotient lift 4+8 and inner
+   kernel/quotient lift 3+6.
 ```
 
 ## Update Rule
@@ -311,3 +319,18 @@ entries and 2076 demanded level-3 entries. This is real but modest progress: the
 propagates some pair-table savings, but it still does not approach the depth-5 base-seal floor
 `z=34`. The same run reports `final_span_1_z_report,34,1740.39750674`, still `14.22185552`
 q-dimensions above the `2^-80` target.
+
+Sparse trace diagnostics added. `--trace-z 34 --trace-span 1` reconstructs the dominant scalar path
+and shows zero log-sum overhead at every displayed state. `--trace-table-state 3,4,7,2,8` shows
+that the level-3 flag table entry used by the level-4 row is not a pair-table win:
+
+```text
+baseline_log2 = table_log2 = 810.94626976
+pair_sum_log2 = 943.43723477
+row_count     = 4432
+```
+
+The top pair row has local logs `1037.25029842` and `906.66533592`, child flag
+`(4,3)>=(2,5)` at `-1000.47839956`, and no sibling-unconsumed kernel cover. This shifts the
+frontier from sparse pair-table plumbing to a nested tau-positive local theorem or richer diagram
+state.

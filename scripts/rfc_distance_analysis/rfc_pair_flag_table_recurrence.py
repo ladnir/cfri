@@ -26,22 +26,33 @@ import sys
 
 sys.path.insert(0, str(Path(__file__).resolve().parent))
 
-from rfc_flag_bad_pair_classifier import build_pair_rows  # noqa: E402
+from rfc_flag_bad_pair_classifier import (  # noqa: E402
+    build_pair_rows,
+    choice_kernel_lift_qdim,
+    choice_quotient_lift_qdim,
+    covered_kernel_lift_qdims,
+)
 from rfc_flag_span_moment import (  # noqa: E402
     INF,
     NEG_INF,
     FlagTable,
     State,
+    choice_child_layers,
+    choice_split_shape_log2,
     first_crossing,
     flag_child_bound_report,
+    flag_table_bound_for_layers,
     get_child_value,
     lift_flag_span_moment,
     local_visible_trace_profile,
     log2_comb_table,
+    merge_equal_dimension_chain,
+    tau1_incidence_profile,
 )
 from rfc_flag_state_choice_diagnostic import (  # noqa: E402
     TermCandidate,
     enumerate_terms_for_state,
+    format_choice,
     format_state,
 )
 
@@ -74,6 +85,23 @@ def parse_flag_state(text: str) -> tuple[int, int, int, int]:
     except ValueError as exc:
         raise argparse.ArgumentTypeError("flag state entries must be integers") from exc
     return outer_span, outer_z, inner_span, inner_z
+
+
+def parse_table_state(text: str) -> tuple[int, int, int, int, int]:
+    parts = text.split(",")
+    if len(parts) != 5:
+        raise argparse.ArgumentTypeError(
+            "table state must be level,outer_span,outer_z,inner_span,inner_z"
+        )
+    try:
+        level, outer_span, outer_z, inner_span, inner_z = (int(part) for part in parts)
+    except ValueError as exc:
+        raise argparse.ArgumentTypeError("table state entries must be integers") from exc
+    return level, outer_span, outer_z, inner_span, inner_z
+
+
+def clean_csv_field(text: str) -> str:
+    return text.replace(",", ";")
 
 
 def finite_states(values_by_span: dict[int, list[float]]) -> list[State]:
@@ -457,7 +485,21 @@ def main() -> None:
         action="append",
         default=[],
     )
+    parser.add_argument(
+        "--trace-table-state",
+        type=parse_table_state,
+        action="append",
+        default=[],
+    )
+    parser.add_argument("--trace-table-top", type=int, default=8)
     parser.add_argument("--report-final-z", type=int, action="append", default=[])
+    parser.add_argument("--trace-z", type=int, default=-1)
+    parser.add_argument("--trace-span", type=int, default=1)
+    parser.add_argument(
+        "--trace-follow",
+        choices=("projection", "coarse-bound"),
+        default="coarse-bound",
+    )
     parser.add_argument(
         "--last-level-report-only",
         action="store_true",
@@ -559,6 +601,289 @@ def main() -> None:
                     f"{saving:.8f},"
                     f"{saving / args.q_log2:.8f}"
                 )
+
+    for target in args.trace_table_state:
+        level, outer_span, outer_z, inner_span, inner_z = target
+        print(
+            "table_trace_summary_level,outer_span,outer_z,inner_span,inner_z,"
+            "baseline_log2,table_log2,pair_sum_log2,row_count"
+        )
+        if level <= 0 or level >= len(levels):
+            print(f"{level},{outer_span},{outer_z},{inner_span},{inner_z},-inf,-inf,-inf,0")
+            continue
+        current = levels[level]
+        previous = levels[level - 1]
+        key = ((outer_span, outer_z), (inner_span, inner_z))
+        table_value = current.flag_table.get(key, NEG_INF) if current.flag_table is not None else NEG_INF
+        current_k = 1 << level
+        current_n = args.expansion * (1 << level)
+        _label, baseline, _outer_first, _inner_first = flag_child_bound_report(
+            child_by_span=current.values,
+            child_k=current_k,
+            child_n=current_n,
+            outer_span=outer_span,
+            inner_span=inner_span,
+            outer_zeros=outer_z,
+            inner_zeros=inner_z,
+            q_log2=args.q_log2,
+            mode="best",
+        )
+        previous_k = 1 << (level - 1)
+        previous_n = args.expansion * (1 << (level - 1))
+        comb = log2_comb_table(args.expansion * (1 << args.depth))
+        outer_terms = take_terms(
+            enumerate_terms_for_state(
+                child_by_span=previous.values,
+                child_flag_table=previous.flag_table,
+                comb=comb,
+                q_log2=args.q_log2,
+                child_k=previous_k,
+                parent_span=outer_span,
+                zeros=outer_z,
+                singleton_charge_mode=args.singleton_charge,
+                flag_bound_mode="best-two-layer-table",
+                max_visible_tau=args.max_visible_tau,
+                cover_lift_mode=args.cover_lift_mode,
+                cover_kernel_lift=args.cover_kernel_lift,
+            ),
+            args.term_limit,
+        )
+        inner_terms = take_terms(
+            enumerate_terms_for_state(
+                child_by_span=previous.values,
+                child_flag_table=previous.flag_table,
+                comb=comb,
+                q_log2=args.q_log2,
+                child_k=previous_k,
+                parent_span=inner_span,
+                zeros=inner_z,
+                singleton_charge_mode=args.singleton_charge,
+                flag_bound_mode="best-two-layer-table",
+                max_visible_tau=args.max_visible_tau,
+                cover_lift_mode=args.cover_lift_mode,
+                cover_kernel_lift=args.cover_kernel_lift,
+            ),
+            args.term_limit,
+        )
+        rows, pair_sum = build_pair_rows(
+            outer_terms=outer_terms,
+            inner_terms=inner_terms,
+            child_values=previous.values,
+            child_flag_table=previous.flag_table,
+            child_k=previous_k,
+            child_n=previous_n,
+            q_log2=args.q_log2,
+            outer_parent_span=outer_span,
+            inner_parent_span=inner_span,
+            exclude_collapsed_active=args.exclude_collapsed_active,
+            kernel_cover_mode=args.kernel_cover_mode,
+        )
+        baseline_label = "-inf" if baseline <= NEG_INF / 2 else f"{baseline:.8f}"
+        table_label = "-inf" if table_value <= NEG_INF / 2 else f"{table_value:.8f}"
+        pair_sum_label = "-inf" if pair_sum <= NEG_INF / 2 else f"{pair_sum:.8f}"
+        print(
+            f"{level},{outer_span},{outer_z},{inner_span},{inner_z},"
+            f"{baseline_label},{table_label},{pair_sum_label},{len(rows)}"
+        )
+        print(
+            "table_trace_row_level,rank,joint_log2,outer_local_log2,"
+            "inner_local_log2,child_flag,child_flag_log2,"
+            "outer_kernel_lift_qdim,outer_quotient_lift_qdim,"
+            "inner_kernel_lift_qdim,inner_quotient_lift_qdim,"
+            "outer_covered_kernel_lift_qdim,inner_covered_kernel_lift_qdim,"
+            "outer_choice,inner_choice"
+        )
+        for rank, row in enumerate(rows[: args.trace_table_top], start=1):
+            outer_covered, inner_covered = covered_kernel_lift_qdims(
+                outer_parent_span=outer_span,
+                inner_parent_span=inner_span,
+                outer_choice=row.outer.choice,
+                inner_choice=row.inner.choice,
+                kernel_cover_mode=args.kernel_cover_mode,
+            )
+            child_flag = clean_csv_field(">=".join(format_state(layer) for layer in row.child_layers))
+            outer_choice = clean_csv_field(format_choice(row.outer.choice))
+            inner_choice = clean_csv_field(format_choice(row.inner.choice))
+            print(
+                f"{level},{rank},{row.joint_log2:.8f},"
+                f"{row.outer_local_log2:.8f},{row.inner_local_log2:.8f},"
+                f"{child_flag},{row.child_flag_log2:.8f},"
+                f"{choice_kernel_lift_qdim(outer_span, row.outer.choice)},"
+                f"{choice_quotient_lift_qdim(outer_span, row.outer.choice)},"
+                f"{choice_kernel_lift_qdim(inner_span, row.inner.choice)},"
+                f"{choice_quotient_lift_qdim(inner_span, row.inner.choice)},"
+                f"{outer_covered},{inner_covered},{outer_choice},{inner_choice}"
+            )
+
+    if args.trace_z >= 0:
+        comb = log2_comb_table(args.expansion * (1 << args.depth))
+        print(
+            "trace_level,span,z,log2_state,p,s,a,tau,outer_span,inner_span,"
+            "outer_zeros,inner_zeros,local_charge,delta,comp,theta,dominant_h,"
+            "gamma,lift_qdim,tau1_quotient_qdim,tau1_support_saving_qdim,"
+            "tau1_charged_postroot_qdim,raw_child_flag,raw_child_table_log2,"
+            "merged_child_flag,merged_child_table_log2,selected_child_log2,"
+            "shape_log2,charge_log2,lift_log2,term_log2,logsum_overhead_log2,"
+            "coarse_child_choice,coarse_child_log2,coarse_outer_first_log2,"
+            "coarse_inner_first_log2"
+        )
+        span = args.trace_span
+        z = args.trace_z
+        for level in range(len(levels) - 1, 0, -1):
+            values = levels[level].values.get(span)
+            state_value = NEG_INF
+            if values is not None and 0 <= z < len(values):
+                state_value = values[z]
+            state_label = "-inf" if state_value <= NEG_INF / 2 else f"{state_value:.8f}"
+            choice = levels[level].choices.get((span, z))
+            if choice is None:
+                print(f"{level},{span},{z},{state_label},,,,,,,,,,,,,,,,,,,,,,,")
+                break
+            (
+                p,
+                singleton_count,
+                visible_support_size,
+                visible_tau,
+                outer_span,
+                inner_span,
+                outer_zeros,
+                local_charge,
+                local_delta,
+                local_components,
+                _local_g,
+                local_theta,
+                local_h,
+                local_gamma,
+                lift_qdim,
+            ) = choice
+            inner_zeros = p + singleton_count
+            tau1_profile = tau1_incidence_profile(span, choice)
+            tau1_quotient_qdim = ""
+            tau1_support_saving_qdim = ""
+            tau1_charged_postroot_qdim = ""
+            child_n = args.expansion * (1 << (level - 1))
+            shape_log2 = choice_split_shape_log2(choice, child_n, comb)
+            charge_log2 = -local_charge * args.q_log2
+            lift_log2 = lift_qdim * args.q_log2
+            selected_child_value = NEG_INF
+            if tau1_profile is not None:
+                (
+                    tau1_quotient_qdim,
+                    _tau1_quotient_ambient_dim,
+                    _tau1_visible_image_dim_bound,
+                    _tau1_invisible_fiber_dim_min,
+                    _tau1_universal_postroot_qdim,
+                    tau1_support_saving_qdim,
+                    tau1_charged_postroot_qdim,
+                ) = tau1_profile
+
+            raw_child_flag = ""
+            raw_child_table_log2 = ""
+            merged_child_flag = ""
+            merged_child_table_log2 = ""
+            selected_child_log2 = ""
+            term_log2 = ""
+            logsum_overhead_log2 = ""
+            coarse_child_choice = ""
+            coarse_child_log2 = ""
+            coarse_outer_first_log2 = ""
+            coarse_inner_first_log2 = ""
+            child_level = levels[level - 1]
+            child_k = 1 << (level - 1)
+            if visible_tau == 0:
+                selected_child_value = get_child_value(
+                    child_level.values,
+                    child_n,
+                    outer_span,
+                    outer_zeros,
+                )
+            else:
+                raw_child_layers = tuple(choice_child_layers(choice))
+                merged_child_layers = tuple(
+                    merge_equal_dimension_chain(list(raw_child_layers))
+                )
+                raw_child_flag = ">=".join(format_state(layer) for layer in raw_child_layers)
+                merged_child_flag = ">=".join(
+                    format_state(layer) for layer in merged_child_layers
+                )
+                raw_child_table_value = flag_table_bound_for_layers(
+                    values_by_span=child_level.values,
+                    flag_table=child_level.flag_table,
+                    child_k=child_k,
+                    child_n=child_n,
+                    q_log2=args.q_log2,
+                    layers=raw_child_layers,
+                )
+                if raw_child_table_value > NEG_INF / 2:
+                    raw_child_table_log2 = f"{raw_child_table_value:.8f}"
+                merged_child_table_value = flag_table_bound_for_layers(
+                    values_by_span=child_level.values,
+                    flag_table=child_level.flag_table,
+                    child_k=child_k,
+                    child_n=child_n,
+                    q_log2=args.q_log2,
+                    layers=merged_child_layers,
+                )
+                if merged_child_table_value > NEG_INF / 2:
+                    merged_child_table_log2 = f"{merged_child_table_value:.8f}"
+                (
+                    coarse_child_choice,
+                    coarse_child_value,
+                    coarse_outer_first_value,
+                    coarse_inner_first_value,
+                ) = flag_child_bound_report(
+                    child_by_span=child_level.values,
+                    child_k=child_k,
+                    child_n=child_n,
+                    outer_span=outer_span,
+                    inner_span=inner_span,
+                    outer_zeros=outer_zeros,
+                    inner_zeros=inner_zeros,
+                    q_log2=args.q_log2,
+                    mode="best",
+                )
+                if coarse_child_value > NEG_INF / 2:
+                    coarse_child_log2 = f"{coarse_child_value:.8f}"
+                if coarse_outer_first_value > NEG_INF / 2:
+                    coarse_outer_first_log2 = f"{coarse_outer_first_value:.8f}"
+                if coarse_inner_first_value > NEG_INF / 2:
+                    coarse_inner_first_log2 = f"{coarse_inner_first_value:.8f}"
+                selected_child_value = coarse_child_value
+                if (
+                    raw_child_table_value > NEG_INF / 2
+                    and raw_child_table_value < selected_child_value
+                ):
+                    selected_child_value = raw_child_table_value
+            if selected_child_value > NEG_INF / 2:
+                selected_child_log2 = f"{selected_child_value:.8f}"
+                term_value = shape_log2 + charge_log2 + lift_log2 + selected_child_value
+                term_log2 = f"{term_value:.8f}"
+                if state_value > NEG_INF / 2:
+                    logsum_overhead_log2 = f"{state_value - term_value:.8f}"
+            print(
+                f"{level},{span},{z},{state_label},{p},{singleton_count},"
+                f"{visible_support_size},{visible_tau},{outer_span},{inner_span},"
+                f"{outer_zeros},{inner_zeros},{local_charge},{local_delta},"
+                f"{local_components},{local_theta},{local_h},{local_gamma},"
+                f"{lift_qdim},{tau1_quotient_qdim},{tau1_support_saving_qdim},"
+                f"{tau1_charged_postroot_qdim},{raw_child_flag},{raw_child_table_log2},"
+                f"{merged_child_flag},{merged_child_table_log2},{selected_child_log2},"
+                f"{shape_log2:.8f},{charge_log2:.8f},{lift_log2:.8f},"
+                f"{term_log2},{logsum_overhead_log2},"
+                f"{coarse_child_choice},{coarse_child_log2},{coarse_outer_first_log2},"
+                f"{coarse_inner_first_log2}"
+            )
+            next_span = outer_span
+            next_z = outer_zeros
+            if (
+                args.trace_follow == "coarse-bound"
+                and coarse_child_choice == "inner-first"
+                and inner_span > 0
+            ):
+                next_span = inner_span
+                next_z = inner_zeros
+            span = next_span
+            z = next_z
 
 
 if __name__ == "__main__":

@@ -499,3 +499,101 @@ Compared to the target `-80` bits, this is still about:
 ```
 
 above the depth-5 base seal target.
+
+## Sparse Trace Classification
+
+The sparse pair-table driver now has two focused trace modes:
+
+```text
+--trace-z Z --trace-span T
+--trace-table-state level,outer_span,outer_z,inner_span,inner_z
+```
+
+For the production-floor diagnostic:
+
+```text
+python -B scripts/rfc_distance_analysis/rfc_pair_flag_table_recurrence.py \
+  --depth 5 \
+  --proof-shaped \
+  --term-limit 300 \
+  --demand-next-level \
+  --report-final-z 34 \
+  --trace-z 34 \
+  --trace-span 1 \
+  --trace-table-state 3,4,7,2,8 \
+  --trace-table-top 12
+```
+
+the scalar trace is exact along the displayed path: every row has `logsum_overhead_log2 = 0`.
+Therefore the residual is not coming from a wide log-sum over many nearly dominant scalar branches.
+
+The first two levels of the top path are:
+
+```text
+level 5:
+  child          1841.77915978
+  split shape      26.61834696
+  root charge    -512.00000000
+  lift            384.00000000
+  total          1740.39750674
+
+level 4:
+  child flag      810.94626976   for (4,7)>=(2,8)
+  split shape       6.83289001
+  root charge    -128.00000000
+  lift           1152.00000000
+  total          1841.77915978
+```
+
+At level 3, the raw child flag matters:
+
+```text
+raw child flag:       (4,3)>=(4,4)
+raw table value:    -2010.91171123
+merged shadow:        (4,4)
+merged scalar value: -1255.04099425
+```
+
+So the theorem-normalized equal-dimension merge is not just cosmetic; the selected scalar term uses
+the raw two-layer table before the merged one-layer shadow is displayed.
+
+The table-internal trace for the level-3 flag selected by level 4 is the important negative result:
+
+```text
+state:        (4,7)>=(2,8)
+baseline:     810.94626976
+table value:  810.94626976
+pair sum:     943.43723477
+row count:   4432
+```
+
+Thus the sparse proof-shaped pair enumeration is not selected for this state. The current table
+uses the coarse outer-first bound:
+
+```text
+F_3(4,7) + 2*(4-2)*log2(q)
+```
+
+The top pair row is already worse than the baseline:
+
+```text
+joint_log2:        943.43723477
+outer_local_log2: 1037.25029842
+inner_local_log2:  906.66533592
+child flag:       (4,3)>=(2,5)
+child flag log2: -1000.47839956
+```
+
+The row is a nested tau-positive/tau-positive configuration with large local lift:
+
+```text
+outer: kernel lift 4, quotient lift 8
+inner: kernel lift 3, quotient lift 6
+covered by sibling-unconsumed rule: 0, 0
+```
+
+This changes the next proof target. The old proof-shaped kernel-cover closure is still useful for
+the standalone classifier, but after the level-2 table improvements the improved coarse baseline
+is stronger than the pair-enumerated sum. Closing the base seal now needs a joint local theorem for
+nested tau-positive rows, or a richer diagram state that reduces the coarse outer-first extension
+for `(4,7)>=(2,8)`. More sparse table plumbing alone is not expected to close the `z=34` gap.

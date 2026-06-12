@@ -454,6 +454,89 @@ The remaining proof obligations are:
    exterior/root-line counts.
 ```
 
+### Container Composability
+
+This subsection addresses obligation 3 for the unconsumed-kernel case, after the
+quotient/root datum has been made canonical.
+
+The recurrence must be interpreted as a container first moment. A state does not count every
+subspace representative `W` inside a container; it counts a canonical container diagram plus the
+quotient/root data that are actually used by the current fold. For one active layer, the kept data
+are:
+
+```text
+L <= V,
+zero budgets for L and V,
+the full quotient/root datum Q used by the current fold,
+root/layer labels for Q on A.
+```
+
+The forgotten data are the choices of:
+
+```text
+K_parent <= L+L
+```
+
+that realize the same kernel container `L`. The datum `Q` must include the quotient-line or
+quotient-plane incidence and the visible root labels; it is not an uncharged placeholder for those
+choices. In particular, if the chosen representation of `Q` depends on `K_parent`, the
+canonicalization must record the induced quotient/root object before `K_parent` is forgotten.
+
+The forgetful map is sound for later folds provided no later profile asks for an additional marked
+subspace inside `K_parent` that is not already determined by `L`, `V`, or the recorded quotient
+datum `Q`.
+
+Formally, let `Phi` be a full multi-level certificate tree. Suppose two certificates differ only by
+replacing an internal kernel lift `K_parent` by another feasible lift with the same kept tuple:
+
+```text
+(L <= V, Q, root/layer labels).
+```
+
+Assume every descendant condition below that edge is expressed only in terms of the child
+containers descended from `L` and `V`, and every ancestor condition above that edge is expressed
+only in terms of `V` and the quotient datum `Q`. Then the two certificates have identical zero
+witnesses and identical carried child diagrams. Hence they map to the same canonical container
+certificate and must be counted once.
+
+The proof is by locality of the fold:
+
+```text
+1. Descendants see only child-code containers. The kernel lift lives in the doubled parent space;
+   after projection, its contribution is contained in L, whose zero budget is already kept.
+2. Ancestors see paired zeros through V, singleton zeros outside A through V, and singleton zeros
+   inside A through Q and the root labels. Changing only the unconsumed kernel lift changes none
+   of these evaluations because the discarded directions project into child containers already
+   zero on the relevant singleton block.
+3. The quotient incidence is not forgotten. Different Q lines/planes are distinct local events and
+   remain counted by LocalContainer(Phi).
+```
+
+Therefore the Gaussian kernel-lift factor:
+
+```text
+q^{kappa(2 dim(L)-kappa)}
+```
+
+is removable exactly for unconsumed kernel lifts.
+
+This is not a quotient-ambient shortcut. If `L` and `V` collapse, or if a tau-positive support is
+only visible through the particular kernel representative, the profile must either canonicalize
+that quotient/root datum explicitly or route the row through the collapsed-active filter. The
+container cover removes only duplicate kernel fibers after the local quotient event has already
+been counted.
+
+The condition is important. If a later or parallel profile marks a line:
+
+```text
+ell <= K_parent
+```
+
+and that line is not determined by `L` or `Q`, then `ell` is a downstream consumer. It must be
+included in the state and counted as event data. This is the same distinction used in
+`rfc_tracked_kernel_chain_state.md`: unconsumed selected kernel lines are duplicate certificates,
+while consumed selected lines are real state.
+
 ## Level-3 Flag Stress Row
 
 The marked-plane recurrence diagnostics now isolate a concrete stress row:

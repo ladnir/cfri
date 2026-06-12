@@ -134,7 +134,10 @@ docs/rfc_distance_analysis/rfc_covering_flag_lift_lemma.md
   the key proof step for making the depth-5 base seal theorem-grade. Important correction:
   all-cover lift removal is anti-conservative for tau-positive branches because quotient
   lines/planes are event data. Tau-zero duplicate-lift covering is safe; tau-positive branches need
-  quotient-incidence/fiber accounting.
+  quotient-incidence/fiber accounting. The current sharpened target is the unconsumed-kernel
+  container cover: after the child container and canonical quotient/root datum are fixed, duplicate
+  choices of `K_parent <= L+L` may be covered once; if a later profile consumes a hidden subspace
+  inside `K_parent`, that subspace must be carried or charged.
 
 docs/rfc_distance_analysis/rfc_depth5_flag_checkpoint_trace.md
   Status: diagnostic.
@@ -175,9 +178,11 @@ The live blockers are now narrow:
 1. Kernel-lift container cover for the level-3 carried flag `(4,7)>=(2,8)`. The bad mass is
    concentrated in high-lift rows, but a fixed-table diagnostic that removes only tau-positive
    kernel-lift multiplicity closes the row with `1.92454905` q-dimensions of slack. The next theorem
-   target is: after fixing the child flag and local quotient/root datum, count the container tuple
-   once instead of multiplying by the Gaussian family of `K <= L+L` kernel lifts. Quotient-line and
-   quotient-plane incidence must remain counted.
+   target is: after fixing the child flag and canonical local quotient/root datum, count the
+   container tuple once instead of multiplying by the Gaussian family of `K <= L+L` kernel lifts.
+   Quotient-line and quotient-plane incidence must remain counted. If a descendant or sibling
+   profile consumes a marked subspace inside the parent kernel lift, that datum is no longer a
+   duplicate fiber and must be part of the state.
 2. Prove/finalize the shared-randomness-safe multi-layer flag transition theorem. The target note
    covers the joint marked-line/frame recurrence for the decomposable |A|=2,delta=2,comp=2 row,
    with the local marked-component certificate and uniform `(q+1)` frame-completion count written.
@@ -193,15 +198,14 @@ The live blockers are now narrow:
 
 The best current next proof step is item 1:
 
-```text
-Move to theta_2=-1 kernel-chain truncation: prove length three is enough, or prove length-four
-chains are dominated by nested-flag zero-budget burn and local charge. The next concrete lemma is
-the flag-gap ancestor bound: ancestor quotients should be counted inside shortened ambients
-determined by the upper zero witnesses, not inside the full child message space. The deterministic
-shortened-ambient count is written. Enlarged shortened ambients are now explicitly exposed as
-canonical child shortened-kernel rank events in `rfc_multilayer_flag_transition_theorem.md`; the
-next step is the analytic normal/defect inequality showing those rank events carry the expected
-codimension.
+Finalize the unconsumed-kernel container cover inside the multi-layer flag transition theorem:
+define the canonical quotient/root datum, prove the forgetful map from parent kernel lifts to the
+same container certificate, and specify the consumed-kernel exception. Then plug the covered lift
+exponent into the finite marked-plane state recurrence and rerun the level-3 `(4,7)>=(2,8)` stress
+row as a theorem-driven certificate, not just a posthoc diagnostic.
+
+After that, return to the theta_2=-1 kernel-chain truncation and the connected full-kernel local
+endpoint. Those remain real blockers, but they are not the first item on the active frontier.
 
 Small diagnostic:
 

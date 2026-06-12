@@ -273,3 +273,10 @@ child table values fixed; it changes the pair sum to `940.85227227` bits against
 quotient-line/plane incidence should remain counted; the next theorem target is duplicate
 kernel-lift covering after the child flag and local quotient/root datum are fixed. The dominant
 original outer row splits as `kernel_lift=15`, `quotient_lift=4`, making the target very specific.
+
+The unconsumed-kernel condition is now written into the covering lemma and the multi-layer
+transition theorem. The safe rule is: after fixing the child container and canonical quotient/root
+datum, duplicate choices of `K_parent <= L+L` may be covered once only if no later/sibling profile
+marks hidden subspace data inside that kernel lift. Quotient incidence remains event data. This is
+not yet scored as a win because the finite marked-plane recurrence still has to consume the covered
+exponent directly.

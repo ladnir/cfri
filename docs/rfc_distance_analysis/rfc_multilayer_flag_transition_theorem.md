@@ -320,6 +320,59 @@ kernel lift. It is larger than the quotient-incidence count in
 sharper quotient bound with its separate kernel/fiber factor; it must not combine the savings from
 both as if they were independent.
 
+### Unconsumed Kernel Container Cover
+
+The bound `L_safe(Phi)` is the always-safe lift count. It pays both:
+
+```text
+kernel lift:   kappa_i(2 r_{K,i} - kappa_i),
+quotient lift: tau_i(2 r_{V,i} - t_i).
+```
+
+The sharpened finite-diagram recurrence may remove the kernel-lift exponent only under the
+container condition from `rfc_covering_flag_lift_lemma.md`.
+
+For an active layer, first fix the child container data:
+
+```text
+L_i <= V_i,
+zero budgets for L_i and V_i,
+the full quotient/root datum Q_i used by this fold,
+root and local layer labels on the exact singleton support A_i.
+```
+
+The datum `Q_i` is event data. For `tau_i=1`, it includes the quotient-line incidence and root
+labels. For `tau_i=2`, it includes the quotient plane plus the local exterior/root-line certificate.
+These terms remain in `LocalContainer(Phi)` and must be counted inside the same child flag used by
+the recurrence.
+
+After those data are fixed, choices of the parent kernel lift:
+
+```text
+K_i <= L_i + L_i,
+dim K_i = kappa_i,
+```
+
+are duplicate container certificates if no later or parallel profile consumes a marked subspace
+inside `K_i` that is not already determined by `L_i`, `V_i`, or `Q_i`. In that unconsumed-kernel
+case the transition may replace:
+
+```text
+q^{kappa_i(2 r_{K,i} - kappa_i)}
+```
+
+by a finite canonical-profile factor. The quotient-lift/local-incidence part is not removed.
+
+If a descendant or sibling condition marks an extra line or plane:
+
+```text
+ell <= K_i
+```
+
+and `ell` is not determined by the kept container tuple, then `ell` is consumed kernel data. It
+must be promoted into the flag state or charged as an additional quotient/kernel incidence event.
+This is the line between the safe kernel-cover diagnostic and the retired `all` cover shortcut.
+
 ## Required Ingredients
 
 ### Exact Support Indexing

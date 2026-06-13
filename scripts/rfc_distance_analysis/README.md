@@ -35,6 +35,7 @@ docs/rfc_distance_analysis/rfc_nested_tau0_equal_container_filter.md exact-suppo
 docs/rfc_distance_analysis/rfc_support_two_high_lift_component_plane_bound.md high-lift support-two component-plane note
 docs/rfc_distance_analysis/rfc_support_three_component_plane_bound.md support-three component-plane stratification note
 docs/rfc_distance_analysis/rfc_tau1_child_line_carry_diagnostic.md tau-one child-line carry ceiling and support-four blocker
+docs/rfc_distance_analysis/rfc_root_kernel_container_cover_diagnostic.md root-kernel cover probes and support-three frontier
 rfc_theta_chain_normal_slice.py     shortened-ambient/defect-slice checker with optimistic rho and strict hard-trace columns
 rfc_defect_conservation.py          fixed-witness rank-defect conservation checker for exposed shortened ambients
 rfc_shortened_rank_recurrence.py    optimistic rho_h(D,z) recurrence with paired-spine compression
@@ -545,6 +546,20 @@ proof target must carry the full ambient quotient line `R <= E_A`, or explicitly
 fiber dimension. The projective-fiber lemma behind this interpretation is documented in
 `docs/rfc_distance_analysis/rfc_tau1_full_line_carry_lemma.md`; the row target is documented in
 `docs/rfc_distance_analysis/rfc_tau1_carried_line_state.md`.
+
+The root-kernel cover probes are:
+
+```text
+--support2-root-kernel-cover-mode kernel
+--support4-root-kernel-cover-mode kernel
+--tau1-root-kernel-cover-mode kernel
+```
+
+They are diagnostic theorem targets, not certificate modes. They count narrow root-compatible
+container fibers once after quotient/root incidence is already charged. In the current depth-5
+checkpoint, safe support-three mode reaches `z=34` value `424.70026934` and `crossing_z=99`;
+rank-3 support-three sensitivity reaches `200.01114103` and `crossing_z=72`. The corresponding
+status note is `docs/rfc_distance_analysis/rfc_root_kernel_container_cover_diagnostic.md`.
 
 `rfc_multicopy_falsification.py` is adversarial. It estimates whether broad one-copy near-families
 can intersect across many independent RFC copies often enough to threaten the target excess.

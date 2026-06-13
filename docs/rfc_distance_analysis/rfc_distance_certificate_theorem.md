@@ -316,6 +316,28 @@ recorded in:
 docs/rfc_distance_analysis/rfc_support_three_component_plane_bound.md
 ```
 
+Latest checkpoint: after adding narrow root-kernel container-cover probes, the safe support-three
+rule leaves the depth-5 `z=34` moment at `424.70026934` bits and `crossing_z=99`, dominated by this
+same support-three row. The rank-3 sensitivity mode lowers the checkpoint to `200.01114103` bits
+and `crossing_z=72`, but is not a certificate rule. Therefore the conditional theorem package now
+requires one of the following support-three rank-defect closures:
+
+```text
+1. proportional active restrictions reroute by exact-support collapse;
+2. the rank-defect stratum forces a smaller effective child container;
+3. a marked proportional-pair child state carries and charges the defect;
+4. an explicit incidence factor recovers the two q-dimensions between safe and rank-3 mode.
+```
+
+The root-kernel probes themselves are documented in:
+
+```text
+docs/rfc_distance_analysis/rfc_root_kernel_container_cover_diagnostic.md
+```
+
+They must be proved as canonical unconsumed-fiber covers with quotient incidence retained before
+they can enter the certificate recurrence.
+
 The next boundary row:
 
 ```text

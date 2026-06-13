@@ -41,8 +41,11 @@ from rfc_flag_span_moment import (  # noqa: E402
     merge_equal_dimension_chain,
     marked_line_child_bound,
     support2_component_plane_saving_qdim,
+    support2_root_kernel_cover_saving_qdim,
     support3_component_plane_saving_qdim,
+    support4_root_kernel_cover_saving_qdim,
     tau1_child_line_carry_saving_qdim,
+    tau1_root_kernel_cover_saving_qdim,
 )
 
 
@@ -138,9 +141,12 @@ def enumerate_terms_for_state(
     cover_kernel_lift: bool,
     exclude_collapsed_active: bool = False,
     support2_line_filter: bool = False,
+    support2_root_kernel_cover_mode: str = "none",
     support2_component_plane_mode: str = "none",
     support3_component_plane_mode: str = "none",
+    support4_root_kernel_cover_mode: str = "none",
     tau1_child_line_carry_mode: str = "none",
+    tau1_root_kernel_cover_mode: str = "none",
 ) -> list[TermCandidate]:
     child_n = len(next(iter(child_by_span.values()))) - 1
     child_spans = sorted(child_by_span)
@@ -293,6 +299,17 @@ def enumerate_terms_for_state(
                             if covers_lift(cover_lift_mode, visible_tau):
                                 lift_log = 0.0
                             else:
+                                if visible_tau == 1:
+                                    lift_log -= (
+                                        tau1_root_kernel_cover_saving_qdim(
+                                            mode=tau1_root_kernel_cover_mode,
+                                            parent_span=parent_span,
+                                            visible_tau=visible_tau,
+                                            outer_span=outer_span,
+                                            local_charge=charge,
+                                        )
+                                        * q_log2
+                                    )
                                 component_plane_saving = support2_component_plane_saving_qdim(
                                     mode=support2_component_plane_mode,
                                     parent_span=parent_span,
@@ -314,6 +331,33 @@ def enumerate_terms_for_state(
                                     outer_span=outer_span,
                                     local_delta=local_delta,
                                     local_components=local_components,
+                                )
+                                component_plane_saving += support4_root_kernel_cover_saving_qdim(
+                                    mode=support4_root_kernel_cover_mode,
+                                    parent_span=parent_span,
+                                    visible_tau=visible_tau,
+                                    visible_support_size=visible_support_size,
+                                    kernel_dim=kernel_dim,
+                                    inner_span=inner_span,
+                                    outer_span=outer_span,
+                                    local_delta=local_delta,
+                                    local_components=local_components,
+                                )
+                                current_lift_qdim = (
+                                    int(round(lift_log / q_log2)) - component_plane_saving
+                                )
+                                component_plane_saving += support2_root_kernel_cover_saving_qdim(
+                                    mode=support2_root_kernel_cover_mode,
+                                    parent_span=parent_span,
+                                    visible_tau=visible_tau,
+                                    visible_support_size=visible_support_size,
+                                    kernel_dim=kernel_dim,
+                                    inner_span=inner_span,
+                                    outer_span=outer_span,
+                                    local_delta=local_delta,
+                                    local_components=local_components,
+                                    current_lift_qdim=current_lift_qdim,
+                                    local_charge=charge,
                                 )
                                 lift_log -= component_plane_saving * q_log2
                             child_log = flag_table_bound_for_layers(

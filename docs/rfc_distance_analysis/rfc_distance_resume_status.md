@@ -234,6 +234,15 @@ docs/rfc_distance_analysis/rfc_tau1_child_line_carry_diagnostic.md
   demanded depth-5 checkpoint to `final_span_1_z_report,34,435.05329836`, with `crossing_z=102`.
   The live blocker moves to a decomposable support-four tau-two row in `(2,20)`:
   `a=4,delta=4,comp=4,K=0,dim V=4`, child `(4,8)`, term `413.29391501`.
+
+docs/rfc_distance_analysis/rfc_root_kernel_container_cover_diagnostic.md
+  Status: diagnostic and proof-target locator.
+  Adds narrow support-two, support-four, and tau-one root-kernel container-cover probes. With
+  theorem-safer support-three mode, the full depth-5 checkpoint is
+  `final_span_1_z_report,34,424.70026934` and `crossing_z=99`. With the rank-3 support-three
+  sensitivity, it reaches `final_span_1_z_report,34,200.01114103` and `crossing_z=72`. The new
+  obstruction is the support-three tau-two rank-stratification proof, not lower pair-table
+  plumbing.
 ```
 
 The external Fable audit was useful and found the product-of-first-moments bug. Its record is:
@@ -247,19 +256,19 @@ docs/rfc_distance_analysis/rfc_fable_audit_2026_06_10.md
 The live blockers are now narrow:
 
 ```text
-1. Formalize scalar kernel-lift container covering. The diagnostic `--cover-kernel-lift` now gives
-   a major safe-looking improvement while keeping quotient incidence counted. With exact-support
-   filters, support-two high-lift, and safe support-three component planes, the full depth-5
-   checkpoint is `final_span_1_z_report,34,565.92392782` and `crossing_z=102`.
-2. Replace the tau-one child-line carry diagnostic by an explicit marked-line/container state. The
+1. Formalize scalar kernel-lift and root-kernel container covering. The diagnostics keep quotient
+   incidence counted and now narrow the safe checkpoint to
+   `final_span_1_z_report,34,424.70026934` and `crossing_z=99`. The proof still has to show the
+   covered fibers are canonical and unconsumed.
+2. Upgrade support-three component-plane stratification. Safe mode saves two q-dimensions but
+   leaves the row `a=3,delta=3,comp=3,tau=2,K=0,dim V=4` dominant. The rank-3 sensitivity saves
+   four q-dimensions and moves the full checkpoint to `final_span_1_z_report,34,200.01114103`,
+   `crossing_z=72`; the proportional-pair/dependent stratum must be charged or carried.
+3. Replace the tau-one child-line carry diagnostic by an explicit marked-line/container state. The
    selected-row ceiling is useful but not theorem-grade.
-3. Finish the support-three component-plane proof. Safe mode saves two q-dimensions uniformly; the
-   rank-3 stratum saves four but needs the proportional-pair stratum charged or carried.
-4. Attack the current support-four decomposable tau-two exterior row. The best trace now goes:
-   level 5 `(1,34)` tau-zero -> child `(2,20)`, then level 4 `(2,20)` top row
-   `a=4,delta=4,comp=4,tau=2,K=0,dim V=4`, child `(4,8)`, term `413.29391501`.
-   The four-q-dimensional `[4 choose 2]_q` local family may be real, so the next diagnostic should
-   test a marked-component child state or a different global argument.
+4. Attack support-four decomposable tau-two exterior rows only after the root-kernel cover proof is
+   clarified. The narrow support-four cover removes the previous top support-four row as a
+   diagnostic, but the theorem must still justify counting the root-compatible container once.
 5. Prove/finalize the shared-randomness-safe multi-layer flag transition theorem. The target notes
    cover quotient-frame, component-plane, and marked-line states, but the final finite recurrence
    is still not written as a theorem.
@@ -287,14 +296,20 @@ subcases into theorem statements:
 6. support-four marked-component child state, or a replacement global argument for that row.
 ```
 
-The current best diagnostic leaves:
+The current best theorem-safer diagnostic leaves:
 
 ```text
-(435.05329836 + 80) / 128 = 4.02385389
+(424.70026934 + 80) / 128 = 3.9430
 ```
 
-q-dimensions above the `2^-80` target. This is now close to the old anti-conservative tau-two-cover
-ceiling, but the route is better structured because quotient incidence is still counted.
+q-dimensions above the `2^-80` target. The rank-3 support-three sensitivity leaves:
+
+```text
+(200.01114103 + 80) / 128 = 2.1876
+```
+
+q-dimensions above target, but that mode is not theorem-grade until the rank-defect stratum is
+handled.
 
 ## Historical Trace Updates
 

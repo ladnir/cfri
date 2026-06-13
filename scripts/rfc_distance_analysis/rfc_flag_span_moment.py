@@ -658,6 +658,107 @@ def tau1_child_line_carry_saving_qdim(
     return max(0, child_profile[6])
 
 
+def support4_root_kernel_cover_saving_qdim(
+    *,
+    mode: str,
+    parent_span: int,
+    visible_tau: int,
+    visible_support_size: int,
+    kernel_dim: int,
+    inner_span: int,
+    outer_span: int,
+    local_delta: int,
+    local_components: int,
+) -> int:
+    """Diagnostic cover for the decomposable support-four exterior row.
+
+    In the live row, after the child 4-container and active roots are fixed,
+    the four singleton equations cut a four-dimensional root-kernel inside
+    `V+V`.  The scalar recurrence still pays the `q^4` Grassmann family of
+    parent two-planes inside that kernel.  This diagnostic counts that
+    root-kernel container once.  It is deliberately restricted to the exact
+    support-four shape and is not the retired tau-two all-lift shortcut.
+    """
+
+    if mode == "none":
+        return 0
+    if mode != "kernel":
+        raise ValueError(f"unknown support4 root-kernel cover mode: {mode}")
+    if (
+        parent_span == 2
+        and visible_tau == 2
+        and visible_support_size == 4
+        and kernel_dim == 0
+        and inner_span == 0
+        and outer_span == 4
+        and local_delta == 4
+        and local_components == 4
+    ):
+        return 4
+    return 0
+
+
+def support2_root_kernel_cover_saving_qdim(
+    *,
+    mode: str,
+    parent_span: int,
+    visible_tau: int,
+    visible_support_size: int,
+    kernel_dim: int,
+    inner_span: int,
+    outer_span: int,
+    local_delta: int,
+    local_components: int,
+    current_lift_qdim: int,
+    local_charge: int,
+) -> int:
+    """Diagnostic root-kernel container cover for decomposable support two.
+
+    This targets the currently exposed `a=2,delta=2,comp=2` quotient-frame row.
+    After root labels and the child container are fixed, the scalar recurrence
+    still pays the remaining post-root parent-plane family.  The diagnostic
+    counts that root-compatible container once, subtracting exactly the
+    positive post-root q-dimension left by the current local accounting.
+    """
+
+    if mode == "none":
+        return 0
+    if mode != "kernel":
+        raise ValueError(f"unknown support2 root-kernel cover mode: {mode}")
+    if (
+        parent_span == 2
+        and visible_tau == 2
+        and visible_support_size == 2
+        and kernel_dim == 0
+        and inner_span == 0
+        and outer_span in (3, 4)
+        and local_delta == 2
+        and local_components == 2
+    ):
+        return max(0, current_lift_qdim - local_charge)
+    return 0
+
+
+def tau1_root_kernel_cover_saving_qdim(
+    *,
+    mode: str,
+    parent_span: int,
+    visible_tau: int,
+    outer_span: int,
+    local_charge: int,
+) -> int:
+    """Diagnostic cover for saturated tau-one root-compatible line families."""
+
+    if mode == "none":
+        return 0
+    if mode != "kernel":
+        raise ValueError(f"unknown tau1 root-kernel cover mode: {mode}")
+    if visible_tau != 1:
+        return 0
+    quotient_lift_qdim = 2 * outer_span - parent_span
+    return max(0, quotient_lift_qdim - local_charge)
+
+
 def lift_flag_span_moment(
     child_by_span: dict[int, list[float]],
     comb: list[list[float]],
@@ -672,9 +773,12 @@ def lift_flag_span_moment(
     child_choices: dict[tuple[int, int], tuple[int, ...] | None] | None = None,
     child_flag_table: FlagTable | None = None,
     exclude_collapsed_active: bool = False,
+    support2_root_kernel_cover_mode: str = "none",
     support2_component_plane_mode: str = "none",
     support3_component_plane_mode: str = "none",
+    support4_root_kernel_cover_mode: str = "none",
     tau1_child_line_carry_mode: str = "none",
+    tau1_root_kernel_cover_mode: str = "none",
 ) -> tuple[dict[int, list[float]], dict[tuple[int, int], tuple[int, ...] | None]]:
     child_n = len(next(iter(child_by_span.values()))) - 1
     parent_n = 2 * child_n
@@ -873,6 +977,17 @@ def lift_flag_span_moment(
                                     if covers_lift(visible_tau):
                                         lift_log = 0.0
                                     else:
+                                        if visible_tau == 1:
+                                            lift_log -= (
+                                                tau1_root_kernel_cover_saving_qdim(
+                                                    mode=tau1_root_kernel_cover_mode,
+                                                    parent_span=parent_span,
+                                                    visible_tau=visible_tau,
+                                                    outer_span=outer_span,
+                                                    local_charge=charge,
+                                                )
+                                                * q_log2
+                                            )
                                         component_plane_saving = support2_component_plane_saving_qdim(
                                             mode=support2_component_plane_mode,
                                             parent_span=parent_span,
@@ -894,6 +1009,33 @@ def lift_flag_span_moment(
                                             outer_span=outer_span,
                                             local_delta=local_delta,
                                             local_components=local_components,
+                                        )
+                                        component_plane_saving += support4_root_kernel_cover_saving_qdim(
+                                            mode=support4_root_kernel_cover_mode,
+                                            parent_span=parent_span,
+                                            visible_tau=visible_tau,
+                                            visible_support_size=visible_support_size,
+                                            kernel_dim=kernel_dim,
+                                            inner_span=inner_span,
+                                            outer_span=outer_span,
+                                            local_delta=local_delta,
+                                            local_components=local_components,
+                                        )
+                                        current_lift_qdim = (
+                                            int(round(lift_log / q_log2)) - component_plane_saving
+                                        )
+                                        component_plane_saving += support2_root_kernel_cover_saving_qdim(
+                                            mode=support2_root_kernel_cover_mode,
+                                            parent_span=parent_span,
+                                            visible_tau=visible_tau,
+                                            visible_support_size=visible_support_size,
+                                            kernel_dim=kernel_dim,
+                                            inner_span=inner_span,
+                                            outer_span=outer_span,
+                                            local_delta=local_delta,
+                                            local_components=local_components,
+                                            current_lift_qdim=current_lift_qdim,
+                                            local_charge=charge,
                                         )
                                         lift_log -= component_plane_saving * q_log2
                                     child_log = flag_child_bound(

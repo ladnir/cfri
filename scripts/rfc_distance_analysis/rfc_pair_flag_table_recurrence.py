@@ -272,9 +272,12 @@ def compute_pair_enumerated_flag_table(
     support2_diamond_mode: str,
     support2_line_filter: bool,
     nested_tau0_equal_container_filter: bool,
+    support2_root_kernel_cover_mode: str,
     support2_component_plane_mode: str,
     support3_component_plane_mode: str,
+    support4_root_kernel_cover_mode: str,
     tau1_child_line_carry_mode: str,
+    tau1_root_kernel_cover_mode: str,
     exact_filtered_empty: bool,
     allowed_keys: set[tuple[State, State]] | None = None,
 ) -> tuple[FlagTable, TableStats]:
@@ -308,9 +311,12 @@ def compute_pair_enumerated_flag_table(
             cover_kernel_lift=cover_kernel_lift,
             exclude_collapsed_active=exclude_collapsed_active,
             support2_line_filter=support2_line_filter,
+            support2_root_kernel_cover_mode=support2_root_kernel_cover_mode,
             support2_component_plane_mode=support2_component_plane_mode,
             support3_component_plane_mode=support3_component_plane_mode,
+            support4_root_kernel_cover_mode=support4_root_kernel_cover_mode,
             tau1_child_line_carry_mode=tau1_child_line_carry_mode,
+            tau1_root_kernel_cover_mode=tau1_root_kernel_cover_mode,
         )
         return terms
 
@@ -442,9 +448,12 @@ def collect_pair_row_child_flag_keys(
     support2_diamond_mode: str,
     support2_line_filter: bool,
     nested_tau0_equal_container_filter: bool,
+    support2_root_kernel_cover_mode: str,
     support2_component_plane_mode: str,
     support3_component_plane_mode: str,
+    support4_root_kernel_cover_mode: str,
     tau1_child_line_carry_mode: str,
+    tau1_root_kernel_cover_mode: str,
     demanded_keys: set[tuple[State, State]],
 ) -> set[tuple[State, State]]:
     """Collect lower two-layer keys queried by pair rows for demanded entries."""
@@ -479,9 +488,12 @@ def collect_pair_row_child_flag_keys(
             cover_kernel_lift=cover_kernel_lift,
             exclude_collapsed_active=exclude_collapsed_active,
             support2_line_filter=support2_line_filter,
+            support2_root_kernel_cover_mode=support2_root_kernel_cover_mode,
             support2_component_plane_mode=support2_component_plane_mode,
             support3_component_plane_mode=support3_component_plane_mode,
+            support4_root_kernel_cover_mode=support4_root_kernel_cover_mode,
             tau1_child_line_carry_mode=tau1_child_line_carry_mode,
+            tau1_root_kernel_cover_mode=tau1_root_kernel_cover_mode,
         )
         cached = take_terms(terms, term_limit)
         term_cache[state] = cached
@@ -709,9 +721,12 @@ def _build_pair_levels_once(
     support2_diamond_mode: str,
     support2_line_filter: bool,
     nested_tau0_equal_container_filter: bool,
+    support2_root_kernel_cover_mode: str,
     support2_component_plane_mode: str,
     support3_component_plane_mode: str,
+    support4_root_kernel_cover_mode: str,
     tau1_child_line_carry_mode: str,
+    tau1_root_kernel_cover_mode: str,
     exact_filtered_empty: bool,
     last_level_keys: set[tuple[State, State]] | None,
     demand_next_level: bool,
@@ -751,9 +766,12 @@ def _build_pair_levels_once(
             previous_choices,
             previous_flag_table,
             exclude_collapsed_active=exclude_collapsed_active,
+            support2_root_kernel_cover_mode=support2_root_kernel_cover_mode,
             support2_component_plane_mode=support2_component_plane_mode,
             support3_component_plane_mode=support3_component_plane_mode,
+            support4_root_kernel_cover_mode=support4_root_kernel_cover_mode,
             tau1_child_line_carry_mode=tau1_child_line_carry_mode,
+            tau1_root_kernel_cover_mode=tau1_root_kernel_cover_mode,
         )
         allowed_keys = last_level_keys if level == stop_level else None
         if allowed_keys is None and level == depth and level == stop_level:
@@ -805,9 +823,12 @@ def _build_pair_levels_once(
             support2_diamond_mode=support2_diamond_mode,
             support2_line_filter=support2_line_filter,
             nested_tau0_equal_container_filter=nested_tau0_equal_container_filter,
+            support2_root_kernel_cover_mode=support2_root_kernel_cover_mode,
             support2_component_plane_mode=support2_component_plane_mode,
             support3_component_plane_mode=support3_component_plane_mode,
+            support4_root_kernel_cover_mode=support4_root_kernel_cover_mode,
             tau1_child_line_carry_mode=tau1_child_line_carry_mode,
+            tau1_root_kernel_cover_mode=tau1_root_kernel_cover_mode,
             exact_filtered_empty=exact_filtered_empty,
             allowed_keys=allowed_keys,
         )
@@ -845,9 +866,12 @@ def build_pair_levels(
     support2_diamond_mode: str,
     support2_line_filter: bool,
     nested_tau0_equal_container_filter: bool,
+    support2_root_kernel_cover_mode: str,
     support2_component_plane_mode: str,
     support3_component_plane_mode: str,
+    support4_root_kernel_cover_mode: str,
     tau1_child_line_carry_mode: str,
+    tau1_root_kernel_cover_mode: str,
     exact_filtered_empty: bool,
     last_level_keys: set[tuple[State, State]] | None,
     demand_next_level: bool,
@@ -879,9 +903,12 @@ def build_pair_levels(
             support2_diamond_mode=support2_diamond_mode,
             support2_line_filter=support2_line_filter,
             nested_tau0_equal_container_filter=nested_tau0_equal_container_filter,
+            support2_root_kernel_cover_mode=support2_root_kernel_cover_mode,
             support2_component_plane_mode=support2_component_plane_mode,
             support3_component_plane_mode=support3_component_plane_mode,
+            support4_root_kernel_cover_mode=support4_root_kernel_cover_mode,
             tau1_child_line_carry_mode=tau1_child_line_carry_mode,
+            tau1_root_kernel_cover_mode=tau1_root_kernel_cover_mode,
             exact_filtered_empty=exact_filtered_empty,
             last_level_keys=last_level_keys,
             demand_next_level=demand_next_level,
@@ -921,9 +948,12 @@ def build_pair_levels(
                 support2_diamond_mode=support2_diamond_mode,
                 support2_line_filter=support2_line_filter,
                 nested_tau0_equal_container_filter=nested_tau0_equal_container_filter,
+                support2_root_kernel_cover_mode=support2_root_kernel_cover_mode,
                 support2_component_plane_mode=support2_component_plane_mode,
                 support3_component_plane_mode=support3_component_plane_mode,
+                support4_root_kernel_cover_mode=support4_root_kernel_cover_mode,
                 tau1_child_line_carry_mode=tau1_child_line_carry_mode,
+                tau1_root_kernel_cover_mode=tau1_root_kernel_cover_mode,
                 demanded_keys=demanded_keys,
             )
             if not child_keys:
@@ -1018,6 +1048,16 @@ def main() -> None:
         ),
     )
     parser.add_argument(
+        "--support2-root-kernel-cover-mode",
+        choices=("none", "kernel"),
+        default="none",
+        help=(
+            "diagnostic: for decomposable support-two tau-two rows, count the "
+            "root-compatible container once after existing component-plane "
+            "savings instead of all remaining parent 2-planes"
+        ),
+    )
+    parser.add_argument(
         "--support3-component-plane-mode",
         choices=("none", "safe", "rank3"),
         default="none",
@@ -1029,12 +1069,31 @@ def main() -> None:
         ),
     )
     parser.add_argument(
+        "--support4-root-kernel-cover-mode",
+        choices=("none", "kernel"),
+        default="none",
+        help=(
+            "diagnostic: for the decomposable support-four tau-two row, count "
+            "the root-compatible 4D kernel container once instead of all "
+            "parent 2-planes inside it"
+        ),
+    )
+    parser.add_argument(
         "--tau1-child-line-carry-mode",
         choices=("none", "top"),
         default="none",
         help=(
             "diagnostic: when a parent row is tau-one, condition the selected "
             "child scalar tau-one row on the carried full quotient line"
+        ),
+    )
+    parser.add_argument(
+        "--tau1-root-kernel-cover-mode",
+        choices=("none", "kernel"),
+        default="none",
+        help=(
+            "diagnostic: for tau-one rows with saturated root-compatible "
+            "line families, count the root-kernel container once"
         ),
     )
     parser.add_argument(
@@ -1155,9 +1214,12 @@ def main() -> None:
         support2_diamond_mode=args.support2_diamond_mode,
         support2_line_filter=args.support2_line_quotient_filter,
         nested_tau0_equal_container_filter=args.nested_tau0_equal_container_filter,
+        support2_root_kernel_cover_mode=args.support2_root_kernel_cover_mode,
         support2_component_plane_mode=args.support2_component_plane_mode,
         support3_component_plane_mode=args.support3_component_plane_mode,
+        support4_root_kernel_cover_mode=args.support4_root_kernel_cover_mode,
         tau1_child_line_carry_mode=args.tau1_child_line_carry_mode,
+        tau1_root_kernel_cover_mode=args.tau1_root_kernel_cover_mode,
         exact_filtered_empty=args.exact_filtered_empty,
         last_level_keys=last_level_keys,
         demand_next_level=args.demand_next_level,
@@ -1275,9 +1337,12 @@ def main() -> None:
                 cover_kernel_lift=args.cover_kernel_lift,
                 exclude_collapsed_active=args.exclude_collapsed_active,
                 support2_line_filter=args.support2_line_quotient_filter,
+                support2_root_kernel_cover_mode=args.support2_root_kernel_cover_mode,
                 support2_component_plane_mode=args.support2_component_plane_mode,
                 support3_component_plane_mode=args.support3_component_plane_mode,
+                support4_root_kernel_cover_mode=args.support4_root_kernel_cover_mode,
                 tau1_child_line_carry_mode=args.tau1_child_line_carry_mode,
+                tau1_root_kernel_cover_mode=args.tau1_root_kernel_cover_mode,
             ),
             args.term_limit,
         )
@@ -1298,9 +1363,12 @@ def main() -> None:
                 cover_kernel_lift=args.cover_kernel_lift,
                 exclude_collapsed_active=args.exclude_collapsed_active,
                 support2_line_filter=args.support2_line_quotient_filter,
+                support2_root_kernel_cover_mode=args.support2_root_kernel_cover_mode,
                 support2_component_plane_mode=args.support2_component_plane_mode,
                 support3_component_plane_mode=args.support3_component_plane_mode,
+                support4_root_kernel_cover_mode=args.support4_root_kernel_cover_mode,
                 tau1_child_line_carry_mode=args.tau1_child_line_carry_mode,
+                tau1_root_kernel_cover_mode=args.tau1_root_kernel_cover_mode,
             ),
             args.term_limit,
         )
@@ -1502,9 +1570,12 @@ def main() -> None:
                 cover_kernel_lift=args.cover_kernel_lift,
                 exclude_collapsed_active=args.exclude_collapsed_active,
                 support2_line_filter=args.support2_line_quotient_filter,
+                support2_root_kernel_cover_mode=args.support2_root_kernel_cover_mode,
                 support2_component_plane_mode=args.support2_component_plane_mode,
                 support3_component_plane_mode=args.support3_component_plane_mode,
+                support4_root_kernel_cover_mode=args.support4_root_kernel_cover_mode,
                 tau1_child_line_carry_mode=args.tau1_child_line_carry_mode,
+                tau1_root_kernel_cover_mode=args.tau1_root_kernel_cover_mode,
             ),
             args.trace_state_top,
         )

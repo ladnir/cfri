@@ -139,3 +139,79 @@ next local/state blocker is the level-3 table:
 whose dominant row is an outer tau-zero container together with an inner connected tau-one
 quotient-line row. The missing state appears to be a marked child line inside a fixed container,
 not another independent support-two or support-three component-plane count.
+
+## Current Root-Kernel-Cover Checkpoint
+
+The later root-kernel container-cover probes changed the active frontier. With:
+
+```text
+--cover-kernel-lift
+--nested-quotient-mode inner-in-outer
+--nested-subspace-mode inner-in-outer
+--consumed-kernel-mode inner-kernel-contained
+--support2-diamond-mode child-only
+--support2-line-quotient-filter
+--exact-filtered-empty
+--nested-tau0-equal-container-filter
+--support2-component-plane-mode high-lift
+--support2-root-kernel-cover-mode kernel
+--support3-component-plane-mode safe
+--tau1-child-line-carry-mode top
+--tau1-root-kernel-cover-mode kernel
+--support4-root-kernel-cover-mode kernel
+```
+
+the full demanded depth-5 checkpoint reports:
+
+```text
+final_span_1_crossing_z,99
+final_span_1_z_report,34,424.70026934
+```
+
+The top safe-mode obstruction is now again a support-three row:
+
+```text
+level 4, state (2,19):
+  p=8, s=3, a=3, tau=2
+  delta=3, comp=3
+  K=0, dim V=4
+  child (4,8)
+  term 408.56599456
+```
+
+Switching only this local rule to the rank-3 sensitivity mode gives:
+
+```text
+final_span_1_crossing_z,72
+final_span_1_z_report,34,200.01114103
+```
+
+and the dominant path becomes:
+
+```text
+level 5: tau-one row into child (2,15), term 200.01072750
+level 4: support-three tau-two row into child (3,6), term 301.39238054
+level 3: support-two quotient-diamond row into child flag (3,2)>=(1,4), term 26.47911711
+```
+
+The child flag `(3,2)>=(1,4)` is already well controlled:
+
+```text
+baseline_log2 =   15.71424552
+table_log2    = -240.28575448
+pair_sum_log2 = -240.28575448
+```
+
+So the next local proof obligation is the rank-defect split for the support-three row. A theorem
+version must show that the dependent/proportional active-restriction strata are not allowed to pay
+the full safe-mode cost. Possible routes:
+
+```text
+1. exact-support collapse reroutes proportional restrictions to smaller support;
+2. the dependent stratum forces a smaller effective child container than dim V = 4;
+3. a marked proportional-pair state carries the defective relation and charges it recursively;
+4. the rank defect pays an explicit incidence factor that recovers the two q-dimensions between
+   safe and rank-3 mode.
+```
+
+Until one of these is proved, `rank3` remains a sensitivity ceiling rather than a certificate rule.

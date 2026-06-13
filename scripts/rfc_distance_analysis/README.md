@@ -36,6 +36,7 @@ docs/rfc_distance_analysis/rfc_support_two_high_lift_component_plane_bound.md hi
 docs/rfc_distance_analysis/rfc_support_three_component_plane_bound.md support-three component-plane stratification note
 docs/rfc_distance_analysis/rfc_tau1_child_line_carry_diagnostic.md tau-one child-line carry ceiling and support-four blocker
 docs/rfc_distance_analysis/rfc_root_kernel_container_cover_diagnostic.md root-kernel cover probes and support-three frontier
+docs/rfc_distance_analysis/rfc_support_three_rank_defect_incidence.md support-three rank-defect incidence charge
 rfc_theta_chain_normal_slice.py     shortened-ambient/defect-slice checker with optimistic rho and strict hard-trace columns
 rfc_defect_conservation.py          fixed-witness rank-defect conservation checker for exposed shortened ambients
 rfc_shortened_rank_recurrence.py    optimistic rho_h(D,z) recurrence with paired-spine compression
@@ -558,8 +559,10 @@ The root-kernel cover probes are:
 They are diagnostic theorem targets, not certificate modes. They count narrow root-compatible
 container fibers once after quotient/root incidence is already charged. In the current depth-5
 checkpoint, safe support-three mode reaches `z=34` value `424.70026934` and `crossing_z=99`;
-rank-3 support-three sensitivity reaches `200.01114103` and `crossing_z=72`. The corresponding
-status note is `docs/rfc_distance_analysis/rfc_root_kernel_container_cover_diagnostic.md`.
+rank-3 support-three sensitivity, and the new theorem-target `--support3-component-plane-mode
+stratified`, reach `200.01114103` and `crossing_z=72`. The corresponding status note is
+`docs/rfc_distance_analysis/rfc_root_kernel_container_cover_diagnostic.md`; the rank-defect
+incidence charge is in `docs/rfc_distance_analysis/rfc_support_three_rank_defect_incidence.md`.
 
 `rfc_multicopy_falsification.py` is adversarial. It estimates whether broad one-copy near-families
 can intersect across many independent RFC copies often enough to threaten the target excess.

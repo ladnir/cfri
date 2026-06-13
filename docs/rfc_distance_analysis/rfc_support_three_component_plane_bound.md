@@ -58,15 +58,27 @@ C_q q^4,
 
 instead of the scalar `q^6`. This gives a theorem-target saving of two q-dimensions.
 
-## Rank-3 Stratum
+## Rank-3 And Rank-Defect Strata
 
 If the three active coordinate restrictions on `V` are pairwise independent, then every slice
 `V cap H_j cap H_k` has dimension at most two. The component planes are then fixed up to finite
 constants after `V` is fixed, and only the local exact-support two-plane contributes `q^2`.
 
-This gives a four-q-dimensional saving on the rank-3 stratum. The current diagnostic exposes this
-as a sensitivity mode, but the safe theorem route uses only the two-q-dimensional saving until the
-proportional-pair stratum is either charged or carried as extra state.
+This gives a four-q-dimensional saving on the rank-3 stratum.
+
+The proportional/rank-defect stratum can pay the same exponent by incidence. Since `delta(A)=3`,
+the three active coordinate functionals are independent modulo the already-zero child coordinates.
+If their restrictions to the fixed child four-container `V` have rank less than three, then `V` is
+contained in the kernel of one nonzero projective linear combination of the three active
+functionals. A fixed extra hyperplane costs `q^-4` for a four-container, and there are only
+`q^2+q+1` projective combinations. Thus rank defect costs two q-dimensions, exactly paying for the
+extra `q^2` component-plane family allowed by the safe proportional-pair count.
+
+The local proof target is recorded in:
+
+```text
+docs/rfc_distance_analysis/rfc_support_three_rank_defect_incidence.md
+```
 
 ## Diagnostic Rule
 
@@ -75,6 +87,7 @@ The pair recurrence exposes this as:
 ```text
 --support3-component-plane-mode safe
 --support3-component-plane-mode rank3
+--support3-component-plane-mode stratified
 ```
 
 The safe mode subtracts two q-dimensions only for:
@@ -89,8 +102,9 @@ K = 0
 dim V = 4
 ```
 
-The rank-3 mode subtracts four q-dimensions for the same row and should be read only as a
-stratified sensitivity test.
+The `rank3` mode subtracts four q-dimensions for the same row and should be read only as a
+sensitivity test. The `stratified` mode also subtracts four q-dimensions, but its intended proof is
+the rank-three/rank-defect split above.
 
 ## Checkpoint
 
@@ -179,7 +193,8 @@ level 4, state (2,19):
   term 408.56599456
 ```
 
-Switching only this local rule to the rank-3 sensitivity mode gives:
+Switching only this local rule to the rank-3 sensitivity mode, or equivalently to the stratified
+rank-defect-incidence target, gives:
 
 ```text
 final_span_1_crossing_z,72
@@ -202,16 +217,6 @@ table_log2    = -240.28575448
 pair_sum_log2 = -240.28575448
 ```
 
-So the next local proof obligation is the rank-defect split for the support-three row. A theorem
-version must show that the dependent/proportional active-restriction strata are not allowed to pay
-the full safe-mode cost. Possible routes:
-
-```text
-1. exact-support collapse reroutes proportional restrictions to smaller support;
-2. the dependent stratum forces a smaller effective child container than dim V = 4;
-3. a marked proportional-pair state carries the defective relation and charges it recursively;
-4. the rank defect pays an explicit incidence factor that recovers the two q-dimensions between
-   safe and rank-3 mode.
-```
-
-Until one of these is proved, `rank3` remains a sensitivity ceiling rather than a certificate rule.
+The rank-defect incidence lemma supplies route 4 from the previous checklist. The remaining work is
+to import its finite constants into the global certificate and to ensure exact-support
+normalization always reroutes active spans with `delta<3` before this row is applied.

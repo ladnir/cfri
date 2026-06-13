@@ -57,11 +57,11 @@ Open items are excluded from the denominator.
 | Kernel-lift-only cover | 0 | 1 | 1 | 0% | Useful after richer state, still not enough | Earlier `--cover-kernel-lift` kept crossing at `z=137`; after nested diagnostics it lowers `z=34` to `924.69`, but crossing remains `z=133` and tau-two/tau-one quotient chains dominate. |
 | Support-two tau-two quotient-frame bound | 1 | 2 | 0 | 33% | Keep, but old stress row is no longer dominant | The decoded `(4,7)>=(2,8)` structural trace has outer `a=2,tau=2,charge=4,lift=12` and adjusted qdim `8`, while the nested inner tau-one line is already reduced to one remaining quotient dimension. `--support2-diamond-mode child-only` lowers that level-3 pair sum from `303.44` to `61.01` bits and full depth-5 `z=34` from `1232.89` to `1095.86`, but the new blocker is `(4,2)>=(2,4)` with a strong bottom/kernel zero budget. |
 | High-lift support-two component planes | 1 | 1 | 0 | 50% | Strong local improvement, next blocker exposed | `rfc_support_two_high_lift_component_plane_bound.md` proves the intended count shape for `parent_span=2,tau=2,a=2,K=0,dim V=4`: after `V` is fixed, the two rank-one components choose child 2-planes inside codimension-one slices, saving four q-dimensions. Diagnostic mode `--support2-component-plane-mode high-lift` moves the full-level-2 demanded checkpoint to `z=34` value `967.01` and crossing `z=130`; now `a=3,delta=3,comp=3` tau-two rows dominate. |
-| Support-three component-plane stratification | 1 | 2 | 0 | 33% | Current local proof blocker | `rfc_support_three_component_plane_bound.md` gives a safe two-q-dimensional saving for the decomposable `a=3,delta=3,comp=3,K=0,dim V=4` row, with a rank-3 four-qdim sensitivity mode. After root-kernel cover probes, safe mode still leaves `z=34` at `424.70026934` bits and the same support-three row dominant; rank-3 sensitivity moves the checkpoint to `200.01114103` bits and `crossing_z=72`. The proportional-pair/dependent stratum must be charged or carried. |
+| Support-three component-plane stratification | 2 | 2 | 0 | 50% | Local route upgraded; constants/import remain | `rfc_support_three_component_plane_bound.md` gives a safe two-q-dimensional saving for the decomposable `a=3,delta=3,comp=3,K=0,dim V=4` row. The new `rfc_support_three_rank_defect_incidence.md` charges the rank-defect stratum by an extra-hyperplane incidence cost, supporting `--support3-component-plane-mode stratified` with the same exponent as the old rank-3 sensitivity. This moves the checkpoint to `200.01114103` bits and `crossing_z=72`; finite constants and recurrence import remain. |
 | Strong-bottom positive-kernel containment | 0 | 1 | 0 | 0% | Local lemma plausible, not enough | `--consumed-kernel-mode inner-kernel-contained` charges a lower positive kernel inside the upper kernel. On `(4,2)>=(2,4)` it moves the table only from `932.90` to `931.48` bits before a codimension-one support-two line-quotient row takes over. |
 | Support-two line-quotient impossibility | 0 | 4 | 0 | 0% | Valid local filter, small fair-baseline gain | `--support2-line-quotient-filter` removes decomposable tau-two support rows with `dim(V/L)=1`, where nonempty root-line support is impossible. `--exact-filtered-empty` proves the lower `(4,2)>=(2,4)` entry is empty and improves the strong-bottom table to `803.48`. In the fair `tau0-inner-contained` baseline it moves depth-5 `z=34` from `1095.86` to `1094.26`. The `1478.22` regression belongs to the stronger `inner-kernel-contained` diagnostic and is partly sparse-demand state loss; `--full-table-until 2` and `--demand-closure-passes 1` both improve that strong-mode report to `1352.53`, while a second closure pass does not move it. |
 | Scalar kernel-lift container cover | 1 | 2 | 0 | 33% | Major theorem target, quotient incidence still counted | With exact-support filters, support-two high-lift, safe support-three, and `--cover-kernel-lift`, the demanded depth-5 checkpoint reaches `final_span_1_z_report,34,565.92392782` and `crossing_z=102`. This removes duplicate `K_parent <= L+L` fibers but keeps quotient line/plane incidence. It still leaves about `5.05` q-dimensions and exposes a marked-line-in-container row. |
-| Root-kernel container cover probes | 0 | 1 | 0 | 0% | Promising diagnostic, not theorem-grade | New modes `--support2-root-kernel-cover-mode kernel`, `--support4-root-kernel-cover-mode kernel`, and `--tau1-root-kernel-cover-mode kernel` test counting root-compatible containers once after quotient/root data are fixed. With safe support-three, the full checkpoint improves to `424.70026934` bits and `crossing_z=99`; with rank-3 support-three sensitivity it reaches `200.01114103` bits and `crossing_z=72`. The proof obligation is canonical unconsumed fibers with quotient incidence retained. |
+| Root-kernel container cover probes | 0 | 1 | 0 | 0% | Promising diagnostic, not theorem-grade | New modes `--support2-root-kernel-cover-mode kernel`, `--support4-root-kernel-cover-mode kernel`, and `--tau1-root-kernel-cover-mode kernel` test counting root-compatible containers once after quotient/root data are fixed. With safe support-three, the full checkpoint improves to `424.70026934` bits and `crossing_z=99`; with rank-3 or stratified support-three it reaches `200.01114103` bits and `crossing_z=72`. The proof obligation is canonical unconsumed fibers with quotient incidence retained. |
 | Tau-one child-line carry | 1 | 1 | 0 | 50% | Useful ceiling, exposes support-four blocker | `--tau1-child-line-carry-mode top` models conditioning a selected child tau-one row on the parent full quotient line. With current best structural modes it lowers `z=34` from `565.92` to `435.05` bits, but top mass moves to tau-zero rows feeding `(2,20)`. Needs a real marked-line state before theorem use. |
 | Marked line inside fixed container | 0 | 1 | 0 | 0% | Useful but superseded as top blocker | The previous frontier was level-3 `(4,7)>=(1,8)`: outer tau-zero container plus inner connected tau-one row `a=2,delta=1,comp=1,K=0,V=2`, with one remaining q-dimension. The tau-one child-line carry diagnostic handles the selected-row ceiling and moves the frontier to support-four tau-two rows. |
 | Support-four decomposable tau-two exterior row | 0 | 0 | 0 | open | Current frontier | After tau-one child-line carry, the top child state is `(2,20)`, dominated by `a=4,delta=4,comp=4,tau=2,K=0,dim V=4`, child `(4,8)`, term `413.29391501`. The local `q^4` family may be real (`[4 choose 2]_q`), so the next proof needs a marked-component child state or a different global argument. |
@@ -84,7 +84,7 @@ with support2/support3 component planes
   plus scalar kernel-cover diagnostic:          565.92392782 bits
 with tau-one child-line carry diagnostic:       435.05329836 bits
 with root-kernel cover probes, safe support3:   424.70026934 bits
-with root-kernel cover probes, rank3 support3:  200.01114103 bits
+with root-kernel cover probes, stratified support3: 200.01114103 bits
 target:                                         -80 bits
 ```
 
@@ -98,7 +98,8 @@ Three plausible ways to turn this into a win:
 ```text
 1. formalize scalar kernel-lift container covering while keeping quotient incidence counted;
 2. replace the tau-one child-line carry diagnostic by an explicit marked-line state;
-3. prove the support-three rank-3/dependent-stratum split or carry the proportional-pair state.
+3. import the support-three rank-defect incidence constants and then attack the remaining
+   root-kernel/tau-one/container-state gap.
 ```
 
 The current best theorem-safer trace is:
@@ -114,10 +115,10 @@ level 3, state (4,8):
   value -121.19264508
 ```
 
-The rank-3 sensitivity trace instead routes through `(2,15) -> (3,6) -> (3,2)>=(1,4)` and leaves
+The stratified support-three trace routes through `(2,15) -> (3,6) -> (3,2)>=(1,4)` and leaves
 `200.01114103` bits. The lower child table `(3,2)>=(1,4)` is already strong
-(`-240.28575448` bits), so the next proof should focus upstream on support-three rank
-stratification rather than lower pair-table completion.
+(`-240.28575448` bits), so the next proof should focus on importing the local incidence constants
+and then on the remaining container/fiber theorem, not lower pair-table completion.
 
 ## Update Rule
 
@@ -136,15 +137,21 @@ Also add a dated note below if the test changes the active frontier.
 
 ### 2026-06-12
 
+Support-three rank-defect incidence lemma added. The lemma charges the proportional/dependent
+active-restriction stratum by noting that a rank defect gives a nonzero projective relation among
+the three active functionals; a fixed relation places the child four-container in one extra
+hyperplane (`q^-4`), and there are only `q^2+q+1` relations. This recovers the two q-dimensions
+between safe support-three and rank-3 sensitivity and is exposed as
+`--support3-component-plane-mode stratified`.
+
 Root-kernel container cover probes added. The modes
 `--support2-root-kernel-cover-mode kernel`, `--support4-root-kernel-cover-mode kernel`, and
 `--tau1-root-kernel-cover-mode kernel` count narrow root-compatible container fibers once after the
 quotient/root data have been charged. With theorem-safer support-three mode, the demanded depth-5
-checkpoint is `final_span_1_z_report,34,424.70026934` and `crossing_z=99`. With rank-3
-support-three sensitivity it reaches `200.01114103` and `crossing_z=72`. The top safe-mode blocker
-is now the decomposable support-three tau-two row
-`a=3,delta=3,comp=3,K=0,dim V=4`; the rank-3 sensitivity shows the row has enough leverage if the
-dependent/proportional stratum can be charged or carried.
+checkpoint is `final_span_1_z_report,34,424.70026934` and `crossing_z=99`. With rank-3 or
+stratified support-three it reaches `200.01114103` and `crossing_z=72`. The top safe-mode blocker
+is the decomposable support-three tau-two row `a=3,delta=3,comp=3,K=0,dim V=4`; the rank-defect
+incidence lemma supplies the local charge needed to interpret the rank-3 exponent theorem-wise.
 
 Residual trace classifier added. The current proof-shaped sparse run reports
 `final_span_1_z_report,34,1478.66370843` in this checkout. The bound-following path has a

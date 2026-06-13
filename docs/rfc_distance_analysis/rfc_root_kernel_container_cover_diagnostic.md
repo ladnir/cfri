@@ -130,10 +130,12 @@ level 4, state (2,19):
 This is the decomposable support-three tau-two layer-codimension row. The safe support-three bound
 saves two q-dimensions, but the row still carries a large local placement cost.
 
-If the support-three diagnostic is upgraded to the rank-3 sensitivity mode:
+If the support-three diagnostic is upgraded to the rank-3 sensitivity mode, or to the stratified
+rank-defect-incidence target:
 
 ```text
 --support3-component-plane-mode rank3
+--support3-component-plane-mode stratified
 ```
 
 the same root-kernel-cover checkpoint becomes:
@@ -171,15 +173,18 @@ The current evidence supports the following division:
 1. root-kernel container covers are useful for removing duplicate post-root fibers;
 2. quotient-line and quotient-plane incidence must remain explicit event data;
 3. safe support-three accounting is still too weak;
-4. the rank-3 support-three stratum has enough strength to move the crossing to z=72, but the
-   proportional-pair/dependent stratum still needs a theorem or a carried state.
+4. the support-three rank-defect incidence lemma gives the same exponent as the rank-3 sensitivity,
+   provided `delta=3` is enforced by exact-support normalization.
 ```
 
 The most plausible theorem upgrade is to refine `rfc_support_three_component_plane_bound.md`.
 After fixing `V`, the three active coordinate restrictions on `V` either have rank three, where
-the component planes are fixed up to constants, or they have a rank defect. The proof must show the
-rank-defect stratum pays elsewhere: by exact-support collapse, by a smaller child container, by a
-marked proportional-pair state, or by an additional root/support charge.
+the component planes are fixed up to constants, or they have a rank defect. The rank-defect
+incidence lemma charges that defect by the extra hyperplane condition on `V`; see:
 
-Until that split is proved, the `rank3` mode remains a sensitivity ceiling and the safe checkpoint
-is the theorem-shaped one.
+```text
+docs/rfc_distance_analysis/rfc_support_three_rank_defect_incidence.md
+```
+
+Until the root-kernel covers and finite constants are fully imported into the certificate
+recurrence, this remains a diagnostic checkpoint rather than a final distance certificate.

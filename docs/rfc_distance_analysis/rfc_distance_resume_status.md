@@ -239,10 +239,18 @@ docs/rfc_distance_analysis/rfc_root_kernel_container_cover_diagnostic.md
   Status: diagnostic and proof-target locator.
   Adds narrow support-two, support-four, and tau-one root-kernel container-cover probes. With
   theorem-safer support-three mode, the full depth-5 checkpoint is
-  `final_span_1_z_report,34,424.70026934` and `crossing_z=99`. With the rank-3 support-three
-  sensitivity, it reaches `final_span_1_z_report,34,200.01114103` and `crossing_z=72`. The new
-  obstruction is the support-three tau-two rank-stratification proof, not lower pair-table
-  plumbing.
+  `final_span_1_z_report,34,424.70026934` and `crossing_z=99`. With stratified support-three, it
+  reaches `final_span_1_z_report,34,200.01114103` and `crossing_z=72`. The support-three
+  rank-defect lemma below gives the intended theorem route for that exponent; lower pair-table
+  plumbing is not the active obstruction.
+
+docs/rfc_distance_analysis/rfc_support_three_rank_defect_incidence.md
+  Status: local theorem target/proof sketch.
+  Closes the missing two q-dimensions between safe support-three and rank-3 support-three by
+  charging the rank-defect stratum: a nonzero projective relation among the three active
+  restrictions forces the child four-container into one extra hyperplane, costing `q^-4`, while
+  there are only `q^2+q+1` relations. This supports the new
+  `--support3-component-plane-mode stratified` diagnostic.
 ```
 
 The external Fable audit was useful and found the product-of-first-moments bug. Its record is:
@@ -260,10 +268,10 @@ The live blockers are now narrow:
    incidence counted and now narrow the safe checkpoint to
    `final_span_1_z_report,34,424.70026934` and `crossing_z=99`. The proof still has to show the
    covered fibers are canonical and unconsumed.
-2. Upgrade support-three component-plane stratification. Safe mode saves two q-dimensions but
-   leaves the row `a=3,delta=3,comp=3,tau=2,K=0,dim V=4` dominant. The rank-3 sensitivity saves
-   four q-dimensions and moves the full checkpoint to `final_span_1_z_report,34,200.01114103`,
-   `crossing_z=72`; the proportional-pair/dependent stratum must be charged or carried.
+2. Import the support-three rank-defect incidence lemma into the certificate constants. The new
+   `stratified` mode has the same exponent as `rank3` and moves the full checkpoint to
+   `final_span_1_z_report,34,200.01114103`, `crossing_z=72`, but the finite Gaussian/projective
+   constants still need to be included.
 3. Replace the tau-one child-line carry diagnostic by an explicit marked-line/container state. The
    selected-row ceiling is useful but not theorem-grade.
 4. Attack support-four decomposable tau-two exterior rows only after the root-kernel cover proof is

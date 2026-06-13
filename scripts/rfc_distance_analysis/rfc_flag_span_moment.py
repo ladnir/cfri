@@ -609,11 +609,18 @@ def support3_component_plane_saving_qdim(
     The rank3 mode is a sensitivity test for the pairwise-independent active
     restriction stratum, where all three component planes are contained in
     fixed 2-spaces and the post-root cost is only `q^2`.
+
+    The stratified mode applies the same four-qdim saving as a theorem target:
+    the rank-defect stratum pays two q-dimensions because a nonzero projective
+    relation among the three active restrictions forces the fixed child
+    4-container into one additional hyperplane, while there are only q^2 such
+    relations.  This exactly pays for the extra q^2 component-plane family
+    that safe mode allowed in the proportional-pair stratum.
     """
 
     if mode == "none":
         return 0
-    if mode not in ("safe", "rank3"):
+    if mode not in ("safe", "rank3", "stratified"):
         raise ValueError(f"unknown support3 component-plane mode: {mode}")
     if (
         parent_span == 2

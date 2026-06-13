@@ -319,14 +319,17 @@ docs/rfc_distance_analysis/rfc_support_three_component_plane_bound.md
 Latest checkpoint: after adding narrow root-kernel container-cover probes, the safe support-three
 rule leaves the depth-5 `z=34` moment at `424.70026934` bits and `crossing_z=99`, dominated by this
 same support-three row. The rank-3 sensitivity mode lowers the checkpoint to `200.01114103` bits
-and `crossing_z=72`, but is not a certificate rule. Therefore the conditional theorem package now
-requires one of the following support-three rank-defect closures:
+and `crossing_z=72`.
+
+The support-three rank-defect incidence lemma gives a theorem-target interpretation of the same
+four-qdim saving. If the three active restrictions on the fixed child four-container are rank
+deficient, then the container lies in the kernel of a nonzero projective combination of the three
+active coordinate functionals. A fixed extra hyperplane costs `q^-4` for a four-container, while
+there are `q^2+q+1` projective combinations; the rank-defect stratum therefore pays two
+q-dimensions, exactly covering the proportional-pair component-plane excess. This is recorded in:
 
 ```text
-1. proportional active restrictions reroute by exact-support collapse;
-2. the rank-defect stratum forces a smaller effective child container;
-3. a marked proportional-pair child state carries and charges the defect;
-4. an explicit incidence factor recovers the two q-dimensions between safe and rank-3 mode.
+docs/rfc_distance_analysis/rfc_support_three_rank_defect_incidence.md
 ```
 
 The root-kernel probes themselves are documented in:

@@ -1059,13 +1059,14 @@ def main() -> None:
     )
     parser.add_argument(
         "--support3-component-plane-mode",
-        choices=("none", "safe", "rank3"),
+        choices=("none", "safe", "rank3", "stratified"),
         default="none",
         help=(
             "diagnostic: for the decomposable support-three high-lift row, "
             "count component child planes in active-coordinate slices of the "
             "fixed child 4-container; safe allows one proportional active pair, "
-            "rank3 assumes pairwise-independent active restrictions"
+            "rank3 assumes pairwise-independent active restrictions, and "
+            "stratified charges rank-defect relations by an extra hyperplane"
         ),
     )
     parser.add_argument(

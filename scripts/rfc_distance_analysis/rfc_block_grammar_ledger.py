@@ -81,8 +81,8 @@ BLOCKS: tuple[Block, ...] = (
         "quotient-root",
         "carried full line R and transition map phi",
         "conditional line count q^dim ker(phi)",
-        "rfc_tau1_full_line_carry_lemma.md",
-        "proof sketch",
+        "rfc_top_tau1_root_kernel_carry_block.md",
+        "theorem contract",
     ),
     Block(
         "support2_diamond",
@@ -121,7 +121,7 @@ BLOCKS: tuple[Block, ...] = (
         "container-fiber",
         "unconsumed K_parent <= L+L",
         "remove duplicate Gaussian kernel-lift multiplier",
-        "rfc_covering_flag_lift_lemma.md",
+        "rfc_top_tau1_root_kernel_carry_block.md",
         "theorem target",
     ),
     Block(
@@ -163,7 +163,7 @@ TEST_CASES: tuple[TestCase, ...] = (
         "support2/support4/tau1 root-compatible container probes",
         ("support4_root_kernel", "kernel_fiber_cover", "tau1_full_line_carry"),
         "duplicate post-root fibers should be counted once after quotient/root data",
-        "hidden fibers must not be consumed by descendants unless carried",
+        "tau1 rows need explicit eligibility, kappa_phi, and consumed/unconsumed fiber split",
     ),
     TestCase(
         "stratified_residual_3_6",

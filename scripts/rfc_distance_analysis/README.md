@@ -39,6 +39,7 @@ docs/rfc_distance_analysis/rfc_support_two_high_lift_component_plane_bound.md hi
 docs/rfc_distance_analysis/rfc_support_three_component_plane_bound.md support-three component-plane stratification note
 docs/rfc_distance_analysis/rfc_tau1_child_line_carry_diagnostic.md tau-one child-line carry ceiling and support-four blocker
 docs/rfc_distance_analysis/rfc_root_kernel_container_cover_diagnostic.md root-kernel cover probes and support-three frontier
+docs/rfc_distance_analysis/rfc_top_tau1_root_kernel_carry_block.md top tau-one/root-kernel carry contract
 docs/rfc_distance_analysis/rfc_support_three_rank_defect_incidence.md support-three rank-defect incidence charge
 rfc_theta_chain_normal_slice.py     shortened-ambient/defect-slice checker with optimistic rho and strict hard-trace columns
 rfc_defect_conservation.py          fixed-witness rank-defect conservation checker for exposed shortened ambients

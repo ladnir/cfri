@@ -257,6 +257,17 @@ The next theorem work is not another unrelated row patch; it is to formalize the
 full-line carry/root-kernel cover and import the support-three incidence credit with balanced
 finite constants.
 
+The top carry/root-kernel contract is now recorded in:
+
+```text
+docs/rfc_distance_analysis/rfc_top_tau1_root_kernel_carry_block.md
+```
+
+The key restriction is that the broad tau-one root-kernel diagnostic is not theorem-grade. A legal
+transition must carry the full quotient line, compute the descendant projective-fiber dimension
+`kappa_phi`, and split hidden fibers into consumed and unconsumed parts before spending the two
+top-row q-dimensions.
+
 ## Current Dominant Rows As Tests
 
 ### Test 1: Level-3 `(4,7)>=(2,8)`

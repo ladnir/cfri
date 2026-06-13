@@ -155,6 +155,14 @@ scripts/rfc_distance_analysis/rfc_block_potential_probe.py
   support-three is tight again at `level_weight=1.93994737`. These are ledger diagnostics, not
   certificate claims.
 
+docs/rfc_distance_analysis/rfc_top_tau1_root_kernel_carry_block.md
+  Status: theorem contract for the current top-row blocker.
+  States the safe version of the two q-dimensional top-row credit: carry the full ambient
+  tau-one line `R <= E_A`, count descendant tau-one rows by the projective fiber
+  `q^kappa_phi`, and remove only unconsumed root-kernel fibers that are not used by descendants.
+  It also records the main risk: the current `--tau1-root-kernel-cover-mode kernel` diagnostic is
+  broad and must be replaced by row eligibility flags before theorem use.
+
 docs/rfc_distance_analysis/rfc_support_two_tau2_quotient_frame_lemma.md
   Status: local theorem target.
   Isolates the decomposable `|A|=2,delta=2,comp=2` quotient-frame row now exposed by the decoded
@@ -291,7 +299,10 @@ rows one at a time:
    that diagram once.
 2. Formalize the top tau-one full-line carry/root-kernel cover as a reusable block. The
    `local-incidence` profile moves the bottleneck there, so this is now the shortest test of
-   whether the block grammar is real or merely tuned.
+   whether the block grammar is real or merely tuned. The contract is now in
+   `rfc_top_tau1_root_kernel_carry_block.md`; the missing implementation piece is an eligibility
+   audit that emits `kappa_phi` and consumed/unconsumed fiber dimensions instead of using the broad
+   tau-one root-kernel diagnostic.
 3. Import the support-three rank-defect incidence credit into the certificate constants. The
    `current-target` ceiling returns the tight row to support-three at `level_weight=1.93994737`,
    so support-three cannot be treated as closed.

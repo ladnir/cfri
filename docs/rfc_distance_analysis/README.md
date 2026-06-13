@@ -48,6 +48,7 @@ rfc_tau2_dense_connected_gf11_signal.md       GF(11) dense endpoint signal inter
 rfc_tau2_incidence_framing_lemma.md           quotient-incidence and exact-support Grassmann cap
 rfc_support_two_tau2_quotient_frame_lemma.md  support-two tau-two quotient-frame target
 rfc_tau1_quotient_line_incidence_lemma.md     fixed-flag tau-one quotient-line incidence bound
+rfc_top_tau1_root_kernel_carry_block.md       theorem contract for top tau-one/root-kernel carry
 rfc_root_kernel_container_cover_diagnostic.md root-kernel cover checkpoint and support-three frontier
 rfc_support_three_rank_defect_incidence.md    support-three rank-defect incidence charge
 rfc_dense_endpoint_support_capture_attack.md  support-capture attack criteria for dense endpoint

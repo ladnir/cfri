@@ -479,6 +479,19 @@ level-3 table `(4,7)>=(1,8)`: an outer tau-zero child container together with an
 tau-one quotient-line row. This remaining row keeps quotient-line incidence; the missing state is
 a marked child line inside a fixed container, not another kernel-fiber cover.
 
+Update: the selected-row diagnostic `--tau1-child-line-carry-mode top` models that marked-line
+state by conditioning child tau-one rows on a parent full quotient line. Combined with the modes
+above it gives:
+
+```text
+final_span_1_crossing_z,102
+final_span_1_z_report,34,435.05329836
+```
+
+The carry diagnostic is not a theorem, but it shows the marked-line route is useful and exposes the
+next obstruction: a decomposable support-four tau-two exterior row in state `(2,20)`, with child
+state `(4,8)` and term `413.29391501`.
+
 ### Canonical Quotient/Root Datum
 
 This subsection fixes the meaning of obligation 1 for the current transition.

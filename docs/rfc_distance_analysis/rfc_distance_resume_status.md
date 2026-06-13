@@ -226,6 +226,14 @@ docs/rfc_distance_analysis/rfc_support_three_component_plane_bound.md
   scalar `--cover-kernel-lift` gives the current best end-to-end checkpoint:
   `final_span_1_z_report,34,565.92392782` and `crossing_z=102`. The next blocker is the
   marked-line-in-container interaction in `(4,7)>=(1,8)`.
+
+docs/rfc_distance_analysis/rfc_tau1_child_line_carry_diagnostic.md
+  Status: diagnostic and proof-target locator.
+  Adds `--tau1-child-line-carry-mode top`, a selected-row proxy for conditioning child tau-one
+  quotient lines on a parent full quotient line. With the current best modes it lowers the
+  demanded depth-5 checkpoint to `final_span_1_z_report,34,435.05329836`, with `crossing_z=102`.
+  The live blocker moves to a decomposable support-four tau-two row in `(2,20)`:
+  `a=4,delta=4,comp=4,K=0,dim V=4`, child `(4,8)`, term `413.29391501`.
 ```
 
 The external Fable audit was useful and found the product-of-first-moments bug. Its record is:
@@ -243,22 +251,24 @@ The live blockers are now narrow:
    a major safe-looking improvement while keeping quotient incidence counted. With exact-support
    filters, support-two high-lift, and safe support-three component planes, the full depth-5
    checkpoint is `final_span_1_z_report,34,565.92392782` and `crossing_z=102`.
-2. Add a marked child-line/container state for the new frontier. The current best trace is:
-   level 5 `(1,34)` -> child `(2,15)`, then level 4 `(2,15)` -> child flag `(4,7)>=(1,8)`,
-   then level 3 `(4,7)>=(1,8)` dominated by an outer tau-zero container and an inner connected
-   tau-one quotient-line row with `a=2,delta=1,comp=1,K=0,V=2` and one remaining q-dimension.
-   Merging this into the unmarked `(2,4)` container loses the line/support datum.
+2. Replace the tau-one child-line carry diagnostic by an explicit marked-line/container state. The
+   selected-row ceiling is useful but not theorem-grade.
 3. Finish the support-three component-plane proof. Safe mode saves two q-dimensions uniformly; the
    rank-3 stratum saves four but needs the proportional-pair stratum charged or carried.
-4. Prove/finalize the shared-randomness-safe multi-layer flag transition theorem. The target notes
+4. Attack the current support-four decomposable tau-two exterior row. The best trace now goes:
+   level 5 `(1,34)` tau-zero -> child `(2,20)`, then level 4 `(2,20)` top row
+   `a=4,delta=4,comp=4,tau=2,K=0,dim V=4`, child `(4,8)`, term `413.29391501`.
+   The four-q-dimensional `[4 choose 2]_q` local family may be real, so the next diagnostic should
+   test a marked-component child state or a different global argument.
+5. Prove/finalize the shared-randomness-safe multi-layer flag transition theorem. The target notes
    cover quotient-frame, component-plane, and marked-line states, but the final finite recurrence
    is still not written as a theorem.
-5. Kernel-branch nested-flag truncation:
+6. Kernel-branch nested-flag truncation:
    prove length three is enough, or prove length-four theta_2=-1 chains are dominated.
-6. Direct proof of the delta=3 connected full-kernel endpoint used by the g=1 row, or a general
+7. Direct proof of the delta=3 connected full-kernel endpoint used by the g=1 row, or a general
    component/full-kernel theorem with constants.
-7. Higher-drop tau-two layers beyond the g=1 first-drop case.
-8. Finite constants: marked-line root-fiber constants, exact-support inversion, split counts, and
+8. Higher-drop tau-two layers beyond the g=1 first-drop case.
+9. Finite constants: marked-line root-fiber constants, exact-support inversion, split counts, and
    log-sum/state-count overhead. The determinant-1 nonzero-root normalization is now stated
    separately and is no longer a q-dimensional blocker at the target field size.
 ```
@@ -273,13 +283,14 @@ subcases into theorem statements:
 2. nested quotient/subspace counting for W_inner <= W_outer;
 3. consumed-kernel containment when a lower tau-zero layer sits inside an upper kernel;
 4. scalar kernel-lift container covering with quotient incidence retained;
-5. marked child-line/container state for connected tau-one rows.
+5. marked child-line/container state for connected tau-one rows;
+6. support-four marked-component child state, or a replacement global argument for that row.
 ```
 
 The current best diagnostic leaves:
 
 ```text
-(565.92392782 + 80) / 128 = 5.04628069
+(435.05329836 + 80) / 128 = 4.02385389
 ```
 
 q-dimensions above the `2^-80` target. This is now close to the old anti-conservative tau-two-cover

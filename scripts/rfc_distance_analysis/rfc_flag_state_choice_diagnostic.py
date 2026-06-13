@@ -42,6 +42,7 @@ from rfc_flag_span_moment import (  # noqa: E402
     marked_line_child_bound,
     support2_component_plane_saving_qdim,
     support3_component_plane_saving_qdim,
+    tau1_child_line_carry_saving_qdim,
 )
 
 
@@ -123,6 +124,7 @@ def covers_lift(mode: str, visible_tau: int) -> bool:
 def enumerate_terms_for_state(
     *,
     child_by_span: dict[int, list[float]],
+    child_choices: dict[tuple[int, int], tuple[int, ...] | None] | None,
     child_flag_table: FlagTable | None,
     comb: list[list[float]],
     q_log2: float,
@@ -138,6 +140,7 @@ def enumerate_terms_for_state(
     support2_line_filter: bool = False,
     support2_component_plane_mode: str = "none",
     support3_component_plane_mode: str = "none",
+    tau1_child_line_carry_mode: str = "none",
 ) -> list[TermCandidate]:
     child_n = len(next(iter(child_by_span.values()))) - 1
     child_spans = sorted(child_by_span)
@@ -321,6 +324,19 @@ def enumerate_terms_for_state(
                                 q_log2=q_log2,
                                 layers=((outer_span, outer_zeros), (inner_span, inner_zeros)),
                             )
+                        if (
+                            visible_tau == 1
+                            and child_choices is not None
+                            and tau1_child_line_carry_mode != "none"
+                        ):
+                            child_choice = child_choices.get((outer_span, outer_zeros))
+                            carry_saving = tau1_child_line_carry_saving_qdim(
+                                mode=tau1_child_line_carry_mode,
+                                parent_visible_tau=visible_tau,
+                                child_parent_span=outer_span,
+                                child_choice=child_choice,
+                            )
+                            child_log -= carry_saving * q_log2
                         if child_log <= NEG_INF / 2:
                             continue
                         marked_line_used = False
@@ -477,6 +493,7 @@ def main() -> None:
     child_n = args.expansion * (1 << (args.level - 1))
     outer_terms = enumerate_terms_for_state(
         child_by_span=child.values,
+        child_choices=child.choices,
         child_flag_table=child.flag_table,
         comb=comb,
         q_log2=args.q_log2,
@@ -491,6 +508,7 @@ def main() -> None:
     )[: args.term_limit]
     inner_terms = enumerate_terms_for_state(
         child_by_span=child.values,
+        child_choices=child.choices,
         child_flag_table=child.flag_table,
         comb=comb,
         q_log2=args.q_log2,

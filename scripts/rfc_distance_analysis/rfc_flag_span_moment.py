@@ -629,6 +629,35 @@ def support3_component_plane_saving_qdim(
     return 0
 
 
+def tau1_child_line_carry_saving_qdim(
+    *,
+    mode: str,
+    parent_visible_tau: int,
+    child_parent_span: int,
+    child_choice: tuple[int, ...] | None,
+) -> int:
+    """Diagnostic saving from carrying a parent tau-one line into the child row.
+
+    The parent tau-one local datum already chooses a full quotient line.  If the
+    selected child scalar row is also tau-one, a marked-line state may replace
+    the child's independent quotient-line family by a conditional fiber count.
+    This helper subtracts only the positive child post-root line-family qdim.
+    It is a sensitivity test for the marked-line/container state, not a theorem
+    by itself.
+    """
+
+    if mode == "none":
+        return 0
+    if mode != "top":
+        raise ValueError(f"unknown tau1 child-line carry mode: {mode}")
+    if parent_visible_tau != 1 or child_choice is None:
+        return 0
+    child_profile = tau1_incidence_profile(child_parent_span, child_choice)
+    if child_profile is None:
+        return 0
+    return max(0, child_profile[6])
+
+
 def lift_flag_span_moment(
     child_by_span: dict[int, list[float]],
     comb: list[list[float]],
@@ -645,6 +674,7 @@ def lift_flag_span_moment(
     exclude_collapsed_active: bool = False,
     support2_component_plane_mode: str = "none",
     support3_component_plane_mode: str = "none",
+    tau1_child_line_carry_mode: str = "none",
 ) -> tuple[dict[int, list[float]], dict[tuple[int, int], tuple[int, ...] | None]]:
     child_n = len(next(iter(child_by_span.values()))) - 1
     parent_n = 2 * child_n
@@ -899,6 +929,20 @@ def lift_flag_span_moment(
                                         if marked_plane_log > NEG_INF / 2 and marked_plane_log < child_log:
                                             child_log = marked_plane_log
                                             marked_plane_child_used = True
+
+                                if (
+                                    visible_tau == 1
+                                    and child_choices is not None
+                                    and tau1_child_line_carry_mode != "none"
+                                ):
+                                    child_choice = child_choices.get((outer_span, outer_zeros))
+                                    carry_saving = tau1_child_line_carry_saving_qdim(
+                                        mode=tau1_child_line_carry_mode,
+                                        parent_visible_tau=visible_tau,
+                                        child_parent_span=outer_span,
+                                        child_choice=child_choice,
+                                    )
+                                    child_log -= carry_saving * q_log2
 
                                 if child_log <= NEG_INF / 2:
                                     continue

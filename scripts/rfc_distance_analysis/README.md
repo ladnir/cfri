@@ -34,6 +34,7 @@ docs/rfc_distance_analysis/rfc_residual_trace_classification.md current z=34 pro
 docs/rfc_distance_analysis/rfc_nested_tau0_equal_container_filter.md exact-support sibling-collapse note
 docs/rfc_distance_analysis/rfc_support_two_high_lift_component_plane_bound.md high-lift support-two component-plane note
 docs/rfc_distance_analysis/rfc_support_three_component_plane_bound.md support-three component-plane stratification note
+docs/rfc_distance_analysis/rfc_tau1_child_line_carry_diagnostic.md tau-one child-line carry ceiling and support-four blocker
 rfc_theta_chain_normal_slice.py     shortened-ambient/defect-slice checker with optimistic rho and strict hard-trace columns
 rfc_defect_conservation.py          fixed-witness rank-defect conservation checker for exposed shortened ambients
 rfc_shortened_rank_recurrence.py    optimistic rho_h(D,z) recurrence with paired-spine compression

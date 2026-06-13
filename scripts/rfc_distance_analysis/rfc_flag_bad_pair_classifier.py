@@ -969,6 +969,7 @@ def main() -> None:
 
     outer_terms = enumerate_terms_for_state(
         child_by_span=child.values,
+        child_choices=child.choices,
         child_flag_table=child.flag_table,
         comb=comb,
         q_log2=args.q_log2,
@@ -985,6 +986,7 @@ def main() -> None:
     )[: args.term_limit]
     inner_terms = enumerate_terms_for_state(
         child_by_span=child.values,
+        child_choices=child.choices,
         child_flag_table=child.flag_table,
         comb=comb,
         q_log2=args.q_log2,

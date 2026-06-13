@@ -253,6 +253,7 @@ def compute_pair_enumerated_flag_table(
     *,
     current_values_by_span: dict[int, list[float]],
     previous_values_by_span: dict[int, list[float]],
+    previous_choices: dict[tuple[int, int], tuple[int, ...] | None],
     previous_flag_table: FlagTable | None,
     comb: list[list[float]],
     q_log2: float,
@@ -273,6 +274,7 @@ def compute_pair_enumerated_flag_table(
     nested_tau0_equal_container_filter: bool,
     support2_component_plane_mode: str,
     support3_component_plane_mode: str,
+    tau1_child_line_carry_mode: str,
     exact_filtered_empty: bool,
     allowed_keys: set[tuple[State, State]] | None = None,
 ) -> tuple[FlagTable, TableStats]:
@@ -292,6 +294,7 @@ def compute_pair_enumerated_flag_table(
     def enumerate_state_terms(state: State) -> list[TermCandidate]:
         terms = enumerate_terms_for_state(
             child_by_span=previous_values_by_span,
+            child_choices=previous_choices,
             child_flag_table=previous_flag_table,
             comb=comb,
             q_log2=q_log2,
@@ -307,6 +310,7 @@ def compute_pair_enumerated_flag_table(
             support2_line_filter=support2_line_filter,
             support2_component_plane_mode=support2_component_plane_mode,
             support3_component_plane_mode=support3_component_plane_mode,
+            tau1_child_line_carry_mode=tau1_child_line_carry_mode,
         )
         return terms
 
@@ -419,6 +423,7 @@ def collect_pair_row_child_flag_keys(
     *,
     current_values_by_span: dict[int, list[float]],
     previous_values_by_span: dict[int, list[float]],
+    previous_choices: dict[tuple[int, int], tuple[int, ...] | None],
     previous_flag_table: FlagTable | None,
     comb: list[list[float]],
     q_log2: float,
@@ -439,6 +444,7 @@ def collect_pair_row_child_flag_keys(
     nested_tau0_equal_container_filter: bool,
     support2_component_plane_mode: str,
     support3_component_plane_mode: str,
+    tau1_child_line_carry_mode: str,
     demanded_keys: set[tuple[State, State]],
 ) -> set[tuple[State, State]]:
     """Collect lower two-layer keys queried by pair rows for demanded entries."""
@@ -459,6 +465,7 @@ def collect_pair_row_child_flag_keys(
             return cached
         terms = enumerate_terms_for_state(
             child_by_span=previous_values_by_span,
+            child_choices=previous_choices,
             child_flag_table=previous_flag_table,
             comb=comb,
             q_log2=q_log2,
@@ -474,6 +481,7 @@ def collect_pair_row_child_flag_keys(
             support2_line_filter=support2_line_filter,
             support2_component_plane_mode=support2_component_plane_mode,
             support3_component_plane_mode=support3_component_plane_mode,
+            tau1_child_line_carry_mode=tau1_child_line_carry_mode,
         )
         cached = take_terms(terms, term_limit)
         term_cache[state] = cached
@@ -703,6 +711,7 @@ def _build_pair_levels_once(
     nested_tau0_equal_container_filter: bool,
     support2_component_plane_mode: str,
     support3_component_plane_mode: str,
+    tau1_child_line_carry_mode: str,
     exact_filtered_empty: bool,
     last_level_keys: set[tuple[State, State]] | None,
     demand_next_level: bool,
@@ -744,6 +753,7 @@ def _build_pair_levels_once(
             exclude_collapsed_active=exclude_collapsed_active,
             support2_component_plane_mode=support2_component_plane_mode,
             support3_component_plane_mode=support3_component_plane_mode,
+            tau1_child_line_carry_mode=tau1_child_line_carry_mode,
         )
         allowed_keys = last_level_keys if level == stop_level else None
         if allowed_keys is None and level == depth and level == stop_level:
@@ -776,6 +786,7 @@ def _build_pair_levels_once(
         flag_table, table_stats = compute_pair_enumerated_flag_table(
             current_values_by_span=values,
             previous_values_by_span=previous_values,
+            previous_choices=previous_choices or {},
             previous_flag_table=previous_flag_table,
             comb=comb,
             q_log2=q_log2,
@@ -796,6 +807,7 @@ def _build_pair_levels_once(
             nested_tau0_equal_container_filter=nested_tau0_equal_container_filter,
             support2_component_plane_mode=support2_component_plane_mode,
             support3_component_plane_mode=support3_component_plane_mode,
+            tau1_child_line_carry_mode=tau1_child_line_carry_mode,
             exact_filtered_empty=exact_filtered_empty,
             allowed_keys=allowed_keys,
         )
@@ -835,6 +847,7 @@ def build_pair_levels(
     nested_tau0_equal_container_filter: bool,
     support2_component_plane_mode: str,
     support3_component_plane_mode: str,
+    tau1_child_line_carry_mode: str,
     exact_filtered_empty: bool,
     last_level_keys: set[tuple[State, State]] | None,
     demand_next_level: bool,
@@ -868,6 +881,7 @@ def build_pair_levels(
             nested_tau0_equal_container_filter=nested_tau0_equal_container_filter,
             support2_component_plane_mode=support2_component_plane_mode,
             support3_component_plane_mode=support3_component_plane_mode,
+            tau1_child_line_carry_mode=tau1_child_line_carry_mode,
             exact_filtered_empty=exact_filtered_empty,
             last_level_keys=last_level_keys,
             demand_next_level=demand_next_level,
@@ -888,6 +902,7 @@ def build_pair_levels(
             child_keys = collect_pair_row_child_flag_keys(
                 current_values_by_span=levels[level].values,
                 previous_values_by_span=levels[child_level].values,
+                previous_choices=levels[child_level].choices,
                 previous_flag_table=levels[child_level].flag_table,
                 comb=comb,
                 q_log2=q_log2,
@@ -908,6 +923,7 @@ def build_pair_levels(
                 nested_tau0_equal_container_filter=nested_tau0_equal_container_filter,
                 support2_component_plane_mode=support2_component_plane_mode,
                 support3_component_plane_mode=support3_component_plane_mode,
+                tau1_child_line_carry_mode=tau1_child_line_carry_mode,
                 demanded_keys=demanded_keys,
             )
             if not child_keys:
@@ -1010,6 +1026,15 @@ def main() -> None:
             "count component child planes in active-coordinate slices of the "
             "fixed child 4-container; safe allows one proportional active pair, "
             "rank3 assumes pairwise-independent active restrictions"
+        ),
+    )
+    parser.add_argument(
+        "--tau1-child-line-carry-mode",
+        choices=("none", "top"),
+        default="none",
+        help=(
+            "diagnostic: when a parent row is tau-one, condition the selected "
+            "child scalar tau-one row on the carried full quotient line"
         ),
     )
     parser.add_argument(
@@ -1132,6 +1157,7 @@ def main() -> None:
         nested_tau0_equal_container_filter=args.nested_tau0_equal_container_filter,
         support2_component_plane_mode=args.support2_component_plane_mode,
         support3_component_plane_mode=args.support3_component_plane_mode,
+        tau1_child_line_carry_mode=args.tau1_child_line_carry_mode,
         exact_filtered_empty=args.exact_filtered_empty,
         last_level_keys=last_level_keys,
         demand_next_level=args.demand_next_level,
@@ -1235,6 +1261,7 @@ def main() -> None:
         outer_terms = take_terms(
             enumerate_terms_for_state(
                 child_by_span=previous.values,
+                child_choices=previous.choices,
                 child_flag_table=previous.flag_table,
                 comb=comb,
                 q_log2=args.q_log2,
@@ -1250,12 +1277,14 @@ def main() -> None:
                 support2_line_filter=args.support2_line_quotient_filter,
                 support2_component_plane_mode=args.support2_component_plane_mode,
                 support3_component_plane_mode=args.support3_component_plane_mode,
+                tau1_child_line_carry_mode=args.tau1_child_line_carry_mode,
             ),
             args.term_limit,
         )
         inner_terms = take_terms(
             enumerate_terms_for_state(
                 child_by_span=previous.values,
+                child_choices=previous.choices,
                 child_flag_table=previous.flag_table,
                 comb=comb,
                 q_log2=args.q_log2,
@@ -1271,6 +1300,7 @@ def main() -> None:
                 support2_line_filter=args.support2_line_quotient_filter,
                 support2_component_plane_mode=args.support2_component_plane_mode,
                 support3_component_plane_mode=args.support3_component_plane_mode,
+                tau1_child_line_carry_mode=args.tau1_child_line_carry_mode,
             ),
             args.term_limit,
         )
@@ -1458,6 +1488,7 @@ def main() -> None:
         terms = take_terms(
             enumerate_terms_for_state(
                 child_by_span=child.values,
+                child_choices=child.choices,
                 child_flag_table=child.flag_table,
                 comb=comb,
                 q_log2=args.q_log2,
@@ -1473,6 +1504,7 @@ def main() -> None:
                 support2_line_filter=args.support2_line_quotient_filter,
                 support2_component_plane_mode=args.support2_component_plane_mode,
                 support3_component_plane_mode=args.support3_component_plane_mode,
+                tau1_child_line_carry_mode=args.tau1_child_line_carry_mode,
             ),
             args.trace_state_top,
         )

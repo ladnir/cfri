@@ -337,6 +337,10 @@ def main() -> None:
         consumed_kernel_mode=args.consumed_kernel_mode,
         support2_diamond_mode="none",
         support2_line_filter=False,
+        nested_tau0_equal_container_filter=False,
+        support2_component_plane_mode="none",
+        support3_component_plane_mode="none",
+        tau1_child_line_carry_mode="none",
         exact_filtered_empty=False,
         last_level_keys={target_key},
         demand_next_level=False,
@@ -353,6 +357,7 @@ def main() -> None:
     def terms_for_state(state: State) -> list:
         terms = enumerate_terms_for_state(
             child_by_span=previous.values,
+            child_choices=previous.choices,
             child_flag_table=previous.flag_table,
             comb=comb,
             q_log2=args.q_log2,

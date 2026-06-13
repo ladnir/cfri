@@ -61,7 +61,9 @@ Open items are excluded from the denominator.
 | Strong-bottom positive-kernel containment | 0 | 1 | 0 | 0% | Local lemma plausible, not enough | `--consumed-kernel-mode inner-kernel-contained` charges a lower positive kernel inside the upper kernel. On `(4,2)>=(2,4)` it moves the table only from `932.90` to `931.48` bits before a codimension-one support-two line-quotient row takes over. |
 | Support-two line-quotient impossibility | 0 | 4 | 0 | 0% | Valid local filter, small fair-baseline gain | `--support2-line-quotient-filter` removes decomposable tau-two support rows with `dim(V/L)=1`, where nonempty root-line support is impossible. `--exact-filtered-empty` proves the lower `(4,2)>=(2,4)` entry is empty and improves the strong-bottom table to `803.48`. In the fair `tau0-inner-contained` baseline it moves depth-5 `z=34` from `1095.86` to `1094.26`. The `1478.22` regression belongs to the stronger `inner-kernel-contained` diagnostic and is partly sparse-demand state loss; `--full-table-until 2` and `--demand-closure-passes 1` both improve that strong-mode report to `1352.53`, while a second closure pass does not move it. |
 | Scalar kernel-lift container cover | 1 | 2 | 0 | 33% | Major theorem target, quotient incidence still counted | With exact-support filters, support-two high-lift, safe support-three, and `--cover-kernel-lift`, the demanded depth-5 checkpoint reaches `final_span_1_z_report,34,565.92392782` and `crossing_z=102`. This removes duplicate `K_parent <= L+L` fibers but keeps quotient line/plane incidence. It still leaves about `5.05` q-dimensions and exposes a marked-line-in-container row. |
-| Marked line inside fixed container | 0 | 0 | 0 | open | Current frontier | The current best trace is dominated by level-3 `(4,7)>=(1,8)`: outer tau-zero container plus inner connected tau-one row `a=2,delta=1,comp=1,K=0,V=2`, with one remaining q-dimension of quotient-line incidence. Need a state that carries the marked child line/support intersection rather than merging it into the unmarked container. |
+| Tau-one child-line carry | 1 | 1 | 0 | 50% | Useful ceiling, exposes support-four blocker | `--tau1-child-line-carry-mode top` models conditioning a selected child tau-one row on the parent full quotient line. With current best structural modes it lowers `z=34` from `565.92` to `435.05` bits, but top mass moves to tau-zero rows feeding `(2,20)`. Needs a real marked-line state before theorem use. |
+| Marked line inside fixed container | 0 | 1 | 0 | 0% | Useful but superseded as top blocker | The previous frontier was level-3 `(4,7)>=(1,8)`: outer tau-zero container plus inner connected tau-one row `a=2,delta=1,comp=1,K=0,V=2`, with one remaining q-dimension. The tau-one child-line carry diagnostic handles the selected-row ceiling and moves the frontier to support-four tau-two rows. |
+| Support-four decomposable tau-two exterior row | 0 | 0 | 0 | open | Current frontier | After tau-one child-line carry, the top child state is `(2,20)`, dominated by `a=4,delta=4,comp=4,tau=2,K=0,dim V=4`, child `(4,8)`, term `413.29391501`. The local `q^4` family may be real (`[4 choose 2]_q`), so the next proof needs a marked-component child state or a different global argument. |
 | One-layer shortened child flag ambient | 0 | 0 | 1 | 0% | Not useful for current base seal | Diagnostic `--flag-bound best-shortened` leaves the depth-5 checkpoint at `z=137` and the `z=34` trace unchanged. |
 | High-kernel/local-incidence bonus | 0 | 0 | 0 | open | Next candidate | Need prove hard row carrying large shortened ambient pays more than uniform `q^-9`. |
 | Joint nested shortened-rank profile charge | 0 | 0 | 0 | open | Next candidate | May recover missing few dimensions by charging the whole nested profile, not max one edge. |
@@ -79,6 +81,7 @@ with nested quotient/subspace/kernel modes:    1232.88847175 bits
 with additional scalar kernel-cover diagnostic: 924.69069031 bits
 with support2/support3 component planes
   plus scalar kernel-cover diagnostic:          565.92392782 bits
+with tau-one child-line carry diagnostic:       435.05329836 bits
 target:                                         -80 bits
 ```
 
@@ -91,36 +94,27 @@ Three plausible ways to turn this into a win:
 
 ```text
 1. formalize scalar kernel-lift container covering while keeping quotient incidence counted;
-2. add a marked child-line state for the level-3 `(4,7)>=(1,8)` row;
-3. finish the support-three component-plane proof, including the proportional-pair stratum or
-   an explicit state for it.
+2. replace the tau-one child-line carry diagnostic by an explicit marked-line state;
+3. attack the support-four decomposable tau-two exterior row at `(2,20)`.
 ```
 
 The current best trace is:
 
 ```text
-level 5, state (1,34):
-  top row tau=1,a=4, child (2,15), term 565.92392782
+level 5, state (1,34), after tau-one child-line carry:
+  top row tau=0, child (2,20), term 434.53619596
 
-level 4, state (2,15), with safe support3 and kernel cover:
-  top row tau=1,a=1, child flag (4,7)>=(1,8), term 667.30558085
+level 4, state (2,20):
+  top row tau=2,a=4,delta=4,comp=4, child (4,8), term 413.29391501
 
-level 3, table (4,7)>=(1,8):
-  top row outer tau0 container plus inner tau1 quotient line,
-  child flag (2,4), table value 20.47269084
+level 3, state (4,8):
+  value -121.19264508
 ```
 
-The inner level-3 tau-one row has:
-
-```text
-a=2, delta=1, comp=1, K=0, V=2,
-remaining quotient-line qdim = 1.
-```
-
-This is too structured to treat as a generic constant. The next diagnostic should keep the child
-line/support datum instead of merging it into the unmarked `(2,4)` container. A symmetric
-tau-zero-collapse filter might exist, but it needs coordinate-intersection data; applying it from
-dimension counts alone would be unsafe.
+The support-four row has local charge `8` and lift `12`, leaving the four-q-dimensional
+`[4 choose 2]_q` exterior family. This may be a real local family, not a trace bug. The next
+diagnostic should test whether the child `(4,8)` event becomes significantly rarer when it carries
+the four component-line structure induced by the active coordinates.
 
 ## Update Rule
 
@@ -173,6 +167,13 @@ row. Adding the scalar kernel-lift container cover gives the current best full d
 the `2^-80` target. The new frontier is level-3 `(4,7)>=(1,8)`, an outer tau-zero container plus
 an inner connected tau-one quotient-line row with one remaining q-dimension; the next state should
 carry a marked child line inside the fixed container.
+
+Tau-one child-line carry diagnostic added. The mode
+`--tau1-child-line-carry-mode top` conditions selected child tau-one rows on a parent full quotient
+line. With the current best structural modes, the demanded depth-5 checkpoint improves to
+`final_span_1_z_report,34,435.05329836`, about `4.0239` q-dimensions above target. The frontier
+moves to a support-four decomposable tau-two exterior row in state `(2,20)`: `a=4,delta=4,comp=4`,
+child `(4,8)`, term `413.29391501`.
 
 ### 2026-06-11
 

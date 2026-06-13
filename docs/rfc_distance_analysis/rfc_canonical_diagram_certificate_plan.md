@@ -194,6 +194,42 @@ scripts/rfc_distance_analysis/rfc_block_grammar_ledger.py
 
 That script is deterministic bookkeeping for the next LP/potential pass; it is not a profiler.
 
+The first coarse potential probe is:
+
+```text
+scripts/rfc_distance_analysis/rfc_block_potential_probe.py
+```
+
+It checks the current stress transitions against a simple template:
+
+```text
+Phi_h(D) =
+  level_weight * h
+  + dim_weight * sum(node dimensions)
+  - zero_weight * sum(node zero budgets)
+  + node_weight * number_of_nodes.
+```
+
+This is only a diagnostic. With unconstrained feature weights, the best probe is trivial and asks
+for `level_weight = 2.13994737` q-dimensions, bottlenecked by the support-three stratified row.
+With a modest positive zero reward:
+
+```text
+python -B scripts/rfc_distance_analysis/rfc_block_potential_probe.py \
+  --zero-grid 0.2:2:0.05 --top 1 --show-transitions
+```
+
+the bottleneck remains:
+
+```text
+support3_stratified_to_3_6, margin 0.00000000
+```
+
+and requires `level_weight = 3.93994737` q-dimensions. Interpretation: a naive global
+zero/dimension potential does not yet see the support-three incidence credit as a reusable
+theorem block. The next potential pass should add block-specific credits/debits from the dimension
+ledger rather than relying only on state-level features.
+
 ## Current Dominant Rows As Tests
 
 ### Test 1: Level-3 `(4,7)>=(2,8)`

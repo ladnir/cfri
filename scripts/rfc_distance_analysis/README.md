@@ -31,6 +31,7 @@ rfc_flag_state_choice_diagnostic.py target flag-state joint expansion choice dia
 rfc_flag_bad_pair_classifier.py     groups high-mass flag-state pair witnesses by structural keys
 rfc_pair_flag_table_recurrence.py   pair-enumerated two-layer flag-table recurrence diagnostic
 rfc_block_grammar_ledger.py         canonical diagram block grammar table and test-case validator
+rfc_block_potential_probe.py        first simple potential probe over grammar stress transitions
 docs/rfc_distance_analysis/rfc_residual_trace_classification.md current z=34 proof-obligation note
 docs/rfc_distance_analysis/rfc_canonical_diagram_certificate_plan.md canonical block grammar reset plan
 docs/rfc_distance_analysis/rfc_nested_tau0_equal_container_filter.md exact-support sibling-collapse note
@@ -496,6 +497,25 @@ python -B scripts/rfc_distance_analysis/rfc_block_grammar_ledger.py --validate-o
 
 It is deterministic bookkeeping, not a profiler. Extend this script before building a dual
 potential/LP checker so the proof blocks have stable machine-readable IDs.
+
+`rfc_block_potential_probe.py` is the first such dual-potential probe. It uses the current stress
+transitions from the canonical plan and searches a small deterministic grid for:
+
+```text
+Phi_h(D) = level_weight*h + dim_weight*dim_sum - zero_weight*zero_sum + node_weight*node_count.
+```
+
+Useful commands:
+
+```text
+python -B scripts/rfc_distance_analysis/rfc_block_potential_probe.py --top 5
+python -B scripts/rfc_distance_analysis/rfc_block_potential_probe.py \
+  --zero-grid 0.2:2:0.05 --top 1 --show-transitions
+```
+
+The current probe is not a certificate. Its useful output is the bottleneck transition; with
+positive zero reward, that is still `support3_stratified_to_3_6`, showing that the next potential
+needs explicit block-ledger credits rather than only global state features.
 
 `--demand-closure-passes` is the cheaper version of the same test. It adds lower pair-table keys
 queried by demanded pair rows, then rebuilds. In the same stronger mode:

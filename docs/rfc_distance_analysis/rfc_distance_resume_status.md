@@ -142,6 +142,14 @@ docs/rfc_distance_analysis/rfc_canonical_diagram_certificate_plan.md
   count child diagrams and quotient/root data once, keep consumed kernel data, cover only
   unconsumed fibers, and charge rank defects by incidence.
 
+scripts/rfc_distance_analysis/rfc_block_potential_probe.py
+  Status: deterministic potential diagnostic.
+  Searches a simple potential over current grammar stress transitions. The unconstrained best is
+  trivial with `level_weight=2.13994737` qdims, bottlenecked by support-three. With positive zero
+  reward (`--zero-grid 0.2:2:0.05`), the bottleneck remains
+  `support3_stratified_to_3_6` and needs `level_weight=3.93994737`; the next potential pass needs
+  explicit block-ledger credits, not only global state features.
+
 docs/rfc_distance_analysis/rfc_support_two_tau2_quotient_frame_lemma.md
   Status: local theorem target.
   Isolates the decomposable `|A|=2,delta=2,comp=2` quotient-frame row now exposed by the decoded
@@ -276,28 +284,31 @@ rows one at a time:
    `rfc_canonical_diagram_certificate_plan.md`. The proof must map every recursive witness to a
    child diagram with quotient/root data, consumed-kernel nodes, and incidence markers, then count
    that diagram once.
-2. Formalize scalar kernel-lift and root-kernel container covering. The diagnostics keep quotient
+2. Extend `rfc_block_potential_probe.py` from global state features to block-specific ledger
+   credits/debits. The first probe correctly bottlenecks on support-three because it does not yet
+   use the support-three incidence credit as a reusable block.
+3. Formalize scalar kernel-lift and root-kernel container covering. The diagnostics keep quotient
    incidence counted and now narrow the safe checkpoint to
    `final_span_1_z_report,34,424.70026934` and `crossing_z=99`. The proof still has to show the
    covered fibers are canonical and unconsumed.
-3. Import the support-three rank-defect incidence lemma into the certificate constants. The new
+4. Import the support-three rank-defect incidence lemma into the certificate constants. The new
    `stratified` mode has the same exponent as `rank3` and moves the full checkpoint to
    `final_span_1_z_report,34,200.01114103`, `crossing_z=72`, but the finite Gaussian/projective
    constants still need to be included.
-4. Replace the tau-one child-line carry diagnostic by an explicit marked-line/container state. The
+5. Replace the tau-one child-line carry diagnostic by an explicit marked-line/container state. The
    selected-row ceiling is useful but not theorem-grade.
-5. Attack support-four decomposable tau-two exterior rows only after the root-kernel cover proof is
+6. Attack support-four decomposable tau-two exterior rows only after the root-kernel cover proof is
    clarified. The narrow support-four cover removes the previous top support-four row as a
    diagnostic, but the theorem must still justify counting the root-compatible container once.
-6. Prove/finalize the shared-randomness-safe multi-layer flag transition theorem. The target notes
+7. Prove/finalize the shared-randomness-safe multi-layer flag transition theorem. The target notes
    cover quotient-frame, component-plane, and marked-line states, but the final finite recurrence
    is still not written as a theorem.
-7. Kernel-branch nested-flag truncation:
+8. Kernel-branch nested-flag truncation:
    prove length three is enough, or prove length-four theta_2=-1 chains are dominated.
-8. Direct proof of the delta=3 connected full-kernel endpoint used by the g=1 row, or a general
+9. Direct proof of the delta=3 connected full-kernel endpoint used by the g=1 row, or a general
    component/full-kernel theorem with constants.
-9. Higher-drop tau-two layers beyond the g=1 first-drop case.
-10. Finite constants: marked-line root-fiber constants, exact-support inversion, split counts, and
+10. Higher-drop tau-two layers beyond the g=1 first-drop case.
+11. Finite constants: marked-line root-fiber constants, exact-support inversion, split counts, and
    log-sum/state-count overhead. The determinant-1 nonzero-root normalization is now stated
    separately and is no longer a q-dimensional blocker at the target field size.
 ```

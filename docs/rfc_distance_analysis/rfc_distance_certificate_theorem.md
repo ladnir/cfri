@@ -498,6 +498,19 @@ The current target theorem is:
 docs/rfc_distance_analysis/rfc_multilayer_flag_transition_theorem.md
 ```
 
+The strategic reset is to state L4 through a canonical diagram certificate:
+
+```text
+docs/rfc_distance_analysis/rfc_canonical_diagram_certificate_plan.md
+```
+
+In that formulation, each one-step transition first conditions on the child code and forms a
+single child inclusion diagram. Quotient/root data are counted as event data, consumed kernel
+subspaces are carried as diagram nodes, unconsumed kernel/container fibers are quotiented out, and
+rank-defect freedom is charged by explicit incidence markers. This is intended to subsume the
+current collection of exact-support collapse, quotient-diamond, carried-line, root-kernel cover,
+and support-three rank-defect rules.
+
 That theorem must dominate the exact first moment `B_d(1,z)`, include the dominant layer value
 `theta_2(A)` or an equivalent charge for intermediate rank-drop layers, and apply the
 exact-support incidence cap inside the represented quotient `pi(V_i)/pi(K_i)` before spending any

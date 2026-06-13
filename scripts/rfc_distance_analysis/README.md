@@ -30,7 +30,9 @@ rfc_diagram_path_dp.py              follows bound trace with carried-flag and ma
 rfc_flag_state_choice_diagnostic.py target flag-state joint expansion choice diagnostic
 rfc_flag_bad_pair_classifier.py     groups high-mass flag-state pair witnesses by structural keys
 rfc_pair_flag_table_recurrence.py   pair-enumerated two-layer flag-table recurrence diagnostic
+rfc_block_grammar_ledger.py         canonical diagram block grammar table and test-case validator
 docs/rfc_distance_analysis/rfc_residual_trace_classification.md current z=34 proof-obligation note
+docs/rfc_distance_analysis/rfc_canonical_diagram_certificate_plan.md canonical block grammar reset plan
 docs/rfc_distance_analysis/rfc_nested_tau0_equal_container_filter.md exact-support sibling-collapse note
 docs/rfc_distance_analysis/rfc_support_two_high_lift_component_plane_bound.md high-lift support-two component-plane note
 docs/rfc_distance_analysis/rfc_support_three_component_plane_bound.md support-three component-plane stratification note
@@ -482,6 +484,18 @@ coarse flag bounds. `--full-table-until 2` is a diagnostic knob for this: with t
 recovers the targeted `(4,7)>=(2,8)` child value `423.08002115` and moves the global `z=34` report
 from `1478.22313584` to `1352.53125813`, but trying to keep level 3 fully complete timed out in
 the current Python driver.
+
+`rfc_block_grammar_ledger.py` emits the reset block grammar from
+`rfc_canonical_diagram_certificate_plan.md` and validates that the named current test cases only
+reference known blocks:
+
+```text
+python -B scripts/rfc_distance_analysis/rfc_block_grammar_ledger.py --section all --format csv
+python -B scripts/rfc_distance_analysis/rfc_block_grammar_ledger.py --validate-only
+```
+
+It is deterministic bookkeeping, not a profiler. Extend this script before building a dual
+potential/LP checker so the proof blocks have stable machine-readable IDs.
 
 `--demand-closure-passes` is the cheaper version of the same test. It adds lower pair-table keys
 queried by demanded pair rows, then rebuilds. In the same stronger mode:

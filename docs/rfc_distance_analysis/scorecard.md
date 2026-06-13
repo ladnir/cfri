@@ -28,6 +28,7 @@ Open items are excluded from the denominator.
 | Idea | Wins | Partials | Losses | Score | Current Verdict | Evidence |
 |---|---:|---:|---:|---:|---|---|
 | Exact-support / finite-replica route instead of fixed-set MDS | 3 | 1 | 0 | 75% | Keep as main architecture | Removes marked-core overcount, handles shared child randomness, matches first-moment target; still needs final recurrence/constants. |
+| Canonical diagram certificate theorem | 0 | 1 | 0 | 0% | New umbrella plan | `rfc_canonical_diagram_certificate_plan.md` packages the repeated local fixes into one block grammar: child diagrams and quotient/root data counted once, consumed kernels carried, unconsumed fibers covered, rank defects charged by incidence. This is the reset intended to stop row-by-row patching. |
 | Product of child first moments for shared child events | 0 | 0 | 1 | 0% | Retired | Fable/Claude audit found shared-randomness bug; replaced by joint flag states. |
 | Joint multi-layer flag state `L <= V` | 3 | 1 | 0 | 75% | Keep | Corrects product bug, supports decomposable marked-line row, supports kernel-chain accounting; still globalizing. |
 | Determinant-1 nonzero-root normalization | 2 | 0 | 0 | 100% | Closed construction constant | Binary-field compatible; singleton root cost is `q^-1 * q/(q-1)` and fits finite bucket. |
@@ -136,6 +137,13 @@ Also add a dated note below if the test changes the active frontier.
 ## Dated Notes
 
 ### 2026-06-12
+
+Canonical diagram certificate reset added. The new plan in
+`rfc_canonical_diagram_certificate_plan.md` records the pattern behind the successful local
+repairs: count one child diagram over shared randomness, keep quotient/root incidence as event
+data, cover only unconsumed duplicate fibers, and charge rank defects by incidence. This is now the
+umbrella route; future diagnostics should be judged by whether they fit the block grammar or force
+a genuinely new kind of certificate node.
 
 Support-three rank-defect incidence lemma added. The lemma charges the proportional/dependent
 active-restriction stratum by noting that a rank defect gives a nonzero projective relation among

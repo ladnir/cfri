@@ -13,6 +13,7 @@ rfc_fable_audit_2026_06_10.md                 external Fable audit and correctio
 claude_report.md                              follow-up external review of the resume status
 rfc_claude_report_response.md                 accepted/corrected actions from Claude report
 rfc_distance_certificate_theorem.md           canonical conditional theorem and certificate statement
+rfc_canonical_diagram_certificate_plan.md     reset plan: canonical diagram block grammar and ledger
 rfc_distance_certificate_c8_k2048_q128.json   generated default original c=8/k=2048/q=2^128 certificate
 rfc_distance_certificate_c8_k2048_q128.csv    same certificate in CSV form
 rfc_original_falsification_status.md          active bad-family/falsification status

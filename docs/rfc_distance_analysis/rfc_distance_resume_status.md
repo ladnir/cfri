@@ -135,6 +135,13 @@ docs/rfc_distance_analysis/rfc_exact_support_quotient_state.md
   nested quotient counting, nested parent-subspace counting, consumed-kernel containment, and the
   remaining small-support tau-two / recursive tau-one quotient blockers.
 
+docs/rfc_distance_analysis/rfc_canonical_diagram_certificate_plan.md
+  Status: strategic reset / theorem architecture.
+  Generalizes the successful local blocks into a canonical child-diagram certificate with a
+  q-dimensional ledger. This is the current umbrella plan for avoiding open-ended row chasing:
+  count child diagrams and quotient/root data once, keep consumed kernel data, cover only
+  unconsumed fibers, and charge rank defects by incidence.
+
 docs/rfc_distance_analysis/rfc_support_two_tau2_quotient_frame_lemma.md
   Status: local theorem target.
   Isolates the decomposable `|A|=2,delta=2,comp=2` quotient-frame row now exposed by the decoded
@@ -261,36 +268,42 @@ docs/rfc_distance_analysis/rfc_fable_audit_2026_06_10.md
 
 ## Current Blockers
 
-The live blockers are now narrow:
+The live blockers are now narrow, but the next step is to consolidate rather than keep repairing
+rows one at a time:
 
 ```text
-1. Formalize scalar kernel-lift and root-kernel container covering. The diagnostics keep quotient
+1. Formalize the canonical diagram certificate theorem in
+   `rfc_canonical_diagram_certificate_plan.md`. The proof must map every recursive witness to a
+   child diagram with quotient/root data, consumed-kernel nodes, and incidence markers, then count
+   that diagram once.
+2. Formalize scalar kernel-lift and root-kernel container covering. The diagnostics keep quotient
    incidence counted and now narrow the safe checkpoint to
    `final_span_1_z_report,34,424.70026934` and `crossing_z=99`. The proof still has to show the
    covered fibers are canonical and unconsumed.
-2. Import the support-three rank-defect incidence lemma into the certificate constants. The new
+3. Import the support-three rank-defect incidence lemma into the certificate constants. The new
    `stratified` mode has the same exponent as `rank3` and moves the full checkpoint to
    `final_span_1_z_report,34,200.01114103`, `crossing_z=72`, but the finite Gaussian/projective
    constants still need to be included.
-3. Replace the tau-one child-line carry diagnostic by an explicit marked-line/container state. The
+4. Replace the tau-one child-line carry diagnostic by an explicit marked-line/container state. The
    selected-row ceiling is useful but not theorem-grade.
-4. Attack support-four decomposable tau-two exterior rows only after the root-kernel cover proof is
+5. Attack support-four decomposable tau-two exterior rows only after the root-kernel cover proof is
    clarified. The narrow support-four cover removes the previous top support-four row as a
    diagnostic, but the theorem must still justify counting the root-compatible container once.
-5. Prove/finalize the shared-randomness-safe multi-layer flag transition theorem. The target notes
+6. Prove/finalize the shared-randomness-safe multi-layer flag transition theorem. The target notes
    cover quotient-frame, component-plane, and marked-line states, but the final finite recurrence
    is still not written as a theorem.
-6. Kernel-branch nested-flag truncation:
+7. Kernel-branch nested-flag truncation:
    prove length three is enough, or prove length-four theta_2=-1 chains are dominated.
-7. Direct proof of the delta=3 connected full-kernel endpoint used by the g=1 row, or a general
+8. Direct proof of the delta=3 connected full-kernel endpoint used by the g=1 row, or a general
    component/full-kernel theorem with constants.
-8. Higher-drop tau-two layers beyond the g=1 first-drop case.
-9. Finite constants: marked-line root-fiber constants, exact-support inversion, split counts, and
+9. Higher-drop tau-two layers beyond the g=1 first-drop case.
+10. Finite constants: marked-line root-fiber constants, exact-support inversion, split counts, and
    log-sum/state-count overhead. The determinant-1 nonzero-root normalization is now stated
    separately and is no longer a q-dimensional blocker at the target field size.
 ```
 
-The best current next proof step is item 2, with item 1 being formalized in parallel:
+The best current next proof step is item 1, using the exact-support quotient state as the local
+contract:
 
 Use `rfc_exact_support_quotient_state.md` as the canonical proof contract and turn its diagnostic
 subcases into theorem statements:

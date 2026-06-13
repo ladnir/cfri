@@ -146,9 +146,14 @@ scripts/rfc_distance_analysis/rfc_block_potential_probe.py
   Status: deterministic potential diagnostic.
   Searches a simple potential over current grammar stress transitions. The unconstrained best is
   trivial with `level_weight=2.13994737` qdims, bottlenecked by support-three. With positive zero
-  reward (`--zero-grid 0.2:2:0.05`), the bottleneck remains
-  `support3_stratified_to_3_6` and needs `level_weight=3.93994737`; the next potential pass needs
-  explicit block-ledger credits, not only global state features.
+  reward (`--zero-grid 0.2:2:0.05`) and no block credits, the bottleneck remains
+  `support3_stratified_to_3_6` and needs `level_weight=3.93994737`. The block-credit pass is now
+  implemented. With `--credit-profile local-incidence`, support-three gets `1.06800847` qdims of
+  slack and the tight row moves to `top_tau1_to_2_15` at `level_weight=3.00795584`. With
+  `--credit-profile diagram-sensitivity`, support-two is also slack and the top row remains tight.
+  With `--credit-profile current-target`, top/support-two/base container rows are slack and
+  support-three is tight again at `level_weight=1.93994737`. These are ledger diagnostics, not
+  certificate claims.
 
 docs/rfc_distance_analysis/rfc_support_two_tau2_quotient_frame_lemma.md
   Status: local theorem target.
@@ -284,17 +289,16 @@ rows one at a time:
    `rfc_canonical_diagram_certificate_plan.md`. The proof must map every recursive witness to a
    child diagram with quotient/root data, consumed-kernel nodes, and incidence markers, then count
    that diagram once.
-2. Extend `rfc_block_potential_probe.py` from global state features to block-specific ledger
-   credits/debits. The first probe correctly bottlenecks on support-three because it does not yet
-   use the support-three incidence credit as a reusable block.
-3. Formalize scalar kernel-lift and root-kernel container covering. The diagnostics keep quotient
+2. Formalize the top tau-one full-line carry/root-kernel cover as a reusable block. The
+   `local-incidence` profile moves the bottleneck there, so this is now the shortest test of
+   whether the block grammar is real or merely tuned.
+3. Import the support-three rank-defect incidence credit into the certificate constants. The
+   `current-target` ceiling returns the tight row to support-three at `level_weight=1.93994737`,
+   so support-three cannot be treated as closed.
+4. Formalize scalar kernel-lift and root-kernel container covering. The diagnostics keep quotient
    incidence counted and now narrow the safe checkpoint to
    `final_span_1_z_report,34,424.70026934` and `crossing_z=99`. The proof still has to show the
    covered fibers are canonical and unconsumed.
-4. Import the support-three rank-defect incidence lemma into the certificate constants. The new
-   `stratified` mode has the same exponent as `rank3` and moves the full checkpoint to
-   `final_span_1_z_report,34,200.01114103`, `crossing_z=72`, but the finite Gaussian/projective
-   constants still need to be included.
 5. Replace the tau-one child-line carry diagnostic by an explicit marked-line/container state. The
    selected-row ceiling is useful but not theorem-grade.
 6. Attack support-four decomposable tau-two exterior rows only after the root-kernel cover proof is

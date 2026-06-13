@@ -212,7 +212,7 @@ Phi_h(D) =
 
 This is only a diagnostic. With unconstrained feature weights, the best probe is trivial and asks
 for `level_weight = 2.13994737` q-dimensions, bottlenecked by the support-three stratified row.
-With a modest positive zero reward:
+With a modest positive zero reward and no block credits:
 
 ```text
 python -B scripts/rfc_distance_analysis/rfc_block_potential_probe.py \
@@ -227,8 +227,35 @@ support3_stratified_to_3_6, margin 0.00000000
 
 and requires `level_weight = 3.93994737` q-dimensions. Interpretation: a naive global
 zero/dimension potential does not yet see the support-three incidence credit as a reusable
-theorem block. The next potential pass should add block-specific credits/debits from the dimension
-ledger rather than relying only on state-level features.
+theorem block.
+
+The block-credit probe adds explicit ledger offsets by block ID. These are still diagnostics, not
+certificate claims:
+
+```text
+python -B scripts/rfc_distance_analysis/rfc_block_potential_probe.py \
+  --zero-grid 0.2:2:0.05 --credit-profile local-incidence --top 1 --show-transitions
+```
+
+Using only the support-three incidence credit, the best traced potential has
+`level_weight = 3.00795584`. The tight row is the top tau-one/root-kernel feed:
+
+```text
+top_tau1_to_2_15, margin 0.00000000
+support3_stratified_to_3_6, margin 1.06800847
+support2_diamond_to_3_2_ge_1_4, margin 0.92385528
+flag_tau1_tau0_to_base_flag, margin 3.13837075
+```
+
+Adding the suspected support-two quotient-diamond credit as a sensitivity check leaves the same top
+row tight and gives the support-two row almost three q-dimensions of slack. Adding the broader
+`current-target` ceiling credits makes the top row slack by `0.93199153`, the support-two row slack
+by `1.85584681`, and returns the tight row to support-three with `level_weight = 1.93994737`.
+
+Interpretation: the block grammar is coherent enough to move the bottleneck in predictable ways.
+The next theorem work is not another unrelated row patch; it is to formalize the top tau-one
+full-line carry/root-kernel cover and import the support-three incidence credit with balanced
+finite constants.
 
 ## Current Dominant Rows As Tests
 

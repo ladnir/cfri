@@ -11,7 +11,11 @@ asks for a coarse potential of the form
 
 For every transition we require, in q-dimensional units,
 
-    Phi(parent) >= local_qdim + Phi(child) + slack.
+    Phi(parent) >= adjusted_local_qdim + Phi(child) + slack.
+
+where
+
+    adjusted_local_qdim = local_qdim - sum(block ledger credits).
 
 The `level_weight` is a placeholder per-fold budget.  A good future proof should
 replace it by actual local/root/incidence accounting; here it is useful because
@@ -90,6 +94,7 @@ class SearchResult:
     worst_margin: float
     weights: Weights
     bottleneck: str
+    credit_profile: str
 
 
 TRANSITIONS: tuple[Transition, ...] = (
@@ -128,6 +133,31 @@ TRANSITIONS: tuple[Transition, ...] = (
 )
 
 
+DEFAULT_CREDIT_PROFILES: dict[str, dict[str, float]] = {
+    "none": {},
+    # Local theorem targets that are already written as incidence/canonical
+    # lemmas, but still need global finite-constant import.
+    "local-incidence": {
+        "support3_stratified": 2.0,
+    },
+    # Sensitivity profile: adds the next suspected joint-diagram credit for the
+    # kerneled support-two residual.  This is not a theorem claim.
+    "diagram-sensitivity": {
+        "support3_stratified": 2.0,
+        "support2_diamond": 2.0,
+    },
+    # Broad diagnostic ceiling for current stress rows.  Use only to see where
+    # the bottleneck moves if all current local blocks pay their intended fees.
+    "current-target": {
+        "support3_stratified": 2.0,
+        "support2_diamond": 2.0,
+        "tau1_full_line_carry": 1.0,
+        "kernel_fiber_cover": 1.0,
+        "tau0_container": 1.0,
+    },
+}
+
+
 def parse_grid(spec: str) -> list[float]:
     parts = spec.split(":")
     if len(parts) != 3:
@@ -146,6 +176,36 @@ def parse_grid(spec: str) -> list[float]:
     return values
 
 
+def parse_block_credit(spec: str) -> tuple[str, float]:
+    if "=" not in spec:
+        raise argparse.ArgumentTypeError("block credit must be block_id=value")
+    block_id, value = spec.split("=", 1)
+    try:
+        credit = float(value)
+    except ValueError as exc:
+        raise argparse.ArgumentTypeError(f"invalid credit value: {value}") from exc
+    if credit < 0:
+        raise argparse.ArgumentTypeError("block credit must be nonnegative")
+    return block_id, credit
+
+
+def credit_map(profile: str, overrides: list[tuple[str, float]]) -> dict[str, float]:
+    if profile not in DEFAULT_CREDIT_PROFILES:
+        raise ValueError(f"unknown credit profile: {profile}")
+    credits = dict(DEFAULT_CREDIT_PROFILES[profile])
+    for block_id, credit in overrides:
+        credits[block_id] = credit
+    return credits
+
+
+def transition_credit(transition: Transition, credits: dict[str, float]) -> float:
+    return sum(credits.get(block_id, 0.0) for block_id in transition.blocks)
+
+
+def adjusted_local_qdim(transition: Transition, credits: dict[str, float]) -> float:
+    return transition.local_qdim - transition_credit(transition, credits)
+
+
 def feature_score(state: DiagramState, weights: Weights) -> float:
     return (
         weights.dim * state.dim_sum
@@ -157,23 +217,29 @@ def feature_score(state: DiagramState, weights: Weights) -> float:
 def required_level_weight(
     transition: Transition,
     weights: Weights,
+    credits: dict[str, float],
     slack: float,
 ) -> float:
     if transition.level_drop <= 0:
         raise ValueError(f"{transition.transition_id} does not descend in level")
     parent_feature = feature_score(transition.parent, weights)
     child_feature = feature_score(transition.child, weights)
-    requirement = transition.local_qdim + child_feature - parent_feature + slack
+    requirement = adjusted_local_qdim(transition, credits) + child_feature - parent_feature + slack
     return requirement / transition.level_drop
 
 
-def margin(transition: Transition, weights: Weights, level_weight: float) -> float:
+def margin(
+    transition: Transition,
+    weights: Weights,
+    level_weight: float,
+    credits: dict[str, float],
+) -> float:
     parent_phi = level_weight * transition.parent.level + feature_score(transition.parent, weights)
     child_phi = level_weight * transition.child.level + feature_score(transition.child, weights)
-    return parent_phi - transition.local_qdim - child_phi
+    return parent_phi - adjusted_local_qdim(transition, credits) - child_phi
 
 
-def validate_transitions() -> None:
+def validate_transitions(credits: dict[str, float] | None = None) -> None:
     block_ids = {block.block_id for block in BLOCKS}
     for transition in TRANSITIONS:
         unknown = sorted(set(transition.blocks) - block_ids)
@@ -181,15 +247,24 @@ def validate_transitions() -> None:
             raise ValueError(f"{transition.transition_id} references unknown blocks: {unknown}")
         if transition.level_drop <= 0:
             raise ValueError(f"{transition.transition_id} has nonpositive level drop")
+    if credits is not None:
+        unknown_credits = sorted(set(credits) - block_ids)
+        if unknown_credits:
+            raise ValueError(f"credit profile references unknown blocks: {unknown_credits}")
 
 
-def evaluate(weights: Weights, slack: float) -> SearchResult:
+def evaluate(
+    weights: Weights,
+    credits: dict[str, float],
+    slack: float,
+    credit_profile: str,
+) -> SearchResult:
     requirements = [
-        max(0.0, required_level_weight(transition, weights, slack))
+        max(0.0, required_level_weight(transition, weights, credits, slack))
         for transition in TRANSITIONS
     ]
     level_weight = max(requirements)
-    margins = [margin(transition, weights, level_weight) for transition in TRANSITIONS]
+    margins = [margin(transition, weights, level_weight, credits) for transition in TRANSITIONS]
     worst_margin = min(margins)
     bottleneck_index = margins.index(worst_margin)
     return SearchResult(
@@ -197,6 +272,7 @@ def evaluate(weights: Weights, slack: float) -> SearchResult:
         worst_margin=worst_margin,
         weights=weights,
         bottleneck=TRANSITIONS[bottleneck_index].transition_id,
+        credit_profile=credit_profile,
     )
 
 
@@ -204,15 +280,17 @@ def search(
     dim_grid: list[float],
     zero_grid: list[float],
     node_grid: list[float],
+    credits: dict[str, float],
     slack: float,
     top: int,
+    credit_profile: str,
 ) -> list[SearchResult]:
     results: list[SearchResult] = []
     for dim_weight in dim_grid:
         for zero_weight in zero_grid:
             for node_weight in node_grid:
                 weights = Weights(dim=dim_weight, zero=zero_weight, node=node_weight)
-                results.append(evaluate(weights, slack))
+                results.append(evaluate(weights, credits, slack, credit_profile))
     results.sort(
         key=lambda result: (
             result.level_weight,
@@ -224,7 +302,11 @@ def search(
     return results[:top]
 
 
-def transition_rows(weights: Weights, level_weight: float) -> list[dict[str, object]]:
+def transition_rows(
+    weights: Weights,
+    level_weight: float,
+    credits: dict[str, float],
+) -> list[dict[str, object]]:
     rows: list[dict[str, object]] = []
     for transition in TRANSITIONS:
         rows.append(
@@ -235,7 +317,9 @@ def transition_rows(weights: Weights, level_weight: float) -> list[dict[str, obj
                 "level": transition.parent.level,
                 "child_level": transition.child.level,
                 "local_qdim": f"{transition.local_qdim:.8f}",
-                "margin_qdim": f"{margin(transition, weights, level_weight):.8f}",
+                "block_credit_qdim": f"{transition_credit(transition, credits):.8f}",
+                "adjusted_local_qdim": f"{adjusted_local_qdim(transition, credits):.8f}",
+                "margin_qdim": f"{margin(transition, weights, level_weight, credits):.8f}",
                 "blocks": ";".join(transition.blocks),
                 "note": transition.note,
             }
@@ -264,6 +348,19 @@ def main() -> None:
     parser.add_argument("--slack", default=0.0, type=float, help="required margin in qdims")
     parser.add_argument("--top", default=10, type=int)
     parser.add_argument(
+        "--credit-profile",
+        choices=tuple(DEFAULT_CREDIT_PROFILES),
+        default="none",
+        help="named block-ledger credit profile",
+    )
+    parser.add_argument(
+        "--block-credit",
+        action="append",
+        default=[],
+        type=parse_block_credit,
+        help="override a block credit as block_id=value in qdims",
+    )
+    parser.add_argument(
         "--show-transitions",
         action="store_true",
         help="print per-transition margins for the best result instead of the search table",
@@ -271,14 +368,23 @@ def main() -> None:
     parser.add_argument("--validate-only", action="store_true")
     args = parser.parse_args()
 
-    validate_transitions()
+    credits = credit_map(args.credit_profile, args.block_credit)
+    validate_transitions(credits)
     if args.validate_only:
         return
 
-    results = search(args.dim_grid, args.zero_grid, args.node_grid, args.slack, args.top)
+    results = search(
+        args.dim_grid,
+        args.zero_grid,
+        args.node_grid,
+        credits,
+        args.slack,
+        args.top,
+        args.credit_profile,
+    )
     if args.show_transitions:
         best = results[0]
-        emit_csv(transition_rows(best.weights, best.level_weight))
+        emit_csv(transition_rows(best.weights, best.level_weight, credits))
         return
 
     rows = [
@@ -289,6 +395,7 @@ def main() -> None:
             "dim_weight": f"{result.weights.dim:.8f}",
             "zero_weight": f"{result.weights.zero:.8f}",
             "node_weight": f"{result.weights.node:.8f}",
+            "credit_profile": result.credit_profile,
             "bottleneck": result.bottleneck,
         }
         for index, result in enumerate(results)

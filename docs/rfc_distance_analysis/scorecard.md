@@ -29,7 +29,8 @@ Open items are excluded from the denominator.
 |---|---:|---:|---:|---:|---|---|
 | Exact-support / finite-replica route instead of fixed-set MDS | 3 | 1 | 0 | 75% | Keep as main architecture | Removes marked-core overcount, handles shared child randomness, matches first-moment target; still needs final recurrence/constants. |
 | Canonical diagram certificate theorem | 0 | 1 | 0 | 0% | New umbrella plan | `rfc_canonical_diagram_certificate_plan.md` packages the repeated local fixes into one block grammar: child diagrams and quotient/root data counted once, consumed kernels carried, unconsumed fibers covered, rank defects charged by incidence. This is the reset intended to stop row-by-row patching. |
-| Simple global potential probe | 0 | 1 | 0 | 0% | Useful negative/locator | `rfc_block_potential_probe.py` shows a naive state-feature potential bottlenecks on `support3_stratified_to_3_6`; with positive zero reward it needs `level_weight=3.93994737` qdims. The next version needs block-specific ledger credits, especially support-three incidence credit. |
+| Simple global potential probe | 0 | 1 | 0 | 0% | Useful negative/locator | `rfc_block_potential_probe.py` shows a naive state-feature potential bottlenecks on `support3_stratified_to_3_6`; with positive zero reward it needs `level_weight=3.93994737` qdims. This justifies moving to block-specific ledger credits instead of treating `(level,dimension,zeros)` as enough. |
+| Block-credit potential probe | 0 | 1 | 0 | 0% | Promising locator, not proof | `--credit-profile local-incidence` moves the bottleneck from support-three to `top_tau1_to_2_15` and gives support-three `1.06800847` qdims of slack. `diagram-sensitivity` makes support-two slack too, while `current-target` returns the tight row to support-three at `level_weight=1.93994737`. This supports the block-grammar direction but still requires theorem-grade top carry/root-kernel and support-three incidence imports. |
 | Product of child first moments for shared child events | 0 | 0 | 1 | 0% | Retired | Fable/Claude audit found shared-randomness bug; replaced by joint flag states. |
 | Joint multi-layer flag state `L <= V` | 3 | 1 | 0 | 75% | Keep | Corrects product bug, supports decomposable marked-line row, supports kernel-chain accounting; still globalizing. |
 | Determinant-1 nonzero-root normalization | 2 | 0 | 0 | 100% | Closed construction constant | Binary-field compatible; singleton root cost is `q^-1 * q/(q-1)` and fits finite bucket. |
@@ -146,11 +147,13 @@ data, cover only unconsumed duplicate fibers, and charge rank defects by inciden
 umbrella route; future diagnostics should be judged by whether they fit the block grammar or force
 a genuinely new kind of certificate node.
 
-First potential probe added. `rfc_block_potential_probe.py` validates the current stress-transition
-block IDs and searches a simple potential. It does not certify anything yet: the best
-zero-rewarded potential still bottlenecks on `support3_stratified_to_3_6`, showing the next
-potential must use explicit block-ledger credits rather than only global `(level,dimension,zeros)`
-features.
+Block-credit potential probe added. `rfc_block_potential_probe.py` still shows that global
+`(level,dimension,zeros,node)` features alone bottleneck on `support3_stratified_to_3_6`. Once the
+support-three incidence credit is treated as a reusable block, the bottleneck moves to
+`top_tau1_to_2_15`; once support-two is also credited as a sensitivity check, the top row remains
+tight. A broad `current-target` ceiling makes top/support-two/base rows slack and returns
+support-three as the tight row at a lower per-level budget. This is progress if the top carry and
+incidence credits can be formalized; it is not yet a distance certificate.
 
 Support-three rank-defect incidence lemma added. The lemma charges the proportional/dependent
 active-restriction stratum by noting that a rank defect gives a nonzero projective relation among

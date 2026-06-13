@@ -511,11 +511,24 @@ Useful commands:
 python -B scripts/rfc_distance_analysis/rfc_block_potential_probe.py --top 5
 python -B scripts/rfc_distance_analysis/rfc_block_potential_probe.py \
   --zero-grid 0.2:2:0.05 --top 1 --show-transitions
+python -B scripts/rfc_distance_analysis/rfc_block_potential_probe.py \
+  --zero-grid 0.2:2:0.05 --credit-profile local-incidence --top 1 --show-transitions
+python -B scripts/rfc_distance_analysis/rfc_block_potential_probe.py \
+  --zero-grid 0.2:2:0.05 --credit-profile diagram-sensitivity --top 1 --show-transitions
+python -B scripts/rfc_distance_analysis/rfc_block_potential_probe.py \
+  --zero-grid 0.2:2:0.05 --credit-profile current-target --top 1 --show-transitions
 ```
 
-The current probe is not a certificate. Its useful output is the bottleneck transition; with
-positive zero reward, that is still `support3_stratified_to_3_6`, showing that the next potential
-needs explicit block-ledger credits rather than only global state features.
+The current probe is not a certificate. Its useful output is the bottleneck transition. With
+positive zero reward and no block credits, that is still `support3_stratified_to_3_6`, showing that
+global state features alone do not see the reusable incidence credit. With
+`--credit-profile local-incidence`, the support-three row gains `1.06800847` q-dimensions of slack
+and the tight row moves to `top_tau1_to_2_15` at `level_weight=3.00795584`. With
+`--credit-profile diagram-sensitivity`, support-two is also slack and the top row remains tight.
+With `--credit-profile current-target`, the top and support-two rows are slack while
+`support3_stratified_to_3_6` is tight at `level_weight=1.93994737`. Treat the latter two profiles
+as locator/sensitivity runs; the theorem target is balanced import of the support-three incidence
+credit plus the top tau-one full-line carry/root-kernel cover.
 
 `--demand-closure-passes` is the cheaper version of the same test. It adds lower pair-table keys
 queried by demanded pair rows, then rebuilds. In the same stronger mode:

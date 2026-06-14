@@ -9,6 +9,57 @@ near-MDS, open to interpretation, but certainly better than the original BaseFol
 deliverable is a *theorem-grade* relative-distance lower bound that beats the paper, pushed as close
 to MDS as the honest first moment allows.
 
+## Current understanding (synthesis — read this first)
+
+This section is the settled current view. The chronological "Progress log" below is the audit trail
+(including one discarded guess); trust this section where they appear to differ.
+
+**Settled conclusions:**
+
+1. **We now have exact ground truth.** `rfc_brute_force_moment.py` computes the true first moment
+   `B_d(R,z)` of the real code by enumeration (exact for depth<=2 / small q; Monte-Carlo for depth 3),
+   and `rfc_lift_validator.py` feeds the recurrence EXACT children to isolate one-step error. These
+   are the acceptance test for any bound. This is the asset the project previously lacked.
+
+2. **The exact singleton charge law is `charge = r + extras - 1`** (validated vs oracle at r=1,2,4).
+   First non-common singleton costs the full replica rate `r`; each additional costs only its root
+   `q^-1`. It unifies with the exact r=1 charge (`= extras`) and does NOT depend on common-zero
+   saturation.
+
+3. **The `2^2016` base-seal artifact was a charge bug, not mathematics.** `component-uniform` drops
+   the charge to 0 once common-zeros saturate the child dimension; the true charge never collapses.
+   So all the saturation / credit-lemma machinery was fighting a bug.
+
+4. **The proof constant is irrelevant.** Sweeping `log2 C(d,N)` over 0..8192 moves relative distance
+   only 0.871->0.867. Stop optimizing constants and the `e=71` razor's edge.
+
+5. **The recurrence framework is structurally too loose, and its looseness compounds with depth.**
+   Even fed the exact charge, `B_d(r,z) = sum 2^s q^-charge binom(u,p) binom(n'-u,s-c) B_{d-1}(2r,u)`
+   re-multiplies the child moment by free placement counts that the child already aggregated over —
+   double-counting. Measured gap vs exact oracle: ~1.4 bits (depth 2) -> ~4 bits (depth 3); the
+   production bound degrades (rel dist 0.40/0.19/0.05 at depth 5/6/7). **No per-term charge fix can
+   repair this** — which is precisely why years of charge/credit-lemma work never closed.
+
+**The one genuinely open scientific question:** *is the real code actually near-MDS at q=2^128?*
+We do not yet know, and should not assert either way:
+- The top-level (r=1) charge measures ~1.0 (q^-1 per zero) at depth<=3 — consistent with near-MDS.
+- But the exact charge law `r+extras-1 < r*extras` (the optimistic `replica` rate) means the true
+  first moment is *larger* than the optimistic model behind `e=71`, and `replica` is provably unsafe.
+- And the only rigorous bound we have (the recurrence) is too loose to decide it (it degrades).
+So the truth sits between the small-q oracle hints and the optimistic conjecture, **unmeasured at
+production scale.** Near-MDS is plausible but unproven; the honest production relative distance is
+currently unknown.
+
+**Path forward (what would actually settle it):** a first-moment handle that is both rigorous and
+tight enough to match the oracle within o(1) bits per level (not the current ~2.5+ that compounds).
+Two candidates:
+- (a) an exact-support / inclusion-exclusion recurrence that does NOT re-multiply placement counts
+  already inside the child moment (kill the double-counting at the source); or
+- (b) a direct first-moment computation at production scale by a smarter-than-brute-force method
+  (e.g. exploiting the self-similar fold structure to evaluate `E_T[...]` without enumerating T).
+Either way, validate every step against the oracle. Do NOT resume charge/credit-lemma refinement on
+the existing recurrence — that layer is solved (`r+extras-1`) and is not where the loss is.
+
 ## Diagnosis of why the old direction stalled
 
 The whole effort is a first-moment certificate `B_d(1, k+e) <= 2^-lambda`. Two facts, both now

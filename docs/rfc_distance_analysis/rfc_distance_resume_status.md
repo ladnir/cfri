@@ -126,7 +126,25 @@ docs/rfc_distance_analysis/rfc_depth5_rank_pattern_audit.md
 docs/rfc_distance_analysis/rfc_depth5_finite_flag_recurrence_target.md
   Status: theorem/DP target.
   States the finite two-layer flag recurrence needed for the base seal, including tau=0/1/2
-  branches and the depth-4 `B_4(2,u)` state table for `0<=u<=17`.
+  branches and the depth-4 `B_4(2,u)` state table for `0<=u<=17`. New budget audit: relative to
+  the optimistic scalar calibration, the top boundary has only `35.10435419` bits
+  (`0.27425277` qdims) of uniform child-bound slack, and dominant `u=0..5` child states tolerate
+  only about `0.29..0.31` qdims of loss.
+
+scripts/rfc_distance_analysis/rfc_base_seal_budget.py
+  Status: deterministic budget diagnostic.
+  Uses the optimistic scalar replica recurrence only as a baseline and reports how much
+  theorem-grade depth-4 child bounds may loosen before the calibrated `B_5(1,34)` exceeds
+  `2^-80`. The result is tight enough that a one-qdim loss on any dominant child value breaks the
+  scalar-calibrated finite boundary seal. This is a falsification threshold, not proof slack,
+  because the scalar recurrence is already retired as a theorem.
+
+scripts/rfc_distance_analysis/rfc_base_seal_child_gap.py
+  Status: deterministic child-gap diagnostic.
+  Compares candidate depth-4 child values against the scalar one-`u` ceilings from the base-seal
+  budget. With `--candidate-charge component-uniform`, low `u=0..12` rows are below the ceilings,
+  but the high-common-zero tail `u>=13` exceeds them. This means the finite base-seal DP must
+  control high-`u` common-zero branches, not only the dominant scalar `u=0..5` terms.
 
 docs/rfc_distance_analysis/rfc_exact_support_quotient_state.md
   Status: canonical current theorem target.
@@ -320,7 +338,13 @@ rows one at a time:
 2. Prove the finite top boundary seal `B_5(1,34)<=2^-80`. The local top-credit audit shows
    `top_tau1_to_2_15` supports neither `tau1_full_line_carry` nor `kernel_fiber_cover`, so the
    current architecture is explicitly hybrid: boundary-specific finite theorem at the top,
-   reusable block grammar below.
+   reusable block grammar below. The new budget audit shows that, relative to the retired scalar
+   calibration, the theorem must be nearly scalar-sharp: less than one third of a q-dimension of
+   calibration slack is available on dominant child values. The current safe two-layer flag
+   checkpoint remains much farther away, so the next decisive task is the finite exact-support DP,
+   not more confidence in the scalar number. The new child-gap diagnostic also shows a high-`u`
+   tail hazard: component-uniform child values pass low `u=0..12` but exceed scalar one-`u` ceilings
+   for `u>=13`.
 3. Import the support-three rank-defect incidence credit into the certificate constants. The
    old `current-target` ceiling returns the tight row to support-three at `level_weight=1.93994737`,
    but the audited profile leaves the top row tight at `level_weight=3.00795584`, so support-three

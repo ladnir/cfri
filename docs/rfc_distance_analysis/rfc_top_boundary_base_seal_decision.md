@@ -97,6 +97,44 @@ log2 B_5(1,34) = -115.10435419
 but that scalar recurrence is not theorem-safe by itself. The theorem-grade route still needs the
 finite exact-support/flag recurrence.
 
+## Optimistic Calibration Budget
+
+The calibration slack is small, but this is not theorem slack yet. The budget script:
+
+```text
+python -B scripts/rfc_distance_analysis/rfc_base_seal_budget.py
+```
+
+reports slack against the optimistic scalar replica recurrence:
+
+```text
+log2 B_5(1,34) calibration = -115.10435419
+uniform child-loss budget   =   35.10435419 bits
+uniform child-loss budget   =    0.27425277 qdims.
+```
+
+This scalar calibration is a known non-theorem baseline. It is useful because it tells us how
+close a theorem-grade finite recurrence must stay to the ideal trace, but it does not prove that
+the base seal has positive slack. The existing safe two-layer flag checkpoint is much farther from
+the target; closing the gap requires a tighter finite exact-support/flag DP.
+
+For the dominant child states, if only one `B_4(2,u)` value is loosened, the allowed losses are:
+
+```text
+u=2: 36.82450305 bits = 0.28769143 qdims
+u=1: 37.19373686 bits = 0.29057607 qdims
+u=3: 37.24450680 bits = 0.29097271 qdims
+u=0: 38.75573821 bits = 0.30277920 qdims
+u=4: 38.29697422 bits = 0.29919511 qdims
+u=5: 39.90396303 bits = 0.31174971 qdims
+```
+
+So the boundary theorem cannot afford a one-q-dimension loss on the dominant depth-4 child values.
+It must be almost as sharp as the optimistic scalar recurrence, with only finite/projective
+constants and less than roughly one third of a q-dimension of aggregate calibration slack. If the
+finite exact-support recurrence loses whole q-dimensions relative to scalar on these child states,
+the hybrid boundary route should be considered falsified.
+
 ## Decision
 
 Use a hybrid architecture:
@@ -119,7 +157,9 @@ The hybrid route fails if either:
 
 ```text
 1. the finite depth-5 base-seal recurrence cannot certify B_5(1,34) <= 2^-80; or
-2. after importing the boundary theorem, the lower block grammar cannot make the support-three
+2. the theorem-grade finite recurrence loses even one q-dimension on the dominant `u=0..5` child
+   values, or lets the high-common-zero tail `u>=13` re-enter above the scalar one-`u` ceilings; or
+3. after importing the boundary theorem, the lower block grammar cannot make the support-three
    incidence row theorem-grade with finite constants.
 ```
 

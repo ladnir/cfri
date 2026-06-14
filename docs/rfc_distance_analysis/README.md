@@ -11,6 +11,7 @@ rfc_distance_resume_status.md                 concise resume note for restarting
 scorecard.md                                  success/failure scorecard for proof ideas
 rfc_fable_audit_2026_06_10.md                 external Fable audit and corrections
 claude_report.md                              follow-up external review of the resume status
+claude_second_opinion_2026_06_13.md           external review of hybrid base-seal direction
 rfc_claude_report_response.md                 accepted/corrected actions from Claude report
 rfc_distance_certificate_theorem.md           canonical conditional theorem and certificate statement
 rfc_canonical_diagram_certificate_plan.md     reset plan: canonical diagram block grammar and ledger

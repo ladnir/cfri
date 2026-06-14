@@ -30,6 +30,23 @@ log2 B_5(1,34) = -115.10435419.
 But the scalar local charge `q^{-r|E|}` is not proof-safe. The finite proof must use a flag state
 that exposes low-visible-rank singleton blocks.
 
+Budget update: relative to the optimistic scalar calibration, the top boundary has only:
+
+```text
+35.10435419 bits = 0.27425277 qdims
+```
+
+of uniform child-bound slack before the calibrated `B_5(1,34)` moment exceeds `2^-80`. For dominant
+`B_4(2,u)` child values with `u=0..5`, a loss on just that child value can be only about
+`0.29..0.31` qdims. Therefore the finite exact-support recurrence must be nearly scalar-sharp on
+the dominant depth-4 states; any theorem step that loses a full q-dimension there cannot close the
+base seal.
+
+This is not a safe proof margin. The scalar recurrence is already retired as a theorem, so the
+budget is a falsification/calibration threshold for the finite DP: if theorem-grade child bounds
+fall behind scalar by whole q-dimensions, the hybrid base-seal route should be abandoned or
+replaced by a more row-specific argument.
+
 ## State
 
 Use exact witness zero sets and subspace/container flags. The point is to bound existence of a bad
@@ -196,10 +213,21 @@ with the already documented `(q+1)` frame-completion factor.
 
 ## Finite State Table To Certify
 
-The top-level scalar trace calls depth-4 `r=2` states:
+The top-level scalar trace is dominated by depth-4 `r=2` states:
 
 ```text
 B_4(2,u), 0 <= u <= 17.
+```
+
+The full top sum can still mention `u > 17` through common-zero singleton branches. Under the
+optimistic scalar recurrence these terms are far below the maximum, but the child-gap diagnostic
+shows they can re-enter if a coarse theorem bound makes high-`u` child states too large. Therefore
+the finite base-seal DP must report all `0 <= u <= 34`, with special attention to:
+
+```text
+u=0..5:   dominant scalar branches with only 0.29..0.31 qdims one-u slack.
+u>=13:    high-common-zero tail that component-uniform child bounds already push above the scalar
+          one-u ceilings.
 ```
 
 The best depth-4 scalar splits are:
@@ -254,11 +282,11 @@ unless the kernel/marked-line child flag is charged recursively.
 Current deterministic diagnostics bracket the target:
 
 ```text
-optimistic scalar replica recurrence:  crossing_z = 34
-span/subspace endpoint diagnostics:    crossing_z = 249
-two-layer flag checkpoint:             crossing_z = 137
-tau0 cover-lift checkpoint:            crossing_z = 135
-all cover-lift checkpoint:             crossing_z = 35
+optimistic scalar replica recurrence:  crossing_z = 34   (not theorem-safe)
+span/subspace endpoint diagnostics:    crossing_z = 249  (safe but too pessimistic)
+two-layer flag checkpoint:             crossing_z = 137  (proof-shaped but too loose)
+tau0 cover-lift checkpoint:            crossing_z = 135  (safe partial cover)
+all cover-lift checkpoint:             crossing_z = 35   (anti-conservative diagnostic)
 ```
 
 More granular cover-lift diagnostics:
@@ -321,6 +349,26 @@ q_log2=128.
 If this finite DP still crosses far above `34`, the base-seal route is probably not the fastest
 path. If it moves close to `34`, the remaining task is to turn the finite transition inequalities
 into theorem-grade lemmas and constants.
+
+The first budget check is:
+
+```text
+python -B scripts/rfc_distance_analysis/rfc_base_seal_budget.py
+```
+
+Use it to compare any proposed theorem-grade depth-4 child bounds against the optimistic
+`u`-specific loss budgets. Passing this comparison is necessary for the hybrid route but not
+sufficient for a proof, because the comparison baseline is scalar and non-theorem.
+
+The first child-gap check is:
+
+```text
+python -B scripts/rfc_distance_analysis/rfc_base_seal_child_gap.py
+```
+
+The default `component-uniform` comparison passes the low-`u` scalar ceilings but fails for
+`u>=13`. This redirects the finite-DP experiment: the child recurrence must keep the high-common-zero
+tail sharp as well as the low-`u` dominant terms.
 
 The corrected checkpoint trace after retiring the all-cover shortcut is recorded in:
 

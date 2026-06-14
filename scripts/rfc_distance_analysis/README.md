@@ -21,6 +21,8 @@ rfc_exterior_constraint_profile.py  exact r=2 exterior-count profiles by matroid
 rfc_replica_rank1_profile.py        r=2 root-compatibility singleton profile
 rfc_replica_zero_moment.py          loose/optimistic aggregate replica recurrence diagnostic
 rfc_replica_span_moment.py          ordered-tuple span-aware diagnostic
+rfc_base_seal_budget.py             depth-5 boundary slack budget against child-bound losses
+rfc_base_seal_child_gap.py          compare candidate child bounds against base-seal ceilings
 rfc_subspace_span_moment.py         subspace-span diagnostic exposing visible-kernel state
 rfc_flag_span_moment.py             two-layer flag diagnostic for kernel-zero propagation
 rfc_carried_flag_diagnostic.py      targeted carried-flag merge/diagram diagnostic for depth-5 trace
@@ -634,6 +636,32 @@ use `--explain-z Z --top-terms K` to print the dominant one-step split terms alo
 and `--dump-level L --dump-start A --dump-stop B` to print aggregate moments at an intermediate
 level. These are deterministic recurrence diagnostics, still conditional on the rank-pattern
 local theorem.
+
+`rfc_base_seal_budget.py` budgets the hybrid top-boundary theorem:
+
+```text
+python -B scripts/rfc_distance_analysis/rfc_base_seal_budget.py
+```
+
+The default `c=8,q=2^128,z=34` output reports only `35.10435419` bits, or `0.27425277` qdims, of
+uniform child-bound calibration slack before the scalar-calibrated `B_5(1,34)` moment exceeds
+`2^-80`. Dominant individual child states `u=0..5` tolerate only about `0.29..0.31` qdims of loss
+relative to scalar. The CSV now includes `child_log2` and `child_plus_loss_ceiling_log2` columns,
+so a finite exact-support DP can compare its theorem-grade `B_4(2,u)` rows directly against the
+optimistic one-at-a-time ceiling. This is a falsification threshold, not proof slack, because the
+scalar baseline is already retired as a theorem.
+
+`rfc_base_seal_child_gap.py` joins those scalar ceilings against a candidate depth-4 child-bound
+mode:
+
+```text
+python -B scripts/rfc_distance_analysis/rfc_base_seal_child_gap.py
+```
+
+With the default `--candidate-charge component-uniform`, low child-zero rows `u=0..12` are below
+the scalar one-`u` ceilings, but the high-common-zero tail `u>=13` exceeds them. This says the
+finite base-seal DP cannot only tune the dominant scalar child states `u=0..5`; it must also keep
+coarse high-`u` common-zero branches from re-entering the top moment.
 
 `rfc_visible_span_profile.py` precomputes the exact Gaussian-binomial number of local subspaces and
 skips subsets above `--max-subspaces`; this keeps sampled runs from accidentally turning into large

@@ -30,6 +30,15 @@ distance >= N - (k+e) + 1.
 
 Do not claim exact MDS.
 
+For the coherent stop/handoff narrative, read:
+
+```text
+docs/rfc_distance_analysis/rfc_distance_stop_report.md
+```
+
+That file summarizes the current architecture, retired ideas, latest diagnostics, and the next
+high-common-zero tail theorem target.
+
 ## Main Proof Direction
 
 The active route is a finite-replica / flag first moment, not fixed-set MDS and not the old scalar

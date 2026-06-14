@@ -7,6 +7,7 @@ Useful entry points:
 
 ```text
 rfc_distance_manager_board.md                 current manager board and lane ownership
+rfc_distance_stop_report.md                   coherent stop/handoff report for current proof status
 rfc_distance_resume_status.md                 concise resume note for restarting the proof thread
 scorecard.md                                  success/failure scorecard for proof ideas
 rfc_fable_audit_2026_06_10.md                 external Fable audit and corrections

@@ -298,3 +298,31 @@ Either way we stop chasing a number (`e=71`) that may not even be true for this 
     bar is now concrete — reproduce the oracle's ~0.8-0.9 charge within o(1)/level (the current
     recurrence loses ~0.15 charge/level). The oracle now also emits `A_d(R,w)` as the per-`w`
     acceptance test.
+
+- 2026-06-13: **Tight top relation derived and VALIDATED EXACTLY; exact propagation hits a
+  state-explosion blocker.** (Goal: tighten the bound.)
+
+  - **Exact top relation** (`rfc_exact_top_relation.py`), from the corrected shared-challenge fold:
+    `parent_zeros = 2u + X`, where `u` = common zeros of the child 2-tuple and
+    `X = sum over non-common child columns of independent Bernoulli(g/(q-1))`,
+    `g = [a!=0] + [a!=-b]` for `b!=0` (g in {1,2}), else 0; `(a,b)=(W_L[jj],W_R[jj])`.
+    Hence `B_d(1,z) = E_childcode[ sum_{m!=0} E_top[ binom(2u+X, z) ] ]` with NO binomial placement
+    factor — the double-count is gone by construction.
+  - **Validation:** reproduces the brute-force oracle EXACTLY (full Fraction equality) at depth 2 for
+    q=3 and q=5, and matches the depth-3 MC oracle within ~0.002 bits. So at d2/d3 this tightens the
+    bound from the old recurrence's 0.84 / 2.38 bit gap to **0.00**.
+  - **BLOCKER for production scale:** turning this into a recurrence requires propagating the joint
+    distribution of `(u, m1, m2)` for the child 2-tuple, which in turn needs the joint column-TYPE
+    distribution of the codewords (zero-pattern AND the `a=-b` proportionality relation). Under the
+    replica doubling (depth d, R=1 -> 2-tuple at d-1 -> 4-tuple at d-2 -> 2^j-tuple at d-j), the
+    column type lives in F^{2^j} and its sufficient statistic grows in richness per level ->
+    state explosion. Collapsing to a scalar zero-count (what the old recurrence does) is exactly what
+    forces the binom double-count and the ~0.15 charge/level loss. So there is a real tension:
+    tractable scalar state <=> double-count looseness; exact <=> exponential state.
+  - **Most promising way through (next):** the first moment only needs certain MOMENTS of the
+    column-type distribution (e.g. `E[binom(2u,z)]` needs the u-distribution; the `X` correction
+    needs `E[(m1+2m2)*binom(2u,z-1)]/(q-1)`), not the full joint. A moment-closure / transfer-operator
+    recurrence over a small fixed set of column-type moments may be both tractable and tight. Whether
+    such a finite moment set closes under the fold is the open question. Build target: a recurrence on
+    the exact zero-count distribution `A_d(R,.)` augmented with the minimal extra moments needed for
+    the `X` term, validated against the oracle to confirm <o(1)/level loss before scaling.

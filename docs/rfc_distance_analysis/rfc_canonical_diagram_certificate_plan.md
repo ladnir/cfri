@@ -258,8 +258,15 @@ The `current-target` profile is now known to be too generous on the top edge. Th
 python -B scripts/rfc_distance_analysis/rfc_tau1_carry_kappa_audit.py
 ```
 
-reports that `top_tau1_to_2_15` has no descendant tau-one line edge and its parent tau-one profile
-has `charged_postroot_qdim = -1`. Therefore `tau1_full_line_carry` is not a legal credit for that
+reports that `top_tau1_to_2_15` has no descendant tau-one line edge, its parent tau-one profile has
+`charged_postroot_qdim = -1`, and the same row has:
+
+```text
+kernel_dim = 0
+kernel_lift_qdim = 0.
+```
+
+Therefore neither `tau1_full_line_carry` nor `kernel_fiber_cover` is a legal credit for that
 immediate transition. The audited profile:
 
 ```text
@@ -267,15 +274,14 @@ python -B scripts/rfc_distance_analysis/rfc_block_potential_probe.py \
   --zero-grid 0.2:2:0.05 --credit-profile audited-top-kernel --top 1 --show-transitions
 ```
 
-keeps the possible `kernel_fiber_cover` credit but removes `tau1_full_line_carry`. It gives
-`level_weight = 2.00795584`; the top row remains tight, support-three has only `0.06800847`
-q-dimensions of slack, and support-two has `0.92385528`.
+removes both top credits. It gives `level_weight = 3.00795584`; the top row remains tight, while
+support-three has `1.06800847` q-dimensions of slack and support-two has `2.92385528`.
 
 Interpretation: the block grammar is coherent enough to move the bottleneck in predictable ways.
-The next theorem work is not another unrelated row patch; it is to formalize the top root-kernel
-fiber cover and import the support-three incidence credit with balanced finite constants. Any
-future tau-one full-line carry credit must be attached to a row with an actual descendant line map
-`phi : E'_B -> E_A`.
+The next theorem work is now a sharper fork: either find a different top-row theorem for
+`top_tau1_to_2_15`, or accept that the current block-ledger route is missing a top-specific
+ingredient. Support-three incidence still behaves like a reusable block, but it is no longer the
+next obstruction.
 
 The top carry/root-kernel contract is now recorded in:
 
@@ -286,7 +292,7 @@ docs/rfc_distance_analysis/rfc_top_tau1_root_kernel_carry_block.md
 The key restriction is that the broad tau-one root-kernel diagnostic is not theorem-grade. A legal
 line-carry transition must carry the full quotient line, compute the descendant projective-fiber
 dimension `kappa_phi`, and split hidden fibers into consumed and unconsumed parts. The current top
-edge only supports auditing the kernel-fiber part.
+edge supports neither line-carry nor kernel-fiber credit.
 
 ## Current Dominant Rows As Tests
 

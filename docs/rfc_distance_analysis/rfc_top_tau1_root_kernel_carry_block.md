@@ -36,11 +36,13 @@ no descendant tau-one line and its parent tau-one row has:
 
 ```text
 charged_postroot_qdim = -1.
+kernel_dim = 0.
+kernel_lift_qdim = 0.
 ```
 
-So `tau1_full_line_carry` is not a legal credit for this edge. The audited potential profile
-`audited-top-kernel` keeps only the possible `kernel_fiber_cover` top credit; the top row remains
-tight at `level_weight = 2.00795584`.
+So neither `tau1_full_line_carry` nor `kernel_fiber_cover` is a legal credit for this edge. The
+audited potential profile `audited-top-kernel` removes both top credits; the top row remains tight
+at `level_weight = 3.00795584`.
 
 ## Objects
 
@@ -131,10 +133,9 @@ The recurrence may count the unconsumed container once and remove only the Gauss
 choosing parent subspaces inside it. If a descendant event later uses the same hidden directions,
 they must be represented by a consumed-kernel node; otherwise the same fiber has been charged twice.
 
-For the audited top-row potential probe we need at least one q-dimension of such unconsumed-fiber
-credit. This is the theorem version of the diagnostic `kernel_fiber_cover` block. A separate
-carried-line credit can only be used on a later row with an actual descendant line map
-`phi : E'_B -> E_A`.
+This is the theorem version of the diagnostic `kernel_fiber_cover` block. It does not apply to the
+immediate top edge because that row has no kernel lift. A carried-line or kernel-fiber credit can
+only be used on a later row with the corresponding line map or positive unconsumed kernel lift.
 
 ## Top-Row Eligibility Test
 
@@ -185,19 +186,21 @@ charged in the final finite-constant budget.
 
 ## Current Assessment
 
-This is promising but narrowed. The good news is structural: the block-credit probe moves the
-bottleneck exactly to the top root/kernel area. The bad news is precise: the full-line carry part
-does not apply to the immediate top edge. We need a consumed/unconsumed kernel-fiber audit before
-claiming even the remaining one q-dimension for the top row.
+This is useful but negative for the current top edge. The good news is structural: the audit
+prevented us from spending a fictional credit. The bad news is precise: neither full-line carry nor
+kernel-fiber cover applies to `top_tau1_to_2_15`. The general block-ledger route now needs a new
+top-row theorem, or this boundary transition should be handled row-by-row.
 
 ## Next Implementation Step
 
 Add a narrow diagnostic mode that does not use the broad `--tau1-root-kernel-cover-mode kernel`.
-For the top row, emit:
+For the top row, the audit now emits:
 
 ```text
 charged_postroot_qdim
 line_carry_applicable
+kernel_dim
+kernel_lift_qdim
 unconsumed_kernel_fiber_qdim
 legal_total_saving_qdim
 ```

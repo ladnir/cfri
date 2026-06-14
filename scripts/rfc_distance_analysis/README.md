@@ -533,11 +533,12 @@ and the tight row moves to `top_tau1_to_2_15` at `level_weight=3.00795584`. With
 With the old ceiling `--credit-profile current-target`, the top and support-two rows are slack
 while `support3_stratified_to_3_6` is tight at `level_weight=1.93994737`. The
 `rfc_tau1_carry_kappa_audit.py` check shows that the current top edge has no descendant tau-one
-line and no positive top post-root line family, so `tau1_full_line_carry` should not be spent on
-that edge. The audited profile `audited-top-kernel` keeps only the possible top kernel-fiber
-credit; it has `level_weight=2.00795584` and remains tight at `top_tau1_to_2_15`. Treat
-`current-target` as a ceiling only; the theorem target is now the top kernel-fiber cover plus
-balanced support-three incidence.
+line, no positive top post-root line family, and no kernel lift (`kernel_dim=0`,
+`kernel_lift_qdim=0`). Thus neither `tau1_full_line_carry` nor `kernel_fiber_cover` should be spent
+on that edge. The audited profile `audited-top-kernel` removes both top credits; it has
+`level_weight=3.00795584` and remains tight at `top_tau1_to_2_15`. Treat `current-target` as a
+ceiling only; the theorem target is now a real top-row theorem or a row-specific boundary
+treatment.
 
 `--demand-closure-passes` is the cheaper version of the same test. It adds lower pair-table keys
 queried by demanded pair rows, then rebuilds. In the same stronger mode:

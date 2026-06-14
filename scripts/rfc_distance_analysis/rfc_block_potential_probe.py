@@ -156,13 +156,12 @@ DEFAULT_CREDIT_PROFILES: dict[str, dict[str, float]] = {
         "tau0_container": 1.0,
     },
     # Audited top-row profile: rfc_tau1_carry_kappa_audit.py shows that the
-    # current top_tau1_to_2_15 edge has no descendant tau-one line and its
-    # parent tau-one row has no positive post-root line family to carry.  Keep
-    # the possible kernel-fiber credit, but do not spend tau1_full_line_carry.
+    # current top_tau1_to_2_15 edge has no descendant tau-one line, no positive
+    # post-root line family to carry, and no kernel lift (parent_span=tau=1).
+    # Do not spend either top-row credit on this immediate transition.
     "audited-top-kernel": {
         "support3_stratified": 2.0,
         "support2_diamond": 2.0,
-        "kernel_fiber_cover": 1.0,
         "tau0_container": 1.0,
     },
 }

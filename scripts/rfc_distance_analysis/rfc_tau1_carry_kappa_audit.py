@@ -1,5 +1,5 @@
 #!/usr/bin/env python3
-"""Audit tau-one carry rows for an actual kappa_phi obligation.
+"""Audit tau-one carry rows and top kernel-fiber eligibility.
 
 This is deterministic proof bookkeeping, not a profiler.  It records the
 dominant tau-one carry candidates currently discussed in the RFC distance notes
@@ -7,7 +7,9 @@ and separates three facts that were getting blurred:
 
 * the tau-one quotient ambient dimensions from the scalar recurrence;
 * the visible-only fiber dimension, which is known to be too weak;
-* whether the row currently has a defined descendant full-line transition map.
+* whether the row currently has a defined descendant full-line transition map;
+* whether the current top edge has an unconsumed kernel lift that can support
+  the remaining audited kernel_fiber_cover credit.
 
 The script intentionally does not invent phi.  If the current recurrence state
 does not specify a map E'_B -> E_A, the result is "undefined", not a guessed
@@ -62,6 +64,15 @@ class CarryAuditCase:
     parent: Tau1Row
     descendant: Tau1Row | None
     status: str
+    verdict: str
+
+
+@dataclass(frozen=True)
+class KernelFiberAuditCase:
+    case_id: str
+    row: Tau1Row
+    has_displayed_sibling: bool
+    descendant_consumption_status: str
     verdict: str
 
 
@@ -135,6 +146,7 @@ def known_cases() -> tuple[CarryAuditCase, ...]:
         ),
         note="current block-potential top row feeding state (2,15)",
     )
+
     old_parent = Tau1Row(
         row_id="level4_2_15_to_4_7_ge_2_8",
         level=4,
@@ -186,6 +198,23 @@ def known_cases() -> tuple[CarryAuditCase, ...]:
     )
 
 
+def known_kernel_cases() -> tuple[KernelFiberAuditCase, ...]:
+    top_parent = known_cases()[0].parent
+    return (
+        KernelFiberAuditCase(
+            case_id="current_top_kernel_fiber",
+            row=top_parent,
+            has_displayed_sibling=False,
+            descendant_consumption_status="not_audited_below_child_state",
+            verdict=(
+                "the immediate top edge has kernel_dim=0 and kernel_lift_qdim=0, so "
+                "kernel_fiber_cover is not a legal credit on this edge; any later kernel-fiber "
+                "credit must be attached below child state (2,15)"
+            ),
+        ),
+    )
+
+
 def row_fields(prefix: str, row: Tau1Row | None) -> dict[str, object]:
     if row is None:
         return {
@@ -198,6 +227,8 @@ def row_fields(prefix: str, row: Tau1Row | None) -> dict[str, object]:
             f"{prefix}_visible_image_dim_bound": "",
             f"{prefix}_visible_only_kappa": "",
             f"{prefix}_charged_postroot_qdim": "",
+            f"{prefix}_kernel_dim": "",
+            f"{prefix}_kernel_lift_qdim": "",
             f"{prefix}_note": "",
         }
     (
@@ -219,8 +250,19 @@ def row_fields(prefix: str, row: Tau1Row | None) -> dict[str, object]:
         f"{prefix}_visible_image_dim_bound": visible_image_dim_bound,
         f"{prefix}_visible_only_kappa": visible_only_kappa,
         f"{prefix}_charged_postroot_qdim": charged_postroot_qdim,
+        f"{prefix}_kernel_dim": row.parent_span - row.choice[3],
+        f"{prefix}_kernel_lift_qdim": kernel_lift_qdim(row.parent_span, row.choice),
         f"{prefix}_note": row.note,
     }
+
+
+def kernel_lift_qdim(parent_span: int, choice: Choice) -> int:
+    tau = choice[3]
+    inner_span = choice[5]
+    kernel_dim = parent_span - tau
+    if kernel_dim <= 0:
+        return 0
+    return kernel_dim * (2 * inner_span - kernel_dim)
 
 
 def case_row(case: CarryAuditCase) -> dict[str, object]:
@@ -242,6 +284,28 @@ def case_row(case: CarryAuditCase) -> dict[str, object]:
     }
 
 
+def kernel_case_row(case: KernelFiberAuditCase) -> dict[str, object]:
+    kernel_dim = case.row.parent_span - case.row.choice[3]
+    lift_qdim = kernel_lift_qdim(case.row.parent_span, case.row.choice)
+    sibling_status = "none" if not case.has_displayed_sibling else "requires_pair_audit"
+    local_unconsumed = lift_qdim > 0 and not case.has_displayed_sibling
+    legal_local_saving = lift_qdim if local_unconsumed else 0
+    return {
+        "case_id": case.case_id,
+        **row_fields("row", case.row),
+        "displayed_sibling_status": sibling_status,
+        "descendant_consumption_status": case.descendant_consumption_status,
+        "local_unconsumed_kernel_fiber": "yes" if local_unconsumed else "no",
+        "legal_local_kernel_fiber_saving_qdim": legal_local_saving,
+        "full_tree_status": (
+            "open_descendant_audit"
+            if case.descendant_consumption_status != "none"
+            else "locally_closed"
+        ),
+        "verdict": case.verdict,
+    }
+
+
 def emit_csv(rows: list[dict[str, object]]) -> None:
     fieldnames: list[str] = []
     for row in rows:
@@ -256,17 +320,35 @@ def emit_csv(rows: list[dict[str, object]]) -> None:
 def main() -> None:
     parser = argparse.ArgumentParser()
     parser.add_argument(
+        "--section",
+        choices=("carry", "kernel", "all"),
+        default="all",
+    )
+    parser.add_argument(
         "--case",
-        choices=("all", "current_top_block", "old_4_7_descendant"),
+        choices=(
+            "all",
+            "current_top_block",
+            "old_4_7_descendant",
+            "current_top_kernel_fiber",
+        ),
         default="all",
     )
     args = parser.parse_args()
 
-    rows = [
-        case_row(case)
-        for case in known_cases()
-        if args.case == "all" or args.case == case.case_id
-    ]
+    rows: list[dict[str, object]] = []
+    if args.section in ("carry", "all"):
+        rows.extend(
+            case_row(case)
+            for case in known_cases()
+            if args.case == "all" or args.case == case.case_id
+        )
+    if args.section in ("kernel", "all"):
+        rows.extend(
+            kernel_case_row(case)
+            for case in known_kernel_cases()
+            if args.case == "all" or args.case == case.case_id
+        )
     emit_csv(rows)
 
 

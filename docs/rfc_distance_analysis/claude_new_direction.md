@@ -325,4 +325,30 @@ Either way we stop chasing a number (`e=71`) that may not even be true for this 
     recurrence over a small fixed set of column-type moments may be both tractable and tight. Whether
     such a finite moment set closes under the fold is the open question. Build target: a recurrence on
     the exact zero-count distribution `A_d(R,.)` augmented with the minimal extra moments needed for
-    the `X` term, validated against the oracle to confirm <o(1)/level loss before scaling.
+    the `X` term, validated against the oracle to confirm o(1)/level loss before scaling.
+
+- 2026-06-13: **Tractable scalar-state bound BUILT and shown to FAIL — the blocker is fundamental.**
+  (`rfc_ub_recurrence.py`.) Tried the tractable middle path: collapse to the zero-count distribution
+  `A_h(R,.)` and UPPER-bound the hit term `X <= Bin(#non-common, 2/(q-1))` (every non-common column
+  treated as max-hittable, g=2). Valid upper bound (>= oracle, confirmed depth 1-2), tractable, scales
+  to depth 11.
+
+  - **Result: it DEGRADES like the old recurrence** — q=2^128, exp 8: rel_dist 0.0625 (d5), 0.0156
+    (d6), 0.0078 (d7). Worse than the BaseFold paper.
+  - **Why (fundamental):** at replica R, a parent coordinate is common-zero only if the child column
+    `(a,b)` is proportional in F^R (prob ~q^-(R-1)); generic rank-2 columns are NOT hittable (g=0).
+    The `g=2`-for-all over-bound discards this rank-dependent suppression — which IS the charge.
+  - **Definitive characterization:** the per-zero charge lives in the column RANK-TYPE structure. Any
+    scalar (zero-count-only) recurrence loses it — by double-counting (old recurrence, ~0.15
+    charge/level) or by over-bounding (this UB, total charge loss). The exact relation is tight but
+    needs the full column-type distribution (state explosion). No tractable scalar bound exists; now
+    demonstrated, not conjectured.
+  - **Depth-11 distance? No.** The first-moment/replica route cannot give a tight bound without
+    tracking rank structure. Best provable depth-11 distance remains the BaseFold paper's; the true
+    ~0.84-0.86 (oracle charge extrapolation) is unproven.
+  - **Redirect (next move):** abandon scalar first-moment recurrences. (1) RANK-MOMENT closure: track
+    moments of the column rank-type distribution; minimal closing set open; validate vs oracle. Hard
+    but the only first-moment route to near-MDS. (2) COMBINATORIAL min-distance recursion
+    (BaseFold-paper style): bound `d_h` from `d_{h-1}` via codeword weights directly, sidestepping the
+    first moment and rank-tracking; tighten to BEAT the paper's constant. Option (2) is the likelier
+    path to an actual depth-11 theorem.

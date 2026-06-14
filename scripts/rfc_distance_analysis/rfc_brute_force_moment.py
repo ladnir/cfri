@@ -69,8 +69,11 @@ def challenge_domain(q: int, nonzero: bool) -> list[int]:
 
 def brute_force_moment(depth: int, c: int, q: int, nonzero_t: bool,
                        max_z: int | None, samples: int | None,
-                       seed: int) -> tuple[list[Fraction], int, int, bool]:
-    """Return (B[z] for z=0..N, N, num_T_vectors, exact?).
+                       seed: int, replica: int) -> tuple[list[Fraction], int, int, bool]:
+    """Return (B_d(replica, z) for z=0..N, N, num_T_vectors, exact?).
+
+    B_d(R, z) = E_T[ sum over nonzero ordered R-tuples of messages of binom(common_zeros, z) ]
+    where common_zeros = #coords where all R codewords vanish.  R=1 is the distance certificate.
 
     If `samples` is None the full challenge space is enumerated (exact Fractions).  Otherwise
     `samples` random challenge vectors are drawn (Monte-Carlo unbiased estimate of E_T)."""
@@ -88,7 +91,10 @@ def brute_force_moment(depth: int, c: int, q: int, nonzero_t: bool,
         for z in range(1, w + 1):
             binom[w][z] = binom[w - 1][z - 1] + binom[w - 1][z]
 
-    messages = [m for m in itertools.product(range(q), repeat=k) if any(m)]
+    # All messages (including zero, at index 0 after sorting) for R-tuple enumeration.
+    all_messages = list(itertools.product(range(q), repeat=k))
+    zero_idx = all_messages.index((0,) * k)
+    num_msgs = len(all_messages)
 
     if samples is None:
         chal_iter = itertools.product(t_dom, repeat=n_chal)
@@ -103,16 +109,43 @@ def brute_force_moment(depth: int, c: int, q: int, nonzero_t: bool,
     for chal in chal_iter:
         num_t_vectors += 1
         chal = list(chal)
-        for m in messages:
+        # zero-set bitmask of each message's codeword under this T
+        masks = []
+        for m in all_messages:
             cw = encode(m, depth, c, q, chal, [0])
-            zeros = sum(1 for x in cw if x == 0)
-            if zeros == 0:
-                continue
-            row = binom[zeros]
-            top = min(zeros, max_z)
-            for z in range(1, top + 1):
-                total[z] += row[z]
-    total[0] = len(messages) * num_t_vectors
+            mask = 0
+            for i, x in enumerate(cw):
+                if x == 0:
+                    mask |= (1 << i)
+            masks.append(mask)
+        if replica == 1:
+            for idx in range(num_msgs):
+                if idx == zero_idx:
+                    continue
+                zeros = bin(masks[idx]).count("1")
+                if zeros == 0:
+                    continue
+                row = binom[zeros]
+                for z in range(1, min(zeros, max_z) + 1):
+                    total[z] += row[z]
+        else:
+            full = (1 << n) - 1
+            for tup in itertools.product(range(num_msgs), repeat=replica):
+                if all(i == zero_idx for i in tup):
+                    continue
+                common = full
+                for i in tup:
+                    common &= masks[i]
+                    if common == 0:
+                        break
+                if common == 0:
+                    continue
+                zeros = bin(common).count("1")
+                row = binom[zeros]
+                for z in range(1, min(zeros, max_z) + 1):
+                    total[z] += row[z]
+    # z=0 term: number of nonzero R-tuples, counted once per T.
+    total[0] = (num_msgs ** replica - 1) * num_t_vectors
 
     moments = [Fraction(total[z], num_t_vectors) for z in range(n + 1)]
     return moments, n, num_t_vectors, exact
@@ -136,6 +169,7 @@ def main() -> None:
     ap.add_argument("--samples", type=int, default=None,
                     help="Monte-Carlo: sample this many T-vectors instead of full enumeration")
     ap.add_argument("--seed", type=int, default=0)
+    ap.add_argument("--replica", type=int, default=1, help="R: ordered R-tuple replica count")
     args = ap.parse_args()
 
     # sanity: q prime
@@ -144,28 +178,29 @@ def main() -> None:
 
     k = 1 << args.depth
     n = args.expansion * k
+    R = args.replica
     moments, n, num_t, exact = brute_force_moment(
         args.depth, args.expansion, args.q, args.t_domain == "nonzero", args.max_z,
-        args.samples, args.seed)
+        args.samples, args.seed, R)
 
     q = args.q
     qlog = math.log2(q)
-    print(f"# depth={args.depth} k={k} c={args.expansion} n={n} q={q} "
+    num_tuples = q ** (R * k) - 1
+    print(f"# depth={args.depth} k={k} c={args.expansion} n={n} q={q} replica={R} "
           f"t_domain={args.t_domain} num_T_vectors={num_t} "
           f"mode={'exact' if exact else 'montecarlo'}")
-    print(f"# num_nonzero_messages={q**k - 1}  num_challenges={num_challenges(args.depth, args.expansion)}")
-    print("z,excess,B_exact,log2_B,log_q_B,ideal_log2_binomNz_minus_qz,charge_per_zero_q")
+    print(f"# num_nonzero_tuples={num_tuples}  num_challenges={num_challenges(args.depth, args.expansion)}")
+    print("z,excess,B_exact,log2_B,log_q_B,ideal_log2,charge_per_zero_q")
     top = args.max_z if args.max_z is not None else n
     for z in range(0, top + 1):
         b = moments[z]
         l2 = log2_fraction(b)
         lq = l2 / qlog if l2 != float("-inf") else float("-inf")
-        # idealized random-code first moment for a fixed nonzero msg: binom(N,z)*(q^k-1)*q^-z
-        ideal_l2 = (math.lgamma(n + 1) - math.lgamma(z + 1) - math.lgamma(n - z + 1)) / math.log(2)
-        ideal_l2 += math.log2(q**k - 1) - z * qlog
-        # measured average q-suppression per zero relative to binom(N,z)*(q^k-1)
-        denom_l2 = ((math.lgamma(n + 1) - math.lgamma(z + 1) - math.lgamma(n - z + 1)) / math.log(2)
-                    + math.log2(q**k - 1))
+        binom_l2 = (math.lgamma(n + 1) - math.lgamma(z + 1) - math.lgamma(n - z + 1)) / math.log(2)
+        # idealized: a fixed nonzero R-tuple is common-zero on z fixed coords with prob ~ q^-z
+        # (one scalar constraint per coord), so B ~ binom(N,z)*(#tuples)*q^-z.
+        ideal_l2 = binom_l2 + math.log2(num_tuples) - z * qlog
+        denom_l2 = binom_l2 + math.log2(num_tuples)
         charge = (denom_l2 - l2) / z / qlog if (z > 0 and l2 != float("-inf")) else float("nan")
         excess = z - k
         l2s = "-inf" if l2 == float("-inf") else f"{l2:.6f}"

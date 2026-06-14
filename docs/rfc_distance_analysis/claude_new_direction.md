@@ -117,3 +117,40 @@ Either way we stop chasing a number (`e=71`) that may not even be true for this 
   component-uniform is safe-but-loose. Next (M2): build the exact-support flag DP, validate its
   per-shape transitions against this oracle at depth<=3, then evaluate the honest charge at the
   production base to get the theorem-grade relative distance.
+
+- 2026-06-13: **M2 in progress — oracle extended to replica states; one-step lift isolated; the
+  `2^2016` artifact precisely diagnosed.**
+
+  - Oracle now computes exact `B_d(R,z)` for ordered R-tuples (`--replica R`), giving ground truth
+    for the replica child states the recurrence actually uses (e.g. exact `B_1(2,u)={80,32,12,0,0}`,
+    `B_1(4,u)={6560,320,120,0,0}` at c=2,q=3).
+
+  - New tool `rfc_lift_validator.py`: feeds the one-step lift the EXACT child `B_{d-1}(2r,u)` and
+    compares to the EXACT parent `B_d(r,z)`, so any gap is the transition's fault, not compounding.
+
+  - Findings (all at c=2,q=3, exact), with TRUE charge backed out per dominant split:
+    | regime | extras | quotient_rank | TRUE charge | component-uniform | replica (r·extras) |
+    |---|---|---|---|---|---|
+    | r=1 (top) | any | - | = extras (each q^-1) | = extras (exact) | n/a |
+    | r=2 non-saturated | 2 | 1 | 2.99 | 3 (exact) | 4 (unsafe) |
+    | r=2 **saturated** | 2 | **0** | **3.60** | **0 (ARTIFACT)** | 4 (unsafe) |
+    | r=2 | 1 | 1 | 2.10 | 1 (loose) | 2 (~exact) |
+
+  - **Root cause of the `2^2016` artifact, now proven:** `component-uniform` sets the singleton
+    charge to 0 once common-zeros saturate the child dimension (`quotient_rank=0`). But the measured
+    TRUE charge in that saturated regime is ~3.6 — essentially the SAME as the non-saturated ~3.0,
+    i.e. roughly the replica rate `r·extras` minus a small component correction. **The charge does
+    NOT collapse in saturation; the model's saturation->0 rule is simply wrong.** It stays a valid
+    upper bound (over-counts) but the slack compounds (depth2 r2: +1.6/+3.6/+5.1/+5.7 bits at
+    z=3..6), which is the depth-5 `2^2016`.
+
+  - `replica` confirmed structurally UNSAFE again at the child level: lift undershoots exact
+    `B_1(2,z)` by 1.60 bits at z=2 (it charges `r·extras`, the upper end, with no low-rank
+    correction).
+
+  - **The fix for M2's DP:** charge non-common singletons at ~`r·extras` (replica rate) with a
+    proven component/rank correction that keeps it just below truth, INDEPENDENT of common-zero
+    saturation. This deletes the artifact at the source and should make the bound track the measured
+    ~1.0 per-zero charge (near-MDS). Next: implement this corrected charge as a new mode, re-run the
+    lift validator across r=1,2,4 and depth<=3 to confirm safe-and-tight, then propagate to the
+    depth-5 base seal and read off the honest crossing.

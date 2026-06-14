@@ -41,7 +41,7 @@ def main() -> None:
     ap.add_argument("--q", type=int, required=True)
     ap.add_argument("--expansion", type=int, default=2)
     ap.add_argument("--charge", default="component-uniform",
-                    choices=["loose", "replica", "component-uniform"])
+                    choices=["loose", "replica", "component-uniform", "component-envelope"])
     ap.add_argument("--t-domain", choices=["nonzero", "all"], default="nonzero")
     ap.add_argument("--child-samples", type=int, default=None)
     ap.add_argument("--parent-samples", type=int, default=None)

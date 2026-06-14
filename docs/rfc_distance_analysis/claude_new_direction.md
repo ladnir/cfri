@@ -150,7 +150,43 @@ Either way we stop chasing a number (`e=71`) that may not even be true for this 
 
   - **The fix for M2's DP:** charge non-common singletons at ~`r·extras` (replica rate) with a
     proven component/rank correction that keeps it just below truth, INDEPENDENT of common-zero
-    saturation. This deletes the artifact at the source and should make the bound track the measured
-    ~1.0 per-zero charge (near-MDS). Next: implement this corrected charge as a new mode, re-run the
-    lift validator across r=1,2,4 and depth<=3 to confirm safe-and-tight, then propagate to the
-    depth-5 base seal and read off the honest crossing.
+    saturation. (Refined below.)
+
+- 2026-06-13: **M2/M3 — exact charge law found; but the recurrence framework is shown to be
+  structurally too loose. This is the key result of the session and it redirects the whole effort.**
+
+  - **Exact singleton charge law (validated against the oracle across r=1,2,4):**
+    `charge = r + extras - 1` (for extras>=1). The first non-common singleton costs the full replica
+    rate `r` (rank-1 alignment q^-(r-1) times root q^-1); each additional one, conditioned on that
+    alignment, costs only its own root equation q^-1. Unifies with the exact r=1 charge (= extras)
+    and is independent of common-zero saturation. Implemented as `component-envelope` in
+    `rfc_replica_zero_moment.py`. (An earlier guess `(r-1)*extras+1` was UNSAFE at r=4 by 3.3 bits;
+    discarded. Measured true charges: (r,extras)=(2,1)->2.1, (2,2)->3.0, (4,1)->4.0, (4,2)->4.9,
+    all = r+extras-1 up to the negligible (q-1)/q finite factor.)
+
+  - **The `2^2016` artifact is fully explained:** component-uniform charges 0 in saturation; the
+    true charge is `r+extras-1`, which never collapses. All the saturation/credit-lemma work was
+    fighting a charge bug.
+
+  - **BUT: with the correct charge the recurrence still does not prove near-MDS — because it is a
+    loose upper bound whose looseness COMPOUNDS with depth.** Recurrence vs exact oracle (c=2,q=3):
+    depth 2 gap ~1.4 bits, depth 3 gap ~4 bits (same support, growing excess). Production trend
+    (exp8, q=2^128, correct charge) then degrades: rel_dist 0.398 (d5) -> 0.187 (d6) -> 0.047 (d7).
+    The earlier "stable 0.746" was an artifact of the UNSAFE overcharge, not real.
+
+  - **Root cause (structural, not the charge):**
+    `B_d(r,z) = sum_{p,s,c} 2^s q^-charge binom(u,p) binom(n'-u,s-c) B_{d-1}(2r,u)`
+    multiplies the child moment by free placement factors `binom(u,p) binom(n'-u,s-c)`. But
+    `B_{d-1}(2r,u)` already aggregates over all size-`u` common-zero placements, so re-multiplying by
+    placement counts over-counts configurations. This union-bound looseness compounds over depth,
+    independent of any per-term charge. **No charge refinement can fix it.** This explains why years
+    of charge/credit-lemma work (component-uniform, theta_2 algebra, the credit lemmas) never closed:
+    they refined the per-term charge of a recurrence whose aggregation looseness grows with depth.
+
+  - **Redirect.** The true first moment (oracle) is well-behaved, so a tight bound exists — just not
+    via this recursive-union-bound aggregation. Path to near-MDS = a TIGHTER first-moment handle:
+    (a) a recurrence that does not re-multiply placement counts already inside the child moment
+    (exact-support / inclusion-exclusion so common-zero placements are not double-counted), or
+    (b) a direct first-moment computation at production scale by a smarter-than-brute-force method.
+    The oracle + lift validator stay as ground truth: any new bound must match within o(1) bits per
+    level, not the current ~2.5+ bits/level that compounds.

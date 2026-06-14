@@ -132,6 +132,16 @@ def lift_moment(
                         else:
                             charge = extras + replica_count * quotient_rank - 1
                     root_charge_log = -charge * q_log2
+                elif singleton_charge == "component-envelope":
+                    # Saturation-free charge, fit and validated against the brute-force oracle
+                    # (rfc_lift_validator.py).  The first non-common singleton in an r-replica state
+                    # costs the full replica rate r (rank-1 alignment q^-(r-1) times root q^-1); each
+                    # additional non-common singleton, conditioned on that alignment, costs only its
+                    # own root equation q^-1.  Hence charge = r + extras - 1.  This unifies with the
+                    # exact r=1 charge (= extras) and is INDEPENDENT of common-zero saturation,
+                    # unlike component-uniform which wrongly drops to 0 and yields the 2^2016 artifact.
+                    charge = 0 if extras == 0 else replica_count + extras - 1
+                    root_charge_log = -charge * q_log2
                 else:
                     raise ValueError(f"unknown singleton charge {singleton_charge}")
                 term = (
@@ -203,6 +213,9 @@ def lift_terms_for_z(
                     else:
                         charge = extras + replica_count * quotient_rank - 1
                 root_charge_log = -charge * q_log2
+            elif singleton_charge == "component-envelope":
+                charge = 0 if extras == 0 else replica_count + extras - 1
+                root_charge_log = -charge * q_log2
             else:
                 raise ValueError(f"unknown singleton charge {singleton_charge}")
             term = (
@@ -241,7 +254,7 @@ def main() -> None:
     parser.add_argument("--dump-stop", type=int, default=-1)
     parser.add_argument(
         "--singleton-charge",
-        choices=["loose", "replica", "component-uniform"],
+        choices=["loose", "replica", "component-uniform", "component-envelope"],
         default="loose",
     )
     args = parser.parse_args()

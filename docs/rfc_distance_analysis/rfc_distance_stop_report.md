@@ -514,6 +514,38 @@ python -B scripts/rfc_distance_analysis/rfc_base_seal_tail_trace.py --min-u 9 --
 
 These reproduce the latest top-boundary facts.
 
+## Preservation Checklist
+
+This table records where each important piece of progress is preserved, so future work does not
+have to infer it from commit history.
+
+| Progress Item | Preserved In | Reproduce / Check |
+|---|---|---|
+| Overall status and stop narrative | `docs/rfc_distance_analysis/rfc_distance_stop_report.md` | read this file first |
+| Concise resume path | `docs/rfc_distance_analysis/rfc_distance_resume_status.md` | read after the stop report |
+| Idea success/failure ledger | `docs/rfc_distance_analysis/scorecard.md` | check the top rows and active frontier |
+| External Claude/Fable critique | `docs/rfc_distance_analysis/claude_second_opinion_2026_06_13.md`, `docs/rfc_distance_analysis/rfc_fable_audit_2026_06_10.md` | read before trusting any scalar/product split |
+| Top carry/kernel credit rejection | `docs/rfc_distance_analysis/rfc_top_tau1_root_kernel_carry_block.md`, `scripts/rfc_distance_analysis/rfc_tau1_carry_kappa_audit.py` | `python -B scripts/rfc_distance_analysis/rfc_tau1_carry_kappa_audit.py` |
+| Hybrid base-seal decision | `docs/rfc_distance_analysis/rfc_top_boundary_base_seal_decision.md` | inspect falsification criteria |
+| Lower grammar potential after skipping top edge | `scripts/rfc_distance_analysis/rfc_block_potential_probe.py`, `docs/rfc_distance_analysis/rfc_top_boundary_base_seal_decision.md` | run the `--skip-transition top_tau1_to_2_15` command in that note |
+| Finite depth-5 theorem target | `docs/rfc_distance_analysis/rfc_depth5_finite_flag_recurrence_target.md` | inspect state and branch requirements |
+| Scalar calibration budget | `scripts/rfc_distance_analysis/rfc_base_seal_budget.py`, `scripts/rfc_distance_analysis/README.md` | `python -B scripts/rfc_distance_analysis/rfc_base_seal_budget.py` |
+| Corrected child-gap comparison | `scripts/rfc_distance_analysis/rfc_base_seal_child_gap.py` | `python -B scripts/rfc_distance_analysis/rfc_base_seal_child_gap.py` |
+| High-common-zero tail mechanism | `scripts/rfc_distance_analysis/rfc_base_seal_tail_trace.py` | `python -B scripts/rfc_distance_analysis/rfc_base_seal_tail_trace.py --min-u 9 --max-u 17` |
+| Construction/root normalization | `docs/rfc_distance_analysis/rfc_distance_certificate_theorem.md`, this stop report | check determinant-1 nonzero-root assumptions |
+| Deferred systematic state | `docs/rfc_distance_analysis/systematic_rfc_distance_proof.md`, `docs/rfc_distance_analysis/rfc_systematic_distance_proof_status.md` | systematic is not active in this stop point |
+
+The most important numbers to preserve are:
+
+```text
+scalar calibration log2 B_5(1,34) = -115.10435419
+uniform calibration slack          =   35.10435419 bits = 0.27425277 qdims
+dominant one-u slack               = about 0.29..0.31 qdims for u=0..5
+component-uniform child gap        = matches scalar for u=0..8, fails for u>=9
+first failed tail row              = u=9, excess 0.69810814 qdims
+all-paired tail row                = u=17, excess 16.37775695 qdims
+```
+
 ## Current Commit Trail
 
 The most relevant recent commits are:

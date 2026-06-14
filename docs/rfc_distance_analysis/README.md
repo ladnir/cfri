@@ -106,6 +106,9 @@ scripts/rfc_distance_analysis/rfc_quotient_diamond_diagnostic.py support-two quo
 scripts/rfc_distance_analysis/rfc_block_grammar_ledger.py canonical diagram block grammar table
 scripts/rfc_distance_analysis/rfc_block_potential_probe.py simple potential probe over stress transitions
 scripts/rfc_distance_analysis/rfc_tau1_carry_kappa_audit.py tau-one carry/kappa eligibility audit
+scripts/rfc_distance_analysis/rfc_base_seal_budget.py depth-5 base-seal calibration budget
+scripts/rfc_distance_analysis/rfc_base_seal_child_gap.py corrected child-gap comparison against scalar ceilings
+scripts/rfc_distance_analysis/rfc_base_seal_tail_trace.py high-common-zero tail mechanism trace
 scripts/rfc_distance_analysis/rfc_defect_conservation.py fixed-witness defect-conservation diagnostic
 scripts/rfc_distance_analysis/rfc_shortened_rank_recurrence.py optimistic shortened-kernel rank recurrence
 rfc_rank_pattern_induction_target.md          current finite-replica induction target

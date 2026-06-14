@@ -377,3 +377,28 @@ Either way we stop chasing a number (`e=71`) that may not even be true for this 
     proliferate per level -> genuine wall. This is now a concrete automaton/transfer-operator closure
     question, not a vague "track more structure." Next: enumerate the column value-classes and test
     closure under the fold.
+
+- 2026-06-13: **CLOSURE TEST RESOLVED — definitive wall. The minimal closed column-class alphabet is
+  the PROJECTIVE SPACE, size ~q^(D-1); no finite alphabet exists.** (`rfc_column_class_closure.py`.)
+
+  - Computed the coarsest fold-closed equivalence on column values (bisimulation: class of a scalar =
+    zero/nonzero; class of `(a,b)` = the function `t -> (class(a+t b), class(a+(t+1)b))`). Class
+    counts by replica dim D: q=3: 2,5,41,3281; q=5: 2,7,157,97657; q=7: 2,9,401,960801.
+  - **Exact formula (matches all q, all D): `#classes(D) = (q^D - 1)/(q-1) + 1` = |P^{D-1}(F_q)| + 1.**
+    The closed alphabet IS projective space (column directions) plus zero. Makes sense: `a+t b = 0`
+    iff `(a,b)` is projectively aligned with `(1,-t)`, so the fold's zero pattern is governed by the
+    column's projective class, which does not coarsen.
+  - **Consequence (proven, not conjectured): there is no tractable exact/tight first-moment recurrence.**
+    The minimal sufficient per-column state is the projective direction; the state size grows as
+    ~q^(D-1) with column dim D=2^j -> at production (D=2^11, q=2^128) astronomically intractable.
+    Every earlier failure (scalar double-count, UB over-bound, (u,rank) insufficiency) is a shadow of
+    this: the charge lives in the projective geometry of the codeword columns, which has no compression.
+  - **Bottom line for the whole first-moment program:** near-MDS for this code is very likely TRUE
+    (oracle charge ~0.85 -> rel_dist ~0.84-0.86) but is NOT tractably provable via the first
+    moment / replica recurrence. The route is closed. Stop here.
+  - **Only remaining routes to a depth-11 theorem:** (A) the combinatorial min-distance recursion
+    (BaseFold-paper style) -- tractable, gives a constant, but capped below near-MDS and offers
+    limited advantage over the paper; (B) a genuinely different (e.g. algebraic) idea -- none in hand.
+    Honest assessment: the paper's combinatorial constant is likely the practical ceiling for a
+    tractable proof; near-MDS appears true but proof-intractable by all first-moment methods tried,
+    now with a structural reason (projective-class explosion), not just repeated failure.

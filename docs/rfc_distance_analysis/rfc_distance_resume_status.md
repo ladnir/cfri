@@ -155,6 +155,8 @@ scripts/rfc_distance_analysis/rfc_block_potential_probe.py
   support-three is tight again at `level_weight=1.93994737`. These are ledger diagnostics, not
   certificate claims. The audited profile `--credit-profile audited-top-kernel` removes both
   unsupported top credits and gives `level_weight=3.00795584` with `top_tau1_to_2_15` still tight.
+  If `top_tau1_to_2_15` is skipped as an externally sealed finite boundary theorem, the remaining
+  lower grammar has `level_weight=1.93994737`, bottlenecked by `support3_stratified_to_3_6`.
 
 scripts/rfc_distance_analysis/rfc_tau1_carry_kappa_audit.py
   Status: narrow eligibility audit.
@@ -174,6 +176,12 @@ docs/rfc_distance_analysis/rfc_top_tau1_root_kernel_carry_block.md
   It also records the main risk: the current `--tau1-root-kernel-cover-mode kernel` diagnostic is
   broad and must be replaced by row eligibility flags before theorem use. After the carry/kernel
   audit, the immediate top edge supports neither tau-one full-line carry nor kernel-fiber cover.
+
+docs/rfc_distance_analysis/rfc_top_boundary_base_seal_decision.md
+  Status: current architecture decision.
+  Records the hybrid route: handle `top_tau1_to_2_15` by a finite depth-5 boundary theorem
+  `B_5(1,34)<=2^-80`, and use the reusable block grammar below that boundary. The boundary-skip
+  potential probe leaves support-three as the lower bottleneck with support-two/base rows slack.
 
 docs/rfc_distance_analysis/rfc_support_two_tau2_quotient_frame_lemma.md
   Status: local theorem target.
@@ -309,11 +317,10 @@ rows one at a time:
    `rfc_canonical_diagram_certificate_plan.md`. The proof must map every recursive witness to a
    child diagram with quotient/root data, consumed-kernel nodes, and incidence markers, then count
    that diagram once.
-2. Resolve the top row `top_tau1_to_2_15`. The `local-incidence` profile moves the bottleneck
-   there, but the first eligibility audit shows the current top edge supports neither
-   `tau1_full_line_carry` nor `kernel_fiber_cover`. This is now the fastest falsification point for
-   the general block grammar: either find a real top-row theorem, or fall back to a row-specific
-   treatment for this boundary transition.
+2. Prove the finite top boundary seal `B_5(1,34)<=2^-80`. The local top-credit audit shows
+   `top_tau1_to_2_15` supports neither `tau1_full_line_carry` nor `kernel_fiber_cover`, so the
+   current architecture is explicitly hybrid: boundary-specific finite theorem at the top,
+   reusable block grammar below.
 3. Import the support-three rank-defect incidence credit into the certificate constants. The
    old `current-target` ceiling returns the tight row to support-three at `level_weight=1.93994737`,
    but the audited profile leaves the top row tight at `level_weight=3.00795584`, so support-three

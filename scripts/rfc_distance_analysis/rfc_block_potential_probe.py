@@ -264,23 +264,24 @@ def validate_transitions(credits: dict[str, float] | None = None) -> None:
 
 def evaluate(
     weights: Weights,
+    transitions: tuple[Transition, ...],
     credits: dict[str, float],
     slack: float,
     credit_profile: str,
 ) -> SearchResult:
     requirements = [
         max(0.0, required_level_weight(transition, weights, credits, slack))
-        for transition in TRANSITIONS
+        for transition in transitions
     ]
     level_weight = max(requirements)
-    margins = [margin(transition, weights, level_weight, credits) for transition in TRANSITIONS]
+    margins = [margin(transition, weights, level_weight, credits) for transition in transitions]
     worst_margin = min(margins)
     bottleneck_index = margins.index(worst_margin)
     return SearchResult(
         level_weight=level_weight,
         worst_margin=worst_margin,
         weights=weights,
-        bottleneck=TRANSITIONS[bottleneck_index].transition_id,
+        bottleneck=transitions[bottleneck_index].transition_id,
         credit_profile=credit_profile,
     )
 
@@ -289,6 +290,7 @@ def search(
     dim_grid: list[float],
     zero_grid: list[float],
     node_grid: list[float],
+    transitions: tuple[Transition, ...],
     credits: dict[str, float],
     slack: float,
     top: int,
@@ -299,7 +301,7 @@ def search(
         for zero_weight in zero_grid:
             for node_weight in node_grid:
                 weights = Weights(dim=dim_weight, zero=zero_weight, node=node_weight)
-                results.append(evaluate(weights, credits, slack, credit_profile))
+                results.append(evaluate(weights, transitions, credits, slack, credit_profile))
     results.sort(
         key=lambda result: (
             result.level_weight,
@@ -312,12 +314,13 @@ def search(
 
 
 def transition_rows(
+    transitions: tuple[Transition, ...],
     weights: Weights,
     level_weight: float,
     credits: dict[str, float],
 ) -> list[dict[str, object]]:
     rows: list[dict[str, object]] = []
-    for transition in TRANSITIONS:
+    for transition in transitions:
         rows.append(
             {
                 "transition_id": transition.transition_id,
@@ -370,6 +373,12 @@ def main() -> None:
         help="override a block credit as block_id=value in qdims",
     )
     parser.add_argument(
+        "--skip-transition",
+        action="append",
+        default=[],
+        help="omit a transition by id because it is handled by an external boundary theorem",
+    )
+    parser.add_argument(
         "--show-transitions",
         action="store_true",
         help="print per-transition margins for the best result instead of the search table",
@@ -379,6 +388,17 @@ def main() -> None:
 
     credits = credit_map(args.credit_profile, args.block_credit)
     validate_transitions(credits)
+    transition_ids = {transition.transition_id for transition in TRANSITIONS}
+    unknown_skips = sorted(set(args.skip_transition) - transition_ids)
+    if unknown_skips:
+        raise SystemExit(f"unknown skipped transitions: {unknown_skips}")
+    transitions = tuple(
+        transition
+        for transition in TRANSITIONS
+        if transition.transition_id not in set(args.skip_transition)
+    )
+    if not transitions:
+        raise SystemExit("all transitions were skipped")
     if args.validate_only:
         return
 
@@ -386,6 +406,7 @@ def main() -> None:
         args.dim_grid,
         args.zero_grid,
         args.node_grid,
+        transitions,
         credits,
         args.slack,
         args.top,
@@ -393,7 +414,7 @@ def main() -> None:
     )
     if args.show_transitions:
         best = results[0]
-        emit_csv(transition_rows(best.weights, best.level_weight, credits))
+        emit_csv(transition_rows(transitions, best.weights, best.level_weight, credits))
         return
 
     rows = [

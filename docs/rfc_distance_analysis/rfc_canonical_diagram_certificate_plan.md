@@ -283,6 +283,26 @@ The next theorem work is now a sharper fork: either find a different top-row the
 ingredient. Support-three incidence still behaves like a reusable block, but it is no longer the
 next obstruction.
 
+The current decision is to treat the top as a finite boundary seal rather than as a reusable local
+block. With:
+
+```text
+--skip-transition top_tau1_to_2_15
+```
+
+and the audited lower credits, the lower block grammar has:
+
+```text
+level_weight = 1.93994737
+bottleneck = support3_stratified_to_3_6.
+```
+
+This hybrid route is recorded in:
+
+```text
+docs/rfc_distance_analysis/rfc_top_boundary_base_seal_decision.md
+```
+
 The top carry/root-kernel contract is now recorded in:
 
 ```text

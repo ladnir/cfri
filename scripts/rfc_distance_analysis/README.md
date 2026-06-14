@@ -521,6 +521,9 @@ python -B scripts/rfc_distance_analysis/rfc_block_potential_probe.py \
   --zero-grid 0.2:2:0.05 --credit-profile current-target --top 1 --show-transitions
 python -B scripts/rfc_distance_analysis/rfc_block_potential_probe.py \
   --zero-grid 0.2:2:0.05 --credit-profile audited-top-kernel --top 1 --show-transitions
+python -B scripts/rfc_distance_analysis/rfc_block_potential_probe.py \
+  --zero-grid 0.2:2:0.05 --credit-profile audited-top-kernel \
+  --skip-transition top_tau1_to_2_15 --top 1 --show-transitions
 python -B scripts/rfc_distance_analysis/rfc_tau1_carry_kappa_audit.py
 ```
 
@@ -537,8 +540,10 @@ line, no positive top post-root line family, and no kernel lift (`kernel_dim=0`,
 `kernel_lift_qdim=0`). Thus neither `tau1_full_line_carry` nor `kernel_fiber_cover` should be spent
 on that edge. The audited profile `audited-top-kernel` removes both top credits; it has
 `level_weight=3.00795584` and remains tight at `top_tau1_to_2_15`. Treat `current-target` as a
-ceiling only; the theorem target is now a real top-row theorem or a row-specific boundary
-treatment.
+ceiling only. If `top_tau1_to_2_15` is skipped as an externally sealed finite boundary theorem,
+the lower grammar returns to `level_weight=1.93994737`, bottlenecked by
+`support3_stratified_to_3_6`. This is the hybrid route recorded in
+`docs/rfc_distance_analysis/rfc_top_boundary_base_seal_decision.md`.
 
 `--demand-closure-passes` is the cheaper version of the same test. It adds lower pair-table keys
 queried by demanded pair rows, then rebuilds. In the same stronger mode:

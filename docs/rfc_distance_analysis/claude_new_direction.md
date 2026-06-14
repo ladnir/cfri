@@ -352,3 +352,28 @@ Either way we stop chasing a number (`e=71`) that may not even be true for this 
     (BaseFold-paper style): bound `d_h` from `d_{h-1}` via codeword weights directly, sidestepping the
     first moment and rank-tracking; tighten to BEAT the paper's constant. Option (2) is the likelier
     path to an actual depth-11 theorem.
+
+- 2026-06-13: **Sufficiency test (`rfc_sufficiency_test.py`): `(zeros, rank)` is INSUFFICIENT; the
+  full column-type histogram is sufficient and has only POLYNOMIAL size.** (Pursuing option 1.)
+
+  - The parent zero distribution of a fold is fixed by the child's column-type counts `(u, g1, g2)`
+    (common / one-root-hittable / two-root-hittable). Tested which coarse summary determines them,
+    by exact enumeration (q=3, depths 1-2, R=1,2):
+    | summary | verdict |
+    |---|---|
+    | `u` (zero-count) | INSUFFICIENT |
+    | `(u, rank)` | INSUFFICIENT  <- the proposed rank-augmentation is DEAD |
+    | `(u, rank, #nonzero-cols)` | INSUFFICIENT |
+    | full type-histogram `(common,g1,g2,dead)` | SUFFICIENT |
+  - **`(zeros, rank)` does not close** — rank is not the missing statistic. But the SUFFICIENT object,
+    the column-type histogram, is only 4 counts summing to n, so its count is ~n^3 (POLYNOMIAL):
+    observed 17 distinct histograms at n=4, 131 at n=8.
+  - **Reframed open question (sharp, and the next decisive test):** does the type-histogram CLOSE
+    under the fold — is the parent histogram a function of the child histogram (in distribution over
+    the fold challenge)? Equivalently: is there a finite alphabet of per-column value-classes,
+    closed under the det-1 fold map `(x_LL,x_LR,x_RL,x_RR; tau) -> two parent (a,b) columns`, that
+    determines the zero/hit classes? If the class alphabet is finite & small -> a transfer-operator
+    recurrence on a polynomial-size state -> tractable AND tight -> near-MDS provable. If the classes
+    proliferate per level -> genuine wall. This is now a concrete automaton/transfer-operator closure
+    question, not a vague "track more structure." Next: enumerate the column value-classes and test
+    closure under the fold.

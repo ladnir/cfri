@@ -6,9 +6,11 @@ distance-certificate push. Systematic notes are retained as deferred/reference m
 Useful entry points:
 
 ```text
+rfc_distance_analysis_current_understanding.md current synthesis of what is known/proven/blocked
+claude_new_direction.md                       active clean-start plan: ground-truth-first oracle/lift path
 rfc_distance_manager_board.md                 current manager board and lane ownership
-rfc_distance_stop_report.md                   coherent stop/handoff report for current proof status
-rfc_distance_resume_status.md                 concise resume note for restarting the proof thread
+rfc_distance_stop_report.md                   historical stop/handoff report for the prior lemma-grind path
+rfc_distance_resume_status.md                 historical resume note; see claude_new_direction.md for current path
 scorecard.md                                  success/failure scorecard for proof ideas
 rfc_fable_audit_2026_06_10.md                 external Fable audit and corrections
 claude_report.md                              follow-up external review of the resume status
@@ -111,6 +113,8 @@ scripts/rfc_distance_analysis/rfc_base_seal_child_gap.py corrected child-gap com
 scripts/rfc_distance_analysis/rfc_base_seal_tail_trace.py high-common-zero tail mechanism trace
 scripts/rfc_distance_analysis/rfc_defect_conservation.py fixed-witness defect-conservation diagnostic
 scripts/rfc_distance_analysis/rfc_shortened_rank_recurrence.py optimistic shortened-kernel rank recurrence
+scripts/rfc_distance_analysis/rfc_brute_force_moment.py exact small-field oracle for true RFC first moments
+scripts/rfc_distance_analysis/rfc_lift_validator.py one-step lift validator against exact child moments
 rfc_rank_pattern_induction_target.md          current finite-replica induction target
 ```
 
@@ -142,6 +146,8 @@ rfc_visible_span_profile.py     exact local visible-span subspace profiler with 
 rfc_support_profile_bound.py    support-containment Gaussian bound from delta(A)
 rfc_root_line_kernel_profile.py root-line kernel profile with exact-support inversion
 rfc_replica_zero_moment.py      loose aggregate replica first-moment recurrence diagnostic
+rfc_brute_force_moment.py       exact small-field oracle for true RFC first moments
+rfc_lift_validator.py           one-step recurrence/lift validator fed exact child moments
 rfc_multicopy_falsification.py  multi-copy broad-family falsification stress model
 rfc_paired_spine_cascade.py     paired-spine cascade diagnostic seeded by complete-stride flags
 ```
@@ -149,7 +155,7 @@ rfc_paired_spine_cascade.py     paired-spine cascade diagnostic seeded by comple
 The intended hierarchy is:
 
 ```text
-theorem note -> certificate script -> diagnostic profilers
+current understanding / theorem note -> oracle + lift validator -> certificate script -> diagnostic profilers
 ```
 
 The certificate output is conditional until the corrected tau-2 endpoint theorem, the finite-replica

@@ -51,9 +51,9 @@ def main() -> None:
     nonzero = args.t_domain == "nonzero"
 
     # Exact child B_{d-1}(2r, u) and exact parent B_d(r, z) from the oracle.
-    child_mom, child_n, _, child_exact = brute_force_moment(
+    child_mom, _child_hist, child_n, _, child_exact = brute_force_moment(
         d - 1, c, q, nonzero, None, args.child_samples, 1, 2 * r)
-    parent_mom, parent_n, _, parent_exact = brute_force_moment(
+    parent_mom, _parent_hist, parent_n, _, parent_exact = brute_force_moment(
         d, c, q, nonzero, None, args.parent_samples, 1, r)
 
     child_log = [log2_frac(x) for x in child_mom]

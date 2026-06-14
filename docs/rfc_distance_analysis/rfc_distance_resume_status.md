@@ -1,5 +1,16 @@
 # RFC Distance Resume Status
 
+Status note: this file is now a historical resume for the pre-oracle proof push. The active
+clean-start direction is:
+
+```text
+docs/rfc_distance_analysis/claude_new_direction.md
+```
+
+That note supersedes the high-common-zero tail/base-seal grind below with a ground-truth-first
+program: exact small-field first-moment oracle, one-step lift validation, and then a tighter
+exact-support/inclusion-exclusion recurrence or direct first-moment computation.
+
 Scope: original non-systematic RFC distance certificate work. Systematic RFC notes exist in this
 folder, but the active proof push is original/non-systematic.
 

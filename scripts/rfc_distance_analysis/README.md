@@ -16,10 +16,12 @@ Recent original-RFC near-MDS probes:
 
 ```text
 rfc_distance_certificate.py        conditional theorem-based distance certificate driver
+rfc_brute_force_moment.py          exact small-field oracle for true RFC first moments B_d(R,z)
+rfc_lift_validator.py              one-step recurrence/lift validator fed exact child moments
 rfc_original_falsification_report.py original-RFC bad-family/falsification report
 rfc_exterior_constraint_profile.py  exact r=2 exterior-count profiles by matroid components
 rfc_replica_rank1_profile.py        r=2 root-compatibility singleton profile
-rfc_replica_zero_moment.py          loose/optimistic aggregate replica recurrence diagnostic
+rfc_replica_zero_moment.py          loose/optimistic/component-envelope aggregate recurrence diagnostic
 rfc_replica_span_moment.py          ordered-tuple span-aware diagnostic
 rfc_base_seal_budget.py             depth-5 boundary slack budget against child-bound losses
 rfc_base_seal_child_gap.py          compare candidate child bounds against base-seal ceilings
@@ -60,7 +62,7 @@ rfc_multicopy_falsification.py      multi-copy broad-family falsification stress
 The intended hierarchy is:
 
 ```text
-theorem note -> rfc_distance_certificate.py -> diagnostic profilers
+current understanding / theorem note -> oracle + lift validator -> rfc_distance_certificate.py -> diagnostic profilers
 ```
 
 `rfc_distance_certificate.py` is a final-shape conditional calculator. It uses theorem exponents
@@ -68,6 +70,14 @@ and emits CSV to stdout plus optional JSON/CSV artifacts; it does not consume em
 counts. The profiler scripts below it are diagnostics for local theorem and recurrence development.
 After the `a=5, delta=3, comp=1, g=1` endpoint correction, this driver should be read as
 conditional on a layer-codimension tau-2 theorem, not on the older generic/component shortcut.
+
+The active clean-start direction is documented in
+`docs/rfc_distance_analysis/claude_new_direction.md`. In that direction,
+`rfc_brute_force_moment.py` and `rfc_lift_validator.py` are acceptance tests: candidate recurrences
+must match the exact small-field oracle before being extrapolated. The `component-envelope` mode in
+`rfc_replica_zero_moment.py` encodes the currently validated local singleton charge law
+`charge = r + extras - 1`; it fixes the saturation charge bug, but the aggregate recurrence remains
+structurally too loose to certify production distance.
 
 `rfc_subspace_span_moment.py`, `rfc_replica_span_moment.py`, and `rfc_flag_span_moment.py` support
 `--singleton-charge endpoint-tau2-layer`. This mode uses the calibration charge:

@@ -104,7 +104,12 @@ def brute_force_moment(depth: int, c: int, q: int, nonzero_t: bool,
         chal_iter = ([rng.choice(t_dom) for _ in range(n_chal)] for _ in range(samples))
         exact = False
 
-    total = [0] * (n + 1)
+    # hist[w] = total count (over T and nonzero tuples) of tuples with EXACTLY w common zeros.
+    # This is the exact-support histogram; A_d(R,w) = hist[w]/num_T, and the binom-weighted moment
+    # is recovered EXACTLY as B_d(R,z) = sum_w A_d(R,w)*binom(w,z).  Tracking exact w (rather than
+    # the binom-weighted B directly) is what the inclusion-exclusion recurrence needs to avoid the
+    # compounding double-count.
+    hist = [0] * (n + 1)
     num_t_vectors = 0
     for chal in chal_iter:
         num_t_vectors += 1
@@ -122,12 +127,7 @@ def brute_force_moment(depth: int, c: int, q: int, nonzero_t: bool,
             for idx in range(num_msgs):
                 if idx == zero_idx:
                     continue
-                zeros = bin(masks[idx]).count("1")
-                if zeros == 0:
-                    continue
-                row = binom[zeros]
-                for z in range(1, min(zeros, max_z) + 1):
-                    total[z] += row[z]
+                hist[bin(masks[idx]).count("1")] += 1
         else:
             full = (1 << n) - 1
             for tup in itertools.product(range(num_msgs), repeat=replica):
@@ -136,19 +136,19 @@ def brute_force_moment(depth: int, c: int, q: int, nonzero_t: bool,
                 common = full
                 for i in tup:
                     common &= masks[i]
-                    if common == 0:
-                        break
-                if common == 0:
-                    continue
-                zeros = bin(common).count("1")
-                row = binom[zeros]
-                for z in range(1, min(zeros, max_z) + 1):
-                    total[z] += row[z]
-    # z=0 term: number of nonzero R-tuples, counted once per T.
-    total[0] = (num_msgs ** replica - 1) * num_t_vectors
+                hist[bin(common).count("1")] += 1
+
+    # B_d(R,z) = sum_{w>=z} hist[w]*binom(w,z) / num_T  (binom-weighted moment, exact identity).
+    total = [0] * (n + 1)
+    for w in range(n + 1):
+        if hist[w] == 0:
+            continue
+        for z in range(0, min(w, max_z) + 1):
+            total[z] += hist[w] * binom[w][z]
 
     moments = [Fraction(total[z], num_t_vectors) for z in range(n + 1)]
-    return moments, n, num_t_vectors, exact
+    hist_moments = [Fraction(hist[w], num_t_vectors) for w in range(n + 1)]
+    return moments, hist_moments, n, num_t_vectors, exact
 
 
 def log2_fraction(x: Fraction) -> float:
@@ -170,6 +170,8 @@ def main() -> None:
                     help="Monte-Carlo: sample this many T-vectors instead of full enumeration")
     ap.add_argument("--seed", type=int, default=0)
     ap.add_argument("--replica", type=int, default=1, help="R: ordered R-tuple replica count")
+    ap.add_argument("--histogram", action="store_true",
+                    help="also print the exact-support histogram A_d(R,w)=E[#tuples with exactly w common zeros]")
     args = ap.parse_args()
 
     # sanity: q prime
@@ -179,7 +181,7 @@ def main() -> None:
     k = 1 << args.depth
     n = args.expansion * k
     R = args.replica
-    moments, n, num_t, exact = brute_force_moment(
+    moments, hist_moments, n, num_t, exact = brute_force_moment(
         args.depth, args.expansion, args.q, args.t_domain == "nonzero", args.max_z,
         args.samples, args.seed, R)
 
@@ -206,6 +208,15 @@ def main() -> None:
         l2s = "-inf" if l2 == float("-inf") else f"{l2:.6f}"
         lqs = "-inf" if lq == float("-inf") else f"{lq:.6f}"
         print(f"{z},{excess},{b},{l2s},{lqs},{ideal_l2:.6f},{charge:.4f}")
+
+    if args.histogram:
+        print("# exact-support histogram A_d(R,w) = E_T[#nonzero tuples with EXACTLY w common zeros]")
+        print("w,A_exact,log2_A")
+        for w in range(0, top + 1):
+            a = hist_moments[w]
+            a2 = log2_fraction(a)
+            a2s = "-inf" if a2 == float("-inf") else f"{a2:.6f}"
+            print(f"{w},{a},{a2s}")
 
 
 if __name__ == "__main__":

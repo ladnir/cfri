@@ -154,9 +154,10 @@ Either way we stop chasing a number (`e=71`) that may not even be true for this 
       Unresolved: depth-compounding vs small-q tail effect. This is the key number M2's DP must
       reproduce and then evaluate at production q/depth.
 
-  - **`replica` (the optimistic model behind e=71) is concretely UNSAFE**: at depth2,q=3,z=6 it
-    gives log2 0.830 < truth 1.210 — it undershoots the real moment. So e=71 rests on a model now
-    shown to violate the very bound it claims. Treat e=71 as a lower target, not a provable one.
+  - **`replica` (the optimistic model behind e=71) is concretely UNSAFE in replica-state lifts**:
+    at depth2, parent replica R=2, q=3, z=6 it gives log2 2.567041 < exact 3.209453, undershooting
+    the real moment by 0.642413 bits. So e=71 rests on a model now shown to violate the very bound
+    it claims in the child states the recurrence uses. Treat e=71 as a target, not a provable one.
 
   - **`component-uniform` is a VALID upper bound at this scale** (>= truth everywhere, ~1 bit loose
     at depth2,q=3). The catastrophic `2^2016` artifact is therefore NOT intrinsic to it; it erupts
@@ -195,13 +196,13 @@ Either way we stop chasing a number (`e=71`) that may not even be true for this 
     upper bound (over-counts) but the slack compounds (depth2 r2: +1.6/+3.6/+5.1/+5.7 bits at
     z=3..6), which is the depth-5 `2^2016`.
 
-  - `replica` confirmed structurally UNSAFE again at the child level: lift undershoots exact
-    `B_1(2,z)` by 1.60 bits at z=2 (it charges `r·extras`, the upper end, with no low-rank
-    correction).
+  - `replica` is structurally UNSAFE in the one-step lift: with exact child moments, parent
+    R=2, q=3, z=6 gives lift log2 2.567041 versus exact 3.209453. The safer
+    `component-envelope` charge gives 4.152003 on the same row. This is the current reproducible
+    unsafe/safe sanity check for the local charge layer.
 
-  - **The fix for M2's DP:** charge non-common singletons at ~`r·extras` (replica rate) with a
-    proven component/rank correction that keeps it just below truth, INDEPENDENT of common-zero
-    saturation. (Refined below.)
+  - The intermediate idea "charge near r*extras with a correction" is superseded by the exact law
+    below. Do not build a new DP around the discarded intermediate charge.
 
 - 2026-06-13: **M2/M3 — exact charge law found; but the recurrence framework is shown to be
   structurally too loose. This is the key result of the session and it redirects the whole effort.**

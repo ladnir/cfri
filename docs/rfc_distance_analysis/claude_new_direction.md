@@ -40,15 +40,36 @@ This section is the settled current view. The chronological "Progress log" below
    production bound degrades (rel dist 0.40/0.19/0.05 at depth 5/6/7). **No per-term charge fix can
    repair this** — which is precisely why years of charge/credit-lemma work never closed.
 
-**The one genuinely open scientific question:** *is the real code actually near-MDS at q=2^128?*
-We do not yet know, and should not assert either way:
-- The top-level (r=1) charge measures ~1.0 (q^-1 per zero) at depth<=3 — consistent with near-MDS.
-- But the exact charge law `r+extras-1 < r*extras` (the optimistic `replica` rate) means the true
-  first moment is *larger* than the optimistic model behind `e=71`, and `replica` is provably unsafe.
-- And the only rigorous bound we have (the recurrence) is too loose to decide it (it degrades).
-So the truth sits between the small-q oracle hints and the optimistic conjecture, **unmeasured at
-production scale.** Near-MDS is plausible but unproven; the honest production relative distance is
-currently unknown.
+**CORRECTION (encoder fidelity bug found and fixed).** The oracle originally used INDEPENDENT fold
+challenges per subtree; the real encoder (`evaluate_over_foldable_domain`) indexes the challenge by
+the position WITHIN a chunk, so the SAME challenge vector is shared across all sibling chunks at a
+level (total `c*(2^d-1)` challenges, not `d*c*2^{d-1}`). Depth-1 is unaffected; depth>=2 ground truth
+was for the wrong code and has been recomputed. On the corrected oracle the session's conclusions
+SURVIVE and sharpen: charge law `r+extras-1` holds, `replica` is unsafe by 1.6 bits, and
+`component-envelope` is safe and *tighter* at the saturated end.
+
+**The open question is now substantially resolved — and the answer leans "statement TRUE, proof
+hard," NOT "statement false."** The key realization is that relative distance is ROBUST to the
+per-zero charge: at large q, `rel_dist ~ 1 - 1/(c*charge)`, so for c=8:
+`charge=1.0 -> 0.875`, `0.9 -> 0.861`, `0.8 -> 0.844`, `0.5 -> 0.750`. Distance only collapses if
+charge falls to ~0.15. Measured against the corrected exact oracle:
+- True per-zero charge at z=k: **0.90 (depth 2, exact, q-stable across q=3,5,7,11) -> 0.80 (depth 3,
+  MC).** That corresponds to relative distance ~0.84-0.86 — i.e. **good / near-MDS-ish.** The exact
+  `e=71` (which needs charge=1, rel_dist 0.875) is mildly optimistic; the honest value looks like
+  ~0.84-0.86.
+- The recurrence's apparent "rel_dist -> 0.05 by depth 7" is its EFFECTIVE charge collapsing to
+  ~0.13 — a pure looseness artifact: the recurrence-vs-oracle gap grows 0.84 bits (depth 2) -> 2.38
+  bits (depth 3), and its z=k charge falls 0.78 -> 0.62 while the true charge falls only 0.90 -> 0.80.
+  The recurrence understates the true distance; the true code is fine.
+- Consistent with the BaseFold paper (which proves these foldable codes have good relative distance):
+  the charge plausibly stabilizes at a positive constant.
+
+**Remaining genuine uncertainty:** only two clean depth points (d2, d3) for the oracle charge trend,
+declining ~0.1/level; d4+ is out of brute-force reach (q=3,d4 needs 3^16 messages). If that decline
+were linear-to-zero rather than converging, distance would eventually suffer — but robustness +
+the BaseFold theorem make convergence to a positive constant the strong bet. So: **near-MDS in the
+loose sense (rel_dist ~0.84-0.86) is plausibly true; exact `e=71` is slightly optimistic; the
+in-house recurrence cannot prove either because it is too loose and compounds.**
 
 **Path forward (what would actually settle it):** a first-moment handle that is both rigorous and
 tight enough to match the oracle within o(1) bits per level (not the current ~2.5+ that compounds).
@@ -242,3 +263,38 @@ Either way we stop chasing a number (`e=71`) that may not even be true for this 
     (b) a direct first-moment computation at production scale by a smarter-than-brute-force method.
     The oracle + lift validator stay as ground truth: any new bound must match within o(1) bits per
     level, not the current ~2.5+ bits/level that compounds.
+
+- 2026-06-13: **Encoder-fidelity bug found and fixed; the open question is now substantially
+  resolved toward "statement true, proof hard."** (Larger milestone.)
+
+  - **Bug:** the oracle used independent per-subtree fold challenges; the real encoder
+    (`evaluate_over_foldable_domain`) shares one challenge vector across all sibling chunks per level
+    (`level[j-half_chunk]`, local index). Total challenges `c*(2^d-1)`, not `d*c*2^{d-1}`. Fixed the
+    oracle's `encode` to match exactly (depth-1 unchanged; depth>=2 recomputed). Earlier depth>=2
+    oracle numbers (and the gap measurements based on them) were for the wrong code.
+
+  - **Re-validation on the corrected oracle:** charge law `r+extras-1` holds; `replica` unsafe by
+    1.6 bits; `component-envelope` safe and tighter at the saturated end (z=6 essentially exact).
+
+  - **Key insight — relative distance is robust to the charge:** at large q,
+    `rel_dist ~ 1 - 1/(c*charge)`, so charge 0.8-1.0 all give rel_dist 0.84-0.875; distance only
+    collapses if charge falls to ~0.15.
+
+  - **Measured true charge (corrected oracle, at z=k):** 0.90 (depth 2, exact, q-stable across
+    q=3,5,7,11) -> 0.80 (depth 3, MC) => true rel_dist ~0.84-0.86 (good / near-MDS-ish). Exact
+    `e=71` (charge=1, rel_dist 0.875) is mildly optimistic; honest value ~0.84-0.86.
+
+  - **The recurrence's degradation is a looseness artifact, now quantified against the CORRECTED
+    oracle:** gap grows 0.84 (d2) -> 2.38 bits (d3); recurrence z=k charge falls 0.78->0.62 while the
+    true charge falls only 0.90->0.80; the recurrence's "rel_dist -> 0.05 at d7" = effective charge
+    ~0.13, pure looseness. The true code is fine; the recurrence cannot show it.
+
+  - **Verdict:** near-MDS in the loose sense (rel_dist ~0.84-0.86) is plausibly TRUE and consistent
+    with the BaseFold distance theorem; the in-house recurrence is just too loose to prove it. This
+    is "proof hard," not "statement false." Caveat: only d2,d3 clean charge points (declining
+    ~0.1/level); d4+ is beyond brute-force reach (q=3,d4 needs 3^16 messages).
+
+  - **Implication for the build:** the inclusion-exclusion recurrence is still the target, and its
+    bar is now concrete — reproduce the oracle's ~0.8-0.9 charge within o(1)/level (the current
+    recurrence loses ~0.15 charge/level). The oracle now also emits `A_d(R,w)` as the per-`w`
+    acceptance test.

@@ -33,34 +33,49 @@ from fractions import Fraction
 
 
 def encode(message: tuple[int, ...], depth: int, c: int, q: int,
-           challenges: list[int], cursor: list[int]) -> list[int]:
+           challenges: list[int], cursor: list[int] | None = None) -> list[int]:
     """Encode `message` (length 2^depth) into a codeword (length c*2^depth) mod q.
 
-    `challenges` is a flat list of fold challenges; `cursor` is a one-element list used as a
-    consuming index so each fold coordinate draws the next challenge in a fixed order.
+    FAITHFUL to crates/cfri/src/backend/basefold.rs::evaluate_over_foldable_domain: the fold
+    challenge at level i is `level[j - half_chunk]`, indexed by the position WITHIN a chunk, so the
+    SAME challenge vector `level` is reused across all sibling chunks at that level.  Challenges are
+    therefore shared across subtrees (total c*(2^depth - 1)), NOT independent per subtree.
+
+    `challenges` is the flat challenge vector; it is sliced into levels: level i (i=0..depth-1) is
+    `challenges[off : off + c*2^i]`.  The `cursor` arg is ignored (kept for signature compatibility).
+    The base-code repetition layout and per-level det-1 fold match the encoder exactly; the final
+    `reverse_index_bits` only permutes coordinates and does not change the zero COUNT, so it is
+    omitted (this script only ever counts zeros).
     """
-    if depth == 0:
-        return [message[0] % q] * c
-    half = 1 << (depth - 1)
-    w_l = encode(message[:half], depth - 1, c, q, challenges, cursor)
-    w_r = encode(message[half:], depth - 1, c, q, challenges, cursor)
-    child_n = len(w_l)
-    left = [0] * child_n
-    right = [0] * child_n
-    for j in range(child_n):
-        t = challenges[cursor[0]]
-        cursor[0] += 1
-        left[j] = (w_l[j] + t * w_r[j]) % q
-        right[j] = (w_l[j] + (t + 1) * w_r[j]) % q
-    return left + right
+    k = 1 << depth
+    cl = c * k
+    arr = [0] * cl
+    for i in range(k):
+        v = message[i] % q
+        for j in range(c):
+            arr[i * c + j] = v
+    off = 0
+    chunk_size = c
+    for i in range(depth):
+        level_len = c * (1 << i)           # = half_chunk for this level
+        level = challenges[off:off + level_len]
+        off += level_len
+        chunk_size <<= 1
+        half = chunk_size >> 1
+        for base in range(0, cl, chunk_size):
+            for jj in range(half):
+                t = level[jj]
+                u = arr[base + jj]
+                w = arr[base + half + jj]
+                arr[base + jj] = (u + t * w) % q
+                arr[base + half + jj] = (u + (t + 1) * w) % q
+    return arr
 
 
 def num_challenges(depth: int, c: int) -> int:
-    # Fold level i (1..depth) has 2^{d-i} nodes, each drawing c*2^{i-1} challenges.
-    # Total = sum_{i=1}^d 2^{d-i} * c*2^{i-1} = d * c * 2^{d-1}.
-    if depth == 0:
-        return 0
-    return depth * c * (1 << (depth - 1))
+    # Shared per-level challenges (faithful to the encoder): level i has c*2^i challenges,
+    # reused across all sibling chunks.  Total = sum_{i=0}^{d-1} c*2^i = c*(2^d - 1).
+    return c * ((1 << depth) - 1)
 
 
 def challenge_domain(q: int, nonzero: bool) -> list[int]:

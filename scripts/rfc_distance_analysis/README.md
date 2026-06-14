@@ -23,6 +23,7 @@ rfc_replica_zero_moment.py          loose/optimistic aggregate replica recurrenc
 rfc_replica_span_moment.py          ordered-tuple span-aware diagnostic
 rfc_base_seal_budget.py             depth-5 boundary slack budget against child-bound losses
 rfc_base_seal_child_gap.py          compare candidate child bounds against base-seal ceilings
+rfc_base_seal_tail_trace.py         trace high-u common-zero tail rows in the base-seal child
 rfc_subspace_span_moment.py         subspace-span diagnostic exposing visible-kernel state
 rfc_flag_span_moment.py             two-layer flag diagnostic for kernel-zero propagation
 rfc_carried_flag_diagnostic.py      targeted carried-flag merge/diagram diagnostic for depth-5 trace
@@ -658,10 +659,22 @@ mode:
 python -B scripts/rfc_distance_analysis/rfc_base_seal_child_gap.py
 ```
 
-With the default `--candidate-charge component-uniform`, low child-zero rows `u=0..12` are below
-the scalar one-`u` ceilings, but the high-common-zero tail `u>=13` exceeds them. This says the
-finite base-seal DP cannot only tune the dominant scalar child states `u=0..5`; it must also keep
-coarse high-`u` common-zero branches from re-entering the top moment.
+With the default `--candidate-charge component-uniform`, child-zero rows `u=0..8` match the scalar
+child values, but the high-common-zero tail `u>=9` exceeds the scalar one-`u` ceilings. This says
+the finite base-seal DP cannot only tune the dominant scalar child states `u=0..5`; it must also
+keep coarse high-`u` common-zero branches from re-entering the top moment.
+
+`rfc_base_seal_tail_trace.py` follows those failed high-`u` rows through the depth-4 child:
+
+```text
+python -B scripts/rfc_distance_analysis/rfc_base_seal_tail_trace.py --min-u 9 --max-u 17
+```
+
+The current trace shows an all-singleton/common-zero staircase. Once the child common-zero count
+saturates the child dimension, the coarse component-uniform model sets the remaining singleton
+charge to zero, so values like `B_4(2,17)` stay near `2^2016` instead of the scalar `2^-186.94`.
+The required recovery is smaller than full scalar charge: about `0.70` qdims at `u=9` and
+`16.38` qdims at `u=17`. That is the finite-DP obligation exposed by the tail.
 
 `rfc_visible_span_profile.py` precomputes the exact Gaussian-binomial number of local subspaces and
 skips subsets above `--max-subspaces`; this keeps sampled runs from accidentally turning into large

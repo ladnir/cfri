@@ -226,7 +226,7 @@ the finite base-seal DP must report all `0 <= u <= 34`, with special attention t
 
 ```text
 u=0..5:   dominant scalar branches with only 0.29..0.31 qdims one-u slack.
-u>=13:    high-common-zero tail that component-uniform child bounds already push above the scalar
+u>=9:     high-common-zero tail that component-uniform child bounds already push above the scalar
           one-u ceilings.
 ```
 
@@ -366,9 +366,28 @@ The first child-gap check is:
 python -B scripts/rfc_distance_analysis/rfc_base_seal_child_gap.py
 ```
 
-The default `component-uniform` comparison passes the low-`u` scalar ceilings but fails for
-`u>=13`. This redirects the finite-DP experiment: the child recurrence must keep the high-common-zero
+The corrected default `component-uniform` comparison matches scalar through `u=8` but fails for
+`u>=9`. This redirects the finite-DP experiment: the child recurrence must keep the high-common-zero
 tail sharp as well as the low-`u` dominant terms.
+
+The first tail trace is:
+
+```text
+python -B scripts/rfc_distance_analysis/rfc_base_seal_tail_trace.py --min-u 9 --max-u 17
+```
+
+It exposes an all-singleton/common-zero staircase in the depth-4 child. For example, `u=17` follows
+singleton splits with many common-zero child groups until the child common-zero count saturates the
+child dimension; the coarse component-uniform rule then assigns zero charge to remaining singleton
+extras. A theorem-grade finite DP has to replace that saturation shortcut by a sharp high-zero child
+bound, especially for the all-paired top branch `B_5(1,34) -> B_4(2,17)`.
+
+The obstruction is substantial but not obviously fatal. The trace reports both the excess above the
+one-`u` ceiling and the charge missing relative to the optimistic scalar rule. At `u=9`, only about
+`0.70` qdims must be recovered, while the staircase has more than fifty missing scalar qdims. At
+`u=17`, about `16.38` qdims must be recovered, still far below the total missing scalar charge. So
+the next theorem target is not "prove full scalar locally"; it is a high-common-zero tail lemma that
+recovers enough of this missing charge uniformly across `u>=9`.
 
 The corrected checkpoint trace after retiring the all-cover shortcut is recorded in:
 

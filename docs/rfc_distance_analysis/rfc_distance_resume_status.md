@@ -142,9 +142,19 @@ scripts/rfc_distance_analysis/rfc_base_seal_budget.py
 scripts/rfc_distance_analysis/rfc_base_seal_child_gap.py
   Status: deterministic child-gap diagnostic.
   Compares candidate depth-4 child values against the scalar one-`u` ceilings from the base-seal
-  budget. With `--candidate-charge component-uniform`, low `u=0..12` rows are below the ceilings,
-  but the high-common-zero tail `u>=13` exceeds them. This means the finite base-seal DP must
-  control high-`u` common-zero branches, not only the dominant scalar `u=0..5` terms.
+  budget, using the same depth-5 replica schedule and extracting the depth-4 child. With
+  `--candidate-charge component-uniform`, rows `u=0..8` match scalar, but the high-common-zero tail
+  `u>=9` exceeds the ceilings. This means the finite base-seal DP must control high-`u` common-zero
+  branches, not only the dominant scalar `u=0..5` terms.
+
+scripts/rfc_distance_analysis/rfc_base_seal_tail_trace.py
+  Status: deterministic mechanism trace.
+  Traces the failed high-`u` child rows. For `u=9..17`, the component-uniform child bound follows an
+  all-singleton/common-zero staircase; once common-zero child support saturates child dimension,
+  remaining singleton extras receive zero charge. The exposed theorem target is a sharp high-zero
+  child bound, especially the all-paired top branch `B_5(1,34) -> B_4(2,17)`. The trace also shows
+  this may still be viable: `u=9` needs only about `0.70` recovered qdims and `u=17` about `16.38`,
+  while the staircase has much larger missing scalar charge.
 
 docs/rfc_distance_analysis/rfc_exact_support_quotient_state.md
   Status: canonical current theorem target.
@@ -342,9 +352,9 @@ rows one at a time:
    calibration, the theorem must be nearly scalar-sharp: less than one third of a q-dimension of
    calibration slack is available on dominant child values. The current safe two-layer flag
    checkpoint remains much farther away, so the next decisive task is the finite exact-support DP,
-   not more confidence in the scalar number. The new child-gap diagnostic also shows a high-`u`
-   tail hazard: component-uniform child values pass low `u=0..12` but exceed scalar one-`u` ceilings
-   for `u>=13`.
+   not more confidence in the scalar number. The corrected child-gap diagnostic also shows a
+   high-`u` tail hazard: component-uniform child values match scalar for `u=0..8` but exceed scalar
+   one-`u` ceilings for `u>=9`, via an all-singleton/common-zero staircase.
 3. Import the support-three rank-defect incidence credit into the certificate constants. The
    old `current-target` ceiling returns the tight row to support-three at `level_weight=1.93994737`,
    but the audited profile leaves the top row tight at `level_weight=3.00795584`, so support-three

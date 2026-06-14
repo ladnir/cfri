@@ -64,7 +64,7 @@ def main() -> None:
         ceilings[u] = (scalar_child, ceiling, loss_budget)
 
     candidate_levels = build_levels(
-        depth=args.depth - 1,
+        depth=args.depth,
         expansion=args.expansion,
         q_log2=args.q_log2,
         singleton_charge=args.candidate_charge,

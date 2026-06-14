@@ -158,7 +158,7 @@ The hybrid route fails if either:
 ```text
 1. the finite depth-5 base-seal recurrence cannot certify B_5(1,34) <= 2^-80; or
 2. the theorem-grade finite recurrence loses even one q-dimension on the dominant `u=0..5` child
-   values, or lets the high-common-zero tail `u>=13` re-enter above the scalar one-`u` ceilings; or
+   values, or lets the high-common-zero tail `u>=9` re-enter above the scalar one-`u` ceilings; or
 3. after importing the boundary theorem, the lower block grammar cannot make the support-three
    incidence row theorem-grade with finite constants.
 ```

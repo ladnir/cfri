@@ -32,6 +32,7 @@ rfc_flag_bad_pair_classifier.py     groups high-mass flag-state pair witnesses b
 rfc_pair_flag_table_recurrence.py   pair-enumerated two-layer flag-table recurrence diagnostic
 rfc_block_grammar_ledger.py         canonical diagram block grammar table and test-case validator
 rfc_block_potential_probe.py        first simple potential probe over grammar stress transitions
+rfc_tau1_carry_kappa_audit.py       narrow tau-one carry/kappa_phi eligibility audit
 docs/rfc_distance_analysis/rfc_residual_trace_classification.md current z=34 proof-obligation note
 docs/rfc_distance_analysis/rfc_canonical_diagram_certificate_plan.md canonical block grammar reset plan
 docs/rfc_distance_analysis/rfc_nested_tau0_equal_container_filter.md exact-support sibling-collapse note
@@ -518,6 +519,9 @@ python -B scripts/rfc_distance_analysis/rfc_block_potential_probe.py \
   --zero-grid 0.2:2:0.05 --credit-profile diagram-sensitivity --top 1 --show-transitions
 python -B scripts/rfc_distance_analysis/rfc_block_potential_probe.py \
   --zero-grid 0.2:2:0.05 --credit-profile current-target --top 1 --show-transitions
+python -B scripts/rfc_distance_analysis/rfc_block_potential_probe.py \
+  --zero-grid 0.2:2:0.05 --credit-profile audited-top-kernel --top 1 --show-transitions
+python -B scripts/rfc_distance_analysis/rfc_tau1_carry_kappa_audit.py
 ```
 
 The current probe is not a certificate. Its useful output is the bottleneck transition. With
@@ -526,10 +530,14 @@ global state features alone do not see the reusable incidence credit. With
 `--credit-profile local-incidence`, the support-three row gains `1.06800847` q-dimensions of slack
 and the tight row moves to `top_tau1_to_2_15` at `level_weight=3.00795584`. With
 `--credit-profile diagram-sensitivity`, support-two is also slack and the top row remains tight.
-With `--credit-profile current-target`, the top and support-two rows are slack while
-`support3_stratified_to_3_6` is tight at `level_weight=1.93994737`. Treat the latter two profiles
-as locator/sensitivity runs; the theorem target is balanced import of the support-three incidence
-credit plus the top tau-one full-line carry/root-kernel cover.
+With the old ceiling `--credit-profile current-target`, the top and support-two rows are slack
+while `support3_stratified_to_3_6` is tight at `level_weight=1.93994737`. The
+`rfc_tau1_carry_kappa_audit.py` check shows that the current top edge has no descendant tau-one
+line and no positive top post-root line family, so `tau1_full_line_carry` should not be spent on
+that edge. The audited profile `audited-top-kernel` keeps only the possible top kernel-fiber
+credit; it has `level_weight=2.00795584` and remains tight at `top_tau1_to_2_15`. Treat
+`current-target` as a ceiling only; the theorem target is now the top kernel-fiber cover plus
+balanced support-three incidence.
 
 `--demand-closure-passes` is the cheaper version of the same test. It adds lower pair-table keys
 queried by demanded pair rows, then rebuilds. In the same stronger mode:

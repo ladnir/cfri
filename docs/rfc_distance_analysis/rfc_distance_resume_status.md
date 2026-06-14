@@ -153,7 +153,17 @@ scripts/rfc_distance_analysis/rfc_block_potential_probe.py
   `--credit-profile diagram-sensitivity`, support-two is also slack and the top row remains tight.
   With `--credit-profile current-target`, top/support-two/base container rows are slack and
   support-three is tight again at `level_weight=1.93994737`. These are ledger diagnostics, not
-  certificate claims.
+  certificate claims. The audited profile `--credit-profile audited-top-kernel` removes the
+  unsupported top `tau1_full_line_carry` credit, keeps `kernel_fiber_cover`, and gives
+  `level_weight=2.00795584` with `top_tau1_to_2_15` still tight.
+
+scripts/rfc_distance_analysis/rfc_tau1_carry_kappa_audit.py
+  Status: narrow eligibility audit.
+  Reports that `top_tau1_to_2_15` has no descendant tau-one line edge and its parent tau-one row has
+  `charged_postroot_qdim=-1`, so `tau1_full_line_carry` is not a legal credit for that immediate
+  transition. The old `(4,7)>=(2,8)` descendant line row has dimension-only minimum
+  `kappa_phi=0`, but that row is rerouted by the nested tau-zero equal-container filter and still
+  has no actual `phi` in the recurrence state.
 
 docs/rfc_distance_analysis/rfc_top_tau1_root_kernel_carry_block.md
   Status: theorem contract for the current top-row blocker.
@@ -161,7 +171,9 @@ docs/rfc_distance_analysis/rfc_top_tau1_root_kernel_carry_block.md
   tau-one line `R <= E_A`, count descendant tau-one rows by the projective fiber
   `q^kappa_phi`, and remove only unconsumed root-kernel fibers that are not used by descendants.
   It also records the main risk: the current `--tau1-root-kernel-cover-mode kernel` diagnostic is
-  broad and must be replaced by row eligibility flags before theorem use.
+  broad and must be replaced by row eligibility flags before theorem use. After the kappa audit, the
+  live top edge should be treated as a kernel-fiber-cover target, not as a tau-one full-line carry
+  target.
 
 docs/rfc_distance_analysis/rfc_support_two_tau2_quotient_frame_lemma.md
   Status: local theorem target.
@@ -297,15 +309,16 @@ rows one at a time:
    `rfc_canonical_diagram_certificate_plan.md`. The proof must map every recursive witness to a
    child diagram with quotient/root data, consumed-kernel nodes, and incidence markers, then count
    that diagram once.
-2. Formalize the top tau-one full-line carry/root-kernel cover as a reusable block. The
+2. Formalize the top root-kernel fiber cover as a reusable block. The
    `local-incidence` profile moves the bottleneck there, so this is now the shortest test of
    whether the block grammar is real or merely tuned. The contract is now in
-   `rfc_top_tau1_root_kernel_carry_block.md`; the missing implementation piece is an eligibility
-   audit that emits `kappa_phi` and consumed/unconsumed fiber dimensions instead of using the broad
-   tau-one root-kernel diagnostic.
+   `rfc_top_tau1_root_kernel_carry_block.md`; the first eligibility audit shows the current top
+   edge does not support `tau1_full_line_carry`, so the missing implementation piece is the
+   consumed/unconsumed kernel-fiber split.
 3. Import the support-three rank-defect incidence credit into the certificate constants. The
-   `current-target` ceiling returns the tight row to support-three at `level_weight=1.93994737`,
-   so support-three cannot be treated as closed.
+   old `current-target` ceiling returns the tight row to support-three at `level_weight=1.93994737`,
+   but the audited top-kernel profile leaves the top row tight at `level_weight=2.00795584`, so both
+   top kernel cover and support-three constants remain live.
 4. Formalize scalar kernel-lift and root-kernel container covering. The diagnostics keep quotient
    incidence counted and now narrow the safe checkpoint to
    `final_span_1_z_report,34,424.70026934` and `crossing_z=99`. The proof still has to show the

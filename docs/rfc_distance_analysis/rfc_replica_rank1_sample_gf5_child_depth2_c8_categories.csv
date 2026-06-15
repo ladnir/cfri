@@ -1,0 +1,6 @@
+mode,prime,child_depth,child_k,child_n,expansion,checked_tuples,category,total,per_tuple_coordinate_rate
+sampled,5,2,4,32,8,100000,rank0,5119,0.0015996875
+sampled,5,2,4,32,8,100000,rank1_no_root,122200,0.0381875
+sampled,5,2,4,32,8,100000,rank1_one_root,246111,0.0769096875
+sampled,5,2,4,32,8,100000,rank1_two_roots,368582,0.115181875
+sampled,5,2,4,32,8,100000,rank2,2457988,0.76812125

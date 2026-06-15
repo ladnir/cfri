@@ -1,6 +1,34 @@
-# Original RFC MDS Certificate Direction
+# Original RFC MDS Investigation
 
 This note records the current status for the original, non-systematic RFC generator.
+
+## Current Status
+
+The non-systematic RFC still has strong evidence for **per-subset generic full rank**: for a
+fixed selected column set `Q` of size `k`, the recursive orientation certificate appears to
+construct a nonzero determinant polynomial.
+
+That is not yet an MDS theorem for a sampled code. A sampled code is MDS only if:
+
+```text
+every k-column subset is full rank for the same sampled diagonal challenges.
+```
+
+The BaseFold paper reports concrete RFC distance bounds below the Singleton/MDS distance. In the
+extracted text, the theorem we checked is a high-probability lower bound on distance, not an
+explicit impossibility theorem for MDS. Still, the paper's table and "tight bounds" language are a
+warning that the previous "original RFC is generically MDS" wording was too strong.
+
+The working distinction is:
+
+```text
+fixed Q:        determinant is plausibly nonzero as a polynomial
+all Q at once:  not proved, and likely false at large parameters without extra structure
+```
+
+At target sizes, the number of `k`-subsets is enormous. Even if every fixed-subset determinant is
+nonzero, accidental roots after sampling the RFC challenges can create deficient subsets unless the
+determinants have a much stronger collision-free structure than a generic Schwartz-Zippel bound.
 
 ## Claim Shape
 
@@ -11,7 +39,7 @@ k = 2^d
 N = c k
 ```
 
-The desired full-strength statement is generic MDS:
+The strongest possible statement would be sampled MDS:
 
 ```text
 every k selected columns have rank k.
@@ -25,7 +53,7 @@ N - k + 1.
 
 ## Same Recursive Certificate
 
-The recursive leading-monomial certificate from the systematic restricted-rank analysis applies
+The recursive leading-monomial certificate from the systematic restricted-rank analysis may apply
 directly with no deleted systematic rows:
 
 ```text
@@ -43,7 +71,8 @@ Singleton columns are oriented to a live child as their leading-term obligation.
 rows are deleted, the obstruction that hurt the systematic code is absent: a split sibling pair
 never loses one child side by quotienting out a full systematic subtree.
 
-Thus the same certificate is a natural route to proving original generic MDS.
+Thus the same certificate is a natural route to proving fixed-subset generic full rank. It is not,
+by itself, enough to prove sampled MDS.
 
 ## Evidence
 
@@ -87,34 +116,47 @@ depth 5, expansion 8, samples 20000: failures 0
 depth 8, expansion 8, samples 2000:  failures 0
 ```
 
-Depth `2` was also previously checked by direct numeric rank over a large prime, and every
-`k`-subset was full rank. The certificate result is stronger in the proof direction because it
-constructs a recursive minor rather than evaluating one random code instance.
+Additional exact numeric checks for the current determinant-`1` fold form:
+
+```text
+depth 2, expansion 8, GF(65537): all 35,960 k-subsets full rank
+depth 3, expansion 2, GF(65537): all 12,870 k-subsets full rank
+```
+
+For the paper's literal `T'=-T` form, a depth-2, expansion-8 check over `GF(65537)` found an
+actual deficient `k`-subset for one seed. Resampling that fixed shape across 1000 seeds produced
+one failure, so this looks like an accidental finite-field determinant root rather than a structural
+bad shape.
+
+These checks support "no visible structural obstruction" for small cases. They do not establish MDS
+with high probability at large parameters.
 
 ## Current Read
 
-Original RFC still looks like the full-strength/max-separable object. The remaining proof work is
-combinatorial, and in the original case the combinatorics now appears essentially solved:
+Original RFC still looks structurally much stronger than the systematic all-level code. The
+remaining proof work is not solved by the orientation combinatorics alone:
 
 ```text
-Show that for S=empty and |Q|=2^d, the recursive leading-monomial certificate is always full.
+1. prove the fixed-Q determinant polynomial is nonzero, or find a structural counterexample;
+2. quantify the probability that any k-subset determinant vanishes after sampling all challenges;
+3. reconcile the result with the BaseFold paper's reported RFC distance bounds.
 ```
 
-This should be easier than the systematic case. The systematic obstruction requires deleted row
-subtrees; with `S=empty`, every recursive child remains live, and singleton orientation should be
-provable by a Hall-style tree matching argument.
+The systematic obstruction requires deleted row subtrees; with `S=empty`, every recursive child
+remains live. That removes the known systematic collapse family, but it does not remove the
+finite-field all-subsets problem.
 
 ## Inductive Certificate Theorem
 
-The original MDS certificate theorem is:
+The fixed-subset certificate theorem candidate is:
 
 ```text
 For every depth d and every set Q of exactly 2^d original RFC columns,
 certificate_full(empty, Q, d) = true.
 ```
 
-This is stronger than the sampled checks above because it proves that the recursive
-leading-monomial minor construction never gets stuck.
+This is stronger than the sampled checks above because it would prove that the recursive
+leading-monomial minor construction never gets stuck for a fixed `Q`.
 
 ### Proof
 
@@ -183,25 +225,29 @@ hypothesis, both child sets have full recursive certificates. Combining the two 
 with the determinant-`1` split for paired groups and the chosen leading terms for singletons gives a
 full parent certificate.
 
-Therefore `certificate_full(empty,Q,d)` holds for every `|Q|=2^d`. QED.
+Therefore `certificate_full(empty,Q,d)` holds for every `|Q|=2^d`.
+
+This proves only the combinatorial orientation part. A complete determinant proof still has to show
+that the chosen leading term cannot cancel with other recursive terms, and a sampled-MDS proof would
+also need a uniform all-subsets argument.
 
 ## Consequence
 
-Combining the inductive certificate theorem with the soundness theorem in
-`docs/rfc_distance_analysis/rfc_restricted_rank_induction.md` gives:
+If the determinant soundness theorem can be completed, it gives the fixed-subset statement:
 
 ```text
-Every k-column submatrix of the original RFC generator has generic rank k.
+For every fixed k-column set Q, the corresponding determinant polynomial is nonzero.
 ```
 
-So the original non-systematic RFC generator is generically MDS:
+This is not yet the sampled-MDS statement:
 
 ```text
-d_min = N - k + 1.
+Pr[the sampled generator is MDS] = 1 - negligible.
 ```
 
-The only remaining writeup work is to merge the certificate soundness theorem and this original
-orientation theorem into a polished final proof. The algebra and combinatorics are now aligned.
+The next proof target is a first-moment or structural-collision bound for deficient `k`-subsets.
+That is the point where the BaseFold paper's lower-bound distance analysis has to be compared
+directly against this MDS direction.
 
 The practical distance/query impact of this upgrade is summarized in:
 

@@ -1,0 +1,755 @@
+# RFC Marked-Plane State Recurrence
+
+Scope: original non-systematic RFC. This note refines the local
+`rfc_two_marked_line_plane_lemma.md` into a candidate finite recurrence state.
+
+Status: proof target and diagnostic contract, not a complete distance certificate.
+
+## Motivation
+
+The corrected depth-5 safe-tau-zero trace exposes a child flag that is not a chain after one more
+expansion. The carried flag
+
+```text
+F_3((4,4),(2,5))
+```
+
+expands into a child two-plane with two child lines:
+
+```text
+      P
+     / \
+ M(4) N(3)
+```
+
+The old chain relaxation pays for the lower line through an ambient ancestor factor. Once `P` is
+already fixed, the lower line has at most `q+1` choices inside `P`. The current diagnostic saving is
+about three q-dimensions for this one diagram, but the displayed top path still has a residual gap
+of `15.18484798` q-dimensions. Therefore the real question is whether this local rule can be made
+into a recursive state, not whether the single hand-expanded diagram closes the proof.
+
+## State
+
+For a child depth `h`, define a marked-plane state
+
+```text
+G_h(z_P; z_1, ..., z_m)
+```
+
+to count ordered tuples
+
+```text
+P, L_1, ..., L_m
+```
+
+such that:
+
+```text
+dim P = 2,
+L_i <= P,
+dim L_i = 1,
+P has at least z_P common zeros,
+L_i has at least z_i common zeros.
+```
+
+The tuple is ordered and line coincidences are allowed. This is deliberate: it overcounts, so it is
+safe for a first-moment upper bound. If two requested lines are equal, the ordered model counts the
+same event multiple times instead of missing it.
+
+The minimal carrier inequality is:
+
+```text
+G_h(z_P; z_1, ..., z_m)
+  <= min_i (q+1)^(m-1) F_h((2,z_P),(1,z_i)).
+```
+
+This ignores the zero requirements on the other `m-1` lines after choosing them inside `P`; ignoring
+constraints only enlarges the event. Later refinements can use the extra line zero budgets, but the
+safe base rule needs only the carrier line.
+
+## Transition Pattern
+
+Suppose a two-layer flag state
+
+```text
+V_0 >= V_1
+```
+
+is being bounded at one fold, and the selected one-step rows have:
+
+```text
+V_0 row: child plane P plus marked line M <= P,
+V_1 row: tau = 0, child line N <= P.
+```
+
+The containment `N <= P` follows from `V_1 <= V_0` and functoriality of child projection. No
+containment between `N` and `M` is implied, so the correct child object is the marked-plane diagram,
+not a chain.
+
+The safe replacement is:
+
+```text
+coarse child flag bound
+  -> value of the V_0 carrier state
+     + non-recursive local row cost for V_1
+     + log2(q+1).
+```
+
+The current scripts use `log2(q)` for the q-dimensional part and leave the finite `+1` constant to
+the finite-constant bucket. For `q=2^128`, this distinction is negligible for diagnostics but must
+be accounted for in the final certificate constants.
+
+## Compatibility Checks
+
+This state is compatible with the determinant-1 RFC fold with `T` uniform nonzero:
+
+```text
+1. The line-count step is deterministic after conditioning on the child code and the carrier
+   certificate.
+2. It does not use the unavailable `T'=-T` symmetry, so it is binary-field compatible.
+3. Nonzero-root normalization remains in the local row costs, not in the marked-plane line count.
+4. Ordered tuples and allowed coincidences prevent undercounting.
+```
+
+The main proof hazard is not local algebra; it is state sufficiency. After several folds, the child
+object can become a small inclusion diagram with multiple planes and marked lines. Collapsing that
+diagram back to one chain loses exactly the information this note is trying to preserve.
+
+The equality rule must also be explicit. If two marked line nodes in the same plane turn out to be
+the same line, the diagram state merges them and keeps the strongest zero budget:
+
+```text
+L(z_a), L(z_b) -> L(max(z_a,z_b)).
+```
+
+Before equality is known, ordered duplicate nodes are safe because they overcount. After equality is
+forced by containment plus equal dimension, failing to merge would incorrectly treat one line as two
+independent directions in later folds.
+
+## Diagnostic Contract
+
+`scripts/rfc_distance_analysis/rfc_diagram_state.py` implements the diagnostic state skeleton:
+
+```text
+node: dim, zero budget
+edge: child <= parent
+canonicalization: equal-dimension containment forces node merge
+line insertion: add a marked line under a fixed 2-plane for q+1 choices
+transition builder: derive the child diagram of a two-layer flag transition
+```
+
+`scripts/rfc_distance_analysis/rfc_marked_plane_state_diagnostic.py` scans the current two-layer
+flag recurrence for rows matching the transition pattern above and emits the carrier and successor
+diagram keys. The exact carried-path row is:
+
+```text
+python -B scripts/rfc_distance_analysis/rfc_marked_plane_state_diagnostic.py \
+  --layer-level 2 \
+  --outer-state 4,4 \
+  --inner-state 2,5
+```
+
+It reproduces:
+
+```text
+coarse bound:       -743.04099425 bits
+marked-plane bound: -1124.45603175 bits
+saving:              381.41503750 bits
+carrier diagram:     M:d1:z4;P:d2:z0|M<=P
+next diagram:        M:d1:z4;N:d1:z3;P:d2:z0|M<=P;N<=P
+transition diagram:  I0:d1:z3;O0:d2:z0;O1:d1:z4|I0<=O0;O1<=O0
+```
+
+This agrees with `rfc_carried_flag_diagnostic.py` and makes the next recurrence requirement
+explicit: replace special-case hand carrying by a finite diagram state that can propagate multiple
+marked lines through recursive folds.
+
+The scanner also has a grouping mode:
+
+```text
+python -B scripts/rfc_distance_analysis/rfc_marked_plane_state_diagnostic.py \
+  --only-positive \
+  --group-by-transition-diagram
+```
+
+On the current depth-5 defaults, the top positive groups are all of the form:
+
+```text
+I0:d1:z_a;O0:d2:z0;O1:d1:z_b|I0<=O0;O1<=O0
+```
+
+and the best rows save exactly `3.00000000` q-dimensions before finite constants. This is useful
+evidence that the diagram recurrence has a small repeated state family, not just a single isolated
+repair.
+
+`scripts/rfc_distance_analysis/rfc_diagram_path_dp.py` follows the corrected bound trace and applies
+the carried-flag and marked-plane transitions when they are exposed. On the default depth-5 `z=34`
+path it recovers the known local accounting:
+
+```text
+carry merge saving:       251.97763219 bits
+marked-plane saving:      381.41503750 bits
+combined saving:          633.39266969 bits
+remaining residual:        15.18484798 q-dimensions
+```
+
+As a separate scalar-recursive diagnostic, `rfc_flag_span_moment.py --flag-bound best-marked-plane`
+allows the recurrence to use the q+1 marked-plane child replacement wherever the relevant child
+choices already exist. This mode is selected on the depth-5 `z=34` trace (`dominant_h=-5`) and
+improves the top vector moment to:
+
+```text
+2244.71357608 bits
+```
+
+but the crossing remains:
+
+```text
+crossing_z = 135.
+```
+
+This is a key negative signal. The q+1 brick is valid and useful, but a scalar child-flag tweak
+cannot reproduce the full carried-path saving because it does not preserve the outer layer across an
+inner-first collapse. The next recurrence must carry the multi-layer diagram state itself.
+
+The next diagnostic table is:
+
+```text
+rfc_flag_span_moment.py --flag-bound best-two-layer-table
+```
+
+It builds a two-layer flag table after each scalar level and lets parent scalar rows query that
+table for child flags. This is closer to the desired recurrence, but it still uses scalar-state
+dominant choices when expanding a flag state. The result is another useful negative:
+
+```text
+depth 5, z=34 top vector moment: 2244.71357608 bits
+depth 5 crossing:                z=135
+depth 6 crossing:                z=305
+```
+
+The table report makes the failure mode visible:
+
+```text
+level 2, (4,4)>=(2,5): table saves 381.41503750 bits
+level 3, (4,7)>=(2,8): table saves   0.00000000 bits
+```
+
+So a value table alone is not the missing recurrence. The recurrence must choose and remember
+flag-state expansions, not just reuse scalar-state dominant choices.
+
+`scripts/rfc_distance_analysis/rfc_flag_state_choice_diagnostic.py` then tests exactly that next
+idea for one target flag at a time. It enumerates outer and inner scalar expansion candidates,
+combines them into a carried child flag, and reports both:
+
+```text
+pair_sum:         log-sum over the enumerated pair products
+optimistic_best:  minimum enumerated pair
+dominant_i:       largest enumerated pair contributions
+```
+
+The signal splits by level:
+
+```text
+level 2, (4,4)>=(2,5):
+  pair_sum saves 506.75207249 bits = 3.95900057 q-dim
+
+level 3, (4,7)>=(2,8):
+  pair_sum loses 907.21115036 bits = 7.08758711 q-dim
+  optimistic_best saves thousands of bits, but is not safe by itself
+```
+
+This sharpens the blocker. A flag state choosing its own rows is still not enough if all row-pair
+witnesses are summed naively. The next proof step must supply a canonical witness selection,
+exact-support grouping, or charging lemma that removes the high-mass duplicate/incompatible pair
+family. Without such a lemma, the marked-plane route does not close the level-3 carried flag.
+
+The next classifier is:
+
+```text
+scripts/rfc_distance_analysis/rfc_flag_bad_pair_classifier.py
+```
+
+It groups the same pair products by child flag, outer choice, inner choice, support profile, tau
+profile, and lift profile. The saved diagnostics are:
+
+```text
+docs/rfc_distance_analysis/rfc_flag_bad_pair_classifier_level2_4_4_ge_2_5.csv
+docs/rfc_distance_analysis/rfc_flag_bad_pair_classifier_level3_4_7_ge_2_8.csv
+docs/rfc_distance_analysis/rfc_flag_bad_pair_classifier_level3_4_7_ge_2_8_kernel_cover.csv
+```
+
+The important level-3 output is concentration, not improvement:
+
+```text
+level 3, (4,7)>=(2,8):
+  truncated pair sum:          2094.40570138 bits
+  coarse/table baseline:       1187.19455102 bits
+  naive loss:                  907.21115036 bits = 7.08758711 q-dim
+  top 12 pair products:        2094.40570138 bits
+  dominant outer-choice group: 2094.40570138 bits
+```
+
+The dominant outer choice is:
+
+```text
+p=3, s=1, a=1, tau=1,
+child=(4,4), z=3,
+charge=1, delta=1, comp=1,
+lift=19.
+```
+
+The classifier now prints the lift split for each top grouped row. For this row:
+
+```text
+outer kernel lift:   15 q-dim
+outer quotient lift:  4 q-dim
+```
+
+So the bad mass is not a broad failure of the marked-plane local brick. It is a high-lift tau-one
+outer witness family that admits many inner refinements whose child diagrams collapse back to
+`(4,4)` or a short two-layer flag. A proof now has a concrete target: either choose this witness
+canonically once per parent flag, or prove that the high-lift multiplicity is already charged by
+the exact zero/support data and should not be summed independently across these refinements.
+
+Two finer diagnostics sharpen that target:
+
+```text
+--exclude-collapsed-active:
+  pair sum = 1710.08786604 bits
+  remaining loss = 522.89331502 bits = 4.08510402 q-dim
+
+--posthoc-cover-kernel-lift:
+  pair sum = 940.85227227 bits
+  saving over coarse = 246.34227875 bits = 1.92454905 q-dim
+```
+
+The old `--posthoc-cover-kernel-lift` flag is now also exposed as:
+
+```text
+--kernel-cover-mode unconsumed-container
+```
+
+which records the intended theorem guard: quotient incidence stays counted, and only duplicate
+kernel lifts are covered under the unconsumed-kernel condition.
+
+The classifier now also emits:
+
+```text
+top_outer_kernel_dim
+top_inner_kernel_dim
+top_outer_kernel_unconsumed_by_inner
+```
+
+For the dominant un-covered pair, these are:
+
+```text
+top_outer_kernel_lift_qdim = 15
+top_outer_kernel_dim = 3
+top_inner_kernel_dim = 0
+top_outer_kernel_unconsumed_by_inner = yes
+```
+
+The next two un-covered pairs have `top_inner_kernel_dim = 1` and are marked `no`, which is the
+expected consumed-kernel warning. After `--kernel-cover-mode unconsumed-container`, the top covered
+pairs again have `top_inner_kernel_dim = 0` and are marked `yes`. This does not prove descendant
+unconsumption, but it cleanly separates the easy sibling-unconsumed family from rows that must be
+carried or charged.
+
+The stricter diagnostic is:
+
+```text
+--kernel-cover-mode sibling-unconsumed
+```
+
+It covers only an upper-layer kernel lift when the displayed lower layer is fully visible; it does
+not cover the lower layer's own kernel lift because that requires a descendant audit. By itself it
+does not close the row:
+
+```text
+pair sum = 2092.28967759 bits
+remaining loss = 905.09512656 bits = 7.07105568 q-dim
+top row has top_inner_kernel_dim = 1 and is marked no
+```
+
+However, combining the exact-flag collapse routing with the sibling-unconsumed cover gives:
+
+```text
+--exclude-collapsed-active --kernel-cover-mode sibling-unconsumed:
+  pair sum = 1071.43723477 bits
+  saving over coarse = 115.75731625 bits = 0.90435403 q-dim
+```
+
+This is the current proof-shaped closure of the level-3 stress row. It uses two separate
+statements: collapsed-active rows are rerouted as exact-flag support collapses, and only
+sibling-unconsumed kernel fibers are covered. Consumed-kernel rows remain in the sum, but after the
+collapsed-active rerouting they are below the coarse/table baseline.
+
+The first option removes rows where a tau-positive exact flag would have equal-dimensional child
+containers and the lower container carries the active singleton zero. That alone removes the
+`lift=19` row, but leaves a `lift=13` tau-one row. The second option keeps the child table fixed and
+subtracts only the kernel-lift part of tau-positive rows:
+
+```text
+kappa(2 r_0 - kappa),  kappa = t - tau.
+```
+
+This closes the level-3 stress row with about `1.92` q-dimensions of slack. The current best proof
+target is therefore not to erase quotient-line or quotient-plane incidence. It is to prove a
+kernel-lift container-cover lemma: after fixing the child flag and the local quotient/root datum,
+the Gaussian family of kernel lifts is duplicate certificate data for this existence recurrence.
+
+## Audit Result
+
+A side audit agreed that the local rule is promising provided it is integrated as an atomic diagram
+transition:
+
+```text
+condition on the child code and already-carried child diagram,
+sum actual child diagrams once,
+multiply by explicit current-fold split/root/lift profile constants.
+```
+
+The audit's main warning is the same as above: no product of child moments, no scalar post-hoc
+discount, and no collapse of incomparable marked lines into a chain. The next proof step is to turn
+the marked-plane state into a small diagram recurrence with merge/equality rules.
+
+## Pair-Enumerated Flag Table Recurrence
+
+The script:
+
+```text
+scripts/rfc_distance_analysis/rfc_pair_flag_table_recurrence.py
+```
+
+turns the target-by-target pair enumeration into a table-level diagnostic. It builds pair-enumerated
+two-layer flag tables and feeds them into later scalar levels. The current bounded stress command is:
+
+```text
+python -B scripts/rfc_distance_analysis/rfc_pair_flag_table_recurrence.py \
+  --depth 5 \
+  --stop-level 3 \
+  --proof-shaped \
+  --term-limit 300 \
+  --report-flag-state 4,7,2,8 \
+  --last-level-report-only
+```
+
+The output is:
+
+```text
+level 2, (4,7)>=(2,8):
+  table_log2  = -2008.00842556
+  coarse_log2 = -1505.51820057
+  saving      = 502.49022500 bits = 3.92570488 q-dim
+
+level 3, (4,7)>=(2,8):
+  table_log2  = 810.94626976
+  coarse_log2 = 810.94626976
+```
+
+The level-3 equality is not a failure: the scalar values entering the level-3 coarse flag bound have
+already been improved by the level-2 pair table. This is stronger than the standalone classifier
+checkpoint for the displayed stress state.
+
+The current limitation is computational. A full unpruned level-3 pair table timed out in the Python
+diagnostic. The next implementation target is a sparse/demand-driven pair-table builder that
+computes only the flag states needed by the final distance trace and their recursive children.
+
+Sparse demand mode has now been added:
+
+```text
+python -B scripts/rfc_distance_analysis/rfc_pair_flag_table_recurrence.py \
+  --depth 5 \
+  --proof-shaped \
+  --term-limit 300 \
+  --demand-next-level
+```
+
+This computes only table entries that can be queried by the next depth-pruned scalar lift. It runs
+through depth five and reports:
+
+```text
+final_span_1_crossing_z,133
+```
+
+The table summary is:
+
+```text
+level 2:  599 entries,  402 improved
+level 3: 2076 entries, 1143 improved
+level 4:    0 entries,    0 improved
+```
+
+This improves the previous two-layer-table crossing `z=137` to `z=133`, but it is not close to the
+production floor `z=34`. The next proof/implementation step is therefore not merely sparse table
+plumbing; it needs a richer demanded diagram state or additional local charge that can propagate
+past the level-3 table.
+
+With `--report-final-z 34`, the same sparse run reports:
+
+```text
+final_span_1_z_report,34,1740.39750674
+```
+
+Compared to the target `-80` bits, this is still about:
+
+```text
+(1740.39750674 + 80) / 128 = 14.22185552 q-dim
+```
+
+above the depth-5 base seal target.
+
+## Sparse Trace Classification
+
+The sparse pair-table driver now has two focused trace modes:
+
+```text
+--trace-z Z --trace-span T
+--trace-table-state level,outer_span,outer_z,inner_span,inner_z
+```
+
+For the production-floor diagnostic:
+
+```text
+python -B scripts/rfc_distance_analysis/rfc_pair_flag_table_recurrence.py \
+  --depth 5 \
+  --proof-shaped \
+  --term-limit 300 \
+  --demand-next-level \
+  --report-final-z 34 \
+  --trace-z 34 \
+  --trace-span 1 \
+  --trace-table-state 3,4,7,2,8 \
+  --trace-table-top 12
+```
+
+the scalar trace is exact along the displayed path: every row has `logsum_overhead_log2 = 0`.
+Therefore the residual is not coming from a wide log-sum over many nearly dominant scalar branches.
+
+The first two levels of the top path are:
+
+```text
+level 5:
+  child          1841.77915978
+  split shape      26.61834696
+  root charge    -512.00000000
+  lift            384.00000000
+  total          1740.39750674
+
+level 4:
+  child flag      810.94626976   for (4,7)>=(2,8)
+  split shape       6.83289001
+  root charge    -128.00000000
+  lift           1152.00000000
+  total          1841.77915978
+```
+
+At level 3, the raw child flag matters:
+
+```text
+raw child flag:       (4,3)>=(4,4)
+raw table value:    -2010.91171123
+merged shadow:        (4,4)
+merged scalar value: -1255.04099425
+```
+
+So the theorem-normalized equal-dimension merge is not just cosmetic; the selected scalar term uses
+the raw two-layer table before the merged one-layer shadow is displayed.
+
+The table-internal trace for the level-3 flag selected by level 4 is the important negative result:
+
+```text
+state:        (4,7)>=(2,8)
+baseline:     810.94626976
+table value:  810.94626976
+pair sum:     943.43723477
+row count:   4432
+```
+
+Thus the sparse proof-shaped pair enumeration is not selected for this state. The current table
+uses the coarse outer-first bound:
+
+```text
+F_3(4,7) + 2*(4-2)*log2(q)
+```
+
+The top pair row is already worse than the baseline:
+
+```text
+joint_log2:        943.43723477
+outer_local_log2: 1037.25029842
+inner_local_log2:  906.66533592
+child flag:       (4,3)>=(2,5)
+child flag log2: -1000.47839956
+```
+
+The row is a nested tau-positive/tau-positive configuration with large local lift:
+
+```text
+outer: kernel lift 4, quotient lift 8
+inner: kernel lift 3, quotient lift 6
+covered by sibling-unconsumed rule: 0, 0
+```
+
+This changes the next proof target. The old proof-shaped kernel-cover closure is still useful for
+the standalone classifier, but after the level-2 table improvements the improved coarse baseline
+is stronger than the pair-enumerated sum. Closing the base seal now needs a joint local theorem for
+nested tau-positive rows, or a richer diagram state that reduces the coarse outer-first extension
+for `(4,7)>=(2,8)`. More sparse table plumbing alone is not expected to close the `z=34` gap.
+
+## Nested Quotient And Kernel Diagnostics
+
+The next diagnostics test three structural corrections that are not certificate rules yet:
+
+```text
+--nested-quotient-mode inner-in-outer
+--nested-subspace-mode inner-in-outer
+--consumed-kernel-mode tau0-inner-contained
+```
+
+Their intended meanings are:
+
+```text
+nested quotient:
+  after an outer tau-positive quotient datum is fixed, count a compatible inner quotient
+  inside the outer visible quotient, paying the Grassmann exponent inside that quotient
+  rather than a fresh ambient quotient lift;
+
+nested subspace:
+  after W_outer is fixed, cap the lower row's remaining lift multiplicity by the
+  Grassmann count of W_inner <= W_outer;
+
+consumed kernel:
+  for a lower tau-zero row, count the upper kernel as containing W_inner rather than
+  as a fresh arbitrary kernel lift.
+```
+
+All three keep the local root/support charges and quotient incidence visible; they do not use the
+retired all-lift shortcut.
+
+On the narrow level-3 stress state, with scalar collapsed-active rows also removed, the command:
+
+```text
+python -B scripts/rfc_distance_analysis/rfc_pair_flag_table_recurrence.py \
+  --depth 5 \
+  --stop-level 3 \
+  --proof-shaped \
+  --nested-quotient-mode inner-in-outer \
+  --nested-subspace-mode inner-in-outer \
+  --consumed-kernel-mode tau0-inner-contained \
+  --term-limit 300 \
+  --report-flag-state 4,7,2,8 \
+  --trace-table-state 3,4,7,2,8 \
+  --trace-table-top 12 \
+  --last-level-report-only
+```
+
+reports:
+
+```text
+state:        (4,7)>=(2,8)
+baseline:     549.21247145
+table value:  303.43723477
+pair sum:     303.43723477
+saving:       245.77523667 bits = 1.92011904 q-dim
+```
+
+The top row after these corrections is:
+
+```text
+outer: tau=2, kernel lift 4, quotient lift 8
+inner: tau=1, kernel lift 3, quotient lift 6
+inner nested quotient cover: 5 q-dim
+child flag: (4,3)>=(2,5)
+```
+
+This is the first diagnostic where the level-3 stress flag is genuinely better than its improved
+coarse baseline after scalar collapsed-active rerouting.
+
+End-to-end depth five with those three structural diagnostics gives:
+
+```text
+final_span_1_crossing_z,133
+final_span_1_z_report,34,1232.88847175
+```
+
+So the production floor is still:
+
+```text
+(1232.88847175 + 80) / 128 = 10.25694119 q-dim
+```
+
+above the `2^-80` target. The dominant trace has moved:
+
+```text
+level 5: tau=1, child (2,15), value 1334.27012479
+level 4: tau=1, child flag (4,7)>=(2,8), table value 303.43723477
+level 3: tau=2, child flag (4,3)>=(2,5), table value -1000.47839956
+```
+
+Adding the existing scalar `--cover-kernel-lift` diagnostic, which is a separate proof target for
+unconsumed scalar kernel fibers, gives:
+
+```text
+final_span_1_crossing_z,133
+final_span_1_z_report,34,924.69069031
+```
+
+The new dominant trace then has a small-support tau-two quotient-plane row:
+
+```text
+level 4:
+  p=8, s=2, a=2, tau=2,
+  K=0, outer_span=4,
+  local_charge=4, lift_qdim=12,
+  child state (4,8) = -121.19264508.
+```
+
+Finally, the anti-conservative sensitivity run:
+
+```text
+--cover-lift-mode tau0tau2
+```
+
+with the same structural diagnostics and scalar kernel cover reports:
+
+```text
+final_span_1_crossing_z,41
+final_span_1_z_report,34,567.15416718
+```
+
+This is not a certificate mode because tau-two quotient-plane incidence is real event data. Its
+value is diagnostic: even perfect tau-two lift removal would leave about
+
+```text
+(567.15416718 + 80) / 128 = 5.05589193 q-dim
+```
+
+above target, now dominated by a tau-one quotient chain:
+
+```text
+level 5 tau=1 -> level 4 tau=1 -> level 3 tau=0.
+```
+
+Therefore the next proof object is broader than the old level-3 pair table. We need a finite
+exact-support quotient-incidence state that simultaneously handles:
+
+```text
+1. scalar collapsed-active rerouting;
+2. nested quotient/subspace counting for parent flags;
+3. consumed-kernel containment when a lower tau-zero layer sits inside an upper kernel;
+4. small-support tau-two quotient-plane incidence;
+5. the remaining tau-one quotient chain after tau-two is idealized.
+```
+
+The corresponding theorem contract is now isolated in:
+
+```text
+docs/rfc_distance_analysis/rfc_exact_support_quotient_state.md
+```
+
+That note is also where the upper-visible condition for nested quotient counting is made explicit:
+the lower quotient is counted inside the upper quotient only when
+`K_lower = W_lower cap K_upper`; otherwise the state must carry a consumed-kernel/quotient branch or
+use the independent quotient fallback.

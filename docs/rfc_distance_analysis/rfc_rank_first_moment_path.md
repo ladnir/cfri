@@ -122,8 +122,8 @@ systematic:
   first bad subset: 0:1:4:18
 ```
 
-So the original stacked RFC looks generically MDS in this tiny test, but the systematic generator
-does not. This does not kill the rank route: distance at the target parameters only needs large
+So the original stacked RFC has no deficient `k`-subsets in this tiny sampled instance, while the
+systematic generator does. This does not kill the rank route: distance at the target parameters only needs large
 zero sets of size `z > k` to span, and systematic identity columns should be conditioned on rather
 than treated as random parity columns. But it does rule out the simplest possible proof statement
 that every `k` final coordinates are independent.

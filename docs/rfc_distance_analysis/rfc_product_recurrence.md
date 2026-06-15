@@ -69,6 +69,76 @@ G_(l,r)(x) = E_child_tree Phi_{cat(A l, A r)}(x).
 
 This is the same local algebra as the one-step sampler, now phrased for a single tree.
 
+For a finite-replica first moment, the same local algebra has one extra condition. For `r` replicas,
+write the two child value vectors at one coordinate as:
+
+```text
+X = (A_1, ..., A_r)
+Y = (B_1, ..., B_r).
+```
+
+All `r` selected singleton outputs can be zero for one common root challenge only if:
+
+```text
+dim span(X,Y) <= 1.
+```
+
+If `X=Y=0`, the coordinate is a common zero. If the span has dimension `1`, the coordinate is
+root-compatible and costs one root challenge. If the span has dimension `2`, the singleton request is
+impossible. For `r=2`, root compatibility is the single exterior equation:
+
+```text
+X_1 Y_2 - X_2 Y_1 = 0.
+```
+
+This rank-one condition is the missing savings in any recurrence that tracks only common-zero
+coordinates. It is the main local state needed by a proof-strength finite-replica recurrence.
+
+The first `r=2` diagnostic is:
+
+```text
+scripts/rfc_distance_analysis/rfc_replica_rank1_profile.py
+```
+
+For `GF(5)`, child depth `2`, expansion `8`, the sampled two-replica profile gives the expected
+random local category rates and shows that rank-one compatibility improves the oriented-singleton
+sum by `15.52` bits at `s=8` and `26.09` bits at `s=16` compared to the loose common-zero-only
+bound. See:
+
+```text
+docs/rfc_distance_analysis/rfc_replica_rank1_sample_gf5_child_depth2_c8_categories.csv
+docs/rfc_distance_analysis/rfc_replica_rank1_sample_gf5_child_depth2_c8_singletons.csv
+```
+
+The next refinement is endpoint-aware. For a singleton exact support `A` in the child matroid, the
+rank-one/root-line count has a generic two-copy kernel endpoint and a component/full-rank endpoint.
+With:
+
+```text
+delta = dim U_A
+g     = generic two-copy root-line kernel dimension
+comp  = comp(U_A),
+```
+
+the tau-2 root-weight exponent is:
+
+```text
+max(2g-4, 2delta+comp-4-|A|).
+```
+
+This replaces the older component-only correction. The evidence and proof target are in:
+
+```text
+docs/rfc_distance_analysis/rfc_exterior_component_codimension.md
+```
+
+A scalar endpoint-aware recurrence is still too coarse unless it also tracks replica span dimension.
+The high-replica overcount and proposed span state are recorded in:
+
+```text
+docs/rfc_distance_analysis/rfc_replica_span_state.md
+```
+
 ## Why Pair State Is Not Closed
 
 To know `G_(l,r)`, we need the category distribution of `(A l, A r)`. To recurse that pair

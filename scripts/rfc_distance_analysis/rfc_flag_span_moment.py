@@ -1,0 +1,1767 @@
+#!/usr/bin/env python3
+r"""Two-layer flag checkpoint for original RFC zero-set moments.
+
+This is a small diagnostic, not a certificate.  It tests the proposed
+kernel-zero propagation state
+
+    pi(W) zero on P union (S \ A)
+    pi(K) zero on P union S
+
+where K is the kernel of the singleton visible quotient of W.  The child flag
+count is upper-bounded from existing one-layer child counts by taking the best
+of several safe coarse bounds.  This is deliberately more structured than the
+scalar span recurrence, but it is still only a checkpoint for small depths.
+
+The endpoint-tau2-layer-incidence mode is an experimental calibration for the quotient-framing
+lemma: after a child flag is chosen, tau-two local layers are measured in the quotient `V/L`
+rather than only in the full child code after outer zeros.  It also applies the exact-support
+Grassmann cap `local_charge >= |A|` from the incidence note.
+
+The cover-lift modes are anti-conservative diagnostics for existence-style container counting. They
+are not certificates. They test where quotient/lift multiplicity is concentrated; for tau>0, a
+proof must add quotient-incidence counts back rather than simply zeroing the lift factor.
+
+The kernel-lift cover diagnostic is narrower: it removes only the choice of `K <= L+L` after the
+inner child container `L` is fixed, while keeping quotient incidence. This is a proof target rather
+than a certificate.
+
+The best-shortened flag bound is also diagnostic. It replaces the ambient dimension in the
+inner-first flag count by the ideal shortened dimension after outer zeros. This tests whether a
+simple shortened-child correction helps the depth-5 checkpoint; it is not a theorem-grade RFC bound.
+
+The best-marked-plane flag bound is another diagnostic. When the child flag has a carrier
+two-plane-with-marked-line row and a lower tau-zero child-line row, it uses the safe q+1
+line-in-plane replacement instead of the coarse ambient flag extension.
+"""
+
+from __future__ import annotations
+
+import argparse
+import math
+
+
+NEG_INF = -1.0e300
+INF = 10**9
+DEFAULT_MAX_N = 512
+State = tuple[int, int]
+FlagKey = tuple[State, State]
+Choice = tuple[int, ...]
+FlagTable = dict[FlagKey, float]
+
+
+def log2_add(left: float, right: float) -> float:
+    if left <= NEG_INF / 2:
+        return right
+    if right <= NEG_INF / 2:
+        return left
+    if right > left:
+        left, right = right, left
+    return left + math.log2(1.0 + 2.0 ** (right - left))
+
+
+def log2_comb_table(n: int) -> list[list[float]]:
+    table: list[list[float]] = []
+    for row_n in range(n + 1):
+        row = [NEG_INF] * (row_n + 1)
+        row[0] = 0.0
+        row[row_n] = 0.0
+        for k in range(1, row_n):
+            row[k] = log2_add(table[row_n - 1][k - 1], table[row_n - 1][k])
+        table.append(row)
+    return table
+
+
+def uniform_component_count(size: int, rank: int) -> int:
+    if size == 0 or rank == 0:
+        return 0
+    if rank == size:
+        return size
+    return 1
+
+
+def endpoint_tau2_charge(size: int, delta: int, components: int) -> int:
+    generic_kernel_dim = max(0, 2 * delta - size)
+    if delta < 2 and generic_kernel_dim < 2:
+        return INF
+    component_charge = INF
+    if delta >= 2:
+        component_charge = size + 2 * delta - components
+    generic_charge = INF
+    if generic_kernel_dim >= 2:
+        generic_charge = 4 * delta - 2 * generic_kernel_dim
+    return min(component_charge, generic_charge)
+
+
+def endpoint_tau2_layer_profile(size: int, delta: int, components: int) -> tuple[int, int, int, int, int]:
+    if delta < 2:
+        return INF, -INF, -1, -1, max(0, 2 * delta - size)
+    generic_kernel_dim = max(0, 2 * delta - size)
+    full_component_codim = max(0, size - components)
+    theta = -INF
+    dominant_h = -1
+    dominant_gamma = -1
+    for h in range(2, delta + 1):
+        if h == delta:
+            gamma_h = full_component_codim
+        else:
+            gamma_h = max(0, h - generic_kernel_dim) ** 2
+        layer_theta = 2 * h - 4 - gamma_h
+        if layer_theta > theta:
+            theta = layer_theta
+            dominant_h = h
+            dominant_gamma = gamma_h
+    return int(4 * delta - 4 - theta), int(theta), dominant_h, dominant_gamma, generic_kernel_dim
+
+
+def endpoint_tau2_layer_charge(size: int, delta: int, components: int) -> int:
+    charge, _theta, _dominant_h, _dominant_gamma, _g = endpoint_tau2_layer_profile(
+        size,
+        delta,
+        components,
+    )
+    return charge
+
+
+def local_visible_charge(
+    *,
+    visible_tau: int,
+    child_k: int,
+    outer_zero_count: int,
+    visible_support_size: int,
+    singleton_charge_mode: str,
+) -> int:
+    if visible_support_size == 0:
+        return 0 if visible_tau == 0 else INF
+    if visible_tau == 0:
+        return INF
+
+    outer_rank = min(outer_zero_count, child_k)
+    quotient_rank = max(0, child_k - outer_rank)
+    delta = min(visible_support_size, quotient_rank)
+    if delta < visible_tau:
+        return INF
+
+    components = uniform_component_count(visible_support_size, delta)
+    if singleton_charge_mode == "endpoint-tau2" and visible_tau == 2:
+        return endpoint_tau2_charge(visible_support_size, delta, components)
+    if singleton_charge_mode == "endpoint-tau2-layer" and visible_tau == 2:
+        return endpoint_tau2_layer_charge(visible_support_size, delta, components)
+    return visible_support_size + visible_tau * delta - components
+
+
+def local_visible_trace_profile(
+    *,
+    visible_tau: int,
+    child_k: int,
+    outer_zero_count: int,
+    visible_support_size: int,
+    singleton_charge_mode: str,
+    quotient_delta_floor: int = 0,
+) -> tuple[int, int, int, int, int, int, int]:
+    if visible_support_size == 0:
+        return (0 if visible_tau == 0 else INF, 0, 0, 0, -1, -1, 0)
+    outer_rank = min(outer_zero_count, child_k)
+    quotient_rank = max(0, child_k - outer_rank)
+    delta = min(visible_support_size, quotient_rank)
+    if quotient_delta_floor > 0:
+        delta = max(delta, min(visible_support_size, quotient_delta_floor))
+    components = uniform_component_count(visible_support_size, delta)
+    generic_kernel_dim = max(0, 2 * delta - visible_support_size)
+    if delta < visible_tau:
+        return (INF, delta, components, generic_kernel_dim, -1, -1, -1)
+    if singleton_charge_mode in ("endpoint-tau2-layer", "endpoint-tau2-layer-incidence") and visible_tau == 2:
+        charge, theta, h, gamma, generic_kernel_dim = endpoint_tau2_layer_profile(
+            visible_support_size,
+            delta,
+            components,
+        )
+        return charge, delta, components, generic_kernel_dim, theta, h, gamma
+    charge = local_visible_charge(
+        visible_tau=visible_tau,
+        child_k=child_k,
+        outer_zero_count=outer_zero_count,
+        visible_support_size=visible_support_size,
+        singleton_charge_mode=singleton_charge_mode,
+    )
+    return charge, delta, components, generic_kernel_dim, -1, -1, -1
+
+
+def get_child_value(
+    child_by_span: dict[int, list[float]],
+    child_n: int,
+    span: int,
+    zero_count: int,
+) -> float:
+    if zero_count < 0 or zero_count > child_n:
+        return NEG_INF
+    if span == 0:
+        return 0.0
+    values = child_by_span.get(span)
+    if values is None:
+        return NEG_INF
+    return values[zero_count]
+
+
+def flag_child_bound(
+    *,
+    child_by_span: dict[int, list[float]],
+    child_k: int,
+    child_n: int,
+    outer_span: int,
+    inner_span: int,
+    outer_zeros: int,
+    inner_zeros: int,
+    q_log2: float,
+    mode: str,
+) -> float:
+    outer = get_child_value(child_by_span, child_n, outer_span, outer_zeros)
+    inner = get_child_value(child_by_span, child_n, inner_span, inner_zeros)
+    if outer <= NEG_INF / 2 or inner <= NEG_INF / 2:
+        return NEG_INF
+    if inner_span > outer_span:
+        return NEG_INF
+    if mode == "product":
+        return outer + inner
+    if mode == "outer-only":
+        return outer + inner_span * (outer_span - inner_span) * q_log2
+    if mode not in ("best", "best-shortened", "best-marked-plane", "best-two-layer-table"):
+        raise ValueError(f"unknown flag bound mode {mode!r}")
+
+    outer_first = outer + inner_span * (outer_span - inner_span) * q_log2
+    inner_first = inner + (outer_span - inner_span) * (child_k - outer_span) * q_log2
+    best = min(outer_first, inner_first)
+    if mode == "best-shortened":
+        # Diagnostic: after choosing L with the stronger zero witness, extend V inside the
+        # shortened ambient H(B_outer) rather than the full child message space.  This uses the
+        # ideal/MDS ambient dimension and is not a theorem-grade RFC bound.
+        shortened_dim = max(inner_span, child_k - outer_zeros)
+        if shortened_dim >= outer_span:
+            shortened_inner_first = (
+                inner
+                + (outer_span - inner_span)
+                * (shortened_dim - outer_span)
+                * q_log2
+            )
+            best = min(best, shortened_inner_first)
+    return best
+
+
+def flag_child_bound_report(
+    *,
+    child_by_span: dict[int, list[float]],
+    child_k: int,
+    child_n: int,
+    outer_span: int,
+    inner_span: int,
+    outer_zeros: int,
+    inner_zeros: int,
+    q_log2: float,
+    mode: str,
+) -> tuple[str, float, float, float]:
+    """Return the selected coarse child-flag relaxation and its two main candidates."""
+
+    outer = get_child_value(child_by_span, child_n, outer_span, outer_zeros)
+    inner = get_child_value(child_by_span, child_n, inner_span, inner_zeros)
+    if outer <= NEG_INF / 2 or inner <= NEG_INF / 2 or inner_span > outer_span:
+        return "none", NEG_INF, NEG_INF, NEG_INF
+    if mode == "product":
+        value = outer + inner
+        return "product", value, value, value
+    if mode == "outer-only":
+        value = outer + inner_span * (outer_span - inner_span) * q_log2
+        return "outer-only", value, value, NEG_INF
+
+    outer_first = outer + inner_span * (outer_span - inner_span) * q_log2
+    inner_first = inner + (outer_span - inner_span) * (child_k - outer_span) * q_log2
+    best_label = "outer-first" if outer_first <= inner_first else "inner-first"
+    best = min(outer_first, inner_first)
+    if mode == "best-shortened":
+        shortened_dim = max(inner_span, child_k - outer_zeros)
+        if shortened_dim >= outer_span:
+            shortened_inner_first = (
+                inner
+                + (outer_span - inner_span)
+                * (shortened_dim - outer_span)
+                * q_log2
+            )
+            if shortened_inner_first < best:
+                best = shortened_inner_first
+                best_label = "shortened-inner-first"
+    return best_label, best, outer_first, inner_first
+
+
+def choice_split_shape_log2(
+    choice: tuple[int, ...],
+    child_n: int,
+    comb: list[list[float]],
+) -> float:
+    p = choice[0]
+    singleton_count = choice[1]
+    visible_support_size = choice[2]
+    outer_zeros = choice[6]
+    return (
+        float(singleton_count)
+        + comb[outer_zeros][p]
+        + comb[child_n - outer_zeros][visible_support_size]
+    )
+
+
+def choice_local_row_log2(
+    choice: tuple[int, ...],
+    child_n: int,
+    comb: list[list[float]],
+    q_log2: float,
+) -> float:
+    local_charge = choice[7]
+    lift_qdim = choice[14]
+    return choice_split_shape_log2(choice, child_n, comb) - local_charge * q_log2 + lift_qdim * q_log2
+
+
+def choice_is_plane_carrier(choice: tuple[int, ...]) -> bool:
+    return choice[4] == 2 and choice[5] == 1
+
+
+def choice_is_tau0_child_line(choice: tuple[int, ...]) -> bool:
+    return choice[3] == 0 and choice[4] == 1 and choice[5] == 1
+
+
+def choice_child_layers(choice: Choice) -> list[State]:
+    p = choice[0]
+    singleton_count = choice[1]
+    outer_span = choice[4]
+    inner_span = choice[5]
+    outer_zeros = choice[6]
+    inner_zeros = p + singleton_count
+    layers = [(outer_span, outer_zeros)]
+    if inner_span > 0:
+        layers.append((inner_span, inner_zeros))
+    return layers
+
+
+def merge_equal_dimension_chain(layers: list[State]) -> list[State]:
+    by_dim: dict[int, int] = {}
+    for dim, zeros in layers:
+        by_dim[dim] = max(by_dim.get(dim, -1), zeros)
+    return sorted(by_dim.items(), reverse=True)
+
+
+def marked_plane_flag_child_bound(
+    *,
+    child_by_span: dict[int, list[float]],
+    child_choices: dict[tuple[int, int], tuple[int, ...] | None] | None,
+    comb: list[list[float]],
+    child_n: int,
+    outer_span: int,
+    inner_span: int,
+    outer_zeros: int,
+    inner_zeros: int,
+    q_log2: float,
+) -> float:
+    """Diagnostic q+1 bound for a two-line-in-plane child diagram."""
+
+    if child_choices is None or inner_span <= 0 or child_n <= 1:
+        return NEG_INF
+    outer_choice = child_choices.get((outer_span, outer_zeros))
+    inner_choice = child_choices.get((inner_span, inner_zeros))
+    if outer_choice is None or inner_choice is None:
+        return NEG_INF
+    if not choice_is_plane_carrier(outer_choice):
+        return NEG_INF
+    if not choice_is_tau0_child_line(inner_choice):
+        return NEG_INF
+    outer_value = get_child_value(child_by_span, child_n, outer_span, outer_zeros)
+    if outer_value <= NEG_INF / 2:
+        return NEG_INF
+    grandchild_n = child_n // 2
+    inner_local = choice_local_row_log2(inner_choice, grandchild_n, comb, q_log2)
+    return outer_value + inner_local + q_log2
+
+
+def flag_table_bound_for_layers(
+    *,
+    values_by_span: dict[int, list[float]],
+    flag_table: FlagTable | None,
+    child_k: int,
+    child_n: int,
+    q_log2: float,
+    layers: tuple[State, ...] | list[State],
+) -> float:
+    if len(layers) == 0:
+        return NEG_INF
+    if len(layers) == 1:
+        return get_child_value(values_by_span, child_n, layers[0][0], layers[0][1])
+    if len(layers) != 2:
+        return NEG_INF
+    outer_state, inner_state = layers
+    if flag_table is not None:
+        table_value = flag_table.get((outer_state, inner_state))
+        if table_value is not None:
+            return table_value
+    return flag_child_bound(
+        child_by_span=values_by_span,
+        child_k=child_k,
+        child_n=child_n,
+        outer_span=outer_state[0],
+        inner_span=inner_state[0],
+        outer_zeros=outer_state[1],
+        inner_zeros=inner_state[1],
+        q_log2=q_log2,
+        mode="best",
+    )
+
+
+def compute_two_layer_flag_table(
+    *,
+    values_by_span: dict[int, list[float]],
+    choices: dict[tuple[int, int], Choice | None],
+    previous_values_by_span: dict[int, list[float]] | None,
+    previous_flag_table: FlagTable | None,
+    comb: list[list[float]],
+    q_log2: float,
+    level: int,
+    expansion: int,
+) -> FlagTable:
+    """Diagnostic two-layer flag table with carried-child refinements.
+
+    The baseline is the usual coarse flag bound from scalar state values.  Two
+    refinements are allowed:
+
+    * carry both layers' selected child rows through an inner/outer-first collapse;
+    * use the marked-plane q+1 brick when the carried flag expands to two lines
+      under one child plane.
+    """
+
+    child_k = 1 << level
+    child_n = expansion * (1 << level)
+    previous_k = 1 << (level - 1) if level > 0 else 0
+    previous_n = expansion * (1 << (level - 1)) if level > 0 else 0
+    table: FlagTable = {}
+    states: list[State] = []
+    for span, values in values_by_span.items():
+        for zeros, value in enumerate(values):
+            if value > NEG_INF / 2:
+                states.append((span, zeros))
+
+    for outer_state in states:
+        for inner_state in states:
+            if inner_state[0] > outer_state[0] or inner_state[1] < outer_state[1]:
+                continue
+            label, baseline, _outer_first, _inner_first = flag_child_bound_report(
+                child_by_span=values_by_span,
+                child_k=child_k,
+                child_n=child_n,
+                outer_span=outer_state[0],
+                inner_span=inner_state[0],
+                outer_zeros=outer_state[1],
+                inner_zeros=inner_state[1],
+                q_log2=q_log2,
+                mode="best",
+            )
+            if baseline <= NEG_INF / 2:
+                continue
+            best = baseline
+            if level > 0 and previous_values_by_span is not None:
+                outer_choice = choices.get(outer_state)
+                inner_choice = choices.get(inner_state)
+                if outer_choice is not None and inner_choice is not None:
+                    carried_layers = tuple(
+                        merge_equal_dimension_chain(
+                            choice_child_layers(outer_choice) + choice_child_layers(inner_choice)
+                        )
+                    )
+                    if label in ("inner-first", "shortened-inner-first"):
+                        current_choice = inner_choice
+                    else:
+                        current_choice = outer_choice
+                    current_layers = tuple(merge_equal_dimension_chain(choice_child_layers(current_choice)))
+                    current_bound = flag_table_bound_for_layers(
+                        values_by_span=previous_values_by_span,
+                        flag_table=previous_flag_table,
+                        child_k=previous_k,
+                        child_n=previous_n,
+                        q_log2=q_log2,
+                        layers=current_layers,
+                    )
+                    carried_bound = flag_table_bound_for_layers(
+                        values_by_span=previous_values_by_span,
+                        flag_table=previous_flag_table,
+                        child_k=previous_k,
+                        child_n=previous_n,
+                        q_log2=q_log2,
+                        layers=carried_layers,
+                    )
+                    if current_bound > NEG_INF / 2 and carried_bound > NEG_INF / 2:
+                        saving = current_bound - carried_bound
+                        if saving > 0:
+                            best = min(best, baseline - saving)
+
+                    if choice_is_plane_carrier(outer_choice) and choice_is_tau0_child_line(inner_choice):
+                        outer_value = get_child_value(
+                            values_by_span,
+                            child_n,
+                            outer_state[0],
+                            outer_state[1],
+                        )
+                        inner_local = choice_local_row_log2(inner_choice, previous_n, comb, q_log2)
+                        marked_plane_bound = outer_value + inner_local + q_log2
+                        best = min(best, marked_plane_bound)
+
+            table[(outer_state, inner_state)] = best
+    return table
+
+
+def marked_line_child_bound(
+    *,
+    child_by_span: dict[int, list[float]],
+    child_k: int,
+    child_n: int,
+    outer_span: int,
+    outer_zeros: int,
+    q_log2: float,
+) -> float:
+    """Safe bound for one marked line inside a child span.
+
+    The state is a joint flag L <= V with dim(V)=outer_span and dim(L)=1,
+    where V has outer_zeros common zeros and L has one additional marked zero.
+    """
+
+    if outer_span < 1:
+        return NEG_INF
+    inner_zeros = outer_zeros + 1
+    if inner_zeros > child_n:
+        return NEG_INF
+    return flag_child_bound(
+        child_by_span=child_by_span,
+        child_k=child_k,
+        child_n=child_n,
+        outer_span=outer_span,
+        inner_span=1,
+        outer_zeros=outer_zeros,
+        inner_zeros=inner_zeros,
+        q_log2=q_log2,
+        mode="best",
+    )
+
+
+def support2_component_plane_saving_qdim(
+    *,
+    mode: str,
+    parent_span: int,
+    visible_tau: int,
+    visible_support_size: int,
+    kernel_dim: int,
+    inner_span: int,
+    outer_span: int,
+    local_delta: int,
+    local_components: int,
+) -> int:
+    """Diagnostic saving for the high-lift decomposable support-two row.
+
+    This is deliberately narrow.  It targets the current `(2,15)` support-two
+    frame rows where a two-dimensional parent quotient has no kernel and its
+    two rank-one support components each span a child 2-plane inside a
+    codimension-one slice of the fixed child 4-container.  The component-plane
+    count costs `q^2` per component rather than the current `q^4` per
+    component, saving four q-dimensions.
+    """
+
+    if mode == "none":
+        return 0
+    if mode != "high-lift":
+        raise ValueError(f"unknown support2 component-plane mode: {mode}")
+    if (
+        parent_span == 2
+        and visible_tau == 2
+        and visible_support_size == 2
+        and kernel_dim == 0
+        and inner_span == 0
+        and outer_span == 4
+        and local_delta == 2
+        and local_components == 2
+    ):
+        return 4
+    return 0
+
+
+def support3_component_plane_saving_qdim(
+    *,
+    mode: str,
+    parent_span: int,
+    visible_tau: int,
+    visible_support_size: int,
+    kernel_dim: int,
+    inner_span: int,
+    outer_span: int,
+    local_delta: int,
+    local_components: int,
+) -> int:
+    """Diagnostic saving for the decomposable support-three high-lift row.
+
+    The live `a=3, delta=3, comp=3` tau-two row has three rank-one
+    components.  After the child 4-container is fixed, component `i` lies in
+    the slice zero on the other two active coordinates.  The safe mode allows
+    one proportional pair of active coordinate restrictions on the container:
+    then one component plane may live in a 3-space and cost `q^2`, while the
+    other two are contained in 2-spaces.  The exact-support local two-plane
+    still costs `q^2`, so the post-root component placement costs at most
+    `q^4` instead of the scalar `q^6`.
+
+    The rank3 mode is a sensitivity test for the pairwise-independent active
+    restriction stratum, where all three component planes are contained in
+    fixed 2-spaces and the post-root cost is only `q^2`.
+
+    The stratified mode applies the same four-qdim saving as a theorem target:
+    the rank-defect stratum pays two q-dimensions because a nonzero projective
+    relation among the three active restrictions forces the fixed child
+    4-container into one additional hyperplane, while there are only q^2 such
+    relations.  This exactly pays for the extra q^2 component-plane family
+    that safe mode allowed in the proportional-pair stratum.
+    """
+
+    if mode == "none":
+        return 0
+    if mode not in ("safe", "rank3", "stratified"):
+        raise ValueError(f"unknown support3 component-plane mode: {mode}")
+    if (
+        parent_span == 2
+        and visible_tau == 2
+        and visible_support_size == 3
+        and kernel_dim == 0
+        and inner_span == 0
+        and outer_span == 4
+        and local_delta == 3
+        and local_components == 3
+    ):
+        return 2 if mode == "safe" else 4
+    return 0
+
+
+def tau1_child_line_carry_saving_qdim(
+    *,
+    mode: str,
+    parent_visible_tau: int,
+    child_parent_span: int,
+    child_choice: tuple[int, ...] | None,
+) -> int:
+    """Diagnostic saving from carrying a parent tau-one line into the child row.
+
+    The parent tau-one local datum already chooses a full quotient line.  If the
+    selected child scalar row is also tau-one, a marked-line state may replace
+    the child's independent quotient-line family by a conditional fiber count.
+    This helper subtracts only the positive child post-root line-family qdim.
+    It is a sensitivity test for the marked-line/container state, not a theorem
+    by itself.
+    """
+
+    if mode == "none":
+        return 0
+    if mode != "top":
+        raise ValueError(f"unknown tau1 child-line carry mode: {mode}")
+    if parent_visible_tau != 1 or child_choice is None:
+        return 0
+    child_profile = tau1_incidence_profile(child_parent_span, child_choice)
+    if child_profile is None:
+        return 0
+    return max(0, child_profile[6])
+
+
+def support4_root_kernel_cover_saving_qdim(
+    *,
+    mode: str,
+    parent_span: int,
+    visible_tau: int,
+    visible_support_size: int,
+    kernel_dim: int,
+    inner_span: int,
+    outer_span: int,
+    local_delta: int,
+    local_components: int,
+) -> int:
+    """Diagnostic cover for the decomposable support-four exterior row.
+
+    In the live row, after the child 4-container and active roots are fixed,
+    the four singleton equations cut a four-dimensional root-kernel inside
+    `V+V`.  The scalar recurrence still pays the `q^4` Grassmann family of
+    parent two-planes inside that kernel.  This diagnostic counts that
+    root-kernel container once.  It is deliberately restricted to the exact
+    support-four shape and is not the retired tau-two all-lift shortcut.
+    """
+
+    if mode == "none":
+        return 0
+    if mode != "kernel":
+        raise ValueError(f"unknown support4 root-kernel cover mode: {mode}")
+    if (
+        parent_span == 2
+        and visible_tau == 2
+        and visible_support_size == 4
+        and kernel_dim == 0
+        and inner_span == 0
+        and outer_span == 4
+        and local_delta == 4
+        and local_components == 4
+    ):
+        return 4
+    return 0
+
+
+def support2_root_kernel_cover_saving_qdim(
+    *,
+    mode: str,
+    parent_span: int,
+    visible_tau: int,
+    visible_support_size: int,
+    kernel_dim: int,
+    inner_span: int,
+    outer_span: int,
+    local_delta: int,
+    local_components: int,
+    current_lift_qdim: int,
+    local_charge: int,
+) -> int:
+    """Diagnostic root-kernel container cover for decomposable support two.
+
+    This targets the currently exposed `a=2,delta=2,comp=2` quotient-frame row.
+    After root labels and the child container are fixed, the scalar recurrence
+    still pays the remaining post-root parent-plane family.  The diagnostic
+    counts that root-compatible container once, subtracting exactly the
+    positive post-root q-dimension left by the current local accounting.
+    """
+
+    if mode == "none":
+        return 0
+    if mode != "kernel":
+        raise ValueError(f"unknown support2 root-kernel cover mode: {mode}")
+    if (
+        parent_span == 2
+        and visible_tau == 2
+        and visible_support_size == 2
+        and kernel_dim == 0
+        and inner_span == 0
+        and outer_span in (3, 4)
+        and local_delta == 2
+        and local_components == 2
+    ):
+        return max(0, current_lift_qdim - local_charge)
+    return 0
+
+
+def tau1_root_kernel_cover_saving_qdim(
+    *,
+    mode: str,
+    parent_span: int,
+    visible_tau: int,
+    outer_span: int,
+    local_charge: int,
+) -> int:
+    """Diagnostic cover for saturated tau-one root-compatible line families."""
+
+    if mode == "none":
+        return 0
+    if mode != "kernel":
+        raise ValueError(f"unknown tau1 root-kernel cover mode: {mode}")
+    if visible_tau != 1:
+        return 0
+    quotient_lift_qdim = 2 * outer_span - parent_span
+    return max(0, quotient_lift_qdim - local_charge)
+
+
+def lift_flag_span_moment(
+    child_by_span: dict[int, list[float]],
+    comb: list[list[float]],
+    q_log2: float,
+    child_k: int,
+    singleton_charge_mode: str,
+    flag_bound_mode: str,
+    max_visible_tau: int,
+    cover_lift_mode: str,
+    cover_kernel_lift: bool,
+    max_parent_span: int | None = None,
+    child_choices: dict[tuple[int, int], tuple[int, ...] | None] | None = None,
+    child_flag_table: FlagTable | None = None,
+    exclude_collapsed_active: bool = False,
+    support2_root_kernel_cover_mode: str = "none",
+    support2_component_plane_mode: str = "none",
+    support3_component_plane_mode: str = "none",
+    support4_root_kernel_cover_mode: str = "none",
+    tau1_child_line_carry_mode: str = "none",
+    tau1_root_kernel_cover_mode: str = "none",
+) -> tuple[dict[int, list[float]], dict[tuple[int, int], tuple[int, ...] | None]]:
+    child_n = len(next(iter(child_by_span.values()))) - 1
+    parent_n = 2 * child_n
+    parent_k = 2 * child_k
+    if max_parent_span is None:
+        max_parent_span = parent_k
+    max_parent_span = max(0, min(max_parent_span, parent_k))
+    parent_by_span: dict[int, list[float]] = {
+        span: [NEG_INF] * (parent_n + 1) for span in range(1, max_parent_span + 1)
+    }
+    choices: dict[tuple[int, int], tuple[int, ...] | None] = {}
+    local_profile_cache: dict[tuple[int, int, int, str, int], tuple[int, int, int, int, int, int, int]] = {}
+
+    def cached_local_profile(
+        visible_tau: int,
+        outer_zero_count: int,
+        visible_support_size: int,
+        quotient_delta_floor: int = 0,
+    ) -> tuple[int, int, int, int, int, int, int]:
+        key = (
+            visible_tau,
+            outer_zero_count,
+            visible_support_size,
+            singleton_charge_mode,
+            quotient_delta_floor,
+        )
+        if key not in local_profile_cache:
+            local_profile_cache[key] = local_visible_trace_profile(
+                visible_tau=visible_tau,
+                child_k=child_k,
+                outer_zero_count=outer_zero_count,
+                visible_support_size=visible_support_size,
+                singleton_charge_mode=singleton_charge_mode,
+                quotient_delta_floor=quotient_delta_floor,
+            )
+        return local_profile_cache[key]
+
+    child_spans = sorted(child_by_span)
+
+    def covers_lift(visible_tau: int) -> bool:
+        if cover_lift_mode == "all":
+            return True
+        if cover_lift_mode == "tau0":
+            return visible_tau == 0
+        if cover_lift_mode == "tau1":
+            return visible_tau == 1
+        if cover_lift_mode == "tau2":
+            return visible_tau == 2
+        if cover_lift_mode == "tau0tau1":
+            return visible_tau in (0, 1)
+        if cover_lift_mode == "tau0tau2":
+            return visible_tau in (0, 2)
+        if cover_lift_mode == "tau1tau2":
+            return visible_tau in (1, 2)
+        return False
+
+    for parent_span in range(1, max_parent_span + 1):
+        for z in range(parent_n + 1):
+            total = NEG_INF
+            best = NEG_INF
+            best_choice: tuple[int, ...] | None = None
+
+            for p in range(z // 2 + 1):
+                singleton_count = z - 2 * p
+                if p + singleton_count > child_n:
+                    continue
+                orientation_log = float(singleton_count)
+
+                max_visible_support = min(singleton_count, child_n - p)
+                for visible_support_size in range(max_visible_support + 1):
+                    outer_zeros = p + singleton_count - visible_support_size
+                    inner_zeros = p + singleton_count
+                    if outer_zeros > child_n:
+                        continue
+                    if visible_support_size > child_n - outer_zeros:
+                        continue
+
+                    shape_log = (
+                        orientation_log
+                        + comb[outer_zeros][p]
+                        + comb[child_n - outer_zeros][visible_support_size]
+                    )
+
+                    max_tau = min(parent_span, max_visible_tau)
+                    for visible_tau in range(max_tau + 1):
+                        kernel_dim = parent_span - visible_tau
+                        if visible_tau == 0 and visible_support_size != 0:
+                            continue
+                        if visible_tau > 0 and visible_support_size == 0:
+                            continue
+
+                        (
+                            charge,
+                            local_delta,
+                            local_components,
+                            local_g,
+                            local_theta,
+                            local_h,
+                            local_gamma,
+                        ) = cached_local_profile(
+                            visible_tau,
+                            outer_zeros,
+                            visible_support_size,
+                        )
+                        incidence_mode = singleton_charge_mode == "endpoint-tau2-layer-incidence"
+                        if charge >= INF and not incidence_mode:
+                            continue
+
+                        if kernel_dim == 0:
+                            inner_span_candidates = [0]
+                        else:
+                            inner_span_candidates = [
+                                r0
+                                for r0 in child_spans
+                                if kernel_dim <= 2 * r0 and r0 <= 2 * kernel_dim
+                            ]
+
+                        for inner_span in inner_span_candidates:
+                            if visible_tau == 0:
+                                outer_span_candidates = [inner_span]
+                            else:
+                                outer_span_candidates = [
+                                    r1
+                                    for r1 in child_spans
+                                    if inner_span <= r1
+                                    and parent_span <= 2 * r1
+                                    and r1 <= 2 * parent_span
+                                ]
+
+                            for outer_span in outer_span_candidates:
+                                if outer_span == 0:
+                                    continue
+                                if (
+                                    exclude_collapsed_active
+                                    and visible_tau > 0
+                                    and visible_support_size > 0
+                                    and inner_span == outer_span
+                                    and inner_zeros > outer_zeros
+                                ):
+                                    continue
+                                if incidence_mode:
+                                    quotient_delta_floor = (
+                                        max(0, outer_span - inner_span)
+                                        if visible_tau == 2
+                                        else 0
+                                    )
+                                    (
+                                        charge,
+                                        local_delta,
+                                        local_components,
+                                        local_g,
+                                        local_theta,
+                                        local_h,
+                                        local_gamma,
+                                    ) = cached_local_profile(
+                                        visible_tau,
+                                        outer_zeros,
+                                        visible_support_size,
+                                        quotient_delta_floor,
+                                    )
+                                    if charge >= INF:
+                                        continue
+                                exact_support_grassmann_cap = (
+                                    incidence_mode and visible_tau == 2
+                                )
+                                if exact_support_grassmann_cap:
+                                    grassmann_charge = visible_support_size
+                                    if grassmann_charge > charge:
+                                        charge = grassmann_charge
+                                        local_theta = 4 * local_delta - 4 - charge
+                                        local_h = -2
+                                        local_gamma = -2
+                                charge_log = -charge * q_log2
+                                marked_plane_child_used = False
+                                two_layer_table_used = False
+                                if visible_tau == 0:
+                                    lift_log = parent_span * (2 * outer_span - parent_span) * q_log2
+                                    if covers_lift(visible_tau):
+                                        lift_log = 0.0
+                                    child_log = get_child_value(
+                                        child_by_span,
+                                        child_n,
+                                        outer_span,
+                                        outer_zeros,
+                                    )
+                                else:
+                                    kernel_lift_log = (
+                                        kernel_dim * (2 * inner_span - kernel_dim) * q_log2
+                                    )
+                                    if cover_kernel_lift:
+                                        kernel_lift_log = 0.0
+                                    quotient_lift_log = (
+                                        visible_tau * (2 * outer_span - parent_span) * q_log2
+                                    )
+                                    lift_log = kernel_lift_log + quotient_lift_log
+                                    if covers_lift(visible_tau):
+                                        lift_log = 0.0
+                                    else:
+                                        if visible_tau == 1:
+                                            lift_log -= (
+                                                tau1_root_kernel_cover_saving_qdim(
+                                                    mode=tau1_root_kernel_cover_mode,
+                                                    parent_span=parent_span,
+                                                    visible_tau=visible_tau,
+                                                    outer_span=outer_span,
+                                                    local_charge=charge,
+                                                )
+                                                * q_log2
+                                            )
+                                        component_plane_saving = support2_component_plane_saving_qdim(
+                                            mode=support2_component_plane_mode,
+                                            parent_span=parent_span,
+                                            visible_tau=visible_tau,
+                                            visible_support_size=visible_support_size,
+                                            kernel_dim=kernel_dim,
+                                            inner_span=inner_span,
+                                            outer_span=outer_span,
+                                            local_delta=local_delta,
+                                            local_components=local_components,
+                                        )
+                                        component_plane_saving += support3_component_plane_saving_qdim(
+                                            mode=support3_component_plane_mode,
+                                            parent_span=parent_span,
+                                            visible_tau=visible_tau,
+                                            visible_support_size=visible_support_size,
+                                            kernel_dim=kernel_dim,
+                                            inner_span=inner_span,
+                                            outer_span=outer_span,
+                                            local_delta=local_delta,
+                                            local_components=local_components,
+                                        )
+                                        component_plane_saving += support4_root_kernel_cover_saving_qdim(
+                                            mode=support4_root_kernel_cover_mode,
+                                            parent_span=parent_span,
+                                            visible_tau=visible_tau,
+                                            visible_support_size=visible_support_size,
+                                            kernel_dim=kernel_dim,
+                                            inner_span=inner_span,
+                                            outer_span=outer_span,
+                                            local_delta=local_delta,
+                                            local_components=local_components,
+                                        )
+                                        current_lift_qdim = (
+                                            int(round(lift_log / q_log2)) - component_plane_saving
+                                        )
+                                        component_plane_saving += support2_root_kernel_cover_saving_qdim(
+                                            mode=support2_root_kernel_cover_mode,
+                                            parent_span=parent_span,
+                                            visible_tau=visible_tau,
+                                            visible_support_size=visible_support_size,
+                                            kernel_dim=kernel_dim,
+                                            inner_span=inner_span,
+                                            outer_span=outer_span,
+                                            local_delta=local_delta,
+                                            local_components=local_components,
+                                            current_lift_qdim=current_lift_qdim,
+                                            local_charge=charge,
+                                        )
+                                        lift_log -= component_plane_saving * q_log2
+                                    child_log = flag_child_bound(
+                                        child_by_span=child_by_span,
+                                        child_k=child_k,
+                                        child_n=child_n,
+                                        outer_span=outer_span,
+                                        inner_span=inner_span,
+                                        outer_zeros=outer_zeros,
+                                        inner_zeros=inner_zeros,
+                                        q_log2=q_log2,
+                                        mode=flag_bound_mode,
+                                    )
+                                    if flag_bound_mode == "best-two-layer-table" and child_flag_table is not None:
+                                        table_log = child_flag_table.get(
+                                            ((outer_span, outer_zeros), (inner_span, inner_zeros))
+                                        )
+                                        if table_log is not None and table_log < child_log:
+                                            child_log = table_log
+                                            two_layer_table_used = True
+                                    if flag_bound_mode == "best-marked-plane":
+                                        marked_plane_log = marked_plane_flag_child_bound(
+                                            child_by_span=child_by_span,
+                                            child_choices=child_choices,
+                                            comb=comb,
+                                            child_n=child_n,
+                                            outer_span=outer_span,
+                                            inner_span=inner_span,
+                                            outer_zeros=outer_zeros,
+                                            inner_zeros=inner_zeros,
+                                            q_log2=q_log2,
+                                        )
+                                        if marked_plane_log > NEG_INF / 2 and marked_plane_log < child_log:
+                                            child_log = marked_plane_log
+                                            marked_plane_child_used = True
+
+                                if (
+                                    visible_tau == 1
+                                    and child_choices is not None
+                                    and tau1_child_line_carry_mode != "none"
+                                ):
+                                    child_choice = child_choices.get((outer_span, outer_zeros))
+                                    carry_saving = tau1_child_line_carry_saving_qdim(
+                                        mode=tau1_child_line_carry_mode,
+                                        parent_visible_tau=visible_tau,
+                                        child_parent_span=outer_span,
+                                        child_choice=child_choice,
+                                    )
+                                    child_log -= carry_saving * q_log2
+
+                                if child_log <= NEG_INF / 2:
+                                    continue
+                                marked_line_used = False
+                                if (
+                                    incidence_mode
+                                    and parent_span == 2
+                                    and visible_tau == 2
+                                    and kernel_dim == 0
+                                    and outer_span == 2
+                                    and inner_span == 0
+                                    and visible_support_size == 2
+                                    and local_delta == 2
+                                    and local_components == 2
+                                ):
+                                    marked_child_log = marked_line_child_bound(
+                                        child_by_span=child_by_span,
+                                        child_k=child_k,
+                                        child_n=child_n,
+                                        outer_span=outer_span,
+                                        outer_zeros=outer_zeros,
+                                        q_log2=q_log2,
+                                    )
+                                    if marked_child_log > NEG_INF / 2:
+                                        marked_child_log += q_log2
+                                        if marked_child_log < child_log:
+                                            child_log = marked_child_log
+                                            marked_line_used = True
+                                term = shape_log + charge_log + lift_log + child_log
+                                total = log2_add(total, term)
+                                if term > best:
+                                    best = term
+                                    best_choice = (
+                                        p,
+                                        singleton_count,
+                                        visible_support_size,
+                                        visible_tau,
+                                        outer_span,
+                                        inner_span,
+                                        outer_zeros,
+                                        charge,
+                                        local_delta,
+                                        local_components,
+                                        local_g,
+                                        local_theta,
+                                        (
+                                            -6
+                                            if two_layer_table_used
+                                            else (
+                                                -5
+                                                if marked_plane_child_used
+                                                else (-4 if marked_line_used else local_h)
+                                            )
+                                        ),
+                                        (
+                                            -6
+                                            if two_layer_table_used
+                                            else (
+                                                -5
+                                                if marked_plane_child_used
+                                                else (-4 if marked_line_used else local_gamma)
+                                            )
+                                        ),
+                                        int(round(lift_log / q_log2)),
+                                    )
+
+            parent_by_span[parent_span][z] = total
+            choices[(parent_span, z)] = best_choice
+    return parent_by_span, choices
+
+
+def first_crossing(values: list[float], security_bits: float) -> int | None:
+    target = -security_bits
+    for z, value in enumerate(values):
+        if value <= target:
+            return z
+    return None
+
+
+def parse_flag_state(text: str) -> tuple[int, int, int, int]:
+    parts = text.split(",")
+    if len(parts) != 4:
+        raise argparse.ArgumentTypeError("flag state must be outer_span,outer_z,inner_span,inner_z")
+    try:
+        outer_span, outer_z, inner_span, inner_z = (int(part) for part in parts)
+    except ValueError as exc:
+        raise argparse.ArgumentTypeError("flag state entries must be integers") from exc
+    return outer_span, outer_z, inner_span, inner_z
+
+
+def is_tau2_theta(choice: tuple[int, ...] | None, theta: int) -> bool:
+    return choice is not None and choice[3] == 2 and choice[11] == theta
+
+
+def choice_children(choice: tuple[int, ...]) -> list[tuple[str, int, int]]:
+    p = choice[0]
+    singleton_count = choice[1]
+    outer_span = choice[4]
+    inner_span = choice[5]
+    outer_zeros = choice[6]
+    inner_zeros = p + singleton_count
+    children = [("outer", outer_span, outer_zeros)]
+    if inner_span > 0:
+        children.append(("inner", inner_span, inner_zeros))
+    return children
+
+
+def tau1_incidence_profile(
+    parent_span: int,
+    choice: tuple[int, ...],
+) -> tuple[int, int, int, int, int, int, int] | None:
+    """Return dimension diagnostics for the fixed-flag tau-one quotient-line row.
+
+    The recurrence already counts the quotient-line family through the Gaussian quotient lift.
+    These diagnostics compare that coarse universal line count against the support-subcode saving
+    used by the local tau-one charge.
+    """
+
+    visible_support_size = choice[2]
+    visible_tau = choice[3]
+    outer_span = choice[4]
+    local_charge = choice[7]
+    local_delta = choice[8]
+    local_components = choice[9]
+    if visible_tau != 1:
+        return None
+    quotient_qdim = 2 * outer_span - parent_span
+    quotient_ambient_dim = quotient_qdim + 1
+    visible_image_dim_bound = min(quotient_ambient_dim, 2 * local_delta)
+    invisible_fiber_dim_min = max(0, quotient_ambient_dim - visible_image_dim_bound)
+    universal_postroot_qdim = quotient_qdim - visible_support_size
+    support_saving_qdim = max(0, local_delta - local_components)
+    charged_postroot_qdim = quotient_qdim - local_charge
+    return (
+        quotient_qdim,
+        quotient_ambient_dim,
+        visible_image_dim_bound,
+        invisible_fiber_dim_min,
+        universal_postroot_qdim,
+        support_saving_qdim,
+        charged_postroot_qdim,
+    )
+
+
+def theta_chain_reports(
+    trace: list[dict[tuple[int, int], tuple[int, ...] | None]],
+    values_by_level: list[dict[int, list[float]]],
+    theta: int,
+    limit: int,
+) -> list[tuple[int, int, int, int, float, str]]:
+    memo: dict[tuple[int, int, int], tuple[int, str]] = {}
+
+    def best_chain(level: int, span: int, z: int) -> tuple[int, str]:
+        key = (level, span, z)
+        if key in memo:
+            return memo[key]
+        if level <= 0:
+            memo[key] = (0, "")
+            return memo[key]
+        choice = trace[level - 1].get((span, z))
+        if not is_tau2_theta(choice, theta):
+            memo[key] = (0, "")
+            return memo[key]
+        best_child_len = 0
+        best_child_path = ""
+        for edge_name, child_span, child_z in choice_children(choice):
+            child_len, child_path = best_chain(level - 1, child_span, child_z)
+            if child_len > best_child_len:
+                best_child_len = child_len
+                best_child_path = f"{edge_name}->{child_path}" if child_path else edge_name
+        result = (1 + best_child_len, best_child_path)
+        memo[key] = result
+        return result
+
+    reports: list[tuple[int, int, int, int, float, str]] = []
+    for level in range(1, len(trace) + 1):
+        for (span, z), choice in trace[level - 1].items():
+            if not is_tau2_theta(choice, theta):
+                continue
+            chain_len, path = best_chain(level, span, z)
+            values = values_by_level[level].get(span)
+            if values is None or z < 0 or z >= len(values):
+                continue
+            value = values[z]
+            if value <= NEG_INF / 2:
+                continue
+            reports.append((chain_len, level, span, z, value, path))
+    reports.sort(key=lambda row: (row[0], row[4]), reverse=True)
+    return reports[:limit]
+
+
+def main() -> None:
+    parser = argparse.ArgumentParser()
+    parser.add_argument("--depth", type=int, required=True)
+    parser.add_argument("--expansion", type=int, default=8)
+    parser.add_argument("--q-log2", type=float, default=128.0)
+    parser.add_argument("--security-bits", type=float, default=80.0)
+    parser.add_argument("--print-window", type=int, default=5)
+    parser.add_argument("--trace-z", type=int, default=-1)
+    parser.add_argument("--trace-span", type=int, default=1)
+    parser.add_argument(
+        "--trace-follow",
+        choices=["bound", "projection"],
+        default="bound",
+        help=(
+            "When tracing, follow the selected child-bound branch or always follow the outer "
+            "projection path."
+        ),
+    )
+    parser.add_argument("--max-n", type=int, default=DEFAULT_MAX_N)
+    parser.add_argument("--allow-large", action="store_true")
+    parser.add_argument(
+        "--singleton-charge",
+        choices=[
+            "component-uniform",
+            "endpoint-tau2",
+            "endpoint-tau2-layer",
+            "endpoint-tau2-layer-incidence",
+        ],
+        default="endpoint-tau2",
+    )
+    parser.add_argument(
+        "--flag-bound",
+        choices=[
+            "best",
+            "best-shortened",
+            "best-marked-plane",
+            "best-two-layer-table",
+            "product",
+            "outer-only",
+        ],
+        default="best",
+    )
+    parser.add_argument("--max-visible-tau", type=int, default=2)
+    parser.add_argument(
+        "--cover-lift-mode",
+        choices=[
+            "none",
+            "tau0",
+            "tau1",
+            "tau2",
+            "tau0tau1",
+            "tau0tau2",
+            "tau1tau2",
+            "all",
+        ],
+        default="none",
+        help=(
+            "Diagnostic only: remove selected parent-lift multiplicities to test container-style "
+            "existence counting. Not a certificate mode."
+        ),
+    )
+    parser.add_argument(
+        "--cover-kernel-lift",
+        action="store_true",
+        help=(
+            "Diagnostic/proof target: remove only K<=L+L kernel-lift multiplicity after the "
+            "inner child container is fixed, while keeping quotient incidence."
+        ),
+    )
+    parser.add_argument(
+        "--exclude-collapsed-active",
+        action="store_true",
+        help=(
+            "Diagnostic/proof target: skip tau-positive rows whose equal-dimension child "
+            "containers force the active support into the kernel row."
+        ),
+    )
+    parser.add_argument(
+        "--prune-to-final-span",
+        type=int,
+        default=0,
+        help=(
+            "If positive, only compute spans that can feed this final span by doubling backward "
+            "each remaining level. Use 1 for the distance first moment."
+        ),
+    )
+    parser.add_argument(
+        "--report-local-theta",
+        type=int,
+        default=None,
+        help="Report best-transition states whose local tau-two theta equals this value.",
+    )
+    parser.add_argument(
+        "--report-theta-chains",
+        type=int,
+        default=None,
+        help="Report longest best-transition chains containing this tau-two theta value.",
+    )
+    parser.add_argument(
+        "--report-tau1-incidence",
+        action="store_true",
+        help="Report best-transition tau-one quotient-line incidence dimension diagnostics.",
+    )
+    parser.add_argument(
+        "--report-flag-state",
+        type=parse_flag_state,
+        action="append",
+        default=[],
+        help=(
+            "Report two-layer flag-table values as outer_span,outer_z,inner_span,inner_z. "
+            "Useful with --flag-bound best-two-layer-table."
+        ),
+    )
+    parser.add_argument("--report-limit", type=int, default=20)
+    args = parser.parse_args()
+
+    if args.depth < 0:
+        raise SystemExit("--depth must be nonnegative")
+    if args.expansion < 1:
+        raise SystemExit("--expansion must be positive")
+    if args.trace_span < 1:
+        raise SystemExit("--trace-span must be positive")
+    if args.max_visible_tau < 0:
+        raise SystemExit("--max-visible-tau must be nonnegative")
+    if args.prune_to_final_span < 0:
+        raise SystemExit("--prune-to-final-span must be nonnegative")
+    if args.report_limit < 0:
+        raise SystemExit("--report-limit must be nonnegative")
+
+    total_n = args.expansion * (1 << args.depth)
+    if total_n > args.max_n and not args.allow_large:
+        raise SystemExit(
+            f"refusing total length {total_n}; pass --allow-large or raise --max-n"
+        )
+    if args.cover_lift_mode != "none":
+        print(
+            "warning: --cover-lift-mode is anti-conservative and diagnostic only; "
+            "tau>0 modes omit quotient-incidence multiplicity",
+            flush=True,
+        )
+
+    comb = log2_comb_table(total_n)
+    values_by_span: dict[int, list[float]] = {1: [NEG_INF] * (args.expansion + 1)}
+    values_by_span[1][0] = 0.0
+    trace: list[dict[tuple[int, int], tuple[int, ...] | None]] = []
+    values_by_level: list[dict[int, list[float]]] = [{span: values[:] for span, values in values_by_span.items()}]
+    theta_reports: list[tuple[float, int, int, int, tuple[int, ...]]] = []
+    tau1_reports: list[tuple[float, int, int, int, tuple[int, ...]]] = []
+    flag_table_reports: list[tuple[int, tuple[int, int, int, int], float, float]] = []
+
+    print("level,k,n,span_count,min_log2,max_log2", flush=True)
+    print(f"0,1,{args.expansion},1,0.00000000,0.00000000", flush=True)
+    previous_choices: dict[tuple[int, int], tuple[int, ...] | None] | None = None
+    previous_flag_table: FlagTable | None = None
+    previous_values_by_span: dict[int, list[float]] | None = {
+        span: values[:] for span, values in values_by_span.items()
+    }
+    for level in range(1, args.depth + 1):
+        max_parent_span = None
+        if args.prune_to_final_span > 0:
+            max_parent_span = args.prune_to_final_span * (1 << (args.depth - level))
+        values_by_span, choices = lift_flag_span_moment(
+            values_by_span,
+            comb,
+            args.q_log2,
+            1 << (level - 1),
+            args.singleton_charge,
+            args.flag_bound,
+            args.max_visible_tau,
+            args.cover_lift_mode,
+            args.cover_kernel_lift,
+            max_parent_span,
+            previous_choices,
+            previous_flag_table,
+            exclude_collapsed_active=args.exclude_collapsed_active,
+        )
+        trace.append(choices)
+        values_by_level.append({span: values[:] for span, values in values_by_span.items()})
+        if args.flag_bound == "best-two-layer-table":
+            previous_flag_table = compute_two_layer_flag_table(
+                values_by_span=values_by_span,
+                choices=choices,
+                previous_values_by_span=previous_values_by_span,
+                previous_flag_table=previous_flag_table,
+                comb=comb,
+                q_log2=args.q_log2,
+                level=level,
+                expansion=args.expansion,
+            )
+            for target in args.report_flag_state:
+                outer_span, outer_z, inner_span, inner_z = target
+                key = ((outer_span, outer_z), (inner_span, inner_z))
+                table_value = previous_flag_table.get(key, NEG_INF)
+                _label, coarse_value, _outer_first, _inner_first = flag_child_bound_report(
+                    child_by_span=values_by_span,
+                    child_k=1 << level,
+                    child_n=args.expansion * (1 << level),
+                    outer_span=outer_span,
+                    inner_span=inner_span,
+                    outer_zeros=outer_z,
+                    inner_zeros=inner_z,
+                    q_log2=args.q_log2,
+                    mode="best",
+                )
+                flag_table_reports.append((level, target, table_value, coarse_value))
+        previous_choices = choices
+        previous_values_by_span = {span: values[:] for span, values in values_by_span.items()}
+        if args.report_local_theta is not None:
+            for (span, z), choice in choices.items():
+                if choice is None:
+                    continue
+                if choice[3] != 2:
+                    continue
+                if choice[11] != args.report_local_theta:
+                    continue
+                value = values_by_span[span][z]
+                if value <= NEG_INF / 2:
+                    continue
+                theta_reports.append((value, level, span, z, choice))
+        if args.report_tau1_incidence:
+            for (span, z), choice in choices.items():
+                if choice is None or choice[3] != 1:
+                    continue
+                value = values_by_span[span][z]
+                if value <= NEG_INF / 2:
+                    continue
+                tau1_reports.append((value, level, span, z, choice))
+        finite = [
+            value
+            for values in values_by_span.values()
+            for value in values
+            if value > NEG_INF / 2
+        ]
+        print(
+            f"{level},{1 << level},{args.expansion * (1 << level)},"
+            f"{len(values_by_span)},{min(finite):.8f},{max(finite):.8f}",
+            flush=True,
+        )
+
+    final_lines = values_by_span[1]
+    final_vectors = [
+        value + args.q_log2 if value > NEG_INF / 2 else NEG_INF
+        for value in final_lines
+    ]
+    crossing = first_crossing(final_vectors, args.security_bits)
+    k = 1 << args.depth
+    center = k if crossing is None else crossing
+    start = max(0, center - args.print_window)
+    stop = min(total_n, center + args.print_window)
+    print("z,excess,log2_vector_moment")
+    for z in range(start, stop + 1):
+        label = "-inf" if final_vectors[z] <= NEG_INF / 2 else f"{final_vectors[z]:.8f}"
+        print(f"{z},{z-k},{label}")
+    print(
+        f"crossing_z={crossing} crossing_excess="
+        f"{'' if crossing is None else crossing-k}"
+    )
+
+    if args.report_local_theta is not None:
+        theta_reports.sort(reverse=True, key=lambda row: row[0])
+        print(
+            "theta_report_level,span,z,log2_state,p,s,a,tau,outer_span,inner_span,"
+            "outer_zeros,inner_zeros,local_charge,delta,comp,g,theta,dominant_h,gamma,lift_qdim"
+            ",outer_next_tau,outer_next_theta,inner_next_tau,inner_next_theta"
+        )
+        for value, level, span, z, choice in theta_reports[: args.report_limit]:
+            (
+                p,
+                singleton_count,
+                visible_support_size,
+                visible_tau,
+                outer_span,
+                inner_span,
+                outer_zeros,
+                local_charge,
+                local_delta,
+                local_components,
+                local_g,
+                local_theta,
+                local_h,
+                local_gamma,
+                lift_qdim,
+            ) = choice
+            inner_zeros = p + singleton_count
+            outer_next_tau = ""
+            outer_next_theta = ""
+            inner_next_tau = ""
+            inner_next_theta = ""
+            if level > 1:
+                child_choices = trace[level - 2]
+                outer_next = child_choices.get((outer_span, outer_zeros))
+                if outer_next is not None:
+                    outer_next_tau = str(outer_next[3])
+                    if outer_next[3] == 2:
+                        outer_next_theta = str(outer_next[11])
+                if inner_span > 0:
+                    inner_next = child_choices.get((inner_span, inner_zeros))
+                    if inner_next is not None:
+                        inner_next_tau = str(inner_next[3])
+                        if inner_next[3] == 2:
+                            inner_next_theta = str(inner_next[11])
+            print(
+                f"{level},{span},{z},{value:.8f},{p},{singleton_count},"
+                f"{visible_support_size},{visible_tau},{outer_span},{inner_span},"
+                f"{outer_zeros},{inner_zeros},{local_charge},{local_delta},"
+                f"{local_components},{local_g},{local_theta},{local_h},"
+                f"{local_gamma},{lift_qdim},{outer_next_tau},{outer_next_theta},"
+                f"{inner_next_tau},{inner_next_theta}"
+            )
+
+    if args.report_flag_state:
+        print("flag_table_report_level,outer_span,outer_z,inner_span,inner_z,table_log2,coarse_log2,saving_log2")
+        for level, target, table_value, coarse_value in flag_table_reports:
+            outer_span, outer_z, inner_span, inner_z = target
+            table_label = "-inf" if table_value <= NEG_INF / 2 else f"{table_value:.8f}"
+            coarse_label = "-inf" if coarse_value <= NEG_INF / 2 else f"{coarse_value:.8f}"
+            saving = coarse_value - table_value
+            saving_label = "" if table_value <= NEG_INF / 2 or coarse_value <= NEG_INF / 2 else f"{saving:.8f}"
+            print(
+                f"{level},{outer_span},{outer_z},{inner_span},{inner_z},"
+                f"{table_label},{coarse_label},{saving_label}"
+            )
+
+    if args.report_tau1_incidence:
+        tau1_reports.sort(reverse=True, key=lambda row: row[0])
+        print(
+            "tau1_report_level,span,z,log2_state,p,s,a,outer_span,inner_span,"
+            "outer_zeros,inner_zeros,local_charge,delta,comp,quotient_qdim,"
+            "quotient_ambient_dim,visible_image_dim_bound,invisible_fiber_dim_min,"
+            "universal_postroot_qdim,support_saving_qdim,charged_postroot_qdim,"
+            "lift_qdim"
+        )
+        for value, level, span, z, choice in tau1_reports[: args.report_limit]:
+            profile = tau1_incidence_profile(span, choice)
+            if profile is None:
+                continue
+            (
+                quotient_qdim,
+                quotient_ambient_dim,
+                visible_image_dim_bound,
+                invisible_fiber_dim_min,
+                universal_postroot_qdim,
+                support_saving_qdim,
+                charged_postroot_qdim,
+            ) = profile
+            p = choice[0]
+            singleton_count = choice[1]
+            visible_support_size = choice[2]
+            outer_span = choice[4]
+            inner_span = choice[5]
+            outer_zeros = choice[6]
+            local_charge = choice[7]
+            local_delta = choice[8]
+            local_components = choice[9]
+            lift_qdim = choice[14]
+            inner_zeros = p + singleton_count
+            print(
+                f"{level},{span},{z},{value:.8f},{p},{singleton_count},"
+                f"{visible_support_size},{outer_span},{inner_span},{outer_zeros},"
+                f"{inner_zeros},{local_charge},{local_delta},{local_components},"
+                f"{quotient_qdim},{quotient_ambient_dim},{visible_image_dim_bound},"
+                f"{invisible_fiber_dim_min},{universal_postroot_qdim},"
+                f"{support_saving_qdim},{charged_postroot_qdim},{lift_qdim}"
+            )
+
+    if args.report_theta_chains is not None:
+        print("theta_chain_len,start_level,span,z,log2_state,path")
+        for chain_len, level, span, z, value, path in theta_chain_reports(
+            trace,
+            values_by_level,
+            args.report_theta_chains,
+            args.report_limit,
+        ):
+            print(f"{chain_len},{level},{span},{z},{value:.8f},{path}")
+
+    if args.trace_z >= 0:
+        print(
+            "trace_level,span,z,log2_state,p,s,a,tau,outer_span,inner_span,outer_zeros,inner_zeros,"
+            "local_charge,delta,comp,g,theta,dominant_h,gamma,lift_qdim,"
+            "tau1_quotient_qdim,tau1_universal_postroot_qdim,"
+            "tau1_support_saving_qdim,tau1_charged_postroot_qdim,"
+            "child_bound_choice,child_bound_log2,child_outer_first_log2,child_inner_first_log2"
+        )
+        span = args.trace_span
+        z = args.trace_z
+        for level in range(args.depth, 0, -1):
+            trace_values = values_by_level[level].get(span)
+            trace_value = NEG_INF
+            if trace_values is not None and 0 <= z < len(trace_values):
+                trace_value = trace_values[z]
+            trace_value_label = "-inf" if trace_value <= NEG_INF / 2 else f"{trace_value:.8f}"
+            choice = trace[level - 1].get((span, z))
+            if choice is None:
+                print(f"{level},{span},{z},{trace_value_label},,,,,,,,")
+                break
+            (
+                p,
+                singleton_count,
+                visible_support_size,
+                visible_tau,
+                outer_span,
+                inner_span,
+                outer_zeros,
+                local_charge,
+                local_delta,
+                local_components,
+                local_g,
+                local_theta,
+                local_h,
+                local_gamma,
+                lift_qdim,
+            ) = choice
+            inner_zeros = p + singleton_count
+            tau1_profile = tau1_incidence_profile(span, choice)
+            tau1_quotient_qdim = ""
+            tau1_universal_postroot_qdim = ""
+            tau1_support_saving_qdim = ""
+            tau1_charged_postroot_qdim = ""
+            if tau1_profile is not None:
+                (
+                    tau1_quotient_qdim,
+                    _tau1_quotient_ambient_dim,
+                    _tau1_visible_image_dim_bound,
+                    _tau1_invisible_fiber_dim_min,
+                    tau1_universal_postroot_qdim,
+                    tau1_support_saving_qdim,
+                    tau1_charged_postroot_qdim,
+                ) = tau1_profile
+            child_bound_choice = ""
+            child_bound_log2 = ""
+            child_outer_first_log2 = ""
+            child_inner_first_log2 = ""
+            if visible_tau > 0:
+                child_values = values_by_level[level - 1]
+                child_n = args.expansion * (1 << (level - 1))
+                child_k = 1 << (level - 1)
+                (
+                    child_bound_choice,
+                    child_bound_value,
+                    child_outer_first_value,
+                    child_inner_first_value,
+                ) = flag_child_bound_report(
+                    child_by_span=child_values,
+                    child_k=child_k,
+                    child_n=child_n,
+                    outer_span=outer_span,
+                    inner_span=inner_span,
+                    outer_zeros=outer_zeros,
+                    inner_zeros=inner_zeros,
+                    q_log2=args.q_log2,
+                    mode=args.flag_bound,
+                )
+                if child_bound_value > NEG_INF / 2:
+                    child_bound_log2 = f"{child_bound_value:.8f}"
+                if child_outer_first_value > NEG_INF / 2:
+                    child_outer_first_log2 = f"{child_outer_first_value:.8f}"
+                if child_inner_first_value > NEG_INF / 2:
+                    child_inner_first_log2 = f"{child_inner_first_value:.8f}"
+            print(
+                f"{level},{span},{z},{trace_value_label},{p},{singleton_count},{visible_support_size},"
+                f"{visible_tau},{outer_span},{inner_span},{outer_zeros},{inner_zeros},"
+                f"{local_charge},{local_delta},{local_components},{local_g},{local_theta},"
+                f"{local_h},{local_gamma},{lift_qdim},{tau1_quotient_qdim},"
+                f"{tau1_universal_postroot_qdim},{tau1_support_saving_qdim},"
+                f"{tau1_charged_postroot_qdim},{child_bound_choice},"
+                f"{child_bound_log2},{child_outer_first_log2},{child_inner_first_log2}"
+            )
+            next_span = outer_span
+            next_z = outer_zeros
+            if (
+                args.trace_follow == "bound"
+                and child_bound_choice in ("inner-first", "shortened-inner-first")
+                and inner_span > 0
+            ):
+                next_span = inner_span
+                next_z = inner_zeros
+            span = next_span
+            z = next_z
+
+
+if __name__ == "__main__":
+    main()

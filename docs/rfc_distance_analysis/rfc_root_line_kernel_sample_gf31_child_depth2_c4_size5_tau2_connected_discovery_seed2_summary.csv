@@ -1,0 +1,2 @@
+generator_mode,sampler_mode,prime,child_depth,expansion,parent_size,tau,root_count,attempts,connected_accepts,component_rejects,proposals,profile_rejects,profile_accepts,target_rows,worst_residual_endpoint_excess_logq
+discovery,discovery,31,2,4,5,2,4,100,1,18,2,1,1,1,-0.030615642911292706

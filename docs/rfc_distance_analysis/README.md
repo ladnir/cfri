@@ -7,7 +7,68 @@ Useful entry points:
 
 ```text
 rfc_distance_analysis_current_understanding.md current synthesis of what is known/proven/blocked
+rfc_conjectural_distance_program.md           relaxed conjectures and falsifiable experiment plan
 claude_new_direction.md                       active clean-start plan: ground-truth-first oracle/lift path
+rfc_fixed_survivor_rank_tail_status.md       fixed-set rank/subspace-evasion diagnostic status
+rfc_fixed_survivor_rank_recurrence_target.md fixed-survivor rank recurrence proof target
+rfc_fixed_survivor_one_step_theorem.md       one-step fixed-set rank recurrence theorem
+rfc_paired_compression_rank_lemma.md         exact rank doubling on paired coordinates
+rfc_d2_rootline_parallel_class_lemma.md      D=2 singleton repair parallel-class lemma candidate
+rfc_d2_rootline_pgl2_envelope.md             D=2 cross-ratio-free PGL2 repair envelope
+rfc_d3_rootline_geometry_probe.md            D=3 side-colored matroid leakage probe
+rfc_d3_surplus_codimension_signal.md         D=3 Hall-OK surplus exponent signal
+rfc_rootline_generic_rank_lemma.md           matroid-union generic rank for root-line repair
+rfc_rootline_schwartz_zippel_envelope.md     generic D root-line determinant envelope target
+rfc_original_proof_upgrade_synthesis.md      route for upgrading original proof via surplus/flat-excess
+rfc_incremental_upgrade_ladder.md            crawl-before-run theorem ladder for original-proof upgrades
+rfc_original_vs_refined_profile_ledger.md    old-proof row vs refined h=1 bucket accounting
+rfc_canonical_h1_bucket_complement.md        canonical h=1 bucket theorem and no-gain complement audit
+rfc_common_zero_subcode_replacement_theorem.md full common-zero replacement theorem target
+rfc_common_zero_subcode_paired_envelope_redflag.md all-paired compression warning for subcode-zero
+rfc_common_zero_paired_shape_ledger.md       exact-kernel all-paired stress for common-zero route
+rfc_common_zero_exact_paired_branch.md       theorem brick closing pure all-paired exact buckets
+rfc_common_zero_one_spill_ledger.md          first mixed paired/singleton spill stress
+rfc_one_spill_label_distribution.py          label-distribution profiler for one-spill row
+rfc_one_spill_minority_label_no_go.md        local no-go for minority-label root charge
+rfc_one_spill_exact_maximality_no_go.md      local no-go for extra exact-maximality qdims
+rfc_one_spill_canonical_counting_no_go.md    no-go for closing one-spill via witness de-dup alone
+rfc_one_spill_mixed_incidence_no_go.md       no-go for mixed lower-triple/spill-singleton charge
+rfc_tensor_triple_rank_sampler.py            sampler for one-spill lower triple-rank events
+rfc_tensor_triple_segre_classifier.py        Segre-line classifier for triple-rank codimension
+rfc_flat_excess_control_stack.md             current theorem stack for flat-excess control
+rfc_surplus_repair_codimension_target.md     top-profile tolerance and needed surplus exponent
+rfc_surplus_incidence_stratification.md      corrected surplus exponent with flat-excess term
+rfc_flat_excess_tolerance.md                 how flat excess shifts the near-MDS crossing
+rfc_flat_excess_recursive_charge.md          flat excess as child rank event plus quotient blocker
+rfc_flat_excess_charge_push.md               flat excess as marked-rank event plus combined exponent
+rfc_high_rank_flat_duality_reduction.md      high-rank flat excess as ordinary child zero-set event
+rfc_high_rank_flat_endpoint_theorem.md       Tier-1 theorem: h=1 flat excess is child line-zero
+rfc_low_rank_flat_closure_endpoint.md        low-rank flat excess as marked closure-tail event
+rfc_closure_tail_one_mark_recurrence.md      one-mark closure recurrence plus residual repair factor
+rfc_one_mark_closure_defect_crawl.md         Tier-2 direct A0 core-defect correction
+rfc_one_mark_pa_lift_containment.md          Tier-2 PA lift containment for scalar closure recurrence
+rfc_closure_tail_multimark_recurrence.md     multi-mark closure recurrence with correlated PA chains
+rfc_pa_chain_closure_theorem.md              PA-chain theorem target and multi-mark caveat
+rfc_pa_chain_weak_rank_scale.md              safe weak PA-chain rank-drop scale check
+rfc_one_rank_marked_tail_closure_reduction.md one-rank marked tail reduced to one-mark closure
+rfc_small_flat_subcode_charge.md             small flat excess as generalized subcode-zero event
+rfc_short_set_rank_tail_target.md            two-parameter rank-tail target for small flat excess
+rfc_incremental_flat_rank_tail_target.md     marked quotient-rank target replacing aggregate B_d(z,s)
+rfc_marked_incremental_one_step_state.md     top-fold marked categories and PA mixed blocker
+rfc_pa_mixed_projection_lemma.md             deterministic PA mixed sibling projection lemma
+rfc_multi_pa_projection_gap.md               falsified naive multi-PA projection reduction
+rfc_multi_pa_graph_contraction_incidence.md  corrected multi-PA graph-contraction incidence target
+rfc_multi_pa_rank_drop_witness_target.md     minimal-support witness proof target for multi-PA drops
+rfc_multi_pa_linear_relation_form.md         fiber/relation invariant for multi-PA witness equations
+rfc_multi_pa_codimension_budget.md           codimension needed for all-mixed PA stress profiles
+rfc_all_mixed_pa_full_span_reduction.md      all-mixed PA low rank as full two-copy span deficiency
+rfc_independent_randomizer_route.md          broad alternative: independent (a,b) conditioned a!=b
+rfc_larger_block_fold_compatibility.md       arity-4 fold compatibility and protocol/proof tradeoffs
+rfc_arity4_obstruction_check.md              whether binary PA obstructions survive true arity-4 blocks
+rfc_arity4_occupancy_proxy.md                occupancy proxy for whether arity-4 pushes or changes modes
+root_free_additive_rs_fold_report.md         root-free additive/subspace RS fold as MDS alternative
+binary_rs_encoder_audit.md                   audit: current binary_rs path is not full additive RS
+rfc_fixed_survivor_rank_tail_go_nogo.md      hard go/no-go checkpoint for fixed-survivor rank-tail
 rfc_distance_manager_board.md                 current manager board and lane ownership
 rfc_distance_stop_report.md                   historical stop/handoff report for the prior lemma-grind path
 rfc_distance_resume_status.md                 historical resume note; see claude_new_direction.md for current path
@@ -148,7 +209,10 @@ rfc_root_line_kernel_profile.py root-line kernel profile with exact-support inve
 rfc_replica_zero_moment.py      loose aggregate replica first-moment recurrence diagnostic
 rfc_brute_force_moment.py       exact small-field oracle for true RFC first moments
 rfc_lift_validator.py           one-step recurrence/lift validator fed exact child moments
+rfc_d3_rootline_geometry_selftest.py D=3 root-line projective-geometry leakage probe
 rfc_multicopy_falsification.py  multi-copy broad-family falsification stress model
+rfc_arity4_obstruction_profile.py arity-4 local mixed-PA obstruction profiler
+rfc_arity_occupancy_proxy.py    arity-4 occupancy model for full-cover versus sparse modes
 rfc_paired_spine_cascade.py     paired-spine cascade diagnostic seeded by complete-stride flags
 ```
 

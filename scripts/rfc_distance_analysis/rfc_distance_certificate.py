@@ -129,6 +129,7 @@ class CertificateRow:
 LOCAL_THEOREMS_USED = "; ".join(
     [
         "tau=1 support-subcode lemma",
+        "high-rank flat-excess h=1 endpoint reduced to child line-zero",
         "tau=2 layer-codimension root-line endpoint theorem assumed",
         "component/full-rank endpoint via diagonal endomorphisms",
         "generic two-copy matroid-union endpoint included as one layer",

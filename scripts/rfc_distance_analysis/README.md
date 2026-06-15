@@ -18,6 +18,38 @@ Recent original-RFC near-MDS probes:
 rfc_distance_certificate.py        conditional theorem-based distance certificate driver
 rfc_brute_force_moment.py          exact small-field oracle for true RFC first moments B_d(R,z)
 rfc_lift_validator.py              one-step recurrence/lift validator fed exact child moments
+rfc_fixed_survivor_rank_tail.py    fixed-survivor rank-tail/subspace-evasion diagnostic
+rfc_one_step_repair_tolerance.py   top-profile tolerance check for local repair exponents
+rfc_original_vs_refined_profile_ledger.py old proof row vs refined common-zero h-bucket ledger
+rfc_common_zero_paired_shape_ledger.py exact-kernel all-paired common-zero stress ledger
+rfc_common_zero_one_spill_ledger.py first mixed paired/singleton common-zero stress ledger
+rfc_one_spill_label_distribution.py label-distribution profiler for the one-spill row
+rfc_one_spill_maximality_budget.py exact-maximality budget for the one-spill row
+rfc_one_spill_canonical_counting_budget.py canonical/de-dup counting budget for the one-spill row
+rfc_one_spill_mixed_incidence_budget.py lower-triple/spill-singleton incidence budget
+rfc_tensor_triple_rank_sampler.py tensor-column sampler for one-spill lower rank defects
+rfc_tensor_triple_segre_classifier.py structural Segre-line classifier for triple rank defects
+rfc_incremental_upgrade_ladder.py  Tier-1 high-rank flat-excess crawl certificate helper
+rfc_flat_excess_stratified_scale.py top-profile scale for charging flat excess by marked rank
+rfc_d2_rootline_formula_selftest.py standalone D=2 root-line parallel-class formula self-test
+rfc_d3_rootline_geometry_selftest.py D=3 root-line projective-geometry leakage probe
+rfc_d3_surplus_codim_probe.py     D=3 Hall-OK surplus-codimension probe
+rfc_flat_excess_child_event.py    deterministic flat-excess to child-rank-event bookkeeping
+rfc_flat_excess_subcode_charge.py random-code scale for small-flat subcode-zero charge
+rfc_short_set_rank_tail_envelope.py paired-compression envelope for short-set rank tails
+rfc_short_set_rank_tail_recurrence.py theorem-candidate aggregate B_d(z,s) diagnostic
+rfc_incremental_flat_rank_scale.py random-code scale for marked incremental flat-rank events
+rfc_marked_one_a_profile_scale.py crude A0 vs PA scale for one marked A coordinate
+rfc_closure_tail_one_mark_recurrence.py one-mark closure-tail recurrence diagnostic
+rfc_closure_tail_one_mark_defect_scale.py defect-safe A0 rank-tail version of one-mark closure
+rfc_closure_tail_multimark_recurrence.py multi-mark closure-tail recurrence diagnostic
+rfc_pa_chain_weak_rank_scale.py safe weak PA-chain rank-drop scale check
+rfc_pa_mixed_projection_selftest.py finite-field sanity check for PA projection lemma
+rfc_multi_pa_projection_gap_search.py randomized gap search for naive multi-PA projection lemma
+rfc_multi_pa_graph_contraction_profile.py exact profile for multi-PA full/P/A rank identity
+rfc_multi_pa_codim_need.py q-dimension budget for all-mixed PA flat witnesses
+rfc_marked_incremental_rank_sampler.py linked vs independent marked-rank experiment driver
+audit_binary_rs_encoder.py       small GF(2^m) audit of current binary_rs encoder vs additive RS
 rfc_original_falsification_report.py original-RFC bad-family/falsification report
 rfc_exterior_constraint_profile.py  exact r=2 exterior-count profiles by matroid components
 rfc_replica_rank1_profile.py        r=2 root-compatibility singleton profile
@@ -78,6 +110,36 @@ must match the exact small-field oracle before being extrapolated. The `componen
 `rfc_replica_zero_moment.py` encodes the currently validated local singleton charge law
 `charge = r + extras - 1`; it fixes the saturation charge bug, but the aggregate recurrence remains
 structurally too loose to certify production distance.
+
+`rfc_fixed_survivor_rank_tail.py` is the first diagnostic for the fixed-set rank/subspace-evasion
+route. It measures `Pr_T[rank(G_S)<k]` and `E_T[q^(k-rank(G_S))-1]` for fixed survivor sets `S`.
+Use `--set-family structured` or subfamilies `blocks,strides,top,recursive` to probe adversarial
+survivor patterns without enumerating every set. It also decomposes the top recursion by
+`rank_parent(S)=2*rank_child(P)+singleton_increment` and reports both coarse
+`singleton_repair_summary` rows and refined `singleton_repair_profile_summary` rows. The refined
+rows show that multilevel P/S/E/T profile explains part, but not all, of the singleton-repair
+variation. Add `--quotient-signature` for small targeted runs; it groups repair by the child
+rank-increment histogram of singleton columns modulo paired columns. This mode is slower and is
+off by default. The current evidence says a certificate recurrence likely needs this kind of child
+quotient/matroid or root-line rank-drop signature. Add `--rootline-exact-max 3` for tiny singleton
+sets to exactly enumerate the actual top-root repair probability; this is useful for checking
+whether Hall-OK quotient states pay the predicted finite-field root-line failure rate. Larger
+values such as `--rootline-exact-max 6` are cached but still expensive; use them only for targeted
+small-field checks. The output includes `rootline_signature_ambiguity` to flag whether the same
+side pattern and quotient rank/Hall signature has multiple exact root-line failure probabilities.
+For `D=2`, it also prints `rootline_parallel_class_ambiguity`, which groups by projective
+parallel-class `(left_count,right_count)` data and is the current compact local-theorem candidate.
+Use `rfc_d2_rootline_formula_selftest.py --exhaustive-total 5` to test that candidate against every
+small side-count signature over all projective direction choices for a given field.
+The theorem-grade fallback is the cross-ratio-free PGL2 envelope in
+`docs/rfc_distance_analysis/rfc_d2_rootline_pgl2_envelope.md`; the self-test prints this envelope
+and reports `BOUND_FAIL` if any exact direction set exceeds it.
+`rfc_d3_rootline_geometry_selftest.py` is the next-pressure-point falsification probe: it checks
+whether D=3 exact repair probabilities split inside a coarse rank signature or, for tiny sampled
+runs, a canonical/side-colored matroid signature.
+The go/no-go checkpoint for this route is
+`docs/rfc_distance_analysis/rfc_fixed_survivor_rank_tail_go_nogo.md`; use it to decide whether a
+new experiment answers a proof question or merely adds another descriptive invariant.
 
 `rfc_subspace_span_moment.py`, `rfc_replica_span_moment.py`, and `rfc_flag_span_moment.py` support
 `--singleton-charge endpoint-tau2-layer`. This mode uses the calibration charge:

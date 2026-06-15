@@ -110,6 +110,64 @@ The certificate script searches for the smallest `e`.
 
 The certificate currently depends on the following theorem package.
 
+### L0. Incremental Original-Proof Upgrade Brick
+
+The original fixed-survivor proof can be upgraded locally by replacing the one-minor singleton
+repair bound with the corrected incidence exponent:
+
+```text
+repair_exp(P,T) >= t - 2D + 1 - FE(P,T)
+```
+
+where:
+
+```text
+FE(P,T) = max_{A subset T, r(A)<D} ( |A| - 2r(A) )
+r(A)    = rank(P union A) - rank(P)
+D       = dim ker(ev_P).
+```
+
+The first closed flat-excess brick is the high-rank endpoint. Put:
+
+```text
+h = D-r(A).
+```
+
+For `h=1`, the marked flat-excess event is exactly an ordinary child line-zero event:
+
+```text
+exists 0 != w in ker(ev_{P union A}).
+```
+
+Thus this endpoint is charged by the same child line-zero/rank-tail object used by the original
+proof, plus the residual root-repair factor `q^-max(0,S-F)`.
+
+At the target top profile:
+
+```text
+p = 137
+t = 1845
+D = 887
+S = t - 2D + 1 = 72
+```
+
+the `h=1` endpoint with flat excess `F <= S` has:
+
+```text
+child line-zero exponent = 886+F
+residual repair exponent = 72-F
+combined exponent        = 958.
+```
+
+This is recorded as a standalone theorem in:
+
+```text
+docs/rfc_distance_analysis/rfc_high_rank_flat_endpoint_theorem.md
+```
+
+The remaining flat-excess assumption now starts at `h>=2`; the most delicate endpoint is still the
+low-rank closure event `A subset cl(P)`.
+
 ### L1. Support-Subcode Lemma
 
 For a singleton block `S`, support `A subset S`, and child image `U <= F^S`:

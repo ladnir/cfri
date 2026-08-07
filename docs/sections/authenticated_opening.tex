@@ -6,7 +6,7 @@ oracle from Figure~\ref{fig:func-msg-oracle}.  A prover, an indexer, a Merkle
 tree, or a virtual construction fixes a logical tensor and later answers
 \(\mathcal F_{\mathrm{MsgOracle}}.\mathsf{Open}\) queries at named addresses.
 
-The submitted object carries its own natural address space.  If that address
+The committed object carries its own natural address space.  If that address
 space is \(\B^d\), the Merkle implementation uses the natural binary leaf order
 \[
   \bits_d(0),\bits_d(1),\ldots,\bits_d(2^d-1).
@@ -31,7 +31,7 @@ serialized in the natural binary order described above.
 \(\mathsf{Hash}\) and a value encoder into hash inputs.
 
 \smallskip
-\noindent\(\underline{\Pi_{\mathrm{MerkleMsgOracle}}.\mathsf{Submit}(\prover:x\in\mathcal L^{\B^d},\ \verifier:\bot)\to R}\)
+\noindent\(\underline{\Pi_{\mathrm{MerkleMsgOracle}}.\mathsf{Commit}(\prover:x\in\mathcal L^{\B^d},\ \verifier:\bot)\to R}\)
 
 \smallskip
 \begin{enumerate}[leftmargin=0.24in,label=\textbf{M\arabic*.},itemsep=0.08em,topsep=0.1em,parsep=0pt]
@@ -78,20 +78,20 @@ implementation is Merkle: it stores the logical tensor itself and opens
 coordinates by Merkle paths.  Blaze also uses virtual handles: a virtual handle
 does not store one flat tensor directly, but it still implements
 \(\mathcal F_{\mathrm{MsgOracle}}.\mathsf{Open}\).  The names
-\(\Pi_{\mathrm{rowFoldCommit}}\) and \(\mathsf{CompositeCommit}\) use
+\(\mathsf{RowFold.Commit}\) and \(\mathsf{CompositeCommit}\) use
 \(\mathsf{Commit}\) in this constructor sense: they create a handle.  They do
 not introduce a second coordinate-opening API.  After the handle exists, the
 only coordinate operation is \(\mathsf{Open}\).
 
 The main virtual implementation used by Blaze is
-\(\Pi_{\mathrm{rowFoldCommit}}\), which folds the committed row-word matrix into
+\(\mathsf{RowFold.Commit}\), which folds the committed row-word matrix into
 the folded-tensor handle \(R_\star\).  The later \(\MLEAuth\) implementation
 also constructs packed coordinate handles by routing lane openings to ordinary
 or virtual message-oracle handles.
 
 For example, if $R_c$ is a handle to a column tensor
 $C\in(\F^{\B^\ell})^{\B^n}$ and $\rho\in\F^{\B^\ell}$, then a compressed
-\(\Pi_{\mathrm{rowFoldCommit}}.\mathsf{Commit}(R_c,\rho)\) returns a virtual
+\(\mathsf{RowFold.Commit}(R_c,\rho)\) returns a virtual
 handle \(R_\star\) implementing
 \(\mathcal F_{\mathrm{MsgOracle}}.\mathsf{Open}\).  Its logical domain is \(\B^n\) and
 its logical tensor is

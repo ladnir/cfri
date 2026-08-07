@@ -1,14 +1,56 @@
-\section{Representing A PCS Witness}
+\section{PCS As A Concrete MLPCS Interface}
 
-The ideal PCS functionality is defined in Figure~\ref{fig:func-pcs}.  It
-commits to the polynomial \(f\), not to a particular array representation of
-\(f\).  A concrete protocol must choose such a representation.  In this paper,
-the tensor symbol \(y\) will mean whichever representation is being used at
+In this explainer, a multilinear PCS is the concrete implementation level for
+the same evaluation-handle interface that the native MLPCS model idealizes.
+The native object is a tensor
+\[
+  h\in\F^{\B^d}
+\]
+and its multilinear extension
+\[
+  \MLE(h):\F^d\to\F.
+\]
+The ideal MLPCS functionality stores \(h\) and answers evaluation requests
+\[
+  (\widehat O_h,r)\longmapsto \MLE(h)(r).
+\]
+A PCS replaces that ideal storage by a binding commitment and an opening proof:
+after commit time, the verifier should be able to check claims of the form
+\[
+  \MLE(h)(r)=v
+\]
+without reading all \(2^d\) entries of \(h\).
+
+In our notation, the nontrivial opening primitive is \(\EncMLE[C]\), not
+MLPCS itself.  Given an encoded-MLE opening protocol for a code
+\[
+  C:\F^{\B^d}\to\F^{D},
+\]
+the ordinary MLPCS interface is obtained directly:
+commit by fixing the encoded string \(y=C(h)\) behind a coordinate handle
+\(O_y\), and open an evaluation claim \(\MLE(h)(r)=v\) by running
+\(\EncMLE[C]\) on \((O_y,r,v)\).  Equivalently, an MLPCS handle is a
+coordinate handle together with the declared code \(C\); each evaluation
+opening is an encoded-MLE proof against that same fixed handle.
+
+This is why we do not use a separate ideal \(\mathcal F_{\mathrm{PCS}}\) in the
+rest of the paper.  When the text says ``PCS,'' it means a cryptographic
+realization of the MLPCS evaluation-handle interface, usually through encoded
+oracle strings, \(\EncMLE\) openings, proximity checks, coordinate openings,
+Merkle authentication, and Fiat--Shamir.  When the text needs the ideal object,
+it names
+\(\mathcal F_{\mathrm{MLPCS}}\) or \(\mathcal F_{\mathrm{HMLPCS}}^\delta\)
+directly.
+
+\subsection{Representation Matters}
+
+A concrete PCS must choose what tensor it commits to.  In this paper, a tensor
+symbol such as \(y\) or \(h\) means whichever representation is being used at
 that point, and we will say what it represents before using an evaluation
 formula.
 
-Two representations are especially common.  If $y\in\F^{\B^d}$ stores Boolean
-evaluations, then
+Two representations are especially common.  If \(y\in\F^{\B^d}\) stores Boolean
+evaluations of a multilinear polynomial \(f:\F^d\to\F\), then
 \[
   y[b]=f(b)
   \qquad\text{and}\qquad
@@ -26,7 +68,7 @@ where
   =
   \prod_{i=0}^{d-1}\bigl(b_i z_i+(1-b_i)(1-z_i)\bigr).
 \]
-If instead $y$ stores multilinear coefficients, then
+If instead \(y\) stores multilinear coefficients, then
 \[
   f(X_0,\ldots,X_{d-1})
   =
@@ -39,30 +81,34 @@ In that case
   \sum_{b\in\B^d} y[b]\prod_{i=0}^{d-1}z_i^{b_i}.
 \]
 These are different tensors related by a linear change of basis.  The protocol
-goal $f(z)=v$ is the same, but the public weights in the sum are different.
-We should therefore never infer $f=\MLE(y)$ unless $y$ has just been declared to
+goal \(f(z)=v\) is the same, but the public weights in the sum are different.
+We should therefore never infer \(f=\MLE(y)\) unless \(y\) has just been declared to
 be the Boolean-evaluation tensor.
 
-The simplest concrete implementation of Figure~\ref{fig:func-pcs} is to reveal
-the entire representation tensor to the verifier.  Figure~\ref{fig:protocol-trivial-pcs}
-is useful as a baseline: it is correct, but it gives up succinctness completely.
+\subsection{Trivial Realization}
+
+The simplest concrete realization of the MLPCS evaluation-handle interface is
+to reveal the entire representation tensor to the verifier.
+Figure~\ref{fig:protocol-trivial-pcs} is useful as a baseline: it is correct,
+but it gives up succinctness completely.
 
 \begin{protocolbox}{Protocol: Trivial PCS}{fig:protocol-trivial-pcs}
-\noindent\(\underline{\mathsf{TrivialPCS.Commit}(\prover:y,\ \verifier:\bot)\to C}\)
+\noindent\(\underline{\mathsf{TrivialPCS.Commit}(\prover:h\in\F^{\B^d},\ \verifier:\bot)\to C_h}\)
 
 \smallskip
 \begin{enumerate}[leftmargin=0.24in,label=\textbf{T\arabic*.},itemsep=0.08em,topsep=0.1em,parsep=0pt]
-  \item \(\prover\to\verifier\): \(y\).
-  \item \(\verifier\): \(C\gets y\).
-  \item \(\verifier\): return \(C\).
+  \item \(\prover\to\verifier\): send the full tensor \(h\).
+  \item \(\verifier\): store \(h\) under a fresh handle \(C_h\).
+  \item \(\verifier\): return \(C_h\).
 \end{enumerate}
 
 \smallskip
-\noindent\(\underline{\mathsf{TrivialPCS.Eval}(\prover:y,\ \verifier:(C,z,v))\to\{0,1\}}\)
+\noindent\(\underline{\mathsf{TrivialPCS.Eval}(\prover:\bot,\ \verifier:(C_h,r,v))\to\{0,1\}}\)
 
 \smallskip
 \begin{enumerate}[leftmargin=0.24in,label=\textbf{U\arabic*.},itemsep=0.08em,topsep=0.1em,parsep=0pt]
-  \item \(\verifier\): compute \(u=f_C(z)\) from the stored tensor \(C\).
+  \item \(\verifier\): retrieve the stored tensor \(h\) under \(C_h\).
+  \item \(\verifier\): compute \(u\gets \MLE(h)(r)\).
   \item \(\verifier\): if \(u\ne v\), return reject.
   \item \(\verifier\): return accept.
 \end{enumerate}
@@ -70,7 +116,7 @@ is useful as a baseline: it is correct, but it gives up succinctness completely.
 
 The protocol in Figure~\ref{fig:protocol-trivial-pcs} is correct.  It is also
 exactly what we are trying to avoid.  It leaks the whole polynomial
-representation and makes the verifier store or scan $2^d$ field elements.  For
+representation and makes the verifier store or scan \(2^d\) field elements.  For
 the discussion here, privacy is not the central problem; efficiency and binding
 are.  Later versions of polynomial commitments may also hide $f$, but the
 Blaze/BaseFold construction is already interesting before adding hiding.

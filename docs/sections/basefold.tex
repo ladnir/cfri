@@ -36,7 +36,7 @@ Thus the ideal target is
   \mathcal F_{\mathrm{Prox}}^{L_C,\delta}.
 \]
 A concrete BaseFold IOPP realizes this code-language proximity target, up to
-its soundness error, by testing that the submitted word is close to
+its soundness error, by testing that the committed word is close to
 \emph{some} valid codeword.  This statement is only about proximity to
 \(L_C\).  It does not say which polynomial was encoded, and it does not by
 itself prove \(f(z)=v\).  The PCS will use this proximity statement as one
@@ -379,7 +379,7 @@ The verifier cannot check this invariant everywhere, so
 Figure~\ref{fig:protocol-basefold-iopp} authenticates the committed oracles and
 then checks a few complete parent-child paths.  Notice the protocol box itself
 does not force the prover to compute the honest child oracle before committing
-to it; it lets the prover submit a claimed child oracle.  The query phase is
+to it; it lets the prover commit a claimed child oracle.  The query phase is
 where the verifier tests whether those claimed children are consistent with the
 folds of their parents.
 
@@ -391,7 +391,7 @@ folds of their parents.
 
 \smallskip
 \begin{enumerate}[leftmargin=0.24in,label=\textbf{P\arabic*.},itemsep=0.08em,topsep=0.1em,parsep=0pt]
-  \item \(\prover\): \(R_d\gets\mathcal F_{\mathrm{MsgOracle}}.\mathsf{Submit}(\pi_d)\).
+  \item \(\prover\): \(R_d\gets\mathcal F_{\mathrm{MsgOracle}}.\mathsf{Commit}(\pi_d)\).
   \item \(\prover\to\verifier\): \(R_d\).
   \item For \(i=d-1,d-2,\ldots,0\):
         \begin{enumerate}[leftmargin=0.28in,label=\textbf{P\arabic*.\alph*.},itemsep=0.05em,topsep=0.05em,parsep=0pt]
@@ -399,7 +399,7 @@ folds of their parents.
           \item \(\verifier\to\prover\): \(\alpha_i\).
           \item \(\prover\): choose a claimed child oracle
                 \(\pi_i\in\F^{\B^{n_i}}\).
-          \item \(\prover\): \(R_i\gets\mathcal F_{\mathrm{MsgOracle}}.\mathsf{Submit}(\pi_i)\).
+          \item \(\prover\): \(R_i\gets\mathcal F_{\mathrm{MsgOracle}}.\mathsf{Commit}(\pi_i)\).
           \item \(\prover\to\verifier\): \(R_i\).
         \end{enumerate}
   \item For \(q=0,1,\ldots,Q_{\mathrm{BF}}-1\):
@@ -438,8 +438,8 @@ folds of their parents.
 Now read Figure~\ref{fig:protocol-basefold-iopp} as a test against a cheating
 prover.  In the ideal message-oracle model of Figure~\ref{fig:func-msg-oracle},
 the verifier sees handles and opened coordinates, while an extractor can read
-the full tensors that the prover submitted to the functionality.  In
-particular, after an accepting execution the extractor can inspect the submitted
+the full tensors that the prover committed to the functionality.  In
+particular, after an accepting execution the extractor can inspect the committed
 top oracle
 $\pi_d\in\F^{\B^{n_d}}$.
 
@@ -939,7 +939,7 @@ clear check that replaces the original large committed evaluation claim.
   \item[Commit phase.]
         \begin{enumerate}[leftmargin=0.28in,label=\textbf{C\arabic*.},itemsep=0.08em,topsep=0.1em,parsep=0pt]
           \item \(\prover\): \(\pi_d\gets\Enc_d(y_d)\in\F^{\B^{n_d}}\).
-          \item \(\prover\): \(C_d\gets\mathcal F_{\mathrm{MsgOracle}}.\mathsf{Submit}(\pi_d)\).
+          \item \(\prover\): \(C_d\gets\mathcal F_{\mathrm{MsgOracle}}.\mathsf{Commit}(\pi_d)\).
           \item \(\prover\to\verifier\): \(C_d\).
         \end{enumerate}
   \item[Open phase.]
@@ -979,7 +979,7 @@ clear check that replaces the original large committed evaluation claim.
                   \qquad
                   \pi_i[a]\gets L_{i,a}(r_i).
                 \]
-              \item \(\prover\): \(C_i\gets\mathcal F_{\mathrm{MsgOracle}}.\mathsf{Submit}(\pi_i)\).\\
+              \item \(\prover\): \(C_i\gets\mathcal F_{\mathrm{MsgOracle}}.\mathsf{Commit}(\pi_i)\).\\
                 \(\prover\to\verifier\): \(C_i\).
             \end{enumerate}
           \item \(\verifier\): \(r\gets(r_0,\ldots,r_{d-1})\).
@@ -1133,7 +1133,7 @@ vectors that also satisfy this independence predicate.
   \item[Input.]
         Black-box access to a prover $P^\star$ that convinces the verifier in
         Figure~\ref{fig:protocol-basefold-pcs-eval} with non-negligible
-        probability $\varepsilon$, and access to the oracle strings submitted to
+        probability $\varepsilon$, and access to the oracle strings committed to
         $\mathcal F_{\mathrm{MsgOracle}}$.
   \item[Goal.]
         Recover a coefficient tensor $y_d\in\F^{\B^d}$ such that

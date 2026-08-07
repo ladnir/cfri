@@ -1,27 +1,25 @@
 \section{Sumcheck As Claim Randomization}
 
-Our target is the PCS functionality from Figure~\ref{fig:func-pcs}.  After the
-prover is bound to a multilinear polynomial $f:\F^d\to\F$, the verifier should
-be able to check evaluation claims of the form
+Our target is the MLE evaluation-handle interface.  After the prover is bound
+to a tensor \(h\in\F^{\B^d}\), the verifier should be able to check evaluation
+claims of the form
 \[
-  (C,z,v)\longmapsto 1
+  (\widehat O_h,z,v)\longmapsto 1
   \qquad\text{iff}\qquad
-  f(z)=v,
+  \MLE(h)(z)=v,
 \]
-where $C$ is the commitment handle.  Sumcheck does not implement this
-functionality by itself.  Instead, it transforms one evaluation claim about the
-committed polynomial into another evaluation claim about the same committed
-polynomial:
+where \(\widehat O_h\) is the native MLPCS handle, or the ideal handle being
+realized by a concrete PCS.  Sumcheck does not implement this functionality by
+itself.  Instead, it transforms one evaluation claim about the same committed
+or idealized object into another evaluation claim:
 \[
-  (C,z,v)\quad\rightsquigarrow\quad(C,r,u).
+  (\widehat O_h,z,v)\quad\rightsquigarrow\quad(\widehat O_h,r,u).
 \]
-This does not remove the need to verify the new claim $(C,r,u)$.  From a pure
-API viewpoint, it is a PCS claim $(C,z,v)$ transformed into another PCS claim
-$(C,r,u)$.  The improvement is in the distribution of the point.  The original
-point $z$ may be known before the prover commits; the new point $r$ in
-$(C,r,u)$ is sampled by the verifier after the prover is bound to the
-commitment and to the sumcheck messages.  As protocol designers, that
-randomization is valuable.
+This does not remove the need to verify the new claim
+\((\widehat O_h,r,u)\).  The improvement is in the distribution of the point.
+The original point \(z\) may be known before the prover commits; the new point
+\(r\) is sampled by the verifier after the prover is bound to the handle and to
+the sumcheck messages.  As protocol designers, that randomization is valuable.
 
 The underlying sumcheck protocol is the classical one from LFKN92~[LFKN92].
 This section emphasizes the multilinear-evaluation and batching viewpoint used
@@ -162,8 +160,8 @@ The order matters.  The prover sends each $g_i$ before seeing the corresponding
 random challenge $r_i$.  A false polynomial identity can agree at a random
 field point only with small probability, bounded by its degree over $|\F|$.
 
-\begin{protocolbox}{Protocol: Sumcheck Randomizes A PCS Evaluation Claim}{fig:protocol-sumcheck-randomizes-pcs}
-\noindent Public input: \(C\), \(z\in\F^d\), \(v\in\F\).
+\begin{protocolbox}{Protocol: Sumcheck Randomizes An MLE Evaluation Claim}{fig:protocol-sumcheck-randomizes-pcs}
+\noindent Public input: \(\widehat O_h:\F^d\to\F\), \(z\in\F^d\), \(v\in\F\).
 
 \smallskip
 \begin{enumerate}[leftmargin=0.24in,label=\textbf{S\arabic*.},itemsep=0.08em,topsep=0.1em,parsep=0pt]
@@ -180,9 +178,10 @@ field point only with small probability, bounded by its degree over $|\F|$.
   \item \(\verifier\): \(r\gets(r_0,\ldots,r_{d-1})\).
   \item \(\verifier\): if \(\chi_z(r)=0\), return reject.
   \item \(\verifier\): \(u\gets s_0/\chi_z(r)\).
-  \item \(\verifier\): \(b\gets\mathcal{F}_{\mathrm{PCS}}.\mathsf{Eval}(C,r,u)\).
-  \item \(\verifier\): if \(b=0\), return reject.
-  \item \(\verifier\): return \((1,C,r,u)\).
+  \item \(\verifier\): \(u_{\mathrm{open}}\gets
+        \mathcal F_{\mathrm{MLPCS}}.\mathsf{Eval}(\widehat O_h,r)\).
+  \item \(\verifier\): if \(u_{\mathrm{open}}\ne u\), return reject.
+  \item \(\verifier\): return \((1,\widehat O_h,r,u)\).
 \end{enumerate}
 \end{protocolbox}
 
@@ -246,18 +245,19 @@ and checks
 \[
   T=\Phi(r,w_1,\ldots,w_m).
 \]
-Only after these endpoint requests are authenticated by the existing
-\(\mathcal F_{\mathrm{MLIOP}}\), \(\mathcal F_{\mathrm{MLEAuth}}\), or PCS
-interface does the sumcheck terminal claim become meaningful.
+Only after these endpoint requests are answered by the native
+\(\mathcal F_{\mathrm{MLPCS}}\) interface, or authenticated by the compiled
+backend that realizes that interface, does the sumcheck terminal claim become
+meaningful.
 
 The protocol in Figure~\ref{fig:protocol-sumcheck-randomizes-pcs} is
-deliberately circular if the endpoint is the ideal PCS functionality from
-Figure~\ref{fig:func-pcs}: we have transformed one PCS evaluation into another
-PCS evaluation.  The reason to keep the transformation is that the new point
-$r$ is verifier-random and transcript-bound.  BaseFold removes the circularity
-by implementing this random endpoint from a commitment to an encoded oracle.  In
-short, sumcheck randomizes the polynomial claim; BaseFold folds the
-committed codeword along the same challenges.
+deliberately circular if the endpoint is the ideal MLPCS functionality: we have
+transformed one MLE evaluation into another MLE evaluation.  The reason to keep
+the transformation is that the new point \(r\) is verifier-random and
+transcript-bound.  BaseFold removes the circularity by implementing this random
+endpoint from a commitment to an encoded oracle.  In short, sumcheck randomizes
+the polynomial claim; BaseFold folds the committed codeword along the same
+challenges.
 
 \subsection{Inner-Product Sumcheck}
 

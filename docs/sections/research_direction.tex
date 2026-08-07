@@ -100,7 +100,7 @@ still contain \(2^{n+1}\) field elements.  The possible win is different.  If
 all RAA helper objects can be expressed as \(n\)-variate tensors, then the
 compiled authentication batch might avoid raising the backend dimension from
 \(n\) to \(n+1\).  That would remove one backend folding layer and improve the
-constant factors in the BaseFold/RMLE authentication step.
+constant factors in the BaseFold/encoded-MLE authentication step.
 
 The danger is that the saved variable may reappear as relation complexity.  The
 split representation would need more cases: leaf-to-first-product constraints,
@@ -109,3 +109,70 @@ requests for each relation.  The right question is therefore not whether the
 same product tree can be stored in two tensors; it can.  The question is whether
 the resulting relations can still be batched and authenticated without
 reintroducing an \(n+1\)-variate object through the back door.
+
+\subsection{Research Direction: Systematic-Message Proximity For \(u_5\)}
+
+The current Blaze-mirroring proof treats the folded endpoint tensor \(u_5\)
+through the generic backend \(\RMLE[C_{\mathrm{backend}}]\) interface.  If the
+backend is systematic MLE-RS, the concrete backend word has the form
+\[
+  y_{u_5}=R_\star\Vert p,
+\]
+where the systematic coordinates are literally the RowFold handle \(R_\star\)
+and \(p\) is the prover-supplied parity part.  The generic backend proximity
+statement is a full-word statement:
+\[
+  y_{u_5}\approx C_{\mathrm{backend}}(u_5)
+  \qquad\text{and}\qquad
+  \MLE(u_5)(r)=w.
+\]
+This is sufficient, but it is not exactly the relation needed by the Blaze
+outer proof.
+
+For the row-folded RAA argument, the important proximity statement is about the
+message part:
+\[
+  \Delta(R_\star,u_5^\dagger)\le \delta_{\mathrm{front}},
+\]
+where \(u_5^\dagger\in\F^{\B^n}\) is the effective tensor whose MLE value is
+used in the native RAA checks.  We do not primarily need ordinary relative
+proximity of the whole backend word \(R_\star\Vert p\).  We need the parity
+part to participate in a folding argument that binds the evaluation claim to an
+effective low-degree/backend message, while the distance guarantee is measured
+on the systematic message coordinates.
+
+The generic full-word theorem gives this only after a rate loss.  If the
+systematic part has backend rate \(R\), then a
+\(\delta_{\mathrm{front}}\)-fraction disagreement in \(R_\star\) occupies only
+an \(R\delta_{\mathrm{front}}\)-fraction of the full backend word.  Thus the
+clean generic proof runs the \(u_5\) backend check at the smaller threshold
+\[
+  \delta_{u_5}\lesssim R\cdot\delta_{\mathrm{front}}.
+\]
+This motivates a more tailored backend theorem: a systematic-message proximity
+version of RMLE for systematic MLE-RS.
+
+Such a theorem would not be a set of extra spot checks comparing the systematic
+part to \(R_\star\).  In this construction the systematic part of
+\(y_{u_5}\) is already \(R_\star\), so those checks would be tautological.  The
+new ingredient would have to live inside the backend folding/proximity
+argument itself.  For example, the backend query distribution or folding
+analysis might put more weight on systematic coordinates while still checking
+the full systematic-plus-parity object as one MLE-RS codeword.  The target
+statement would be closer to
+\[
+  \exists u_5^\dagger:
+  \quad
+  \Delta(R_\star,u_5^\dagger)\le\delta_{\mathrm{front}}
+  \quad\text{and}\quad
+  \MLE(u_5^\dagger)(r)=w,
+\]
+with the parity coordinates used to certify that \(u_5^\dagger\) is the
+effective backend message.
+
+This is new protocol territory.  The current proof should continue to use the
+ordinary Blaze-compatible backend RMLE theorem with the smaller
+\(R\delta_{\mathrm{front}}\) threshold.  The research question is whether a
+systematic MLE-RS/BaseFold-style backend can prove the stronger
+message-proximity statement directly, avoiding that rate loss for the
+holographic \(u_5/R_\star\) bridge.

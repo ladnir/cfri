@@ -24,10 +24,10 @@
 \newcommand{\RAA}{\mathsf{RAA}}
 \newcommand{\PRAA}{\mathsf{PRAA}}
 \newcommand{\RMLE}{\mathsf{RMLE}}
+\newcommand{\EncMLE}{\mathsf{EncMLE}}
 \newcommand{\MLE}{\mathsf{MLE}}
 \newcommand{\PT}{\mathsf{PT}}
 \newcommand{\Handle}{\mathsf{Handle}}
-\newcommand{\BackendRMLE}{\mathsf{BackendRMLE}}
 \newcommand{\bits}{\mathsf{bits}}
 \newcommand{\Int}{\mathsf{int}}
 \newcommand{\Idx}{\mathsf{idx}}
@@ -52,6 +52,7 @@
 \newcommand{\prover}{\mathbb{P}}
 \newcommand{\verifier}{\mathbb{V}}
 \newcommand{\ip}[2]{\left\langle #1,#2 \right\rangle}
+\providecommand{\peter}[1]{\par\noindent\textbf{Peter note:} #1\par}
 
 \newtheorem{definition}{Definition}
 \newtheorem{lemma}{Lemma}
@@ -78,8 +79,8 @@ mathematical object that the protocol proves and why its pieces fit together.
 We start by separating the proof templates and oracle interfaces, then define
 finite fields, tensors, the multilinear extension (MLE), Merkle commitments,
 linear codes, sumcheck, and BaseFold.  We then build the native RAA relation
-compiler, the MLE-authentication layer, the row-fold virtual handle, and the
-top-level Blaze PCS that authenticates all terminal claims through the backend.
+compiler and the row-fold virtual handle, ending with Blaze in the
+\(\mathcal F_{\mathrm{MLPCS}}\)-hybrid model.
 No prior
 knowledge of tensor commitments, sumcheck protocols, BaseFold, Blaze, or MLEs is
 assumed.
@@ -96,8 +97,6 @@ assumed.
 \input{sections/sumcheck}
 \input{sections/basefold}
 \input{sections/native_blaze_mliop}
-\input{sections/mle_auth_backend}
-\input{sections/blaze_pcs}
 \input{sections/research_direction}
 \input{sections/glossary_references}
 

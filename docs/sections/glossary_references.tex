@@ -30,10 +30,11 @@
         a handle to preprocessed public relation data instead of reading all of
         \(i\).  Its soundness promise is exact membership for the selected
         relation, not proximity of the index handle.
-  \item[MLIOP.]
-        Multilinear polynomial interactive oracle proof: a polynomial-oracle
-        proof template where the prover registers Boolean tensors with an ideal
-        evaluation functionality that answers MLE evaluations.
+  \item[MLPCS.]
+        Multilinear polynomial commitment service/scheme: our name for the
+        ideal commit-and-evaluate interface that Blaze calls an MLIOP.  The
+        prover registers Boolean tensors with an ideal evaluation functionality
+        that answers MLE evaluations.
   \item[Sumcheck.]
         A protocol that reduces a large hypercube sum claim to one random
         terminal check.
@@ -66,6 +67,9 @@
   \item[\textbf{[BCS16]}] Ben-Sasson, Chiesa, and Spooner,
         ``Interactive Oracle Proofs,''
         Theory of Cryptography Conference 2016.
+  \item[\textbf{[BKS18]}] Ben-Sasson, Kopparty, and Saraf,
+        ``Worst-Case to Average-Case Reductions for the Distance to a Code,''
+        Computational Complexity Conference 2018.
   \item[\textbf{[RVW13]}] Rothblum, Vadhan, and Wigderson,
         ``Interactive Proofs of Proximity: Delegating Computation in
         Sublinear Time,'' STOC 2013.

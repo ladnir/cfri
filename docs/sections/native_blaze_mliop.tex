@@ -3,9 +3,13 @@
 We now restart Blaze at the model where the Blaze paper first lives: the native
 multilinear IOP layer.  This is deliberately before Merkle trees, BaseFold,
 systematic encodings, or concrete coordinate-opening implementations.  At this layer the prover
-and verifier can name committed Boolean oracle handles \(R_h:\B^d\to\F\),
-commit them to MLE oracle handles \(\widehat O_h:\F^d\to\F\), and ask for
-field-point MLE evaluations of those hatted handles.
+can commit multilinear-oracle tensors \(h\in\F^{\B^d}\), receive hatted MLE
+oracle handles \(\widehat O_h:\F^d\to\F\), and the verifier can ask for
+field-point MLE evaluations of those hatted handles.  When a tensor is meant to
+stand for a verifier-originated coordinate handle, the compiled/holographic
+model uses the separate proximity bridge
+\(\mathcal F_{\mathrm{HMLPCS}}^\delta\) from
+Figure~\ref{fig:func-hmlpcs-oracle}.
 
 The goal of the native layer is not to prove proximity to a codeword.  Its goal
 is to compile one algebraic statement into a small set of MLE evaluation
@@ -24,7 +28,15 @@ those requests cryptographic.
   \end{aligned}
 \]
 
+\peter{this is a bad intro. we need to reference the functionalities, not vibes. what does blaze implement, what hybrid model is it in. Generally how does it work.}
+
 \subsection{Native Relation}
+
+\peter{this section is problematic. you use the term PRAA but then its not actually packed. you impl things match the actual protocl but they dont. 
+I like not defining RAA as the packed version. thats more natural IMO. but they we must not hide this. Also, informal statements like "implicit input" 
+do more harm then they help. We must be super clear. }
+
+
 
 Fix a field \(\F\).  Let \(K=2^k\) be the message length and \(N=2^n\) be the
 RAA codeword length.  The base native relation is \(\RMLE[\PRAA]\).  The public
@@ -32,7 +44,7 @@ evaluation claim is
 \[
   z\in\F^k,\qquad v\in\F,
 \]
-and the implicit input is an alleged codeword
+and the implicit input is an alleged codeword \peter{vague. we have an oracle to y.  }
 \[
   y\in\F^{\B^n}.
 \]
@@ -82,16 +94,16 @@ Thus an honest prover's stage tensors satisfy
   \end{aligned}
 \]
 
-The prover provides Boolean oracle handles for
+The prover provides native MLPCS tensors for
 \[
   u_0=m\in\F^{\B^k},
   \qquad
   u_2,u_3,u_4\in\F^{\B^n},
   \qquad
-  f_1,g_1,f_2,g_2\in\F^{\B^{n+1}}.
+  f_1,g_1,f_2,g_2\in\F^{\B^n}.
 \]
-The native MLIOP functionality commits those Boolean handles into hatted MLE
-handles before the verifier asks field-point evaluation questions.
+The native MLPCS functionality turns those prover-committed tensors into
+hatted MLE handles before the verifier asks field-point evaluation questions.
 The prover does not send \(u_1\) or \(u_5\) as separate native messages.
 Queries to \(u_1\) are emulated from \(u_0\) using the repetition layout:
 we write
@@ -101,7 +113,7 @@ we write
   \widehat O_{u_1}(r):=\widehat O_{u_0}(\mathsf{msg}(r)).
 \]
 This is a derived view, not a fresh call to
-\(\mathcal F_{\mathrm{MLIOP}}.\mathsf{Commit}\).  The final stage \(u_5\) is
+\(\mathcal F_{\mathrm{MLPCS}}.\mathsf{Commit}\).  The final stage \(u_5\) is
 the input codeword handle supplied to the checker.
 
 \subsection{Request And Claim Sets}
@@ -111,9 +123,12 @@ A native evaluation request is a tuple
   (J,r,v)\in\EvalReq,
 \]
 where \(J\) is a handle that can later authenticate MLE values, \(r\in\F^d\)
-has the handle's dimension, and \(v\in\F\).  In the native MLIOP section \(J\)
-is a hatted MLE handle \(\widehat O:\F^d\to\F\).  In the compiled Blaze section
-the same slot is a coordinate-opening handle \(C\).  The request means that the
+has the handle's dimension, and \(v\in\F\).  In the native MLPCS section \(J\)
+is a hatted MLE handle \(\widehat O:\F^d\to\F\).  In the compiled Blaze
+section the same logical request is realized by a backend encoded oracle string
+and an \(\RMLE[C_{\mathrm{backend}}]\) proximity check.  Thus the request slot
+remains an MLE-evaluation handle in this API; the expanded semantic view names
+the literal backend string that authenticates it.  The request means that the
 later verifier check needs
 \[
   J(r)=v.
@@ -285,170 +300,163 @@ In the RAA relation, this reducer is used twice:
 
 \subsection{Permutation Reducer}
 
-The permutation relation has the form
-\[
-  y=M_\pi x,
-  \qquad
-  y[\pi(b)]=x[b]\quad\text{for every }b\in\B^n.
-\]
-The verifier samples \(\alpha,\beta\in\F\).  The prover then constructs two
-product-tree tensors \(f,g\in\F^{\B^{n+1}}\).  The leaves are intended to be
-\[
-  f[\mathsf{leaf}(b)]
-  =
-  \alpha-\bigl(x[b]+\beta\,\Idx(\pi(b))\bigr),
-\]
-\[
-  g[\mathsf{leaf}(b)]
-  =
-  \alpha-\bigl(y[b]+\beta\,\Idx(b)\bigr).
-\]
-If \(y[\pi(b)]=x[b]\) and \(\pi\) is a bijection, these two leaf multisets have
-the same product.  The product trees make this global product comparison
-locally checkable.
+The permutation check is the one place where the Blaze paper's most direct
+product-tree presentation would introduce one extra Boolean variable.  We use a
+split product-tree representation instead.  This is the same grand-product
+idea as Blaze Proposition~5.4, but the leaf layer is virtual and the committed
+helper tensors are all \(n\)-variate.  This is an intentional
+presentation-level divergence from Blaze's literal helper-oracle shape, where
+the product-tree tensors are \((n+1)\)-variate.  The equivalence is that the
+omitted leaf layer is not free: every leaf value is derived from the existing
+source handle and the public tag polynomial, and the split residual below
+checks the same parent-equals-product relation on the internal tree.
 
-Here is the intuition.  The left product writes each input value together with
-the address where it is supposed to land:
+Fix a permutation map \(\pi:\B^n\to\B^n\), its multilinear tag
+\(\widehat\pi:\F^n\to\F\), and the public address tag
+\(\Idx:\F^n\to\F\).  For a claimed relation
+\[
+  y[\pi(b)]=x[b]
+  \qquad(b\in\B^n),
+\]
+the usual tagged products are
 \[
   \prod_{b\in\B^n}
-    \left(\alpha-\bigl(x[b]+\beta\,\Idx(\pi(b))\bigr)\right).
-\]
-The right product writes each output value together with its actual address:
-\[
+    \left(\alpha-\bigl(x[b]+\beta\,\widehat\pi(b)\bigr)\right)
+  \quad\text{and}\quad
   \prod_{a\in\B^n}
     \left(\alpha-\bigl(y[a]+\beta\,\Idx(a)\bigr)\right).
 \]
-If \(y[\pi(b)]=x[b]\), then renaming the right product by \(a=\pi(b)\) gives
-\[
-  y[a]=y[\pi(b)]=x[b],
-  \qquad
-  \Idx(a)=\Idx(\pi(b)),
-\]
-so the two products are term-by-term equal after reindexing.  If the tagged
-multisets differ, the two products agree only with small probability over the
-random \(\alpha,\beta\).  The address tag \(\beta\,\Idx(\cdot)\) matters: it
-prevents the prover from merely preserving the multiset of values while moving
-them to the wrong addresses.
+If \(y[\pi(b)]=x[b]\), then the two products are term-by-term equal after the
+change of variable \(a=\pi(b)\).  If the tagged multisets differ, the two
+products agree only with small probability over \(\alpha,\beta\).
 
-We use the source product-tree coordinate convention
+For source tensor \(H\in\F^{\B^n}\) and public tag polynomial
+\(\tau:\F^n\to\F\), define the virtual leaf tensor
 \[
-  \mathsf{root}=(1^n,0),\qquad
-  \mathsf{leaf}(b)=(0,b),
-\]
-\[
-  \mathsf{parent}(X)=(1,X),\qquad
-  \mathsf{left}(X)=(X,0),\qquad
-  \mathsf{right}(X)=(X,1).
-\]
-The same symbols are also the low-degree field maps used in the sumcheck
-formulas:
-\[
-  \mathsf{leaf}(r)=(0,r),\quad
-  \mathsf{parent}(r)=(1,r),\quad
-  \mathsf{left}(r)=(r,0),\quad
-  \mathsf{right}(r)=(r,1)
-  \qquad(r\in\F^n).
-\]
-For \(T\in\F^{\B^{n+1}}\), define
-\[
-  \mathsf{TreeRes}(T,X)
+  L_{H,\tau}(b)
   =
-  \widehat T(\mathsf{parent}(X))
-  -
-  \widehat T(\mathsf{left}(X))\,\widehat T(\mathsf{right}(X)).
+  \alpha-\bigl(H(b)+\beta\,\tau(b)\bigr),
+  \qquad b\in\B^n.
 \]
-On Boolean \(X\), the equation \(\mathsf{TreeRes}(T,X)=0\) says that the node
-named by \(\mathsf{parent}(X)\) is the product of the two children named by
-\(\mathsf{left}(X)\) and \(\mathsf{right}(X)\).  Therefore a valid product tree
-has a root equal to the product of all its leaves.  The coordinate
-\(1^{n+1}\) is the padding point above the root; the honest construction sets
-it to \(0\), so the residual at \(X=1^n\) also vanishes.  In protocol boxes,
-\(\mathsf{TreeRes}(H_T,X)\) means this same expression with tensor label
-\(H_T\); the prover instantiates the polynomial during sumcheck, and the
-verifier records the required endpoint evaluations.
-For a non-Boolean sumcheck endpoint \(q\in\F^n\), this is a formal-extension
-evaluation, not a coordinate opening of \(T\).  Concretely, evaluating
-\(\mathsf{TreeRes}(T,q)\) requires the three MLE values
+The prover does not commit \(L_{H,\tau}\).  Its MLE evaluations are derived
+from the existing source handle:
 \[
-  \widehat T(\mathsf{parent}(q)),\qquad
-  \widehat T(\mathsf{left}(q)),\qquad
-  \widehat T(\mathsf{right}(q)).
+  \MLE(L_{H,\tau})(r)
+  =
+  \alpha-\bigl(\MLE(H)(r)+\beta\,\tau(r)\bigr).
 \]
-The Blaze prose later says that this contributes two queries per product-tree
-tensor.  With the residual written above, the scalar-tensor realization needs
-three formal-extension values.  We therefore treat the two-query line as a typo
-or as accounting for a virtual/packed object not specified there.  In this
-paper all three evaluation claims are made explicit.
+The prover commits only an internal product tensor
+\[
+  P\in\F^{\B^n}.
+\]
+Let
+\[
+  \mathsf{root}_P=(1^{n-1},0)\in\B^n,
+  \qquad
+  \mathsf{pad}_P=1^n\in\B^n.
+\]
+The honest internal layer for leaves \(L\) is defined by
+\[
+  P[0\Vert a]=L[a\Vert0]L[a\Vert1]
+  \qquad(a\in\B^{n-1}),
+\]
+and, for \(t\in\{1,\ldots,n-1\}\) and
+\(a\in\B^{n-t-1}\),
+\[
+  P[1^t\Vert0\Vert a]
+  =
+  P[1^{t-1}\Vert0\Vert a\Vert0]
+  P[1^{t-1}\Vert0\Vert a\Vert1].
+\]
+The padding coordinate is set to
+\[
+  P[\mathsf{pad}_P]=0.
+\]
+The root value is \(P[\mathsf{root}_P]\).
 
-\begin{protocolbox}{Subroutine: Native Permutation Reduction}{fig:native-permute-reduce}
+The generic letter \(P\) is useful while defining the split-tree residual.  In
+the protocol boxes below we drop the \(P\)-prefix for brevity: the symbols
+\(f,g\) and later \(f_1,g_1,f_2,g_2\) denote these committed internal product
+tensors, not full product trees with an explicit leaf layer.  The corresponding
+leaf tensors remain virtual.
+
+For a field point \(X=(s,a)\in\F\times\F^{n-1}\), define
+\[
+\begin{aligned}
+  \mathsf{SplitTreeRes}(P,H,\tau,\alpha,\beta;X)
+  &=
+  \MLE(P)(X)\\
+  &\quad-
+  \Bigl((1-s)\MLE(L_{H,\tau})(a,0)+s\,\MLE(P)(a,0)\Bigr)\\
+  &\qquad\cdot
+  \Bigl((1-s)\MLE(L_{H,\tau})(a,1)+s\,\MLE(P)(a,1)\Bigr).
+\end{aligned}
+\]
+On Boolean \(X=(s,a)\), this is the parent-minus-children residual for the
+virtual full tree whose leaf layer is \(L_{H,\tau}\) and whose internal layer is
+\(P\).  The sumcheck domain remains \(\B^n\), and the only committed helper
+object is \(P\in\F^{\B^n}\).
+
+\begin{protocolbox}{Subroutine: Split Native Permutation Reduction}{fig:native-permute-reduce}
 \scriptsize\raggedright
-\noindent Public parameters: \(n\), \(\Idx,\widehat\pi:\F^n\to\F\), product-tree maps \(\mathsf{root},\mathsf{leaf},\mathsf{parent},\mathsf{left},\mathsf{right}\), \(\mathcal F_{\mathrm{MsgOracle}}\), and \(\mathcal F_{\mathrm{MLIOP}}\).
+\noindent Public parameters: \(n\), \(\Idx,\widehat\pi:\F^n\to\F\),
+\(\mathsf{root}_P\), \(\mathsf{pad}_P\), \(\mathsf{SplitTreeRes}\), and
+\(\mathcal F_{\mathrm{MLPCS}}\).
 
 \smallskip
-\noindent\(\underline{\PermuteCommit(\verifier:(\widehat O_x,\widehat O_y,\alpha,\beta),\ \prover:(x,y))\to(\verifier:(\widehat O_f,\widehat O_g),\prover:(\widehat O_f,\widehat O_g,f,g))}\)
+\noindent\(\underline{\PermuteCommit(\verifier:(\widehat O_x,\widehat O_y,\alpha,\beta),\ \prover:(x,y))\to(\verifier:(\widehat O_{f},\widehat O_{g}),\prover:(\widehat O_{f},\widehat O_{g},f,g))}\)
 \begin{enumerate}[leftmargin=0.24in,label=\textbf{P\arabic*.},itemsep=0.06em,topsep=0.06em,parsep=0pt]
-  \item \(\prover\): for every \(b\in\B^n\), let
-        \(f[0\Vert b]\gets\alpha-(x[b]+\beta\,\widehat\pi(b))\).
-  \item \(\prover\): for every \(b\in\B^n\), let
-        \(g[0\Vert b]\gets\alpha-(y[b]+\beta\,\Idx(b))\).
-  \item \(\prover\): for \(s\in\{1,\ldots,n\}\) and
-        \(a\in\B^{n-s}\), let
-        \(f[1^s\Vert0\Vert a]\gets
-        f[1^{s-1}\Vert0\Vert a\Vert0]\,
-        f[1^{s-1}\Vert0\Vert a\Vert1]\).
-  \item \(\prover\): for \(s\in\{1,\ldots,n\}\) and
-        \(a\in\B^{n-s}\), let
-        \(g[1^s\Vert0\Vert a]\gets
-        g[1^{s-1}\Vert0\Vert a\Vert0]\,
-        g[1^{s-1}\Vert0\Vert a\Vert1]\).
-  \item \(\prover\): let \(f[1^{n+1}]\gets0\) and
-        \(g[1^{n+1}]\gets0\).
-  \item \(\prover,\verifier\): \(R_f\gets
-        \mathcal F_{\mathrm{MsgOracle}}.\mathsf{Submit}(\prover:f,\verifier:\bot)\).
-  \item \(\prover,\verifier\): \(R_g\gets
-        \mathcal F_{\mathrm{MsgOracle}}.\mathsf{Submit}(\prover:g,\verifier:\bot)\).
-  \item \(\prover,\verifier\): \(\widehat O_f\gets
-        \mathcal F_{\mathrm{MLIOP}}.\mathsf{Commit}(\prover,\verifier:R_f)\).
-  \item \(\prover,\verifier\): \(\widehat O_g\gets
-        \mathcal F_{\mathrm{MLIOP}}.\mathsf{Commit}(\prover,\verifier:R_g)\).
-  \item \(\prover,\verifier\): return \((\verifier:(\widehat O_f,\widehat O_g),\prover:(\widehat O_f,\widehat O_g,f,g))\).
+  \item \(\prover\): define virtual leaves
+        \(L_f=L_{x,\widehat\pi}\) and \(L_g=L_{y,\Idx}\).
+  \item \(\prover\): compute internal product tensors
+        \(f,g\in\F^{\B^n}\) from \(L_f,L_g\) by the recursion above, with
+        \(f[\mathsf{pad}_P]=g[\mathsf{pad}_P]=0\).
+  \item \(\prover,\verifier\): \(\widehat O_{f}\gets
+        \mathcal F_{\mathrm{MLPCS}}.\mathsf{Commit}
+        (\prover:f,\verifier:n)\).
+  \item \(\prover,\verifier\): \(\widehat O_{g}\gets
+        \mathcal F_{\mathrm{MLPCS}}.\mathsf{Commit}
+        (\prover:g,\verifier:n)\).
+  \item \(\prover,\verifier\): return
+        \((\verifier:(\widehat O_{f},\widehat O_{g}),
+        \prover:(\widehat O_{f},\widehat O_{g},f,g))\).
 \end{enumerate}
 
 \smallskip
-\noindent Types: \(\widehat O_x,\widehat O_y,\widehat\pi,\Idx:\F^n\to\F\);
-\(\widehat O_f,\widehat O_g:\F^{n+1}\to\F\);
-\(x,y\in\F^{\B^n}\); \(f,g\in\F^{\B^{n+1}}\);
+\noindent Types: \(\widehat O_x,\widehat O_y,\widehat O_{f},\widehat O_{g}:\F^n\to\F\);
+\(x,y,f,g\in\F^{\B^n}\); \(\widehat\pi,\Idx:\F^n\to\F\);
 \(\alpha,\beta\in\F\); \(r\in\F^n\).
 
 \smallskip
-\noindent\(\underline{\PermuteReduce(\verifier:(\widehat O_x,\widehat O_y,\widehat O_f,\widehat O_g,\widehat\pi,\alpha,\beta,r),\ \prover:(x,y,f,g))\to(\EvalReqs,B_f,B_g)}\)
+\noindent\(\underline{\PermuteReduce(\verifier:(\widehat O_x,\widehat O_y,\widehat O_{f},\widehat O_{g},\widehat\pi,\alpha,\beta,r),\ \prover:(x,y,f,g))\to(\EvalReqs,B_f,B_g)}\)
 \begin{enumerate}[leftmargin=0.24in,label=\textbf{R\arabic*.},itemsep=0.06em,topsep=0.06em,parsep=0pt]
-  \item \(\prover\): \(v_{\mathrm{root}}\gets \MLE(f)(\mathsf{root})\).
-  \item \(\prover\): \(v_x\gets \MLE(x)(r)\) and \(v_y\gets \MLE(y)(r)\).
-  \item \(\prover\to\verifier\): \(v_{\mathrm{root}},v_x,v_y\in\F\).
-  \item \(\verifier\): \(v_f\gets\alpha-(v_x+\beta\,\widehat\pi(r))\) and
-        \(v_g\gets\alpha-(v_y+\beta\,\Idx(r))\).
+  \item \(\prover\): \(v_{\mathrm{root}}\gets \MLE(f)(\mathsf{root}_P)\).
+  \item \(\prover\to\verifier\): \(v_{\mathrm{root}}\in\F\).
   \item \(\verifier\): \(\EvalReqs\gets
-        \{(\widehat O_f,\mathsf{root},v_{\mathrm{root}}),
-        (\widehat O_g,\mathsf{root},v_{\mathrm{root}}),
-        (\widehat O_x,r,v_x),(\widehat O_y,r,v_y),
-        (\widehat O_f,\mathsf{leaf}(r),v_f),
-        (\widehat O_g,\mathsf{leaf}(r),v_g)\}\).
-  \item \(\verifier\): \(B_f\gets(\mathsf{tree},0,\widehat O_f,r)\).
-  \item \(\verifier\): \(B_g\gets(\mathsf{tree},0,\widehat O_g,r)\).
+        \{(\widehat O_{f},\mathsf{root}_P,v_{\mathrm{root}}),
+        (\widehat O_{g},\mathsf{root}_P,v_{\mathrm{root}})\}\).
+  \item \(\verifier\):
+        \(B_f\gets(\mathsf{split},\widehat O_{f},\widehat O_x,
+        \widehat\pi,\alpha,\beta,r)\).
+  \item \(\verifier\):
+        \(B_g\gets(\mathsf{split},\widehat O_{g},\widehat O_y,
+        \Idx,\alpha,\beta,r)\).
   \item \(\verifier\): return \((\EvalReqs,B_f,B_g)\).
 \end{enumerate}
 \end{protocolbox}
 
-The records \(B_f=(\mathsf{tree},0,\widehat O_f,r)\) and
-\(B_g=(\mathsf{tree},0,\widehat O_g,r)\) mean
+The records
 \[
-  \sum_{X\in\B^n}\chi_r(X)\mathsf{TreeRes}(f,X)=0,
-  \qquad
-  \sum_{X\in\B^n}\chi_r(X)\mathsf{TreeRes}(g,X)=0.
+  B=(\mathsf{split},\widehat O_P,\widehat O_H,\tau,\alpha,\beta,r)
 \]
-The handle stored in each record tells the later endpoint checks which
-committed product-tree tensor the values must come from.
+mean
+\[
+  \sum_{X\in\B^n}\chi_r(X)
+  \mathsf{SplitTreeRes}(P,H,\tau,\alpha,\beta;X)=0.
+\]
+The committed part of the product tree is \(P\).  The leaf part is the virtual
+tensor \(L_{H,\tau}\), whose evaluations are derived from the source handle
+\(\widehat O_H\) and public tag polynomial \(\tau\).
 
 The RAA relation uses this reducer twice:
 \[
@@ -456,17 +464,18 @@ The RAA relation uses this reducer twice:
   \qquad\text{and}\qquad
   (u_3,u_4,\pi_2).
 \]
-Therefore it introduces four product-tree tensors
+Therefore it introduces four internal product tensors
 \[
-  f_1,g_1,f_2,g_2\in\F^{\B^{n+1}}.
+  f_1,g_1,f_2,g_2\in\F^{\B^n}.
 \]
-Each tree has \(2^{n+1}=2N\) entries.
+Each helper has \(N\) entries.  The leaf layers are virtual and are derived
+from \(u_1,u_2,u_3,u_4\) when their MLE values are needed.
 
-For each permutation edge, read the checks as one correlated argument:
-the derived leaf values load the claimed products from \(x\) and \(y\), the
-parent-child \(\SumClaims\) force \(f\) and \(g\) to be product trees, and the
-shared root value compares the two products.  No single one of these checks
-proves a permutation by itself.
+For each permutation edge, read the checks as one correlated argument: the
+virtual leaves load the claimed tagged products from \(x\) and \(y\), the
+split residual claims force the internal tensors \(f\) and \(g\) to be
+product trees over those virtual leaves, and the shared root value compares the
+two products.  No single one of these checks proves a permutation by itself.
 
 The top-level Blaze box below performs the native RAA orchestration directly.
 It creates the stage handles, calls the two reducers, gathers their returned
@@ -494,24 +503,58 @@ can hide that error with probability at most \(5/|\F|\).  Conditioned on the
 batched claim being false, ordinary sumcheck soundness applies.  This is the
 same scalar-power batching pattern used in Blaze's Remark~2.3.
 
-Only the Boolean-sum identities are batched here.  The permutation leaf
-equations and root equality have already been encoded as evaluation requests by
-deriving leaf values and reusing one root value.  The endpoint values produced
-by this sumcheck are still not trusted; they are appended to \(\EvalReqs\) and
-authenticated later by \(\MLEAuth\).
+Only the Boolean-sum identities are batched here.  The permutation root
+equalities have already been encoded as evaluation requests.  The split-tree
+leaf layers are virtual, so their endpoint values are derived from existing
+source handles when the sumcheck terminal point is known.  The endpoint values
+produced by this sumcheck are still not trusted; they are appended to
+\(\EvalReqs\) and discharged later by the MLPCS-to-IOPP compiler as backend
+RMLE evaluation claims.
 This is exactly the endpoint discipline from
 Figure~\ref{fig:subroutine-sumcheck-terminal}: \(\SumCheck_n\) produces one
-terminal scalar \(T_{\mathrm{sc}}\), and the surrounding RAA flow expands that scalar
-into MLE requests against the existing handles \(\widehat O_{u_2}\),
-\(\widehat O_{u_4}\), \(\widehat O_{f_1}\), \(\widehat O_{g_1}\),
+terminal scalar \(T_{\mathrm{sc}}\), and the surrounding RAA flow expands that
+scalar into MLE requests against the existing stage handles and the internal
+product handles \(\widehat O_{f_1}\), \(\widehat O_{g_1}\),
 \(\widehat O_{f_2}\), and \(\widehat O_{g_2}\).
+
+For a split-tree record
+\[
+  B=(\mathsf{split},\widehat O_P,\widehat O_H,\tau,\alpha,\beta,r_B)
+\]
+and terminal point \(q=(s,a)\in\F\times\F^{n-1}\), let
+\(\mathsf{SplitEndpoint}(B,q)\) denote the following local endpoint expansion.  The
+prover sends
+\[
+  w_P=\MLE(P)(q),\quad
+  w_{P0}=\MLE(P)(a,0),\quad
+  w_{P1}=\MLE(P)(a,1),
+\]
+and
+\[
+  w_{H0}=\MLE(H)(a,0),\qquad
+  w_{H1}=\MLE(H)(a,1).
+\]
+The verifier computes
+\[
+  w_{L0}=\alpha-(w_{H0}+\beta\,\tau(a,0)),
+  \qquad
+  w_{L1}=\alpha-(w_{H1}+\beta\,\tau(a,1)),
+\]
+and returns the residual value
+\[
+  w_P-\bigl((1-s)w_{L0}+s\,w_{P0}\bigr)
+      \bigl((1-s)w_{L1}+s\,w_{P1}\bigr)
+\]
+together with the five evaluation requests for
+\(\widehat O_P\) at \(q,(a,0),(a,1)\) and \(\widehat O_H\) at
+\((a,0),(a,1)\).
 
 \begin{protocolbox}{Subroutine: Native Six-Sumcheck}{fig:native-six-sumcheck}
 \scriptsize\raggedright
-\noindent Public parameters: \(n\), \(\widehat A\), \(\chi_r\), \(\mathsf{TreeRes}\), and \(\SumCheck_n\) from Figure~\ref{fig:subroutine-sumcheck-terminal} with individual degree bound \(2\).
+\noindent Public parameters: \(n\), \(\widehat A\), \(\chi_r\), \(\mathsf{SplitTreeRes}\), \(\mathsf{SplitEndpoint}\), and \(\SumCheck_n\) from Figure~\ref{fig:subroutine-sumcheck-terminal} with individual degree bound \(3\).
 
 \smallskip
-\noindent\(\underline{\RAASixSumcheck(\verifier:(B_{u2},B_{u4},B_{f1},B_{g1},B_{f2},B_{g2}),\ \prover:(u_2,u_4\in\F^{\B^n}, f_1,g_1,f_2,g_2\in\F^{\B^{n+1}}))\to(a_{\mathrm{sc}}\in\{0,1\},\EvalReqs_{\mathrm{sc}})}\)
+\noindent\(\underline{\RAASixSumcheck(\verifier:(B_{u2},B_{u4},B_{f1},B_{g1},B_{f2},B_{g2}),\ \prover:(u_1,u_2,u_3,u_4,f_1,g_1,f_2,g_2\in\F^{\B^n}))\to(a_{\mathrm{sc}}\in\{0,1\},\EvalReqs_{\mathrm{sc}})}\)
 
 \smallskip
 \begin{enumerate}[leftmargin=0.24in,label=\textbf{S\arabic*.},itemsep=0.06em,topsep=0.06em,parsep=0pt]
@@ -519,10 +562,14 @@ into MLE requests against the existing handles \(\widehat O_{u_2}\),
         \(B_{u2}=(\mathsf{acc},s_{u2},\widehat O_{u_2},r_{u2})\) and
         \(B_{u4}=(\mathsf{acc},s_{u4},\widehat O_{u_4},r_{u4})\).
   \item \(\verifier\): let
-        \(B_{f1}=(\mathsf{tree},0,\widehat O_{f_1},r_{f1})\),
-        \(B_{g1}=(\mathsf{tree},0,\widehat O_{g_1},r_{g1})\),
-        \(B_{f2}=(\mathsf{tree},0,\widehat O_{f_2},r_{f2})\), and
-        \(B_{g2}=(\mathsf{tree},0,\widehat O_{g_2},r_{g2})\).
+        \(B_{f1}=(\mathsf{split},\widehat O_{f_1},
+        \widehat O_{u_1},\widehat\pi_1,\alpha,\beta,r_{f1})\),
+        \(B_{g1}=(\mathsf{split},\widehat O_{g_1},
+        \widehat O_{u_2},\Idx,\alpha,\beta,r_{g1})\),
+        \(B_{f2}=(\mathsf{split},\widehat O_{f_2},
+        \widehat O_{u_3},\widehat\pi_2,\alpha,\beta,r_{f2})\), and
+        \(B_{g2}=(\mathsf{split},\widehat O_{g_2},
+        \widehat O_{u_4},\Idx,\alpha,\beta,r_{g2})\).
   \item \(\verifier\): sample \(\lambda\leftarrow\F\), then send
         \(\lambda\) to \(\prover\).
   \item \(\verifier\): \(S_\lambda\gets
@@ -530,104 +577,349 @@ into MLE requests against the existing handles \(\widehat O_{u_2}\),
   \item \(\prover\): \(G_\lambda(X)\gets
         \widehat A(r_{u2},X)\MLE(u_2)(X)
         +\lambda\,\widehat A(r_{u4},X)\MLE(u_4)(X)
-        +\lambda^2\chi_{r_{f1}}(X)\mathsf{TreeRes}(f_1,X)
-        +\lambda^3\chi_{r_{g1}}(X)\mathsf{TreeRes}(g_1,X)
-        +\lambda^4\chi_{r_{f2}}(X)\mathsf{TreeRes}(f_2,X)
-        +\lambda^5\chi_{r_{g2}}(X)\mathsf{TreeRes}(g_2,X)\).
+        +\lambda^2\chi_{r_{f1}}(X)
+        \mathsf{SplitTreeRes}(f_1,u_1,\widehat\pi_1,\alpha,\beta;X)
+        +\lambda^3\chi_{r_{g1}}(X)
+        \mathsf{SplitTreeRes}(g_1,u_2,\Idx,\alpha,\beta;X)
+        +\lambda^4\chi_{r_{f2}}(X)
+        \mathsf{SplitTreeRes}(f_2,u_3,\widehat\pi_2,\alpha,\beta;X)
+        +\lambda^5\chi_{r_{g2}}(X)
+        \mathsf{SplitTreeRes}(g_2,u_4,\Idx,\alpha,\beta;X)\).
   \item \(\prover,\verifier\):
         \((a_{\mathrm{round}},r_{\mathrm{sc}},T_{\mathrm{sc}})
         \gets\SumCheck_n(\verifier:S_\lambda,\prover:G_\lambda)\).
   \item \(\verifier\): if \(a_{\mathrm{round}}=0\), return \((0,\emptyset)\).
-  \item \(\prover\): let  \(w_{u2}\gets\MLE(u_2)(r_{\mathrm{sc}})\) and
-        \(w_{u4}\gets\MLE(u_4)(r_{\mathrm{sc}}),\)\\
-        \(\qquad w_{f1,p}\gets\MLE(f_1)(\mathsf{parent}(r_{\mathrm{sc}}))\),
-        \(w_{f1,l}\gets\MLE(f_1)(\mathsf{left}(r_{\mathrm{sc}}))\),
-        \(w_{f1,r}\gets\MLE(f_1)(\mathsf{right}(r_{\mathrm{sc}}))\),\\
-        \(\qquad w_{g1,p}\gets\MLE(g_1)(\mathsf{parent}(r_{\mathrm{sc}}))\),
-        \(w_{g1,l}\gets\MLE(g_1)(\mathsf{left}(r_{\mathrm{sc}}))\),
-        \(w_{g1,r}\gets\MLE(g_1)(\mathsf{right}(r_{\mathrm{sc}}))\),\\
-        \(\qquad w_{f2,p}\gets\MLE(f_2)(\mathsf{parent}(r_{\mathrm{sc}}))\),
-        \(w_{f2,l}\gets\MLE(f_2)(\mathsf{left}(r_{\mathrm{sc}}))\),
-        \(w_{f2,r}\gets\MLE(f_2)(\mathsf{right}(r_{\mathrm{sc}}))\),\\
-        \(\qquad w_{g2,p}\gets\MLE(g_2)(\mathsf{parent}(r_{\mathrm{sc}}))\),
-        \(w_{g2,l}\gets\MLE(g_2)(\mathsf{left}(r_{\mathrm{sc}}))\),
-        \(w_{g2,r}\gets\MLE(g_2)(\mathsf{right}(r_{\mathrm{sc}}))\).
-  \item \(\prover\to\verifier\): send \(w_{u2},w_{u4},\)\\
-        \(\qquad w_{f1,p},w_{f1,l},w_{f1,r},w_{g1,p},w_{g1,l},w_{g1,r},\)\\
-        \(\qquad w_{f2,p},w_{f2,l},w_{f2,r},w_{g2,p},w_{g2,l},w_{g2,r}\in\F\).  
+  \item \(\prover\): let \(w_{u2}\gets\MLE(u_2)(r_{\mathrm{sc}})\) and
+        \(w_{u4}\gets\MLE(u_4)(r_{\mathrm{sc}})\).
+  \item \(\prover,\verifier\): run
+        \((R_{f1},E_{f1})\gets\mathsf{SplitEndpoint}(B_{f1},r_{\mathrm{sc}})\),
+        \((R_{g1},E_{g1})\gets\mathsf{SplitEndpoint}(B_{g1},r_{\mathrm{sc}})\),
+        \((R_{f2},E_{f2})\gets\mathsf{SplitEndpoint}(B_{f2},r_{\mathrm{sc}})\), and
+        \((R_{g2},E_{g2})\gets\mathsf{SplitEndpoint}(B_{g2},r_{\mathrm{sc}})\).
+  \item \(\prover\to\verifier\): send \(w_{u2},w_{u4}\in\F\).  The
+        \(\mathsf{SplitEndpoint}\) calls send their own endpoint values.
   \item \(\verifier\): \(T_{\mathrm{endpoint}}\gets
         \widehat A(r_{u2},r_{\mathrm{sc}})
         w_{u2}
         +\lambda\,\widehat A(r_{u4},r_{\mathrm{sc}})
         w_{u4}
-        +\lambda^2\chi_{r_{f1}}(r_{\mathrm{sc}})
-        (w_{f1,p}-w_{f1,l}w_{f1,r})
-        +\lambda^3\chi_{r_{g1}}(r_{\mathrm{sc}})
-        (w_{g1,p}-w_{g1,l}w_{g1,r})
-        +\lambda^4\chi_{r_{f2}}(r_{\mathrm{sc}})
-        (w_{f2,p}-w_{f2,l}w_{f2,r})
-        +\lambda^5\chi_{r_{g2}}(r_{\mathrm{sc}})
-        (w_{g2,p}-w_{g2,l}w_{g2,r})\).
+        +\lambda^2\chi_{r_{f1}}(r_{\mathrm{sc}})R_{f1}
+        +\lambda^3\chi_{r_{g1}}(r_{\mathrm{sc}})R_{g1}
+        +\lambda^4\chi_{r_{f2}}(r_{\mathrm{sc}})R_{f2}
+        +\lambda^5\chi_{r_{g2}}(r_{\mathrm{sc}})R_{g2}\).
   \item \(\verifier\): if \(T_{\mathrm{sc}}\ne T_{\mathrm{endpoint}}\), return \((0,\emptyset)\).
   \item \(\verifier\): \(\EvalReqs_{\mathrm{sc}}\gets
         \{(\widehat O_{u_2},r_{\mathrm{sc}},w_{u2}),
-        (\widehat O_{u_4},r_{\mathrm{sc}},w_{u4}),\)\\
-        \(\qquad(\widehat O_{f_1},\mathsf{parent}(r_{\mathrm{sc}}),w_{f1,p})\),
-        \((\widehat O_{f_1},\mathsf{left}(r_{\mathrm{sc}}),w_{f1,l})\),
-        \((\widehat O_{f_1},\mathsf{right}(r_{\mathrm{sc}}),w_{f1,r})\),\\
-        \(\qquad(\widehat O_{g_1},\mathsf{parent}(r_{\mathrm{sc}}),w_{g1,p})\),
-        \((\widehat O_{g_1},\mathsf{left}(r_{\mathrm{sc}}),w_{g1,l})\),
-        \((\widehat O_{g_1},\mathsf{right}(r_{\mathrm{sc}}),w_{g1,r})\),\\
-        \(\qquad(\widehat O_{f_2},\mathsf{parent}(r_{\mathrm{sc}}),w_{f2,p})\),
-        \((\widehat O_{f_2},\mathsf{left}(r_{\mathrm{sc}}),w_{f2,l})\),
-        \((\widehat O_{f_2},\mathsf{right}(r_{\mathrm{sc}}),w_{f2,r})\),\\
-        \(\qquad(\widehat O_{g_2},\mathsf{parent}(r_{\mathrm{sc}}),w_{g2,p})\),
-        \((\widehat O_{g_2},\mathsf{left}(r_{\mathrm{sc}}),w_{g2,l})\),
-        \((\widehat O_{g_2},\mathsf{right}(r_{\mathrm{sc}}),w_{g2,r})\}\)
-
+        (\widehat O_{u_4},r_{\mathrm{sc}},w_{u4})\}
+        \cup E_{f1}\cup E_{g1}\cup E_{f2}\cup E_{g2}\).
   \item \(\verifier\): return \((1,\EvalReqs_{\mathrm{sc}})\).
 \end{enumerate}
 \end{protocolbox}
 
-The terminal request set is explicit in Steps S14--S16: those are the values
-that the later authentication layer must bind to the committed tensors.  The
-first two requests are ordinary MLE endpoint claims for the accumulator inputs.
-Each product-tree residual contributes three formal-extension endpoint claims:
-parent, left child, and right child at the terminal sumcheck point
-\(r_{\mathrm{sc}}\).  The third entry of each \(B\)-tuple is the handle used in
-the endpoint request.  In the inlined Blaze protocol below, those entries are
-hatted MLE handles such as \(\widehat O_{u_2}\) and \(\widehat O_{f_1}\).
+The terminal request set is explicit in the final steps: those are the values
+that the later authentication layer must bind to committed or derived MLE
+handles.  The first two requests are ordinary MLE endpoint claims for the
+accumulator inputs.  Each split product-tree residual contributes five endpoint
+claims: three evaluations of the committed internal product handle
+\(\widehat O_P\) and two evaluations of the existing source handle
+\(\widehat O_H\) used to derive the virtual leaves.  In the inlined Blaze
+protocol below, these handles are objects such as \(\widehat O_{f_1}\),
+\(\widehat O_{g_1}\), and \(\widehat O_{u_1}\).
 The public factors \(\widehat A(r_{u2},r_{\mathrm{sc}})\),
 \(\widehat A(r_{u4},r_{\mathrm{sc}})\), \(\chi_{r_{f1}}(r_{\mathrm{sc}})\),
 \(\chi_{r_{g1}}(r_{\mathrm{sc}})\), \(\chi_{r_{f2}}(r_{\mathrm{sc}})\),
 \(\chi_{r_{g2}}(r_{\mathrm{sc}})\), and the powers of \(\lambda\) are not oracle
 requests.
 
-\subsection{Blaze In The \(\mathcal F_{\mathrm{MLIOP}}\)-Hybrid}
+\subsection{Batching Native Evaluation Requests}
+
+The native RAA checks produce many MLE evaluation requests.  A typical request
+is
+\[
+  (\widehat O_{h_j},r_j,w_j),
+  \qquad\text{meaning}\qquad
+  \MLE(h_j)(r_j)=w_j .
+\]
+This subsection explains the ordinary batch for those requests, following
+Blaze Theorem~2.4, Remark~4.3, and Proposition~4.5.  In the full Blaze
+protocol below, requests to \(\widehat O_{u_5}\) are not part of this ordinary
+batch; the main protocol discharges them directly through
+\(\mathcal F_{\mathrm{HMLPCS}}^\delta.\mathsf{Eval}\).  This is an intentional
+grouping divergence from the most compressed reading of Blaze Remark~4.3, which
+batches evaluation requests abstractly across polynomials.  We split the folded
+endpoint because its MLE handle must stay proximity-bound to the already-fixed
+coordinate handle \(R_\star\); the ordinary prover-originated tensors do not
+need that frontend proximity parameter.  Everything in this subsection is only
+about merging the ordinary native evaluation requests.
+
+The destination is simple.  Starting from an ordered ordinary list
+\[
+  E=\bigl((\widehat O_{h_j},r_j,w_j)\bigr)_{j=0}^{q-1},
+\]
+the batching protocol derives one virtual MLE handle
+\[
+  \widehat O_{\mathrm{batch}}
+  =
+  \mathsf{RowFold.Commit}
+  \bigl((\widehat O_{h_j},\lambda_j)_{j=0}^{q-1}\bigr)
+\]
+and one final evaluation claim
+\[
+  \widehat O_{\mathrm{batch}}(\eta)
+  =
+  w.
+\]
+The coefficients \(\lambda_j\), the point \(\eta\), and the value \(w\) are all
+determined by the batching transcript.  The prover does not commit a fresh
+tensor for \(\widehat O_{\mathrm{batch}}\).
+
+All ordinary requests are first represented as \(n\)-variate requests.  With the
+split product-tree representation, the ordinary tensors
+\(u_2,u_3,u_4,f_1,g_1,f_2,g_2\) already live in \(\F^{\B^n}\), while
+\(u_0\in\F^{\B^k}\).  For a smaller tensor \(h\in\F^{\B^d}\), \(d\le n\), we
+use the padded tensor \(\mathsf{pad}(h)\in\F^{\B^n}\) that agrees with \(h\) on
+the slice \(0^{n-d}\times\B^d\) and is zero elsewhere.  Then
+\(\MLE(h)(r)=w\) is represented as
+\(\MLE(\mathsf{pad}(h))(0^{n-d},r)=w\).  From here on, every ordinary request is
+assumed to have this uniform form with \(h_j\in\F^{\B^n}\) and
+\(r_j\in\F^n\).
+
+Choose \(s\) with \(2^s\ge q\), and write
+\(\bits_s(j)\in\B^s\) for the list address of request \(j\).  For
+\(r\in\F^n\), define the equality function
+\[
+  \mathrm{Eq}_r(Y)
+  =
+  \prod_{i=0}^{n-1}\bigl((1-Y_i)(1-r_i)+Y_i r_i\bigr),
+  \qquad Y\in\F^n.
+\]
+On a Boolean point \(b\in\B^n\), this is exactly the interpolation weight
+\(\chi_b(r)\), so
+\[
+  \sum_{b\in\B^n} h_j(b)\,\mathrm{Eq}_{r_j}(b)
+  =
+  \MLE(h_j)(r_j).
+\]
+
+The CBBZ/Blaze batch begins by sampling one list-address point
+\[
+  t\leftarrow\F^s.
+\]
+This point gives the verifier-derived weights \(\chi_{\bits_s(j)}(t)\) for the
+claimed values \(w_j\).  Define
+\[
+  S_t
+  =
+  \sum_{j=0}^{q-1}\chi_{\bits_s(j)}(t)\,w_j .
+\]
+Now consider two functions on \(\F^s\times\F^n\):
+\[
+  G_t(X,Y)
+  =
+  \sum_{j=0}^{q-1}
+    \chi_{\bits_s(j)}(X)\chi_{\bits_s(j)}(t)\MLE(h_j)(Y),
+\]
+and
+\[
+  \mathsf{Eq}_E(X,Y)
+  =
+  \sum_{j=0}^{q-1}
+    \chi_{\bits_s(j)}(X)\mathrm{Eq}_{r_j}(Y).
+\]
+The first function contains the oracle data, so it is not directly computable
+by the verifier.  The second is public: it is built only from the request
+points \(r_j\) and the list addresses \(\bits_s(j)\).  On the Boolean cube, the
+product
+\(G_t(X,Y)\mathsf{Eq}_E(X,Y)\) selects one request at a time.  Therefore the
+original claims imply the Boolean-sum identity
+\[
+  \sum_{(X,Y)\in\B^s\times\B^n}
+    G_t(X,Y)\,\mathsf{Eq}_E(X,Y)
+  =
+  S_t .
+\]
+This is the exact HyperPlonk/CBBZ batching shape imported by Blaze.
+
+Run the reusable sumcheck from Figure~\ref{fig:subroutine-sumcheck-terminal} on
+the prover's degree-two product
+\[
+  P(X,Y)=G_t(X,Y)\mathsf{Eq}_E(X,Y).
+\]
+The prover supplies the sumcheck messages for this product.  The verifier checks
+the sumcheck algebra using the public target \(S_t\) and degree bound \(2\), but
+does not evaluate \(G_t\) itself.  The run returns
+\[
+  (\mathsf{ok},r',T)
+  \gets
+  \SumCheck_{s+n}(\verifier:S_t,\prover:P),
+\]
+If
+\(\mathsf{ok}=0\), the verifier rejects.  Otherwise write
+\[
+  r'
+  =
+  (\xi,\eta)
+  \in\F^s\times\F^n.
+\]
+The remaining terminal condition is
+\[
+  T
+  =
+  G_t(\xi,\eta)
+  \mathsf{Eq}_E(\xi,\eta).
+\]
+The verifier computes the public factor
+\[
+  e
+  =
+  \mathsf{Eq}_E(\xi,\eta).
+\]
+If \(e=0\), the verifier aborts this batch.  Otherwise the
+needed value of the private factor is forced:
+\[
+  w
+  =
+  T/e.
+\]
+
+It remains to express this private factor as one evaluation request.  Define
+the public RowFold coefficients
+\[
+  \lambda_j
+  =
+  \chi_{\bits_s(j)}(\xi)
+  \chi_{\bits_s(j)}(t)
+  \qquad(0\le j<q),
+\]
+and derive the virtual handle
+\[
+  \widehat O_{\mathrm{batch}}
+  =
+  \mathsf{RowFold.Commit}
+  \bigl((\widehat O_{h_j},\lambda_j)_{j=0}^{q-1}\bigr).
+\]
+By the RowFold definition in the Virtual Handles subsection, this handle
+satisfies
+\[
+  \widehat O_{\mathrm{batch}}(\eta)
+  =
+  \sum_{j=0}^{q-1}
+    \lambda_j\,\widehat O_{h_j}(\eta)
+  \qquad(\eta\in\F^n).
+\]
+Thus the single remaining evaluation claim is
+\[
+  \widehat O_{\mathrm{batch}}(\eta)
+  =
+  w.
+\]
+
+This last display is a handle-level statement.  In a concrete backend, the
+coefficients \(\lambda_j\) scale same-address internal openings of the
+component backend oracles; the verifier is not running one MLPCS evaluation
+protocol for every \(\widehat O_{h_j}\).  That is the handle/API version of
+Blaze Remark~4.3: many different-polynomial, different-point claims become one
+virtual RowFold handle opened at one common point.
+
+The row-folded hybrid protocol below still records the unbatched set
+\(\EvalReqs_{\RAA}\), because the native RAA checks are easiest to state as
+local algebraic constraints.  The main protocol then partitions that set into
+\(\EvalReqs_{\mathrm{ord}}\), containing the ordinary requests, and
+\(\EvalReqs_{u5}\), containing the requests to \(\widehat O_{u_5}\).  Only
+\(\EvalReqs_{\mathrm{ord}}\) is passed to the merged-evaluation subprotocol in
+Figure~\ref{fig:protocol-merge-native-evals}.
+
+\begin{protocolbox}{Subprotocol: Merge Native Evaluation Requests}{fig:protocol-merge-native-evals}
+\small\raggedright
+\noindent Public parameters: \(\bits_s\), \(\chi\), \(\mathrm{Eq}\),
+\(\SumCheck\), \(\mathsf{RowFold}\), and
+\(\mathcal F_{\mathrm{MLPCS}}\).
+
+\smallskip
+\noindent\(\underline{\mathsf{MergeNativeEvals}(\verifier:E=((\widehat O_{h_j},r_j,w_j))_{j=0}^{q-1},\ \prover:(h_j)_{j=0}^{q-1})\to a_{\mathrm{eval}}\in\{0,1\}}\)
+
+\smallskip
+\begin{enumerate}[leftmargin=0.24in,label=\textbf{B\arabic*.},itemsep=0.08em,topsep=0.1em,parsep=0pt]
+  \item \(\verifier\): choose \(s\) with \(2^s\ge q\).
+  \item \(\verifier\): sample \(t\leftarrow\F^s\), then send \(t\) to \(\prover\).
+  \item \(\verifier\): \(S_t\gets
+        \sum_{j=0}^{q-1}\chi_{\bits_s(j)}(t)\,w_j\).
+  \item \(\prover\): define
+        \[
+          G_t(X,Y)=
+          \sum_{j=0}^{q-1}
+            \chi_{\bits_s(j)}(X)\chi_{\bits_s(j)}(t)\MLE(h_j)(Y).
+        \]
+  \item \(\verifier\): define
+        \[
+          \mathsf{Eq}_E(X,Y)=
+          \sum_{j=0}^{q-1}
+            \chi_{\bits_s(j)}(X)\mathrm{Eq}_{r_j}(Y).
+        \]
+  \item \(\prover\): let
+        \(P(X,Y)\gets G_t(X,Y)\mathsf{Eq}_E(X,Y)\).
+  \item \(\prover,\verifier\): \((\mathsf{ok},r',T)\gets
+        \SumCheck_{s+n}(\verifier:S_t,\prover:P)\)
+        with individual degree bound \(2\).
+  \item \(\verifier\): if \(\mathsf{ok}=0\), return \(0\).
+  \item \(\verifier\): parse
+        \(r'=(\xi,\eta)\in\F^s\times\F^n\).
+  \item \(\verifier\): \(e\gets
+        \mathsf{Eq}_E(\xi,\eta)\).
+  \item \(\verifier\): if \(e=0\), return \(0\).
+  \item \(\verifier\): \(w\gets T/e\).
+  \item \(\verifier\): for \(j=0,\ldots,q-1\), set
+        \[
+          \lambda_j\gets
+          \chi_{\bits_s(j)}(\xi)
+          \chi_{\bits_s(j)}(t).
+        \]
+  \item \(\verifier\): \(\widehat O_{\mathrm{batch}}\gets
+        \mathsf{RowFold.Commit}
+        ((\widehat O_{h_j},\lambda_j)_{j=0}^{q-1})\).
+  \item \(\verifier\): \(w_{\mathrm{open}}\gets
+        \mathcal F_{\mathrm{MLPCS}}.\mathsf{Eval}
+        (\verifier:(\widehat O_{\mathrm{batch}},\eta))\).
+  \item \(\verifier\): if \(w_{\mathrm{open}}\ne w\), return \(0\).
+  \item \(\verifier\): return \(1\).
+\end{enumerate}
+\end{protocolbox}
+
+\subsection{Row-Folded Blaze In The
+\(\mathcal F_{\mathrm{MLPCS}}/\mathcal F_{\mathrm{HMLPCS}}^\delta\)-Hybrid}
 
 We can now state the top-level Blaze flow as a hybrid protocol.  In this
-subsection, \(\mathcal F_{\mathrm{MLIOP}}\) is the ideal multilinear-oracle
-functionality from Figure~\ref{fig:func-mliop-oracle}.  This functionality is
-the only oracle power Blaze needs at the native layer: the prover and verifier
-name committed Boolean oracle handles, the functionality commits those handles
-into MLE oracle handles, and the verifier later obtains MLE evaluations at
-field points.
+subsection, \(\mathcal F_{\mathrm{MLPCS}}\) is the ideal multilinear-oracle
+functionality from Figure~\ref{fig:func-mlpcs-oracle}.  It is used for
+prover-originated native tensors: the prover commits a tensor, the
+functionality returns an MLE oracle handle, and the verifier later obtains MLE
+evaluations at field points.  The folded input codeword is different.  It is
+already fixed as a coordinate handle \(R_\star\), so the protocol uses
+\(\mathcal F_{\mathrm{HMLPCS}}^\delta\) from
+Figure~\ref{fig:func-hmlpcs-oracle} to bridge the literal coordinate string
+behind \(R_\star\) to the native MLE handle \(\widehat O_{u_5}\).
 
-Figure~\ref{fig:native-blaze-fmliop-hybrid} is therefore not an incomplete
+Figure~\ref{fig:native-blaze-fmlpcs-hybrid} is therefore not an incomplete
 protocol and not merely a list of constraints.  It is Blaze in the
-\(\mathcal F_{\mathrm{MLIOP}}\)-hybrid model.  The inlined RAA flow produces
-evaluation requests of the form \(J(r)=v\), and the top-level protocol
-immediately discharges those requests by calling
-\(\mathcal F_{\mathrm{MLIOP}}.\mathsf{Eval}\).  Give this protocol real
-implementations of the coordinate-oracle layer and of
-\(\mathcal F_{\mathrm{MLIOP}}\), and the composition is a concrete Blaze
-implementation.  Those implementations may use coordinate commitments,
-batching, BaseFold, Merkle trees, or something else; the Blaze algebra below
-only sees the hybrid functionality.
+\(\mathcal F_{\mathrm{MLPCS}}/\mathcal F_{\mathrm{HMLPCS}}^\delta\)-hybrid
+model.  The inlined RAA flow produces
+evaluation requests of the form \(J(r)=v\).  The ordinary MLPCS requests are
+discharged by the merged-evaluation subprotocol in
+Figure~\ref{fig:protocol-merge-native-evals}; requests to
+\(\widehat O_{u_5}\) are discharged directly through
+\(\mathcal F_{\mathrm{HMLPCS}}^\delta.\mathsf{Eval}\).  Give this protocol real
+implementations of the coordinate-oracle layer and of the MLPCS/HMLPCS
+interfaces, and the composition is a concrete Blaze implementation.  Ordinary
+MLPCS handles are realized by committing an encoded string for each native
+tensor and using \(\EncMLE[C]\) to open later evaluation claims.  The
+\(u_5/R_\star\) bridge has the stricter requirement captured by
+\(\mathcal F_{\mathrm{HMLPCS}}^\delta\): the systematic/message coordinates
+must be the already-fixed handle \(R_\star\), or an equivalent binding mechanism
+must be proved.
 
 The important topology is the same one frozen in
 Figure~\ref{fig:protocol-blaze-pcs}.  The encoded matrix is committed once as a
-coordinate oracle; its rows are not separately committed to the MLIOP layer.
+coordinate oracle; its rows are not separately committed to the MLPCS layer.
 Only after the verifier samples \(\rho\) do the parties form the virtual folded
 handle
 \[
@@ -636,16 +928,33 @@ handle
   \sum_{h\in\B^\ell}\rho[h]\,R_c(b)[h],
   \qquad b\in\B^n.
 \]
-This is the first outer encoded object passed to the inlined RAA flow.  The
-protocol commits \(R_\star\) together with the other RAA-stage handles before
-it asks any MLE-evaluation questions.
+This is the first outer encoded object passed to the inner RAA-opening flow.
+The inner flow commits the supplied coordinate handle together with the other
+RAA-stage handles before it asks any MLE-evaluation questions.
 The folded tensor is
 \[
   c_\star[b]=\sum_{h\in\B^\ell}\rho[h]c[h,b],
   \qquad b\in\B^n.
 \]
+Concretely, the \(\mathcal F_{\mathrm{HMLPCS}}^\delta\) call for this object is
+realized by a systematic backend commitment to
+\[
+  \mathsf{RFC}(u_5)=u_5\Vert p,
+\]
+where the systematic coordinate handle used by the inner opener is literally
+\(O_y=R_\star\), not a fresh commitment to another copy of \(u_5\).  A backend
+commitment that re-commits a fresh systematic copy would not realize the handle
+relation used by this protocol.  The \(\mathcal F_{\mathrm{HMLPCS}}^\delta\)
+threshold is a message-domain threshold for the string behind \(O_y\); the
+systematic backend \(\EncMLE[C_{\mathrm{sys}}]\) threshold must therefore be
+scaled by the systematic fraction of the backend codeword, as described in
+Figure~\ref{fig:func-hmlpcs-oracle}.
+The public \(\mathsf{Open}\) entry point below is written first.  It performs
+the row-folding adapter and then calls the helper
+\(\mathsf{OpenInner}\), defined immediately afterward, on the generic existing
+length-\(2^n\) coordinate handle \(O_y=R_\star\).
 
-\begin{protocolbox}{Protocol: Blaze In The \(\mathcal F_{\mathrm{MLIOP}}\)-Hybrid}{fig:native-blaze-fmliop-hybrid}
+\begin{protocolbox}{Protocol: Row-Folded Blaze In The \(\mathcal F_{\mathrm{MLPCS}}/\mathcal F_{\mathrm{HMLPCS}}^\delta\)-Hybrid}{fig:native-blaze-fmlpcs-hybrid}
 \scriptsize\raggedright
 \noindent Public parameters: \(\ell,k,n\), the RAA map
 \(\RAA:\F^{\B^k}\to\F^{\B^n}\), \(\pi_1,\pi_2:\B^n\to\B^n\),
@@ -653,10 +962,12 @@ The folded tensor is
 \(\widehat A:\F^n\times\F^n\to\F\), \(F_{\mathrm{rep}}\),
 \(\mathsf{msg}:\F^n\to\F^k\), \(\mathsf{RowFold}\),
 \(\AccReduce\), \(\PermuteCommit\), \(\PermuteReduce\), \(\RAASixSumcheck\),
-\(\mathcal F_{\mathrm{MsgOracle}}\), and \(\mathcal F_{\mathrm{MLIOP}}\).
+\(\mathsf{MergeNativeEvals}\),
+\(\mathcal F_{\mathrm{MsgOracle}}\), \(\mathcal F_{\mathrm{MLPCS}}\), and
+\(\mathcal F_{\mathrm{HMLPCS}}^\delta\).
 
 \smallskip
-\noindent\(\underline{\mathsf{Blaze}^{\mathcal F_{\mathrm{MLIOP}}}.\mathsf{Commit}(\verifier:\bot,\ \prover:m\in\F^{\B^\ell\times\B^k})\to C_m\in\Handle}\)
+\noindent\(\underline{\mathsf{Blaze}^{\mathsf{hyb}}.\mathsf{Commit}(\verifier:\bot,\ \prover:m\in\F^{\B^\ell\times\B^k})\to C_m\in\Handle}\)
 
 \smallskip
 \begin{enumerate}[leftmargin=0.24in,label=\textbf{C\arabic*.},itemsep=0.06em,topsep=0.06em,parsep=0pt]
@@ -665,14 +976,14 @@ The folded tensor is
   \item \(\prover\): define \(C\in(\F^{\B^\ell})^{\B^n}\) by
         \(C[b]=c[\ast,b]\) for \(b\in\B^n\).
   \item \(\prover,\verifier\): \(R_c\gets
-        \mathcal F_{\mathrm{MsgOracle}}.\mathsf{Submit}
+        \mathcal F_{\mathrm{MsgOracle}}.\mathsf{Commit}
         (\prover:C,\verifier:\bot)\).
-  \item \(\mathsf{Blaze}^{\mathcal F_{\mathrm{MLIOP}}}\): return
+  \item \(\mathsf{Blaze}^{\mathsf{hyb}}\): return
         \(C_m=R_c\).
 \end{enumerate}
 
 \smallskip
-\noindent\(\underline{\mathsf{Blaze}^{\mathcal F_{\mathrm{MLIOP}}}.\mathsf{Open}(\verifier:(C_m,z_{\mathrm{slice}}\in\F^\ell,z_{\mathrm{in}}\in\F^k,v\in\F),\ \prover:(m,C_m,z_{\mathrm{slice}},z_{\mathrm{in}},v))\to a\in\{0,1\}}\)
+\noindent\(\underline{\mathsf{Blaze}^{\mathsf{hyb}}.\mathsf{Open}(\verifier:(C_m,z_{\mathrm{slice}}\in\F^\ell,z_{\mathrm{in}}\in\F^k,v\in\F),\ \prover:(m,C_m,z_{\mathrm{slice}},z_{\mathrm{in}},v))\to a\in\{0,1\}}\)
 
 \smallskip
 \begin{enumerate}[leftmargin=0.24in,label=\textbf{O\arabic*.},itemsep=0.06em,topsep=0.06em,parsep=0pt]
@@ -691,20 +1002,36 @@ The folded tensor is
         \(v_\star\gets\sum_{h\in\B^\ell}\rho[h]u[h]\).
   \item \(\prover,\verifier\): \(R_\star\gets
         \mathsf{RowFold.Commit}(\verifier:(C_m,\rho),\prover:(C_m,\rho))\).
-  \item \(\prover\): let \(u_0\gets m_\star\),
+  \item \(\prover,\verifier\): let \(O_y\gets R_\star\).
+  \item \(\prover,\verifier\): return
+        \(\mathsf{Blaze}^{\mathsf{hyb}}.\mathsf{OpenInner}
+        (\verifier:(O_y,z_{\mathrm{in}},v_\star),
+        \prover:(m_\star,O_y,z_{\mathrm{in}},v_\star))\).
+\end{enumerate}
+
+\smallskip
+\noindent\(\underline{\mathsf{Blaze}^{\mathsf{hyb}}.\mathsf{OpenInner}(\verifier:(O_y\in\Handle,z\in\F^k,v\in\F),\ \prover:(m_{\mathrm{in}}\in\F^{\B^k},O_y,z,v))\to a\in\{0,1\}}\)
+
+\smallskip
+\begin{enumerate}[leftmargin=0.24in,label=\textbf{I\arabic*.},itemsep=0.06em,topsep=0.06em,parsep=0pt]
+  \item \(\prover\): let \(u_0\gets m_{\mathrm{in}}\),
         \(u_1\gets F_{\mathrm{rep}}(u_0)\),
         \(u_2\gets M_{\pi_1}u_1\),
         \(u_3\gets\Acc(u_2)\),
-        \(u_4\gets M_{\pi_2}u_3\),
-        \(c_\star^{\mathrm{wit}}\gets\Acc(u_4)\), and
-        \(u_5\gets c_\star^{\mathrm{wit}}\).
-  \item \(\prover,\verifier\): let \(R_{u_5}\gets R_\star\).
-  \item \(\prover,\verifier\): for each \(i\in\{0,2,3,4\}\), let
-        \(R_{u_i}\gets
-        \mathcal F_{\mathrm{MsgOracle}}.\mathsf{Submit}(\prover:u_i,\verifier:\bot)\).
-  \item \(\prover,\verifier\): for each \(i\in\{0,2,3,4,5\}\), let
+        \(u_4\gets M_{\pi_2}u_3\), and
+        \(u_5\gets\Acc(u_4)\).
+  \item \(\prover,\verifier\): let
+        \(\widehat O_{u_0}\gets
+        \mathcal F_{\mathrm{MLPCS}}.\mathsf{Commit}
+        (\prover:u_0,\verifier:k)\).
+  \item \(\prover,\verifier\): for each \(i\in\{2,3,4\}\), let
         \(\widehat O_{u_i}\gets
-        \mathcal F_{\mathrm{MLIOP}}.\mathsf{Commit}(\prover,\verifier:R_{u_i})\).
+        \mathcal F_{\mathrm{MLPCS}}.\mathsf{Commit}
+        (\prover:u_i,\verifier:n)\).
+  \item \(\prover,\verifier\): let
+        \(\widehat O_{u_5}\gets
+        \mathcal F_{\mathrm{HMLPCS}}^\delta.\mathsf{Commit}
+        (\prover:u_5,\verifier:O_y)\).
   \item \(\prover,\verifier\): let
         \(\widehat O_{u_1}\gets\RepView(\widehat O_{u_0})\).
   \item \(\verifier\): sample \(\alpha,\beta\leftarrow\F\), then send
@@ -724,7 +1051,7 @@ The folded tensor is
         \AccReduce(\verifier:(\widehat O_{u_2},
         \widehat O_{u_3},r_{\mathrm{chk}}),\prover:(u_2,u_3))\).
   \item \(\prover,\verifier\):
-        \((\EvalReqs_{y},B_{u4})\gets
+        \((\EvalReqs_{u5},B_{u4})\gets
         \AccReduce(\verifier:(\widehat O_{u_4},
         \widehat O_{u_5},r_{\mathrm{chk}}),\prover:(u_4,u_5))\).
   \item \(\prover,\verifier\):
@@ -742,27 +1069,35 @@ The folded tensor is
   \item \(\prover,\verifier\): \((a_{\mathrm{sc}},\EvalReqs_{\mathrm{sc}})\gets
         \RAASixSumcheck(\verifier:(B_{u2},B_{u4},
         B_{f1},B_{g1},B_{f2},B_{g2}),
-        \prover:(u_2,u_4,f_1,g_1,f_2,g_2))\).
-        \item \(\verifier\): \(\EvalReqs_{\RAA}\gets
-        \{(\widehat O_{u_0},z_{\mathrm{in}},v_\star)\}
-        \cup\EvalReqs_{u3}\cup\EvalReqs_y
+        \prover:(u_1,u_2,u_3,u_4,f_1,g_1,f_2,g_2))\).
+  \item \(\verifier\): if \(a_{\mathrm{sc}}=0\), return \(0\).
+  \item \(\verifier\): \(\EvalReqs_{\RAA}\gets
+        \{(\widehat O_{u_0},z,v)\}
+        \cup\EvalReqs_{u3}\cup\EvalReqs_{u5}
         \cup\EvalReqs_{f1,g1}\cup\EvalReqs_{f2,g2}
         \cup\EvalReqs_{\mathrm{sc}}\).
-        \item \(\verifier\): for each \((J,r,w)\in\EvalReqs_{\RAA}\): \(\verifier\): if \( \mathcal F_{\mathrm{MLIOP}}.\mathsf{Eval}
-          (\verifier:(J,r))\ne w\), return \(0\).
-        
-        \item \(\verifier\): if \(a_{\mathrm{sc}}=0\), return \(0\).
+  \item \(\verifier\): \(\EvalReqs_{\mathrm{ord}}\gets
+        \EvalReqs_{\RAA}\setminus\EvalReqs_{u5}\).
+  \item \(\prover,\verifier\): \(a_{\mathrm{eval}}\gets
+        \mathsf{MergeNativeEvals}(\verifier:\EvalReqs_{\mathrm{ord}},
+        \prover:(h_j)_{(\widehat O_{h_j},r_j,w_j)\in\EvalReqs_{\mathrm{ord}}})\).
+  \item \(\verifier\): if \(a_{\mathrm{eval}}=0\), return \(0\).
+  \item \(\verifier\): for each
+        \((\widehat O_{u_5},r,w)\in\EvalReqs_{u5}\), if
+        \(\mathcal F_{\mathrm{HMLPCS}}^\delta.\mathsf{Eval}
+        (\verifier:(\widehat O_{u_5},r))\ne w\), return \(0\).
   \item \(\verifier\): return \(1\).
 \end{enumerate}
 \end{protocolbox}
 
-Figure~\ref{fig:native-blaze-fmliop-hybrid} is the promised Blaze protocol in
+Figure~\ref{fig:native-blaze-fmlpcs-hybrid} is the promised Blaze protocol in
 the hybrid model.  It uses coordinate handles, but not Merkle trees or BaseFold
-query paths.  Those are possible ways to realize the two ideal layers:
-\(\mathcal F_{\mathrm{MsgOracle}}\) for coordinate access and
-\(\mathcal F_{\mathrm{MLIOP}}\) for MLE evaluation access.  The next layer is
-therefore not a second RAA protocol.  It is an implementation of the ideal
-calls used by this figure.
+query paths.  Those are possible ways to realize the ideal layers:
+\(\mathcal F_{\mathrm{MsgOracle}}\) for coordinate access,
+\(\mathcal F_{\mathrm{MLPCS}}\) for prover-originated MLE evaluation access,
+and \(\mathcal F_{\mathrm{HMLPCS}}^\delta\) for the folded input-codeword
+bridge.  The next layer is therefore not a second RAA protocol.  It is an
+implementation of the ideal calls used by this figure.
 
 \section{Blaze Proof Replay In Handle Form}
 
@@ -845,23 +1180,23 @@ This is the proximity statement that the hybrid extractor will use.
 \subsection{The Hybrid Extractor}
 
 We now define the extractor before proving that it works.  The extractor is
-allowed to be computationally unbounded.  It runs in the
-\(\mathcal F_{\mathrm{MLIOP}}\)-hybrid model and treats
-\(\mathcal F_{\mathrm{MLIOP}}\) as a black box.  For an MLE handle
+allowed to be computationally unbounded.  It runs in the hybrid model above and
+treats the MLE-handle functionalities as black boxes.  For an MLE handle
 \(\widehat O_h\), write
 \[
-  \mathsf{Ext}_{\mathrm{MLIOP}}(\widehat O_h)=h^\dagger
+  \mathsf{Ext}_{\mathrm{MLPCS}}(\widehat O_h)=h^\dagger
 \]
 for the tensor represented by that MLE handle.  The functionality is
 relation-agnostic: it does not know whether \(h^\dagger\) is an RAA stage, a
 product tree, or close to any code.  It only guarantees that
 \[
-  \mathcal F_{\mathrm{MLIOP}}.\mathsf{Eval}(\widehat O_h,r)
+  \mathcal F_{\mathrm{MLPCS}}.\mathsf{Eval}(\widehat O_h,r)
   =
   \MLE(h^\dagger)(r).
 \]
-All proximity claims below are proved outside \(\mathcal F_{\mathrm{MLIOP}}\),
-using the row fold and the generic proximity-gap lemma.
+All proximity claims below are proved outside the native MLPCS algebra, using
+the row fold, the HMLPCS bridge for the folded input word, and the generic
+proximity-gap lemma.
 
 For a matrix \(m\in\F^{\B^\ell\times\B^k}\), write \(\PRAA^L(m)\) for the
 row-wise interleaved packed RAA encoding:
@@ -873,11 +1208,12 @@ row-wise interleaved packed RAA encoding:
 \begin{protocolbox}{Extractor: Hybrid Blaze Extractor}{fig:extractor-hybrid-blaze}
 \small\raggedright
 \noindent Input: an accepting transcript \(T\) of
-Figure~\ref{fig:native-blaze-fmliop-hybrid}; the commitment handle
+Figure~\ref{fig:native-blaze-fmlpcs-hybrid}; the commitment handle
 \(C_m=R_c\); the verifier claim
 \((z_{\mathrm{slice}},z_{\mathrm{in}},v)\); the row-fold challenge
 \(\rho\in\F^{\B^\ell}\); and black-box access to
-\(\mathcal F_{\mathrm{MsgOracle}}\) and \(\mathcal F_{\mathrm{MLIOP}}\).
+\(\mathcal F_{\mathrm{MsgOracle}}\), \(\mathcal F_{\mathrm{MLPCS}}\), and
+\(\mathcal F_{\mathrm{HMLPCS}}^\delta\).
 
 \smallskip
 \noindent Output:
@@ -902,13 +1238,13 @@ Figure~\ref{fig:native-blaze-fmliop-hybrid}; the commitment handle
         \[
         \begin{aligned}
         u_i^\dagger&\gets
-        \mathsf{Ext}_{\mathrm{MLIOP}}(\widehat O_{u_i})
+        \mathsf{Ext}_{\mathrm{MLPCS}}(\widehat O_{u_i})
         &&(i\in\{0,2,3,4,5\}),\\
         f_j^\dagger&\gets
-        \mathsf{Ext}_{\mathrm{MLIOP}}(\widehat O_{f_j}),
+        \mathsf{Ext}_{\mathrm{MLPCS}}(\widehat O_{f_j}),
         \qquad
         g_j^\dagger\gets
-        \mathsf{Ext}_{\mathrm{MLIOP}}(\widehat O_{g_j})
+        \mathsf{Ext}_{\mathrm{MLPCS}}(\widehat O_{g_j})
         &&(j\in\{1,2\}).
         \end{aligned}
         \]
@@ -938,9 +1274,9 @@ evaluation.
 
 \paragraph{Folded extraction.}
 First look at lines E2--E5.  The terminal evaluation request in
-Figure~\ref{fig:native-blaze-fmliop-hybrid} asks the verifier to check
+Figure~\ref{fig:native-blaze-fmlpcs-hybrid} asks the verifier to check
 \[
-  \mathcal F_{\mathrm{MLIOP}}.\mathsf{Eval}
+  \mathcal F_{\mathrm{MLPCS}}.\mathsf{Eval}
   (\widehat O_{u_0},z_{\mathrm{in}})
   =
   v_\star.
@@ -962,7 +1298,7 @@ soundness error from the random challenges and sumcheck:
 The handle \(\widehat O_{u_5}\) is the MLE handle committed from the virtual
 folded coordinate handle \(R_\star\).  Therefore the raw folded word
 \(c_\star\) from E2 and the extracted tensor \(u_5^\dagger\) are linked by the
-outer row-fold/proximity argument, not by a special RAA-aware MLIOP rule.
+outer row-fold/proximity argument, not by a special RAA-aware MLPCS rule.
 Combining that proximity statement with the stage equations gives
 \[
   c_\star \text{ is close to } \PRAA(m_\star),
@@ -1007,34 +1343,37 @@ accepting row fold certifies.  The global extractor uses the generic
 proximity-gap lemma to turn that folded certificate into a statement about the
 whole committed matrix.
 
-The Blaze paper uses a different presentation style.  It first constructs an
-MLIOP for \(\RMLE[\PRAA]\), then describes an MLIOP-to-IOPP transformation using
-encoded oracle strings, batching, and an IOPP for \(\RMLE[C]\)~[Blaze24,
-Section~4.1].  In the language of this explainer, that transformation is a
-realization of \(\mathcal F_{\mathrm{MLIOP}}\).  The following dictionary is the
-translation:
+The Blaze paper uses a different presentation style and a different name.  It
+first constructs what it calls an MLIOP for \(\RMLE[\PRAA]\), then describes an
+MLIOP-to-IOPP transformation using encoded oracle strings, batching, and an
+IOPP for \(\RMLE[C]\)~[Blaze24, Section~4.1].  In the language of this
+explainer, that native object is an MLPCS and the transformation realizes the
+MLPCS evaluation interface together with proximity binding for
+verifier-originated handles.  The following dictionary is the translation:
 \[
 \begin{array}{c|c}
 \text{this explainer} & \text{Blaze paper} \\
 \hline
-\mathcal F_{\mathrm{MLIOP}}\text{-hybrid} &
-\text{MLIOP model} \\
+\mathcal F_{\mathrm{MLPCS}}\text{-hybrid} &
+\text{native MLIOP model} \\
 \widehat O &
 \text{multilinear oracle } \widehat H \\
-\mathcal F_{\mathrm{MLIOP}}.\mathsf{Commit}(R) &
-\text{ideal wrapper for authenticated access to }\widehat H \\
+\mathcal F_{\mathrm{MLPCS}}.\mathsf{Commit}(h) &
+\text{prover sends multilinear oracle }\widehat H \\
+\mathcal F_{\mathrm{HMLPCS}}^\delta.\mathsf{Commit}(h,R) &
+\text{systematic compiler bridges literal }R\text{ to effective }\widehat H \\
 \left(\widehat O,r,v\right)\in\EvalReqs &
 \text{verifier evaluation query } \widehat H(r)=v \\
-\text{realize }\mathcal F_{\mathrm{MLIOP}} &
+\text{realize }\mathcal F_{\mathrm{HMLPCS}}^\delta &
 \text{encoded-oracle/RMLE realization via the MLIOP-to-IOPP transformation} \\
-\MLEAuth &
+\text{backend RMLE evaluation checks} &
 \Pi_{\mathrm{batch}}\text{ plus an IOPP for }\RMLE[C] \\
 \text{virtual handle} &
 \text{virtual multilinear polynomial/oracle}
 \end{array}
 \]
 
-\subsection{Self-Contained Import: Blaze Lemma~6.1 In Handle Form}
+\subsection{Self-Contained Import: Blaze Lemma~6.1}
 
 This subsection begins the proof import.  It is written as a local proof, not
 as a reading guide to the Blaze paper.  The reader should be able to follow the
@@ -1042,9 +1381,124 @@ objects, the reduction, and the soundness argument from the definitions in this
 subsection.  Source labels such as ``Blaze Lemma~6.1'' and
 ``Claim~6.1.x'' are provenance markers: they say which Blaze step we are
 mirroring, but the mathematical content is stated here before it is used.
-There is no intended divergence from Blaze in this subsection.
+The first lemma below is the Blaze-side replay.  The second lemma is the
+handle/API translation used by the fixed protocol box.  For the present audit,
+the Blaze-side replay is the authoritative imported proof; the handle-form
+lemma is downstream translation material retained separately.
 
-\paragraph{Local statement.}
+\paragraph{Blaze-side statement.}
+\begin{lemma}[Blaze interleaving RMLE reduction replay; cf. Lemma~6.1]
+\label{lem:blaze-interleaving-replay}
+Let \(C:\F^k\to\F^n\) be a linear code with relative distance \(\lambda\).
+Assume there is an IOPP for \(\RMLE[C]\) which, for proximity parameter
+\(\delta'<\lambda/3\), has soundness error
+\(\varepsilon(\delta',k)\).  Then, for every interleaving parameter \(t\),
+there is an IOPP for \(\RMLE[C^t]\).  For top-level proximity parameter
+\(\delta\), Blaze sets
+\[
+  \delta'=0.99\delta,
+\]
+and obtains soundness
+\[
+  \varepsilon(\delta',k)+\frac{1}{(\delta-\delta')|\F|}.
+\]
+The input alphabet becomes \(\F^t\), the index and proof alphabets remain
+\(\F\), the protocol adds one round and \(2t\) field elements of non-oracle
+communication, and each base input query is emulated by one column query to
+the interleaved input.
+\end{lemma}
+
+\begin{proof}
+This is Blaze Lemma~6.1 in the paper's notation.  The verifier's explicit
+input is \(z=(z_1,z_2)\in\F^{\log t}\times\F^{\log k}\) and \(v\in\F\).  The
+implicit input is a word
+\[
+  c\in(\F^t)^n,
+\]
+viewed equivalently as a \(t\times n\) matrix over \(\F\).  A witness message is
+viewed as a \(t\times k\) matrix \(m\), and \(C^t(m)\) means applying \(C\) to
+each row.
+
+The protocol is the five-step reduction in Blaze.  First the prover sends
+\[
+  u\in\F^t,
+  \qquad
+  u_i=\widehat m_i(z_2)
+\]
+in the honest case.  Second, the verifier checks \(\widehat u(z_1)=v\).  Third,
+the verifier samples \(r\leftarrow\F^t\) and defines
+\[
+  m_{\mathrm{combo}}=r^\top m,
+  \qquad
+  c_{\mathrm{combo}}=r^\top c.
+\]
+Fourth, the prover and verifier run the assumed IOPP for \(\RMLE[C]\) on point
+\(z_2\), value \(v'=\langle u,r\rangle\), and implicit input
+\(c_{\mathrm{combo}}\).  The verifier does not receive
+\(c_{\mathrm{combo}}\) as a new oracle; a query \(j\in[n]\) is answered by
+reading the \(j\)-th column of \(c\) and returning
+\(\sum_i r_i c_{i,j}\).  Fifth, the verifier accepts exactly when the row-value
+check and the base IOPP accept.
+
+Completeness follows from linearity:
+\[
+  c_{\mathrm{combo}}
+  =
+  r^\top C^t(m)
+  =
+  C(r^\top m)
+  =
+  C(m_{\mathrm{combo}}),
+\]
+and
+\[
+  \widehat m_{\mathrm{combo}}(z_2)
+  =
+  \sum_i r_i\widehat m_i(z_2)
+  =
+  \langle u,r\rangle.
+\]
+
+For soundness, fix \(c\) that is \(\delta\)-far from
+\[
+  \mathsf{Aff}_{z,v}
+  =
+  \{C^t(m):\widehat m(z)=v\},
+\]
+and fix a deterministic prover message \(u\) with \(\widehat u(z_1)=v\); if
+this equality fails, the verifier already rejects.  Let
+\[
+  \mathsf{Lin}_{z_2}
+  =
+  \{C(a):\widehat a(z_2)=0\}.
+\]
+Blaze Claim~6.1.1 states that
+\[
+  \Delta\bigl(c-u\otimes C(1^k),(\mathsf{Lin}_{z_2})^t\bigr)>\delta.
+\]
+Otherwise, shifting back by \(u\otimes C(1^k)\) would give a codeword in
+\(\mathsf{Aff}_{z,v}\) within distance \(\delta\) of \(c\).
+
+By Corollary~2.6, this row-wise distance survives a random row combination:
+with all but probability \(1/((\delta-\delta')|\F|)\) over
+\(r\leftarrow\F^t\),
+\[
+  \Delta\bigl(r^\top(c-u\otimes C(1^k)),\mathsf{Lin}_{z_2}\bigr)>\delta'.
+\]
+This is Blaze Claim~6.1.2.  Claim~6.1.3 shifts back from the linear target to
+the affine target:
+\[
+  \Delta\bigl(r^\top c,\{C(a):\widehat a(z_2)=\langle u,r\rangle\}\bigr)
+  >
+  \delta'.
+\]
+Therefore the folded base instance is \(\delta'\)-far from
+\(\RMLE[C]\), and the base IOPP rejects except with error
+\(\varepsilon(\delta',k)\).  Adding the Corollary~2.6 bad-fold probability
+gives the stated soundness.
+\end{proof}
+
+\paragraph{Handle/API translation.}
 \begin{lemma}[Interleaving RMLE reduction in handle form; cf. Blaze Lemma~6.1]
 \label{lem:blaze-interleaving-handle}
 Let
@@ -1197,7 +1651,7 @@ For an honest message \(m\),
   u[h]=\MLE(m[h,\ast])(z_{\mathrm{in}})
   \qquad(h\in\B^\ell).
 \]
-This is exactly Lines O1--O2 of Figure~\ref{fig:native-blaze-fmliop-hybrid}.
+This is exactly Lines O1--O2 of Figure~\ref{fig:native-blaze-fmlpcs-hybrid}.
 
 \emph{Step 2: check the top-level value through \(u\).}
 The verifier views \(u\) as a Boolean tensor on \(\B^\ell\) and checks
@@ -1579,12 +2033,91 @@ from \(\RMLE[\PRAA]\) and must be rejected by the base protocol imported next.
 
 This subsection continues the lemma pass.  The protocol boxes above remain
 fixed.  The purpose here is to give this paper its own named statements for the
-Blaze Section~5 native MLIOP, the Section~4 compiler, and the Section~7
+Blaze Section~5 native MLPCS, the Section~4 compiler, and the Section~7
 composition.  Blaze lemma and proposition numbers appear as provenance in the
-statement titles; the objects used by the proof are restated in our tensor and
-handle notation.
+statement titles.  The imported replay statements below stay in Blaze's proof
+order first; any handle/API translation is placed in a separate statement after
+the replay statement.  For the present audit, the replay statements are the
+objects being checked against Blaze; the handle-form statements are downstream
+translation material.  If we diverge from the literal Blaze object shape, the
+text must say so explicitly before using the translated object.
 
 \paragraph{Native accumulator relation.}
+
+\begin{proposition}[Blaze matrix-vector test replay; cf. Proposition~5.2]
+\label{prop:blaze-matrix-vector-replay}
+Let
+\[
+  M:\B^m\times\B^m\to\F,
+  \qquad
+  x,y:\B^m\to\F,
+\]
+and let \(\widehat M:\F^m\times\F^m\to\F\),
+\(\widehat x:\F^m\to\F\), and \(\widehat y:\F^m\to\F\) be their multilinear
+extensions.  If \(y=Mx\), meaning
+\[
+  y(i)=\sum_{j\in\B^m}M(i,j)x(j)
+  \qquad(i\in\B^m),
+\]
+then for every \(r\in\F^m\),
+\[
+  \widehat y(r)=
+  \sum_{j\in\B^m}x(j)\widehat M(r,j).
+\]
+If \(y\ne Mx\), then for a uniformly random \(r\leftarrow\F^m\), the displayed
+identity fails except with probability at most \(m/|\F|\).
+\end{proposition}
+
+\begin{proof}
+This is Blaze Proposition~5.2.  In the honest case, the displayed identity
+holds at every Boolean point \(r\in\B^m\) by the definition of matrix-vector
+multiplication.  Both sides are multilinear polynomials in \(r\), so equality
+on the Boolean cube implies equality over all \(r\in\F^m\).  In the false case,
+the two sides are distinct multilinear polynomials in \(r\); Schwartz--Zippel
+bounds their agreement probability by \(m/|\F|\).
+\end{proof}
+
+\begin{proposition}[Blaze accumulation-kernel replay; cf. Proposition~5.3]
+\label{prop:blaze-accumulation-kernel-replay}
+Let
+\[
+  A:\B^m\times\B^m\to\{0,1\}
+\]
+be the accumulation matrix, where \(A(i,j)=1\) exactly when the integer encoded
+by \(i\) is at least the integer encoded by \(j\).  Then:
+\[
+  \bigl(\widehat A(r,b)\bigr)_{b\in\B^m}
+\]
+can be generated in \(O(2^m)\) field operations for any \(r\in\F^m\), and
+\(\widehat A(i,j)\) can be evaluated at one field point
+\((i,j)\in\F^m\times\F^m\) using \(O(m)\) field operations.
+\end{proposition}
+
+\begin{proof}
+This is Blaze Proposition~5.3.  For the vector-generation claim, multilinear
+extension gives
+\[
+  \widehat A(r,b)=
+  \sum_{x\in\B^m}\mathrm{eq}(x,r)A(x,b)
+  =
+  \sum_{x\ge b}\mathrm{eq}(x,r).
+\]
+After generating all equality-basis values \(\mathrm{eq}(x,r)\), one obtains
+the displayed suffix sums over the integer order in linear time in the table
+size.  For the point-evaluation claim, Blaze observes that the comparison
+predicate \(i\ge j\) has a width-three read-once branching program, and also
+gives an explicit recursion.  Writing \(i=(i_1,i_2)\) and \(j=(j_1,j_2)\) with
+the first bits most significant,
+\[
+  A_m(i,j)=
+  (i_1=1\wedge j_1=0)
+  \vee
+  (i_1=j_1\wedge A_{m-1}(i_2,j_2)).
+\]
+Its multilinear extension is computed recursively in \(O(m)\) arithmetic
+operations, with \(A_0\equiv 1\).
+\end{proof}
+
 \begin{proposition}[Accumulator reduction; cf. Blaze Propositions~5.2 and~5.3]
 \label{prop:native-accumulator-reduction}
 Let \(x,y\in\F^{\B^n}\), and let
@@ -1619,7 +2152,86 @@ Figure~\ref{fig:native-accumulate-reduce}.
 \end{proof}
 
 \paragraph{Native permutation relation.}
-\begin{proposition}[Permutation product-tree reduction; cf. Blaze Proposition~5.4]
+
+\begin{proposition}[Blaze permutation product-tree reduction; replay of Proposition~5.4]
+\label{prop:blaze-permutation-replay}
+Let \(m\ge 1\), let \(|\F|\ge 2^m\), and let
+\[
+  \pi:\B^m\to\B^m
+\]
+be a public permutation.  As in Blaze, also view \(\pi\) as a tag map
+\(\B^m\to\F\) by assigning distinct field elements to the \(2^m\) Boolean
+addresses, and write
+\[
+  \widehat\pi:\F^m\to\F
+\]
+for its multilinear extension in that tag view.  Let
+\[
+  x,y\in\F^{\B^m}
+\]
+with multilinear extensions \(\MLE(x),\MLE(y):\F^m\to\F\).
+
+First suppose that
+\[
+  y(b)=x(\pi(b))\qquad(b\in\B^m).
+\]
+Then for every \(\alpha,\beta\in\F\) there exist multilinear polynomials
+\[
+  f,g:\F^{m+1}\to\F
+\]
+such that, for every \(r\in\F^m\),
+\[
+  f(1^m,0)=g(1^m,0),
+\]
+\[
+  f(0,r)=\alpha-\bigl(\MLE(x)(r)+\beta\,\widehat\pi(r)\bigr),
+  \qquad
+  g(0,r)=\alpha-\bigl(\MLE(y)(r)+\beta\,\Idx(r)\bigr),
+\]
+and
+\[
+  \sum_{a\in\B^m}\chi_a(r)
+  \bigl(f(1,a)-f(a,0)f(a,1)\bigr)=0,
+\]
+\[
+  \sum_{a\in\B^m}\chi_a(r)
+  \bigl(g(1,a)-g(a,0)g(a,1)\bigr)=0.
+\]
+Moreover, for honest \(x,y,\alpha,\beta\), the prover can construct such
+\(f,g\) in \(O(2^m)\) field operations.
+
+Conversely, if there exists \(b\in\B^m\) with \(y(b)\ne x(\pi(b))\), then
+except with probability at most \((2^m+1)/|\F|\) over
+\(\alpha,\beta\leftarrow\F\), every multilinear pair
+\[
+  f,g:\F^{m+1}\to\F
+\]
+fails at least one of the five displayed tests for all but a
+\(10m/|\F|\)-fraction of \(r\in\F^m\).
+\end{proposition}
+
+\begin{proof}
+This is Blaze Proposition~5.4, restated with this paper's tensor convention
+\(\MLE(\cdot)\) and equality polynomial \(\chi_a(r)\).  The proof is the
+standard grand-product-to-sumcheck reduction used by CBBZ and imported by
+Blaze.  The tagged leaf lists
+\[
+  \alpha-(x[b]+\beta\,\widehat\pi(b))
+  \qquad\text{and}\qquad
+  \alpha-(y[a]+\beta\,\Idx(a))
+\]
+have the same product when the permutation relation holds.  The tensors
+\(f\) and \(g\) are product trees over those leaves: the two leaf equations bind
+the bottom layer, the two Boolean-sum identities enforce the parent-product
+recursion, and the root equality compares the two products.  If the
+permutation relation is false, the two tagged products agree only for the
+exceptional choices of \((\alpha,\beta)\) bounded above; conditioned on a
+non-exceptional choice, the product-tree tests fail on all but the stated
+fraction of projection points \(r\).  This is exactly the permutation input
+used by Blaze Section~5.3.
+\end{proof}
+
+\begin{proposition}[Split-tree translation of Blaze Proposition~5.4]
 \label{prop:native-permutation-reduction}
 Let \(\pi:\B^n\to\B^n\) be a public permutation and let
 \[
@@ -1634,66 +2246,243 @@ leaf values
 \[
   f[\mathsf{leaf}(b)]
   =
-  \alpha-\bigl(x[b]+\beta\,\Idx(\pi(b))\bigr),
+  \alpha-\bigl(x[b]+\beta\,\widehat\pi(b)\bigr),
   \qquad
   g[\mathsf{leaf}(a)]
   =
   \alpha-\bigl(y[a]+\beta\,\Idx(a)\bigr).
 \]
-If \(y=M_\pi x\), then there exist product-tree tensors
+In the split representation, these leaf lists are virtual.  If \(y=M_\pi x\),
+then there exist internal product tensors
 \[
-  f,g\in\F^{\B^{n+1}}
+  f,g\in\F^{\B^n}
 \]
-whose roots agree, whose leaves are the two displayed tagged lists, and whose
-tree residuals vanish on every Boolean internal coordinate.  If
+whose roots agree and whose split residuals vanish on every Boolean internal
+coordinate with respect to the two displayed virtual leaf tensors.  If
 \(y\ne M_\pi x\), then, except with probability at most \((N+1)/|\F|\) over
-\((\alpha,\beta)\), every choice of \(f,g\) fails at least one of the root,
-leaf, or tree-residual tests for all but a \(10n/|\F|\)-fraction of
+\((\alpha,\beta)\), every choice of \(f,g\) fails at least one of the root
+or split-residual tests for all but a \(10n/|\F|\)-fraction of
 \(r\in\F^n\).
 \end{proposition}
 
 \begin{proof}
-When \(y[\pi(b)]=x[b]\), the two tagged leaf multisets are equal after the
-change of variable \(a=\pi(b)\).  The prover can therefore build product trees
-over the two equal multisets; the roots match and every parent-child residual
-is zero.  When the permutation relation is false, the tagged products agree as
-polynomials in \((\alpha,\beta)\) only with the failure probability stated
-above, and the product-tree zero tests reduce the remaining global product
-claims to the displayed root, leaf, and residual equations.  This is the
-push-forward-coordinate copy of Blaze Proposition~5.4; with the pullback
-convention one replaces \(\pi\) by \(\pi^{-1}\) in the leaf tag.
+This proof is the translation step, not a new permutation argument.  Blaze
+Proposition~5.4 uses two \((n+1)\)-variate product-tree oracles.  Our protocol
+stores only the internal product layers and derives the leaf layer from the
+existing source handle.
+
+Start with the honest case.  Under the push-forward convention
+\(y[\pi(b)]=x[b]\), the two tagged leaf multisets are equal after the change of
+variable \(a=\pi(b)\).  Therefore Blaze's full product-tree witnesses exist by
+Proposition~\ref{prop:blaze-permutation-replay}.  Delete their leaf layer and
+keep exactly the internal nodes; these internal nodes are the tensors
+\(f,g\in\F^{\B^n}\) used by this paper.  Whenever the split residual needs a
+leaf value, it recomputes the deleted leaf from the source tensor and public
+tag:
+\[
+  L_{x,\widehat\pi}(b)
+  =
+  \alpha-\bigl(x[b]+\beta\,\widehat\pi(b)\bigr),
+  \qquad
+  L_{y,\Idx}(a)
+  =
+  \alpha-\bigl(y[a]+\beta\,\Idx(a)\bigr).
+\]
+Thus every parent-product equation in the full Blaze tree is represented by
+one split residual equation in our internal tree, and the root equality is the
+same scalar equality.
+
+For soundness, suppose our split-tree checks pass for some internal tensors
+\(f,g\).  Reattach the virtual leaf layers \(L_{x,\widehat\pi}\) and
+\(L_{y,\Idx}\) to obtain full \((n+1)\)-variate product-tree oracles in the
+sense of Proposition~\ref{prop:blaze-permutation-replay}.  The split residuals
+are exactly the full-tree parent-product identities for those reattached
+oracles, and the root equality is unchanged.  Therefore any adversary that
+passes the split-tree tests with false permutation data gives an adversary
+against Blaze Proposition~5.4 with the same \((\alpha,\beta,r)\), up to the
+push-forward convention.  Since \(N=2^n\), the exceptional probability
+\((N+1)/|\F|\) and the bad-projection fraction \(10n/|\F|\) are exactly Blaze's
+\((2^m+1)/|\F|\) and \(10m/|\F|\) with \(m=n\).
 \end{proof}
 
-\paragraph{Native \(\RMLE[\PRAA]\) MLIOP.}
-\begin{lemma}[Native packed-RAA RMLE MLIOP; cf. Blaze Lemma~5.1 and Proposition~5.5]
-\label{lem:native-praa-mliop}
+\paragraph{Native \(\RMLE[\PRAA]\) MLPCS.}
+
+\begin{lemma}[Blaze native PRAA RMLE MLIOP replay in MLPCS notation; cf. Lemma~5.1 and Proposition~5.5]
+\label{lem:blaze-native-praa-replay}
+Fix permutations \(\pi_1,\pi_2:\B^n\to\B^n\), the repetition map
+\(F_{\mathrm{rep}}\), the accumulation operator \(\Acc\), and the packed RAA
+map
+\[
+  \PRAA=\Acc\circ M_{\pi_2}\circ\Acc\circ M_{\pi_1}\circ F_{\mathrm{rep}}.
+\]
+Let the public \(\RMLE[\PRAA]\) claim be
+\[
+  z\in\F^k,\qquad v\in\F,
+\]
+and let the implicit input oracle be an alleged codeword
+\[
+  y\in\F^{\B^n}.
+\]
+Blaze's native MLIOP, written here in our MLPCS notation, proves the exact
+relation
+\[
+  \exists m\in\F^{\B^k}:
+  \qquad
+  y=\PRAA(m)
+  \quad\text{and}\quad
+  \MLE(m)(z)=v.
+\]
+It has perfect completeness.  If a deterministic cheating prover makes the
+verifier accept while the displayed relation is false, then the verifier's
+acceptance probability is at most
+\[
+  \frac{N+13n+7}{|\F|},
+  \qquad N=2^n.
+\]
+This is Blaze Proposition~5.5 with Blaze's codeword length \(n_{\mathrm{Blaze}}\)
+written here as \(N=2^n\).
+\end{lemma}
+
+\begin{proof}
+This is the proof spine of Blaze Section~5.3, replayed before translating to
+our handle presentation.
+
+The prover's intended intermediate tensors are
+\[
+  u_1=F_{\mathrm{rep}}m,\qquad
+  u_2=M_{\pi_1}u_1,\qquad
+  u_3=\Acc(u_2),\qquad
+  u_4=M_{\pi_2}u_3,\qquad
+  u_5=\Acc(u_4).
+\]
+The verifier has MLE access to the implicit input \(y\), so Blaze writes
+\(u_5\equiv y\).  The prover sends oracle access to
+\[
+  m,\quad u_2,\quad u_3,\quad u_4,
+\]
+and the verifier emulates access to \(u_1\) from \(m\) by the repetition view.
+The verifier first checks the direct evaluation claim
+\[
+  \MLE(m)(z)=v.
+\]
+
+Next the verifier samples \(\alpha,\beta\leftarrow\F\).  For the two
+permutation claims
+\[
+  u_2=M_{\pi_1}u_1,
+  \qquad
+  u_4=M_{\pi_2}u_3,
+\]
+the prover supplies product-tree witnesses
+\[
+  (f_1,g_1)
+  \qquad\text{and}\qquad
+  (f_2,g_2)
+\]
+as in Proposition~\ref{prop:blaze-permutation-replay}.  The verifier checks the
+two root equalities.  It then samples \(r\leftarrow\F^n\) and checks the four
+leaf equations for the two permutation products at \(r\).  Finally, the
+verifier runs one scalar-batched sumcheck for six Boolean-sum claims:
+\[
+  u_3=\Acc(u_2),\qquad
+  u_5=\Acc(u_4),
+\]
+and the four product-tree recurrence sums for
+\[
+  f_1,\quad g_1,\quad f_2,\quad g_2.
+\]
+This is exactly Blaze's Step~7: the two accumulator sums come from
+Propositions~5.2 and~5.3, and the four product-tree sums come from
+Proposition~5.4.  The scalar batching is the standard Remark~2.3 batch.
+
+Completeness is direct.  If the witness \(m\) is honest and \(y=\PRAA(m)\),
+then all five stage equations above hold.  Proposition~\ref{prop:blaze-permutation-replay}
+provides product-tree witnesses for the two permutation stages, the two
+accumulator identities hold for every \(r\), and the six sumcheck targets are
+true.  Therefore every verifier check accepts.
+
+For soundness, fix a deterministic cheating prover and name the oracles it
+sends
+\[
+  m,\quad u_2,\quad u_3,\quad u_4,
+\]
+with \(u_1=F_{\mathrm{rep}}m\) and \(u_5=y\).  If \(\MLE(m)(z)\ne v\), the
+verifier rejects immediately in the direct evaluation check.  Otherwise assume
+\(\MLE(m)(z)=v\) and suppose \(u_5\ne\PRAA(m)\).  Then at least one of the four
+stage equations is false:
+\[
+  u_2\ne M_{\pi_1}u_1,\qquad
+  u_3\ne\Acc(u_2),\qquad
+  u_4\ne M_{\pi_2}u_3,\qquad
+  u_5\ne\Acc(u_4).
+\]
+
+If \(u_2\ne M_{\pi_1}u_1\), Proposition~\ref{prop:blaze-permutation-replay}
+says that, except with probability \((N+1)/|\F|\) over
+\((\alpha,\beta)\), the prover's chosen \(f_1,g_1\) fail at least one of the
+root, leaf, or product-tree-sum tests for all but a \(10n/|\F|\)-fraction of
+projection points \(r\).  A root or leaf failure is caught directly.  If the
+failure is one of the two product-tree sums, the batched sumcheck rejects
+except for the scalar-batching and sumcheck error bounded in Blaze by
+\((3n+6)/|\F|\).  This gives the Case~1 rejection bound in Blaze
+Proposition~5.5.
+
+If \(u_3\ne\Acc(u_2)\), Proposition~\ref{prop:native-accumulator-reduction}
+says that, except with probability \(n/|\F|\) over \(r\), the corresponding
+accumulator Boolean-sum claim is false.  The batched sumcheck then rejects
+except with the same \((3n+6)/|\F|\) batching/sumcheck error.  This is Blaze's
+Case~2.
+
+The cases \(u_4\ne M_{\pi_2}u_3\) and \(u_5\ne\Acc(u_4)\) are identical to the
+first two cases, using the second permutation pair \((f_2,g_2)\) and the
+second accumulator claim.  The soundness error is the maximum of these case
+bounds, not their sum, because at least one fixed case applies to any fixed bad
+transcript.  In the notation of this paper, this is bounded by
+\((N+13n+7)/|\F|\).  Therefore, except with that probability, acceptance
+implies all four stage equations and \(\MLE(m)(z)=v\), hence
+\[
+  y=u_5=\PRAA(m)
+  \qquad\text{and}\qquad
+  \MLE(m)(z)=v,
+\]
+contradicting falsity of the \(\RMLE[\PRAA]\) relation.
+\end{proof}
+
+\begin{lemma}[Native packed-RAA RMLE MLPCS; cf. Blaze Lemma~5.1 and Proposition~5.5]
+\label{lem:native-praa-mlpcs}
 Let
 \[
   y\in\F^{\B^n},\qquad z\in\F^k,\qquad v\in\F
 \]
-be a base folded \(\RMLE[\PRAA]\) claim.  In the
-\(\mathcal F_{\mathrm{MLIOP}}\)-hybrid model, the fixed protocol
-Figure~\ref{fig:native-blaze-fmliop-hybrid}, restricted to Lines O8 onward
-after the folded word \(R_\star\) has been formed, is a native MLIOP for the
-exact relation
+be a base folded \(\RMLE[\PRAA]\) claim.  In the native
+\(\mathcal F_{\mathrm{MLPCS}}\)-hybrid model, the verifier is given the input
+MLE handle \(\widehat O_y\).  In Figure~\ref{fig:native-blaze-fmlpcs-hybrid},
+that handle is obtained from \(R_\star\) through
+\(\mathcal F_{\mathrm{HMLPCS}}^\delta\); after that bridge, the RAA checks are
+a native MLPCS for the exact relation
 \[
   y=\PRAA(m)
   \qquad\text{and}\qquad
   \MLE(m)(z)=v.
 \]
 Completeness is perfect.  Soundness is the native algebraic soundness of Blaze
-Proposition~5.5: if the represented MLIOP tensors do not satisfy the displayed
+Proposition~5.5: if the represented MLPCS tensors do not satisfy the displayed
 relation, the verifier rejects except with probability at most
 \[
   \frac{N+13n+7}{|\F|},
   \qquad N=2^n.
 \]
-This is an exact native-MLIOP statement about represented tensors and requested
+This is an exact native-MLPCS statement about represented tensors and requested
 MLE evaluations.  It is not yet a proximity statement about a literal backend
 encoded string.
 \end{lemma}
 
 \begin{proof}
+The previous lemma is the Blaze proof in Blaze's native MLIOP language, already
+renamed into our MLPCS interface.  This paragraph translates that proof to the
+fixed protocol box
+Figure~\ref{fig:native-blaze-fmlpcs-hybrid}.
+
 The prover's represented input tensor is \(u_0\in\F^{\B^k}\).  The verifier
 gets \(u_1\) as the derived repetition view \(F_{\mathrm{rep}}u_0\), receives
 handles for \(u_2,u_3,u_4\), and treats the input folded word as
@@ -1724,10 +2513,20 @@ using the two calls to \(\PermuteCommit\) and \(\PermuteReduce\).  The six
 Boolean-sum claims returned by these four reductions are batched by
 \(\RAASixSumcheck\).  If any one of those Boolean-sum identities is false, the
 scalar-power batch hides it only with the usual low-degree error, and the
-sumcheck endpoint values are then checked through \(\mathcal F_{\mathrm{MLIOP}}\).
+sumcheck endpoint values are then checked through the MLE-evaluation
+functionality that created each handle.
 
-Therefore, except for the native soundness error bounded in Blaze
-Proposition~5.5, acceptance implies
+The only presentation change relative to Blaze's literal proof is the
+split-tree permutation representation.  Proposition~\ref{prop:native-permutation-reduction}
+proved that this is a translation of Blaze Proposition~5.4: virtual leaves can
+be reattached to obtain the full \((n+1)\)-variate product-tree oracles used by
+Blaze, and every split residual is exactly one full-tree recurrence equation.
+Thus the four-case soundness proof from
+Lemma~\ref{lem:blaze-native-praa-replay} applies to the request sets generated
+by this protocol box.
+
+Therefore, except for the native soundness error bounded in
+Lemma~\ref{lem:blaze-native-praa-replay}, acceptance implies
 \[
   u_1=F_{\mathrm{rep}}u_0,\quad
   u_2=M_{\pi_1}u_1,\quad
@@ -1739,10 +2538,154 @@ Since \(u_5=y\), this is exactly \(y=\PRAA(u_0)\), and the direct endpoint
 request gives \(\MLE(u_0)(z)=v\).
 \end{proof}
 
-\paragraph{Compiler from native MLIOP to backend RMLE.}
-\begin{lemma}[MLIOP-to-RMLE IOPP compiler in handle form; cf. Blaze Lemma~4.2 and Proposition~4.4]
-\label{lem:mliop-to-rmle-compiler-handle}
-Let \(\Pi\) be a native MLIOP whose verifier makes MLE evaluation requests
+\paragraph{Compiler from native MLPCS to backend RMLE.}
+
+\begin{theorem}[Blaze backend RMLE proof input; cf. Theorem~4.1]
+\label{thm:blaze-backend-rmle-input}
+Let \(\lambda_{\mathrm{sec}}\) be the security parameter.  Let \(k\) be a power
+of two, and let
+\[
+  \mathrm{RS}=\mathrm{RS}[\F,k,n]
+\]
+be a Reed--Solomon code with message length \(k\), blocklength \(n=O(k)\), and
+relative distance \(d\in(0,1)\), over a binary extension field or smooth field
+\(\F\) with \(|\F|>2^{\lambda_{\mathrm{sec}}}\).  For proximity parameter
+\(\delta<d/3\), Blaze uses a backend IOPP for \(\RMLE[\mathrm{RS}]\) with
+\[
+  q_{\mathrm{inp}}=O(\lambda_{\mathrm{sec}}/\delta),
+  \qquad
+  q_{\mathrm{pf}}=O(\lambda_{\mathrm{sec}}\log k/\delta),
+  \qquad
+  \mathrm{rounds}=O(\log k),
+\]
+oracle proof communication \(O(n)\), non-oracle proof communication
+\(O(\log k)\), soundness
+\[
+  2^{-\lambda_{\mathrm{sec}}}+O(\log n/|\F|),
+\]
+prover time \(O(n)\) given the encoded implicit input, and verifier time
+\[
+  O(\lambda_{\mathrm{sec}}\log k/\delta).
+\]
+\end{theorem}
+
+\begin{proof}[Proof input]
+This is Blaze Theorem~4.1, quoted from BaseFold and FRI-Binius.  Blaze uses it
+as the backend \(\RMLE[C]\)-IOPP inside its MLIOP-to-IOPP compiler, which is
+our MLPCS compiler after the terminology rename.  The theorem
+does not prove anything about RAA by itself; it supplies the backend proximity
+and evaluation check for a systematic encoded multilinear oracle.
+\end{proof}
+
+\begin{lemma}[Blaze MLIOP-to-IOPP compiler replay in MLPCS notation; cf. Lemma~4.2 and Proposition~4.4]
+\label{lem:blaze-mlpcs-compiler-replay}
+Let \(\Pi=(I,P,V)\) be an MLPCS for a relation \(R\).  Assume that each
+multilinear oracle used by \(\Pi\) has at most \(\ell\) variables, and let
+\[
+  C:\F^{\B^\ell}\to\F^D
+\]
+be a systematic linear code of relative distance \(d\).  Suppose there is a
+backend IOPP for the relation
+\[
+  \RMLE[C]:
+  \qquad
+  y\approx C(m)
+  \quad\text{and}\quad
+  \MLE(m)(z)=v.
+\]
+Then Blaze's compiler replaces the native MLPCS oracles by encoded oracle
+strings and obtains an IOPP for \(R\).  Its soundness is the native MLPCS
+soundness plus the backend \(\RMLE[C]\) soundness and the evaluation-batching
+soundness error.
+\end{lemma}
+
+\begin{proof}
+This is the proof spine of Blaze Proposition~4.4, which proves the compiler
+used in Lemma~4.2.  We restate it before translating to our handle API.
+
+First describe the compiled protocol.  The compiled prover and verifier
+simulate the MLPCS transcript.  Whenever the MLPCS prover would send a
+multilinear oracle \(m\in\F^{\B^\ell}\), the compiled prover instead sends the
+encoded string
+\[
+  C(m)\in\F^D.
+\]
+If the relation has a long implicit input \(y\in\F^{\B^\ell}\), Blaze uses
+that input as the systematic part of \(C(y)\): the prover sends only the
+non-systematic part \(\widetilde y\), and together the two strings give oracle
+access to
+\[
+  C(y)=y\Vert\widetilde y.
+\]
+For every MLPCS evaluation query
+\[
+  \MLE(m)(z)=v,
+\]
+the compiled protocol runs a backend \(\RMLE[C]\)-IOPP on the encoded oracle
+for \(m\).  Before the backend calls, Blaze may batch all evaluation claims for
+one oracle, and Remark~4.3 explains how to batch across oracles by using a
+virtual multilinear polynomial.  The compiled verifier accepts only if the
+simulated MLPCS verifier accepts and all backend \(\RMLE[C]\) checks accept.
+
+Completeness is immediate: an honest prover sends honest encodings, the batched
+evaluation claims are true, and the backend \(\RMLE[C]\)-IOPP accepts.
+
+For soundness, fix a deterministic compiled prover.  Fix the public coins of
+the simulated MLPCS transcript.  This fixes the literal encoded strings sent by
+the compiled prover and the list of evaluation claims
+\[
+  (j,z,v),
+\]
+where \(j\) names the encoded string being queried.
+
+Construct an unbounded native MLPCS prover \(\widetilde P\) from this compiled
+prover as follows.  For each literal encoded string \(\pi_j\), check whether
+\(\pi_j\) is within the chosen proximity parameter \(\delta<d/3\) of the code
+\(C\).  If \(\pi_j\) is \(\delta\)-far from every codeword, \(\widetilde P\)
+aborts.  Otherwise, since \(\delta<d/3\), the nearby codeword is unique; decode
+it to a message tensor
+\[
+  m_j^\dagger\in\F^{\B^\ell}
+\]
+and give \(m_j^\dagger\) as the corresponding native MLPCS oracle.  For the
+implicit input, Blaze applies the same step to
+\[
+  \pi_y=(y\Vert\widetilde y).
+\]
+If \(\pi_y\) decodes to \(y^\dagger\), then because \(C\) is systematic of rate
+\(c\), distance \(\Delta(\pi_y,C(y^\dagger))\le\delta\) implies that the
+literal input part \(y\) is at distance at most
+\[
+  \delta'=\delta/c
+\]
+from \(y^\dagger\).  Thus if the original input \(y\) is \(\delta'\)-far from
+every valid implicit input for \(R\), then \((i,x,y^\dagger)\notin R\).
+
+Now split into the two Blaze cases.  If some literal encoded string \(\pi_j\)
+is \(\delta\)-far from the code, then the backend \(\RMLE[C]\)-IOPP rejects
+except with its proximity soundness error.  If all strings are \(\delta\)-close
+to the code, but some accepted evaluation claim
+\[
+  (j,z,v)
+\]
+is false for the decoded message \(m_j^\dagger\), meaning
+\[
+  \MLE(m_j^\dagger)(z)\ne v,
+\]
+then the batching protocol plus the backend \(\RMLE[C]\)-IOPP rejects except
+with the batching error and backend soundness error.  If neither bad case
+occurs, then every compiled evaluation response is consistent with the decoded
+native tensors, so the compiled prover induces a genuine native MLPCS prover
+\(\widetilde P\) for the decoded transcript.  Since the decoded implicit input
+is not in the relation, native MLPCS soundness bounds \(\widetilde P\)'s
+success.  Adding the backend and batching errors gives Blaze Proposition~4.4,
+and the stated complexity parameters with the Reed--Solomon backend give
+Blaze Lemma~4.2.
+\end{proof}
+
+\begin{lemma}[MLPCS-to-RMLE IOPP compiler in handle form; cf. Blaze Lemma~4.2 and Proposition~4.4]
+\label{lem:mlpcs-to-rmle-compiler-handle}
+Let \(\Pi\) be a native MLPCS whose verifier makes MLE evaluation requests
 \[
   \MLE(h)(r)=w
 \]
@@ -1763,15 +2706,38 @@ and each native evaluation request by the backend claim
   \MLE(h)(r)=w
 \]
 gives an IOPP for the same relation as \(\Pi\), with soundness equal to the
-native MLIOP soundness plus the backend RMLE and batching errors.
+native MLPCS soundness plus the backend RMLE and batching errors.
 \end{lemma}
 
 \begin{proof}
+Lemma~\ref{lem:blaze-mlpcs-compiler-replay} is the Blaze compiler proof in
+Blaze's notation.  This paragraph is the handle-level dictionary used by our
+protocol boxes.
+
+A native handle
+\[
+  \widehat O_h:\F^d\to\F
+\]
+means exact MLE access to a native tensor \(h\in\F^{\B^d}\).  In the compiled
+semantic view, that hatted handle is authenticated by a literal backend string
+\[
+  y_h\in\F^D.
+\]
+The backend check for a request \((\widehat O_h,r,w)\) is the expanded
+\(\RMLE[C_{\mathrm{backend}}]\) statement
+\[
+  y_h\approx C_{\mathrm{backend}}(h)
+  \qquad\text{and}\qquad
+  \MLE(h)(r)=w.
+\]
+Thus the hatted handle remains the API-level object, while \(y_h\) is the
+literal oracle string that the compiler/extractor reasons about.
+
 Completeness follows by encoding every honest native tensor \(h\) as
 \(C_{\mathrm{backend}}(h)\) and answering the same MLE values as the native
-MLIOP.  For soundness, fix a deterministic compiled prover and expand every
-authentication handle into its literal backend string \(y_h\).  There are two
-cases.
+MLPCS.  For soundness, fix a deterministic compiled prover and expand every
+authentication handle into its literal backend string \(y_h\).  The two cases
+are exactly the two Blaze cases.
 
 First, if some \(y_h\) is far from the backend code, the corresponding backend
 \(\RMLE[C_{\mathrm{backend}}]\)-IOPP rejects except with its proximity
@@ -1783,15 +2749,121 @@ unbounded extractor decodes each nearby codeword to an effective tensor
 The compiled verifier's accepted backend openings then imply that every native
 request \(\MLE(h)(r)=w\) is true for the effective tensor
 \(h^\dagger\), except with backend and batching error.  The extracted effective
-tensors therefore define a native MLIOP transcript for \(\Pi\).  If the
-underlying relation is false for those tensors, native MLIOP soundness rejects.
-This is the literal/effective split in Blaze Proposition~4.4.
+tensors therefore define a native MLPCS transcript for \(\Pi\).  If the
+underlying relation is false for those tensors, native MLPCS soundness rejects.
+
+For the folded endpoint \(u_5\), our protocol uses
+\(\mathcal F_{\mathrm{HMLPCS}}^\delta\) to name explicitly what Blaze obtains
+from a systematic codeword \(C(y)=y\Vert\widetilde y\): the literal coordinate
+string behind \(R_\star\) is the systematic/message part, and the effective
+tensor used by the native MLPCS is the decoded nearby message.  This is a
+presentation/API divergence from Blaze, but it is the same literal/effective
+split from Proposition~4.4.
 \end{proof}
 
-\begin{proposition}[Batched backend RMLE requests; cf. Blaze Remark~4.3 and Proposition~4.5]
+\begin{theorem}[Blaze evaluation-batching proof input; cf. Theorem~2.4]
+\label{thm:blaze-evaluation-batching-input}
+Let \(f:\B^\ell\to\F\), and let \(\widehat f:\F^\ell\to\F\) be its
+multilinear extension.  For any \(Q>1\), there is an interactive protocol that
+reduces \(Q\) claimed evaluations of \(\widehat f\) to one claimed evaluation
+of \(\widehat f\).  Its soundness error is
+\[
+  \frac{2^{\ell+3}\log_2(Q)}{|\F|},
+\]
+its prover time is \(O(Q2^\ell)\), its verifier time is \(O(Q\ell)\), its
+communication is \(O(\ell+\log Q)\), and it uses
+\(\ell+\log_2(Q)+O(1)\) rounds.
+\end{theorem}
+
+\begin{proof}[Proof input]
+This is Blaze Theorem~2.4, quoted from CBBZ.  Blaze uses it first to batch
+multiple evaluations of one multilinear oracle, and then invokes
+Remark~4.3 to batch across different multilinear oracles by forming a virtual
+multilinear polynomial.  The theorem is the source of the
+\(2^{\ell+3}\log_2(Q)/|\F|\) term in Proposition~4.5.
+\end{proof}
+
+\begin{proposition}[Blaze batched compiler parameters replay; cf. Remark~4.3 and Proposition~4.5]
+\label{prop:blaze-batched-compiler-replay}
+Let \(\Pi=(I,P,V)\) be an MLPCS for a relation \(R\).  Suppose the largest
+multilinear oracle used by \(\Pi\) has \(\ell\) variables, and let
+\[
+  Q=q_{\mathrm{inp}}+q_{\mathrm{idx}}+q_{\mathrm{pf}}
+\]
+be the total number of MLE evaluation requests made to input, index, and prover
+oracles in the native MLPCS.  Let \(n_{\mathrm{oracle}}\) be the number of
+prover oracles sent by the MLPCS prover, and assume, as in Blaze
+Proposition~4.5, that there is one index oracle.  Let
+\[
+  C:\F^{\B^\ell}\to\F^{N_C}
+\]
+be a systematic code, and let \(\Sigma_C=(P_{\mathrm{mle}},V_{\mathrm{mle}})\)
+be a backend IOPP for \(\RMLE[C]\).
+
+Then the Blaze compiler from Lemma~\ref{lem:blaze-mlpcs-compiler-replay},
+combined with the cross-oracle batching optimization from Remark~4.3, produces
+an IOPP for \(R\).  In Blaze's parameter accounting, this compiled protocol has
+soundness
+\[
+  \epsilon+\epsilon'
+  +
+  \frac{2^{\ell+3}\log_2(Q)}{|\F|},
+\]
+where \(\epsilon\) is the native MLPCS soundness and \(\epsilon'\) is the
+backend \(\RMLE[C]\)-IOPP soundness.  Its round count is
+\[
+  \mathrm{rnd}+\mathrm{rnd}'+\ell+\log_2(Q)+O(1),
+\]
+its oracle proof communication is \(n_{\mathrm{oracle}}N_C+
+cc'_{\mathrm{oracle}}\), and its non-oracle proof communication is
+\[
+  cc+cc'+O(\ell+\log Q).
+\]
+The backend proof-query complexity is
+\[
+  n_{\mathrm{oracle}}\cdot q'_{\mathrm{inp}}+q'_{\mathrm{pf}}.
+\]
+\end{proposition}
+
+\begin{proof}
+This is the content of Blaze Proposition~4.5, with the backend blocklength
+renamed from \(n\) to \(N_C\) to avoid colliding with our tensor dimension.
+The proof is the promised combination of Proposition~4.4 and Remark~4.3.
+
+Proposition~4.4 already gives the soundness reduction: a cheating compiled
+prover either sends a backend string far from \(C\), answers some MLE request
+incorrectly for the unique decoded nearby tensor, or induces a cheating native
+MLPCS prover.  The far-string and decoded-native cases are charged to
+\(\epsilon'\) and \(\epsilon\).  The only new term in Proposition~4.5 is the
+probability that the batching protocol hides at least one false evaluation
+claim when the verifier compresses \(Q\) claims to one claim.  Blaze imports
+the CBBZ/HyperPlonk multilinear-evaluation batching theorem for that step,
+which contributes
+\[
+  \frac{2^{\ell+3}\log_2(Q)}{|\F|}.
+\]
+
+Remark~4.3 is the cross-oracle part.  Instead of running one backend
+\(\RMLE[C]\)-IOPP for each multilinear oracle, the verifier forms one virtual
+multilinear polynomial from all requested polynomials.  A query to the encoding
+of that virtual polynomial is answered by querying the corresponding locations
+of the original encoded oracle strings, one per original polynomial.  This is
+why the backend proof-query count has the form
+\[
+  n_{\mathrm{oracle}}\cdot q'_{\mathrm{inp}}+q'_{\mathrm{pf}}:
+\]
+input queries of the backend virtual word fan out across original encoded
+oracles, while proof-oracle queries of the backend IOPP are shared by the one
+batched backend execution.  The additional \(\ell+\log_2(Q)+O(1)\) rounds and
+\(O(\ell+\log Q)\) field elements are exactly the evaluation-batching
+sumcheck and its terminal reduction to one MLE claim.
+\end{proof}
+
+\begin{proposition}[Batched backend RMLE requests in handle form; cf. Blaze Remark~4.3 and Proposition~4.5]
 \label{prop:batched-backend-rmle}
-The per-oracle backend checks in Lemma~\ref{lem:mliop-to-rmle-compiler-handle}
-can be batched: the verifier reduces all native requests
+The per-oracle backend checks in Lemma~\ref{lem:mlpcs-to-rmle-compiler-handle}
+can be batched within a chosen group: the verifier reduces the requests in that
+group
 \[
   \MLE(h_j)(r_j)=w_j
 \]
@@ -1801,27 +2873,138 @@ strings \(y_{h_j}\).  The batching changes the proximity parameter and adds the
 batching soundness term stated in Blaze Proposition~4.5, but it does not change
 the semantic split: far backend strings are rejected, and close backend strings
 decode to effective native tensors.
+
+In the row-folded RAA instantiation we use two groups.  This is an intentional
+divergence from a single all-oracles batch: the ordinary prover-originated
+MLPCS tensors are batched together, while the folded endpoint tensor \(u_5\),
+whose systematic coordinates are tied to the row-fold handle \(R_\star\), is
+checked through a separate holographic backend claim.  This separation keeps
+the ordinary batch at its ordinary backend proximity parameter instead of
+forcing it to use the smaller parameter needed to bind \(u_5\) to the literal
+string behind \(R_\star\).
 \end{proposition}
 
 \begin{proof}
-The batching protocol is linear in the claimed evaluations and in the virtual
-oracle construction.  Thus an honest batch is complete.  If a batch accepts
-while some constituent evaluation is false for the effective tensors, the
-batching polynomial in the verifier challenge has a nonzero error coefficient
-and vanishes only with the standard batching probability.  The resulting single
-virtual claim is then checked by the same backend
-\(\RMLE[C_{\mathrm{backend}}]\)-IOPP as in
-Lemma~\ref{lem:mliop-to-rmle-compiler-handle}.
+Proposition~\ref{prop:blaze-batched-compiler-replay} is the literal Blaze
+parameter statement.  The only dictionary needed for our protocol box is the
+meaning of the virtual polynomial from Remark~4.3.
+
+For a chosen group of handle-level requests
+\[
+  E=\bigl((\widehat O_{h_j},r_j,w_j)\bigr)_{j=0}^{q-1},
+\]
+Figure~\ref{fig:protocol-merge-native-evals} runs exactly the
+CBBZ/HyperPlonk batching step used by Blaze.  It samples the list-address
+challenge \(t\), defines the public selector \(\mathsf{Eq}_E\), runs one
+sumcheck on \(G_t\mathsf{Eq}_E\), and obtains a single terminal claim
+\[
+  \widehat O_{\mathrm{batch}}(\eta)=w.
+\]
+The handle
+\[
+  \widehat O_{\mathrm{batch}}
+  =
+  \mathsf{RowFold.Commit}
+  \bigl((\widehat O_{h_j},\lambda_j)_{j=0}^{q-1}\bigr)
+\]
+is our explicit API name for Blaze's ``virtual multilinear polynomial.''  A
+backend query to this virtual object is implemented by same-address backend
+queries to the original authenticated strings \(y_{h_j}\), combined with the
+public coefficients \(\lambda_j\).  Thus the proof is still the Blaze
+Proposition~4.5 proof: completeness follows from linearity, and soundness
+fails only if the batching reduction hides a false constituent evaluation or
+the backend \(\RMLE[C_{\mathrm{backend}}]\)-IOPP accepts a false/far encoded
+claim.
+
+In the row-folded RAA protocol we instantiate this proposition twice in spirit
+but not symmetrically.  The ordinary requests are merged by
+\(\mathsf{MergeNativeEvals}\).  The \(\widehat O_{u_5}\) requests are left out
+of that group and are checked directly through
+\(\mathcal F_{\mathrm{HMLPCS}}^\delta.\mathsf{Eval}\), because those requests
+must bind the decoded effective tensor to the literal coordinate handle
+\(R_\star\).  This is the intentional grouping divergence stated before
+Figure~\ref{fig:protocol-merge-native-evals}; it weakens no Blaze proof step,
+because running fewer requests inside a batch only removes batching
+opportunities and leaves the same far/close backend cases.
 \end{proof}
 
 \paragraph{Composed theorem.}
+
+\begin{theorem}[Blaze final composition replay; cf. Theorem~7.1]
+\label{thm:blaze-final-composition-replay}
+Let \(\lambda_{\mathrm{sec}}\) be the security parameter, and let \(\PRAA\) be
+a packed RAA code over \(\F\) with message length \(K\) and block length \(N\),
+where \(|\F|>2^{\lambda_{\mathrm{sec}}}\).  For every interleaving parameter
+\(t=t(K)\), Blaze obtains an IOPP for
+\[
+  \RMLE[\PRAA^t],
+\]
+where the interleaved alphabet is \(\F^t\).  For proximity parameter \(\delta\),
+the parameter table in Blaze Theorem~7.1 gives, in particular,
+\[
+  q_{\mathrm{inp}}=O(\lambda_{\mathrm{sec}}/\delta),
+  \qquad
+  q_{\mathrm{pf}}=O(\lambda_{\mathrm{sec}}\log N/\delta),
+  \qquad
+  \mathrm{rounds}=O(\log N),
+\]
+oracle proof communication \(O(N)\), non-oracle proof communication
+\(2t+O(\log N)\), prover time \(O(tN+N\log N)\), and verifier time
+\[
+  O((t+\log N)\lambda_{\mathrm{sec}}/\delta).
+\]
+With \(t=\Theta(\log N)\), the stated prover time becomes \(O(tN)\) after the
+linear-time interleaved RAA encoding optimization used by Blaze.
+\end{theorem}
+
+\begin{proof}
+This is the three-line composition proof at the end of Blaze Section~7, with
+the block length renamed from \(n\) to \(N\).
+
+First, Blaze Lemma~5.1 gives what Blaze calls a native MLIOP for
+\(\RMLE[\PRAA]\).  In our terminology this is the native MLPCS layer.  This
+native protocol has a constant number of prover oracles and evaluation queries,
+prover time \(O(N)\), and verifier time \(O(\log N)\).  Its content is the RAA
+stage chain
+\[
+  u_1=F_{\mathrm{rep}}m,\quad
+  u_2=M_{\pi_1}u_1,\quad
+  u_3=\Acc(u_2),\quad
+  u_4=M_{\pi_2}u_3,\quad
+  u_5=\Acc(u_4)=y,
+\]
+together with the evaluation claim \(\MLE(m)(z)=v\).
+
+Second, Blaze Lemma~4.2 compiles that native MLIOP, equivalently our native
+MLPCS layer, into an IOPP for \(\RMLE[\PRAA]\) by authenticating each native
+multilinear oracle with a
+systematic backend code and replacing every native evaluation request by a
+backend \(\RMLE[C]\) check.  This gives the base IOPP parameters quoted by
+Blaze: \(O(\lambda_{\mathrm{sec}}/\delta)\) input queries,
+\(O(\lambda_{\mathrm{sec}}\log N/\delta)\) proof queries, prover time
+\(O(N\log N)\), and verifier time
+\(O(\lambda_{\mathrm{sec}}\log N/\delta)\).  Blaze pads the smaller
+message-size oracles to length \(N\) for ease of encoding, while noting that an
+implementation can use different backend encodings for different oracle sizes.
+
+Third, Blaze Lemma~6.1 bootstraps the base IOPP for \(\RMLE[\PRAA]\) to the
+interleaved relation \(\RMLE[\PRAA^t]\).  The top-level prover sends the row
+evaluation vector \(u\), the verifier checks \(\MLE(u)(z_{\mathrm{slice}})=v\),
+samples \(\rho\), defines the folded word \(c_\star=\rho^\top c\) and folded
+value \(v_\star=\langle\rho,u\rangle\), and invokes the base
+\(\RMLE[\PRAA]\)-IOPP on \((c_\star,z_{\mathrm{in}},v_\star)\).  Each input
+query made by the base IOPP becomes the corresponding query to the interleaved
+input oracle.  Combining these three ingredients gives Blaze Theorem~7.1.
+\end{proof}
+
 \begin{theorem}[Interleaved packed-RAA RMLE IOPP in handle form; cf. Blaze Theorem~7.1]
 \label{thm:interleaved-praa-rmle-iopp-handle}
 Instantiate Lemma~\ref{lem:blaze-interleaving-handle} with \(C=\PRAA\).  Then
 instantiate the base \(\RMLE[\PRAA]\) protocol by
-Lemma~\ref{lem:native-praa-mliop} and compile its native evaluation requests by
-Lemma~\ref{lem:mliop-to-rmle-compiler-handle}, using the batching of
-Proposition~\ref{prop:batched-backend-rmle}.  The result is an
+Lemma~\ref{lem:native-praa-mlpcs} and compile its native evaluation requests by
+Lemma~\ref{lem:mlpcs-to-rmle-compiler-handle}, using the grouped batching of
+Proposition~\ref{prop:batched-backend-rmle}: one batch for the ordinary MLPCS
+requests and one separate holographic backend check for \(u_5\).  The result is an
 \(\RMLE[\PRAA^t]\)-IOPP for the fixed handle-level protocol above:
 the literal matrix behind \(R_c\) is checked for proximity to an interleaved
 packed-RAA codeword \(\PRAA^t(m)\), and the effective message satisfies
@@ -1831,382 +3014,926 @@ packed-RAA codeword \(\PRAA^t(m)\), and the effective message satisfies
 \end{theorem}
 
 \begin{proof}
+Theorem~\ref{thm:blaze-final-composition-replay} is the Blaze theorem in the
+paper's own proof order.  We now translate the three layers to the fixed
+handle-level protocol boxes above.
+
 Lemma~\ref{lem:blaze-interleaving-handle} reduces a bad top-level interleaved
 claim to a bad folded base claim, except for the row-fold error from
-Lemma~\ref{lem:row-fold-proximity-gap}.  Lemma~\ref{lem:native-praa-mliop}
-proves the folded base claim in the native MLIOP model by enforcing the RAA
+Lemma~\ref{lem:row-fold-proximity-gap}.  Lemma~\ref{lem:native-praa-mlpcs}
+proves the folded base claim in the native MLPCS model by enforcing the RAA
 stage equations and the terminal value \(\MLE(m_\star)(z_{\mathrm{in}})=v_\star\).
-Lemma~\ref{lem:mliop-to-rmle-compiler-handle} and
+Lemma~\ref{lem:mlpcs-to-rmle-compiler-handle} and
 Proposition~\ref{prop:batched-backend-rmle} replace the ideal native MLE
-handles by backend encoded strings and backend \(\RMLE[C_{\mathrm{backend}}]\)
-checks.  Adding the stated soundness errors gives the theorem.  Appendix~A of
+handles by backend encoded strings and grouped backend
+\(\RMLE[C_{\mathrm{backend}}]\) checks.  Adding the stated soundness errors gives
+the theorem.  Appendix~A of
 Blaze supplies the round-by-round soundness form needed when this IOPP is later
 compiled with Merkle commitments and Fiat--Shamir.
 \end{proof}
 
-\subsection{Rewrite Scaffold: Blaze Proof Replay}
+\paragraph{Round-by-round soundness import.}
 
-This subsection is an editorial scaffold for the rewrite, not finished proof
-prose.  It lives at the end so the fixed protocol presentation above remains
-undisturbed while we rebuild the proof narrative.  Delete this scaffold once
-the finished proof has absorbed its checklist and lemma-by-lemma template.
+\begin{proposition}[Blaze round-by-round soundness replay; cf. Appendix~A]
+\label{prop:blaze-rbr-replay}
+The IOPP for \(\RMLE[\PRAA^t]\) obtained in
+Theorem~\ref{thm:blaze-final-composition-replay} is round-by-round sound in
+the sense used by Blaze Appendix~A, assuming the underlying evaluation-batching
+protocol, the backend \(\RMLE[C]\)-IOPP, and the native MLPCS building blocks
+have the corresponding round-by-round soundness guarantees.
+\end{proposition}
 
-\paragraph{Objective.}
-Rewrite the Blaze part of the paper so that its proof spine mirrors the Blaze
-paper's theorem chain:
+\begin{proof}
+This is a replay of the proof skeleton in Blaze Appendix~A.  Round-by-round
+soundness is phrased through a state function on partial public-coin
+transcripts.  For a false instance, the empty transcript is in a doomed state;
+after each prover message and verifier challenge, a doomed transcript remains
+doomed except with the stated round error; and a verifier rejects every doomed
+final transcript.
+
+Blaze proves the claim in three layers.  First, Appendix~A.1 records
+round-by-round soundness for the building blocks.  Evaluation batching starts
+from a list of multilinear evaluation claims; the initial state is doomed when
+at least one claim is false.  After the first batching challenge, the state is
+doomed exactly when the induced sumcheck claim is false, and then ordinary
+sumcheck round-by-round soundness applies.  The native MLPCS for
+\(\RMLE[\PRAA]\) uses the same staged equations as Lemma~5.1:
 \[
-  \RMLE[\PRAA^t]
-  \xrightarrow{\text{interleaving reduction}}
-  \RMLE[\PRAA]
-  \xrightarrow{\text{native RAA MLIOP plus compiler}}
-  \RMLE[C_{\mathrm{backend}}].
+  u_2=M_{\pi_1}u_1,\qquad
+  u_3=A u_2,\qquad
+  u_4=M_{\pi_2}u_3,\qquad
+  y=A u_4,
 \]
-Here an \(\RMLE[C]\)-IOPP should always be read operationally as a proximity
-opening protocol for an encoded MLE claim:
-\[
-  y\approx C(m)
-  \qquad\text{and}\qquad
-  \MLE(m)(z)=v.
-\]
-The exact relation underneath the protocol is
-\[
-  y=C(m)
-  \qquad\text{and}\qquad
-  \MLE(m)(z)=v.
-\]
-The writeup must keep both views visible: Blaze's explicit relation view names
-\((z,v),y,m\), while our API view may hide \(y\) behind a handle.
+together with \(\widehat m(z)=v\).  The doomed state is updated after the
+\(\alpha,\beta\) permutation challenges, after the random point \(r\), and
+after the terminal sumcheck transcript.  The CBBZ permutation reduction,
+Schwartz--Zippel, and sumcheck RBR soundness ensure that doomed states remain
+doomed except with the same algebraic errors used in Section~5.  Appendix~A.1
+also recalls that the BaseFold backend \(\RMLE[\mathrm{RS}]\)-IOPP is RBR
+sound by combining the standard sumcheck and FRI-style RBR arguments.
 
-\paragraph{Mirror-Blaze rule.}
-The Blaze proof is normative for this rewrite.  Each finished proof subsection
-must mirror the corresponding Blaze lemma, proposition, claim, and theorem in
-the same logical order, using Blaze's hypotheses and conclusion as the spine.
-Our extra material may define objects locally, expand compressed steps, and tie
-the proof to the fixed protocol boxes above, but it must not silently replace
-Blaze's argument with a different one.
+Second, Appendix~A.2 shows that the MLPCS-to-IOPP transformation preserves
+round-by-round soundness.  The state first decodes the systematic implicit
+input encoding \(\pi_y=(y\Vert\widetilde y)\) if it is \(\delta\)-close to the
+backend code, and otherwise marks the transcript doomed.  Subsequent prover
+oracles are treated the same way: a close encoded string contributes its
+decoded native multilinear oracle to the simulated MLPCS transcript, and a far
+string contributes \(\bot\).  The batching transcript is then governed by the
+batching state function, and the final backend \(\RMLE[C]\)-IOPP transcript is
+governed by the backend state function.  Thus an escape from a doomed compiled
+state would imply an escape in the native MLPCS, the batching protocol, or the
+backend \(\RMLE[C]\)-IOPP.
 
-If a proposed rewrite needs to deviate from Blaze--for example by changing the
-order of reductions, strengthening or weakening a conclusion, replacing a
-source lemma with a different argument, or relying on a property not named in
-the Blaze step--the text must mark this as a \emph{divergence from Blaze} and
-the edit should not be finalized until the user explicitly approves the
-divergence.  In ordinary cases, prefer the more literal Blaze replay and add
-our handle/API translation as explanatory scaffolding around it.
-
-\paragraph{Writing invariant.}
-Every major proof step must include four pieces:
-\begin{enumerate}[label=\textbf{R\arabic*.},leftmargin=*]
-  \item \textbf{Our API view.}  State the handle-level call, for example
-  \(R_y\gets \MLEAuth.\mathsf{Commit}(m;C)\) and
-  \(\MLEAuth.\mathsf{Open}(R_y,z,v)\).
-  \item \textbf{Expanded semantics.}  Name the literal oracle string
-  \(y=C(m)\) in the honest case, and distinguish it from a malicious literal
-  string that may only be close to a valid codeword.
-  \item \textbf{Blaze relation view.}  Translate the same object to
-  \(((z,v),y;m)\in\RMLE[C]\), and say whether the step is using
-  \(\RMLE[\PRAA^t]\), \(\RMLE[\PRAA]\), or
-  \(\RMLE[C_{\mathrm{backend}}]\).
-  \item \textbf{Source tie-back.}  Name the Blaze lemma, proposition, claim, or
-  appendix paragraph that handles the step.
-\end{enumerate}
-
-\paragraph{Step 1 TODO: interleaving reduces
-\(\RMLE[\PRAA^t]\) to \(\RMLE[\PRAA]\).}
-This step should explain Blaze Section~6 before any native RAA internals.
-The caller-facing object is a committed matrix
+Third, Appendix~A.3 shows that the interleaving transformation preserves
+round-by-round soundness.  For a false \(\RMLE[C^t]\) instance, the first state
+after the prover's vector \(u\in\F^t\) is doomed if the input is far from
+\(C^t\), or if the decoded message does not have row evaluations \(u_i\), or if
+\(\widehat u(z_1)\ne v\).  After the verifier samples \(r\in\F^t\), the state
+is doomed exactly when the folded instance
 \[
-  c\in\F^{\B^\ell\times\B^n},
-  \qquad
-  z=(z_{\mathrm{slice}},z_{\mathrm{in}})\in\F^\ell\times\F^k,
-  \qquad
-  v\in\F.
+  (z_2,\langle u,r\rangle,r^\top c)
 \]
-The intended proximity statement is
-\[
-  c\approx \PRAA^t(m)
-  \qquad\text{and}\qquad
-  \MLE(m)(z_{\mathrm{slice}},z_{\mathrm{in}})=v.
-\]
-TODOs:
-\begin{enumerate}[label=\textbf{I\arabic*.},leftmargin=*]
-  \item Define the row-evaluation vector
-  \(u\in\F^{\B^\ell}\) by
-  \(u[h]=\MLE(m[h,\ast])(z_{\mathrm{in}})\) in the honest case.
-  \item State the verifier's direct check
-  \(\MLE(u)(z_{\mathrm{slice}})=v\).
-  \item Define the verifier's random fold
-  \(\rho\in\F^{\B^\ell}\), the virtual folded word
-  \(c_\star=\rho^\top c\), and the folded value
-  \(v_\star=\ip{\rho}{u}\).
-  \item State the produced base claim:
-  \(c_\star\approx\PRAA(m_\star)\) and
-  \(\MLE(m_\star)(z_{\mathrm{in}})=v_\star\).
-  \item Tie soundness to Blaze Lemma~6.1, Claims~6.1.1--6.1.3, and
-  Corollary~2.6.  The text must say that this is a proximity statement about
-  the literal matrix \(c\), not an exact statement about every coordinate.
-\end{enumerate}
+is not a valid \(\RMLE[C]\) instance at the reduced proximity parameter.  Blaze
+uses Claim~6.1.1 and Corollary~2.6 to show that this doomed condition persists
+with high probability.  The remaining interaction is the base
+\(\RMLE[C]\)-IOPP, so its RBR soundness completes the argument for
+\(\RMLE[\PRAA^t]\).
+\end{proof}
 
-\paragraph{Step 2 TODO: native RAA reduces \(\RMLE[\PRAA]\) to MLE requests.}
-This step should explain Blaze Section~5.3 after the interleaving reduction has
-produced the folded base instance
-\[
-  y=c_\star,\qquad z=z_{\mathrm{in}},\qquad v=v_\star.
-\]
-The exact native relation is
-\[
-  y=\PRAA(m)
-  \qquad\text{and}\qquad
-  \MLE(m)(z)=v.
-\]
-TODOs:
-\begin{enumerate}[label=\textbf{N\arabic*.},leftmargin=*]
-  \item Define the RAA stage tensors
-  \[
-    u_1=F_{\mathrm{rep}}m,\quad
-    u_2=M_{\pi_1}u_1,\quad
-    u_3=\Acc(u_2),\quad
-    u_4=M_{\pi_2}u_3,\quad
-    u_5=\Acc(u_4)=y.
-  \]
-  \item Explain accumulator checks through Blaze Propositions~5.2 and~5.3.
-  These handle \(u_3=\Acc(u_2)\) and \(u_5=\Acc(u_4)\).
-  \item Explain permutation checks through Blaze Proposition~5.4.  These
-  introduce \(f_1,g_1,f_2,g_2\) and handle
-  \(u_2=M_{\pi_1}u_1\) and \(u_4=M_{\pi_2}u_3\).
-  \item Explain the batched sumcheck endpoint requests.  The text must name
-  which MLE evaluations survive to the backend layer.
-  \item Tie exact native soundness to Blaze Lemma~5.1 and
-  Proposition~5.5.  The exact conclusion is about the represented MLIOP
-  tensors; it is not yet a Merkle/proximity claim about a literal committed
-  string.
-\end{enumerate}
+\section{Native Hybrid Proof Rewrite}
 
-\paragraph{Step 3 TODO: backend RMLE authenticates the native MLE requests.}
-This step should explain Blaze Section~4.1 only after the native RAA requests
-have been named.  The native MLIOP has produced tensors such as
-\[
-  m,u_2,u_3,u_4,f_1,g_1,f_2,g_2
-\]
-and evaluation requests of the form
-\[
-  \MLE(h)(r)=w.
-\]
-The backend replaces ideal access to \(h\) with a literal encoded string
-\[
-  y_h\approx C_{\mathrm{backend}}(h).
-\]
-TODOs:
-\begin{enumerate}[label=\textbf{B\arabic*.},leftmargin=*]
-  \item State the backend RMLE claim for each native request:
-  \(y_h\approx C_{\mathrm{backend}}(h)\) and \(\MLE(h)(r)=w\).
-  \item Explain the literal/effective split from Blaze Proposition~4.4:
-  if \(y_h\) is far from the backend code, reject; if it is close, decode an
-  effective tensor \(h\) and simulate the native MLIOP using that tensor.
-  \item Explain batching via Blaze Remark~4.3 and Proposition~4.5 only after
-  the unbatched request set is clear.
-  \item State that \(C_{\mathrm{backend}}\) may be RS/BaseFold or another
-  suitable foldable-code backend.  The backend authenticates native MLIOP
-  oracles; it does not directly re-encode the whole PRAA codeword as one
-  monolithic object.
-\end{enumerate}
+\subsection{Inventory And \(\mathsf{OpenInner}\) Proof Target}
 
-\paragraph{Step 4 TODO: final composition and PCS bridge.}
-After the three reductions are explained, state the composition exactly:
+This subsection is the proof rewrite inventory.  It supersedes the
+wrapper-style translation plan above: the finished proof should be a native
+hybrid proof for the protocol of
+Figure~\ref{fig:native-blaze-fmlpcs-hybrid}.  Blaze remains the mathematical
+source for each transition, but the proof statements should be about our
+handles, transcripts, virtual handles, backend openings, effective tensors,
+rewinding, and extraction.
+
+The proof now proceeds from the inside out.  The public entry point
+\(\mathsf{Open}\) is only the row-folding adapter.  Its helper
+\(\mathsf{OpenInner}(O_y,z,v)\) is the collapsed packed-RAA opener: it receives
+an existing coordinate handle \(O_y:\B^n\to\F\cup\{\bot\}\), a point
+\(z\in\F^k\), and a claimed value \(v\in\F\).  The API does not pass a string
+\(y\).  In the proof, after a transcript prefix fixes \(O_y\), we write
 \[
-  \RMLE[\PRAA^t]
-  \overset{\text{Blaze Lemma 6.1}}{\longrightarrow}
-  \RMLE[\PRAA]
-  \overset{\text{Blaze Lemma 5.1 + Lemma 4.2}}{\longrightarrow}
-  \RMLE[C_{\mathrm{backend}}].
+  y\in\F^{\B^n}
 \]
-TODOs:
-\begin{enumerate}[label=\textbf{C\arabic*.},leftmargin=*]
-  \item State that Blaze Theorem~7.1 is precisely this composition.
-  \item State the final proximity meaning:
-  \(c\approx \PRAA^t(m)\) and \(\MLE(m)(z)=v\).
-  \item Explain that Appendix~A supplies round-by-round soundness for the
-  building blocks, the MLIOP-to-IOPP compiler, and the interleaving reduction.
-  \item Only then mention Merkle commitments and Fiat-Shamir as the PCS bridge.
-\end{enumerate}
+for the concrete string behind that handle.  This is proof notation only.
 
-\paragraph{Audit checklist before replacing this scaffold.}
-\begin{enumerate}[label=\textbf{A\arabic*.},leftmargin=*]
-  \item No bare use of ``IOPP'' without saying which language it is an IOPP
-  for: code proximity, \(\RMLE[C]\), \(\RMLE[\PRAA]\), or
-  \(\RMLE[\PRAA^t]\).
-  \item No statement that literal committed strings are exact codewords in the
-  compiled/PCS setting.  Use proximity and decoded/effective objects there.
-  \item No statement that spot checks alone prove proximity.  Proximity comes
-  from the RMLE IOPP and, for interleaving, from Corollary~2.6.
-  \item Every API statement has a Blaze relation tie-back, and every Blaze
-  relation has an API/handle interpretation.
-  \item The variables \(m,y,c,u,\rho,c_\star,v_\star,h,y_h\) are locally
-  defined before use, with domains.
-\end{enumerate}
-
-\paragraph{Proof replay rule.}
-The protocol boxes above are fixed.  The proof prose should explain why those
-boxes are an implementation-shaped presentation of the Blaze proof stack.  The
-guiding principle is: first restate the Blaze lemma nearly as written, then add
-the smallest possible dictionary from Blaze's explicit oracle notation to our
-handle notation.
-
-\paragraph{Global dictionary.}
-Use the following translation every time Blaze names an oracle or relation:
+The central functionality stack is:
 \[
-\begin{array}{c|c|c}
-\text{Blaze object} & \text{our protocol object} & \text{expanded semantics} \\
-\hline
-\text{input oracle }c &
-R_c &
-\text{literal matrix }c\in\F^{\B^\ell\times\B^n} \\
-c_{\mathrm{combo}}=\rho^\top c &
-R_\star &
-c_\star[b]=\sum_h\rho[h]c[h,b] \\
-\text{MLIOP oracle }\widehat H &
-\widehat O_h &
-\text{MLE handle for }h\in\F^{\B^d} \\
-\widehat H(r)=w &
-(\widehat O_h,r,w)\in\EvalReqs &
-\MLE(h)(r)=w \\
-\text{encoded oracle }y_h &
-\MLEAuth\text{ backend handle} &
-y_h\approx C_{\mathrm{backend}}(h)
+\begin{array}{rcl}
+\EncMLE[C] &:&
+  \text{encoded opening primitive for an already-fixed encoded oracle},\\
+\mathrm{MLPCS} &:&
+  \text{commit } O_{C(h)} \text{ first, then answer evals using }\EncMLE[C],\\
+\mathrm{HMLPCS} &:&
+  \text{message-domain proximity for an already-fixed message handle }O_y.
 \end{array}
 \]
-When this outline is expanded, each row should become prose that says who knows
-the object, who commits to it, which challenges are verifier-sampled, and which
-values are merely opened/evaluated later.
-
-\paragraph{Template for each lemma layer.}
-Each layer below should be written in the same four-part form:
-\begin{enumerate}[label=\textbf{L\arabic*.},leftmargin=*]
-  \item \textbf{Blaze statement.}  State the lemma/proposition in Blaze's
-  relation language, preserving the exact source object and conclusion.
-  \item \textbf{Our protocol lines.}  Point to the fixed protocol lines or
-  subroutines that implement the same interaction.
-  \item \textbf{Expanded semantic object.}  Name the literal string/tensor
-  behind each handle and, in the compiled setting, the effective decoded object
-  used by the proof.
-  \item \textbf{Soundness hook.}  State the exact contradiction or rejection
-  step supplied by the Blaze source.  Do not replace it by intuition.
-\end{enumerate}
-
-\paragraph{Layer 1 outline: interleaving, Blaze Lemma~6.1.}
-This is the outer reduction
+The last line is the important one for \(\mathsf{OpenInner}\).  HMLPCS is not
+itself \(\EncMLE[C]\): its input handle opens the message-domain string.  It can
+be realized by a systematic backend
 \[
-  \RMLE[\PRAA^t]\longrightarrow\RMLE[\PRAA].
+  C_{\mathrm{sys}}(h)=h\Vert\mathrm{parity}(h),
 \]
-Fill this layer by replaying Blaze Lemma~6.1 almost verbatim, with \(C=\PRAA\)
-only after the generic statement has been explained.
-\begin{enumerate}[label=\textbf{I\arabic*.},leftmargin=*]
-  \item Define the caller-facing claim:
-  \(c\in\F^{\B^\ell\times\B^n}\),
-  \(z=(z_{\mathrm{slice}},z_{\mathrm{in}})\in\F^\ell\times\F^k\), and
-  \(v\in\F\).  In our protocol, \(c\) is the literal matrix behind \(R_c\).
-  \item Restate the exact Blaze relation:
-  \(((z,v),c;m)\in\RMLE[\PRAA^t]\) means
-  \(c=\PRAA^t(m)\) and
-  \(\MLE(m)(z_{\mathrm{slice}},z_{\mathrm{in}})=v\).  Then separately state
-  the proximity version \(c\approx\PRAA^t(m)\).
-  \item Replay Blaze's prover message
-  \(u\in\F^{\B^\ell}\), where honestly
-  \(u[h]=\MLE(m[h,\ast])(z_{\mathrm{in}})\), and the verifier check
-  \(\MLE(u)(z_{\mathrm{slice}})=v\).
-  \item Replay the random fold:
-  \(\rho\leftarrow\F^{\B^\ell}\),
-  \(c_\star=\rho^\top c\),
-  \(v_\star=\ip{\rho}{u}\), and honestly
-  \(m_\star=\rho^\top m\).  Translate \(c_\star\) to the virtual handle
-  \(R_\star\).
-  \item State that the produced base claim is an
-  \(\RMLE[\PRAA]\)-IOPP claim for
-  \((z_{\mathrm{in}},v_\star,c_\star)\), not a new top-level protocol.
-  \item Fill in the soundness proof as Blaze does:
-  Claim~6.1.1 normalizes by \(u\otimes C(\mathbf 1)\);
-  Claim~6.1.2 uses Corollary~2.6 for random-fold proximity; and
-  Claim~6.1.3 shifts back to the affine target
-  \(\MLE(m_\star)(z_{\mathrm{in}})=v_\star\).
-\end{enumerate}
+where the verifier's existing \(O_y\) supplies the systematic/message
+coordinates and the prover supplies the parity coordinates.  If the systematic
+fraction of the encoded word is \(\alpha\), then the backend encoded proximity
+threshold must satisfy
+\[
+  \delta_{\mathrm{enc}}\le \alpha\delta
+\]
+to realize an HMLPCS message-domain threshold \(\delta\).
 
-\paragraph{Layer 2 outline: native RAA MLIOP, Blaze Lemma~5.1 and
-Proposition~5.5.}
-This is the base reduction
-\[
-  \RMLE[\PRAA]\longrightarrow\text{native MLIOP evaluation requests}.
-\]
-Fill this layer only after Layer~1 has produced the folded instance
-\[
-  y=c_\star,\qquad z=z_{\mathrm{in}},\qquad v=v_\star.
-\]
-\begin{enumerate}[label=\textbf{N\arabic*.},leftmargin=*]
-  \item Restate the exact base relation:
-  \(y=\PRAA(m)\) and \(\MLE(m)(z)=v\), where
-  \(y\in\F^{\B^n}\) is the literal folded word behind \(R_\star\).
-  \item Map the fixed protocol's stage tensors to Blaze's RAA stages:
-  \(u_1=F_{\mathrm{rep}}m\),
-  \(u_2=M_{\pi_1}u_1\),
-  \(u_3=\Acc(u_2)\),
-  \(u_4=M_{\pi_2}u_3\),
-  \(u_5=\Acc(u_4)=y\).
-  \item Attach accumulator checks to Blaze Propositions~5.2 and~5.3.
-  State which fixed subroutine calls produce the claims for
-  \(u_3=\Acc(u_2)\) and \(u_5=\Acc(u_4)\).
-  \item Attach permutation checks to Blaze Proposition~5.4.  State where the
-  helper tensors \(f_1,g_1,f_2,g_2\) enter and which permutation equalities
-  they certify.
-  \item Attach the six batched Boolean-sum claims and terminal endpoint
-  requests to Proposition~5.5.  The final prose should list the native MLE
-  requests that survive to the backend layer.
-\end{enumerate}
+The extractor is MPC-style.  Fix an adversarial prover \(\prover^\ast\), a
+transcript prefix before each verifier challenge, and the handles fixed at that
+prefix.  The extractor may rewind to such a prefix, resample the next
+challenge, and compare accepting continuations.  Accepted continuations expose:
+\begin{itemize}[leftmargin=*]
+  \item coordinate handles and the concrete strings behind them;
+  \item ordinary MLPCS handles and their effective tensors;
+  \item HMLPCS handles, whose effective tensors are close to an already-fixed
+        message-domain handle;
+  \item virtual handles such as \(R_\star\), determined by prior handles and
+        verifier challenges;
+  \item opened values and MLE-evaluated values returned by the ideal calls in
+        the protocol.
+\end{itemize}
 
-\paragraph{Layer 3 outline: MLIOP-to-IOPP compiler, Blaze Lemma~4.2 and
-Proposition~4.4.}
-This layer turns native MLE handles into backend encoded-oracle claims:
+\paragraph{High-level \(\mathsf{OpenInner}\) extraction sketch.}
+The proof must keep the endpoint objects separate.  The input handle
+\(O_y\) opens a concrete message-domain string
 \[
-  \MLE(h)(r)=w
-  \quad\leadsto\quad
-  y_h\approx C_{\mathrm{backend}}(h)
-  \ \text{and}\quad
-  \MLE(h)(r)=w.
+  y\in\F^{\B^n}.
 \]
-\begin{enumerate}[label=\textbf{B\arabic*.},leftmargin=*]
-  \item Restate the compiler input: a native MLIOP whose verifier asks finitely
-  many evaluations \((\widehat O_h,r,w)\in\EvalReqs\).
-  \item Translate \(\widehat O_h\) into a literal backend oracle string
-  \(y_h\).  In our API this string is hidden behind an authentication handle;
-  in Blaze's relation view it is the explicit \(y\) in
-  \(((r,w),y_h;h)\in\RMLE[C_{\mathrm{backend}}]\).
-  \item State the literal/effective split from Proposition~4.4:
-  if \(y_h\) is far from the backend code, the backend
-  \(\RMLE[C_{\mathrm{backend}}]\)-IOPP rejects; if close, decode an effective
-  tensor \(h^\dagger\) and run the native MLIOP proof over those effective
-  tensors.
-  \item Add batching only after the unbatched mapping is clear.  Tie this to
-  Blaze Remark~4.3 and Proposition~4.5.
-\end{enumerate}
+Inside \(\mathsf{OpenInner}\), the protocol creates an HMLPCS evaluation handle
+\(\widehat O_{u_5}\).  This name is protocol notation; it does not mean that
+the string behind \(O_y\) literally equals the tensor evaluated by the handle.
+If
+\[
+  \mathcal F_{\mathrm{HMLPCS}}^\delta.\mathsf{Eval}
+    (\widehat O_{u_5},r)
+\]
+returns a field element, the ideal functionality returns
+\[
+  \MLE(u_5^\dagger)(r)
+\]
+for an effective tensor \(u_5^\dagger\in\F^{\B^n}\) stored behind
+\(\widehat O_{u_5}\), and its contract gives only
+\[
+  \Delta(y,u_5^\dagger)\le\delta.
+\]
+In general \(y\) and \(u_5^\dagger\) are not equal.
 
-\paragraph{Layer 4 outline: final composition, Blaze Theorem~7.1 and
-Appendix~A.}
-This is the final theorem statement we want the finished prose to justify:
+The native RAA checks have a different job: they show that this effective
+endpoint tensor is actually the output of the packed RAA pipeline.  From the
+ordinary MLPCS handles the extractor obtains effective tensors
 \[
-  \RMLE[\PRAA^t]
-  \overset{\text{Lemma 6.1}}{\longrightarrow}
-  \RMLE[\PRAA]
-  \overset{\text{Lemma 5.1}}{\longrightarrow}
-  \text{native MLIOP}
-  \overset{\text{Lemma 4.2}}{\longrightarrow}
-  \RMLE[C_{\mathrm{backend}}].
+  m^\dagger,u_2^\dagger,u_3^\dagger,u_4^\dagger
 \]
-\begin{enumerate}[label=\textbf{C\arabic*.},leftmargin=*]
-  \item State that Blaze Theorem~7.1 is this composition instantiated with
-  \(C=\PRAA\) and then with the backend code used to authenticate native
-  oracles.
-  \item State the final proximity meaning in our API:
-  the literal matrix behind \(R_c\) is close to a valid interleaved
-  \(\PRAA^t\) codeword, and the decoded/effective message evaluates to
-  \(v\) at \((z_{\mathrm{slice}},z_{\mathrm{in}})\).
-  \item Explain that Appendix~A supplies round-by-round soundness for composing
-  these interactive ingredients and for the later Merkle/Fiat-Shamir PCS
-  bridge.  This should appear after, not before, the lemma chain.
-\end{enumerate}
+and the helper tensors.  The accepted accumulator, permutation, repetition, and
+sumcheck checks are then used to force
+\[
+  u_5^\dagger
+  =
+  \Acc(u_4^\dagger)
+  =
+  \PRAA(m^\dagger),
+  \qquad
+  \MLE(m^\dagger)(z)=v.
+\]
+Combining the HMLPCS proximity with the native RAA conclusion gives the
+encoded-MLE statement for the packed RAA code:
+\[
+  \Delta\bigl(y,\PRAA(m^\dagger)\bigr)\le\delta,
+  \qquad
+  \MLE(m^\dagger)(z)=v.
+\]
+Equivalently, \(\mathsf{OpenInner}\) is the protocol-side realization of the
+ideal opening
+\[
+  \mathcal F_{\EncMLE[\PRAA]}^\delta.\mathsf{Open}(O_y,z,v).
+\]
+This is the native form of the base \(\RMLE[\PRAA]\) claim used by the outer
+row-fold argument.
+
+\paragraph{Native proof target.}
+The statement below is proved in this paper's handle/functionality model.  The
+imported replay above remains available for source auditing, but the proof here
+states the needed algebraic checks directly.
+
+\begin{lemma}[Split-tree permutation soundness used by \(\mathsf{OpenInner}\)]
+\label{lem:split-tree-openinner-soundness}
+Fix \(x,y\in\F^{\B^n}\), a public permutation \(\pi:\B^n\to\B^n\), and
+\(N=2^n\).  Assume the public address map \(\Idx:\B^n\to\F\) is injective and
+that \(\widehat\pi(b)=\Idx(\pi(b))\) for every \(b\in\B^n\).  Let
+\[
+  L_x(b)=\alpha-\bigl(x[b]+\beta\,\widehat\pi(b)\bigr),
+  \qquad
+  L_y(a)=\alpha-\bigl(y[a]+\beta\,\Idx(a)\bigr)
+\]
+be the two virtual leaf tensors used by \(\PermuteCommit\).  If
+\[
+  y\ne M_\pi x,
+\]
+then, except with probability at most \((N+1)/|\F|\) over
+\((\alpha,\beta)\leftarrow\F^2\), the following holds for every pair of
+internal product tensors \(f,g\in\F^{\B^n}\): if
+\[
+  f[\mathsf{root}_P]=g[\mathsf{root}_P],
+\]
+then at least one of
+\[
+  \mathsf{SplitTreeRes}(f,x,\widehat\pi,\alpha,\beta;\cdot),
+  \qquad
+  \mathsf{SplitTreeRes}(g,y,\Idx,\alpha,\beta;\cdot)
+\]
+is a nonzero tensor in \(\F^{\B^n}\).  Consequently, for a fresh
+\(r\leftarrow\F^n\), the probability that both projected split sums vanish is
+at most \(n/|\F|\).
+\end{lemma}
+
+\begin{proof}
+The false permutation relation means that the pair multisets
+\[
+  \{(x[b],\widehat\pi(b)):b\in\B^n\}
+  \quad\text{and}\quad
+  \{(y[a],\Idx(a)):a\in\B^n\}
+\]
+are not equal.  Indeed, since \(\Idx\) is injective and
+\(\widehat\pi(b)=\Idx(\pi(b))\), equality of the pair multisets would force,
+for every \(b\in\B^n\), the pair
+\((x[b],\Idx(\pi(b)))\) to match the unique pair in the second multiset whose
+second coordinate is \(\Idx(\pi(b))\).  That unique pair is
+\((y[\pi(b)],\Idx(\pi(b)))\), so equality of multisets would imply
+\(y[\pi(b)]=x[b]\) for all \(b\), namely \(y=M_\pi x\).
+
+If \(\beta=0\), the address tags are erased; this exceptional
+event has probability \(1/|\F|\).  For the remaining bad event, compare the
+degree-\(N\) products
+\[
+  \prod_{b\in\B^n}\bigl(\alpha-(x[b]+\beta\,\widehat\pi(b))\bigr)
+  \quad\text{and}\quad
+  \prod_{a\in\B^n}\bigl(\alpha-(y[a]+\beta\,\Idx(a))\bigr)
+\]
+at the sampled \((\alpha,\beta)\).  Their difference is a nonzero polynomial in
+\((\alpha,\beta)\) of total degree at most \(N\).  To see nonzeroness, view the
+two products as factorizations over \(\F[\alpha,\beta]\).  Equality as formal
+polynomials would make the multisets of linear factors
+\(\alpha-(x[b]+\beta\widehat\pi(b))\) and
+\(\alpha-(y[a]+\beta\Idx(a))\) equal, and hence would imply equality of the
+pair multisets displayed above.  By
+Schwartz--Zippel, this product-difference polynomial vanishes on a uniform
+\((\alpha,\beta)\) with probability at most \(N/|\F|\).  Combining this with
+the \(\beta=0\) event, except with probability \((N+1)/|\F|\), the two virtual
+leaf products are different.
+
+Now fix such a non-exceptional \((\alpha,\beta)\).  If a split residual tensor
+is zero on all Boolean points, the internal tensor is a valid product tree over
+its virtual leaves: at the bottom layer the residual equations give
+\[
+  P[0\Vert a]=L[a\Vert0]L[a\Vert1],
+\]
+and each higher layer equation gives parent equals product of its two children.
+Induction over the tree layers therefore gives
+\[
+  P[\mathsf{root}_P]=\prod_{b\in\B^n}L[b].
+\]
+Apply this to \(f\) and \(g\).  If both split residual tensors were zero and
+the roots were equal, then the two virtual leaf products would be equal,
+contradicting the non-exceptional choice of \((\alpha,\beta)\).  Hence at
+least one split residual tensor is nonzero.
+
+For a nonzero residual tensor \(R\in\F^{\B^n}\), its multilinear extension is a
+nonzero polynomial of total degree at most \(n\).  The projected split sum at
+\(r\) is exactly \(\MLE(R)(r)\), so
+\[
+  \Pr_{r\leftarrow\F^n}[\MLE(R)(r)=0]\le\frac{n}{|\F|}.
+\]
+This proves the stated projection bound.
+\end{proof}
+
+\paragraph{Divergence from Blaze.}
+The lemma above is the native proof for our split-tree presentation.  Blaze's
+literal product-tree statement keeps a separate leaf layer and uses a
+conservative \(10n/|\F|\) projection envelope.  Our protocol derives the leaf
+values virtually from already-fixed handles and checks one split residual whose
+Boolean vanishing directly implies the product-tree root value.  This changes
+only the proof accounting for the helper representation; it does not change the
+protocol box.
+
+\begin{lemma}[\(\mathsf{OpenInner}\) realizes encoded MLE for \(\PRAA\)]
+\label{lem:native-openinner-target}
+In the
+\(\mathcal F_{\mathrm{MLPCS}}/\mathcal F_{\mathrm{HMLPCS}}^\delta\)-hybrid,
+\(\mathsf{OpenInner}\) realizes the encoded-MLE opening functionality
+\[
+  \mathcal F_{\EncMLE[\PRAA]}^\delta.\mathsf{Open}.
+\]
+More explicitly, for every PPT prover \(\prover^\ast\) attacking
+\(\mathsf{OpenInner}\), there is a PPT extractor/simulator
+\(\mathcal S_{\mathrm{inner}}^{\prover^\ast}\) that controls the verifier
+challenges, extracts an effective \(m^\dagger\), sends \(m^\dagger\) to
+\[
+  \mathcal F_{\EncMLE[\PRAA]}^\delta.\mathsf{Open}(O_y,z,v),
+\]
+receives the ideal output bit, and samples a transcript consistent with that
+bit.  The
+statistical distance between the real uniform-challenge execution and this
+programmed-challenge simulation is at most
+\(\varepsilon_{\mathrm{inner}}\).
+\end{lemma}
+
+\begin{proof}
+Write
+\[
+  N=2^n.
+\]
+\smallskip\noindent\textbf{Hybrid 0: accounting and naming only.}
+The first hybrid is pure accounting.  It runs the real
+\(\mathsf{OpenInner}(O_y,z,v)\) verifier in the
+\(\mathcal F_{\mathrm{MLPCS}}/\mathcal F_{\mathrm{HMLPCS}}^\delta\)-hybrid and
+then names the concrete or effective objects determined by the transcript.
+The input coordinate handle \(O_y:\B^n\to\F\cup\{\bot\}\) determines a concrete
+string
+\[
+  y\in\F^{\B^n}.
+\]
+The ordinary MLPCS handle \(\widehat O_{u_0}\) created in the protocol stores
+an effective message tensor
+\[
+  m^\dagger\in\F^{\B^k}.
+\]
+For \(i\in\{2,3,4\}\), the ordinary MLPCS handle \(\widehat O_{u_i}\) stores an
+effective tensor
+\[
+  u_i^\dagger\in\F^{\B^n}.
+\]
+The repetition view is virtual, so Hybrid~0 defines
+\[
+  u_1^\dagger:=F_{\mathrm{rep}}m^\dagger.
+\]
+The HMLPCS handle \(\widehat O_{u_5}\) created from verifier input \(O_y\)
+stores an effective endpoint tensor
+\[
+  u_5^\dagger\in\F^{\B^n}.
+\]
+For \(j\in\{1,2\}\), the permutation helper handles
+\(\widehat O_{f_j}\) and \(\widehat O_{g_j}\) store effective helper tensors
+\[
+  f_j^\dagger,g_j^\dagger\in\F^{\B^n}.
+\]
+Hybrid~0 also records the verifier challenges \(\alpha,\beta,r_{\mathrm{chk}}\),
+the sumcheck transcript, the ordinary evaluation request set, the
+\(\mathsf{MergeNativeEvals}\) transcript, and the HMLPCS endpoint evaluation
+results.  This hybrid changes no verifier messages, challenges, oracle calls,
+or accept/reject rule; it only names the objects fixed by those calls.
+The named objects need not be mutually consistent.  In particular, Hybrid~0
+does not yet produce the adversary's effective input for
+\(\mathcal F_{\EncMLE[\PRAA]}^\delta\).
+
+After Hybrid~0, the proof evaluates, as mathematical predicates on the named
+objects, whether the transcript represents a valid encoded MLE opening.  The
+remaining hybrids force those predicates one at a time by programming
+challenges.  The common transition is as follows.
+
+Fix a transcript prefix before the verifier challenge used by the target check,
+and let \(\Omega\) be that challenge's sampling domain.  If the target relation
+is false, define
+\[
+  A_{\mathrm{bad}}(\mathsf{prefix})
+  \subseteq \Omega
+\]
+to be the challenge values for which the false relation is not exposed by this
+check, and define the good set
+\[
+  G(\mathsf{prefix})
+  :=
+  \Omega\setminus A_{\mathrm{bad}}(\mathsf{prefix}).
+\]
+The real verifier samples uniformly from \(\Omega\).  The programmed hybrid
+samples uniformly from \(G(\mathsf{prefix})\); equivalently, it samples a
+challenge that forces this false predicate to be rejected.  If
+\[
+  p(\mathsf{prefix})
+  =
+  \Pr_{\omega\leftarrow\Omega}
+    [\omega\in A_{\mathrm{bad}}(\mathsf{prefix})],
+\]
+then the statistical distance between uniform sampling from \(\Omega\) and
+uniform sampling from \(G(\mathsf{prefix})\) is exactly
+\(p(\mathsf{prefix})\).  Indeed, conditioning a uniform distribution on an
+event of probability \(1-p\) changes it by total variation distance \(p\).
+
+The rest of the proof bounds \(p(\mathsf{prefix})\) for each object.  A nonzero
+degree-\(D\) polynomial over a uniformly sampled field point vanishes with
+probability at most \(D/|\F|\) by Schwartz--Zippel.  A
+\(\SumCheck_d\) with individual degree bound \(\Delta\) accepts a false sum
+with probability at most \(d\Delta/|\F|\) once its terminal value is checked
+against the relevant ideal MLE handles.  The factor \(d\Delta\) is the union
+bound over the \(d\) sumcheck rounds: in each round, a false univariate
+identity of degree at most \(\Delta\) can survive the verifier's random
+challenge with probability at most \(\Delta/|\F|\).
+
+\smallskip\noindent\textbf{Hybrid 1: endpoint proximity.}
+This hybrid is identical to Hybrid~0 except that it explicitly rejects if
+\[
+  \Delta(y,u_5^\dagger)>\delta.
+\]
+The change has distance \(0\).  Indeed,
+\(\widehat O_{u_5}\) was created by
+\(\mathcal F_{\mathrm{HMLPCS}}^\delta.\mathsf{Commit}
+(\prover:u_5,\verifier:O_y)\).  The second accumulator reduction always places
+at least one request
+\[
+  (\widehat O_{u_5},r,w)\in\EvalReqs_{u5}
+\]
+into the endpoint request set, and step~I20 evaluates every such request through
+\(\mathcal F_{\mathrm{HMLPCS}}^\delta.\mathsf{Eval}\).  If
+\(\Delta(y,u_5^\dagger)>\delta\), that ideal evaluation returns \(\bot\), so
+the comparison with the field value \(w\) rejects.  Hence every accepting
+transcript in Hybrid~1 satisfies
+\[
+  \Delta(y,u_5^\dagger)\le\delta.
+\]
+This is the handle-level literal/effective split: \(y\) is the string opened by
+the input handle, while \(u_5^\dagger\) is the effective tensor evaluated by
+the HMLPCS handle.  In the present
+\(\mathcal F_{\mathrm{HMLPCS}}^\delta\)-hybrid, proximity between them is an
+ideal-functionality fact rather than a probabilistic backend claim.
+
+\smallskip\noindent\textbf{Hybrid 2: ordinary evaluation requests are true.}
+Let
+\[
+  \EvalReqs_{\mathrm{ord}}
+  =
+  ((\widehat O_{h_j},r_j,w_j))_{j=0}^{q-1}
+\]
+be the ordinary request list passed to \(\mathsf{MergeNativeEvals}\) in
+step~I18.  Each \(\widehat O_{h_j}\) is either an ordinary MLPCS handle for one
+of
+\[
+  m^\dagger,u_2^\dagger,u_3^\dagger,u_4^\dagger,
+  f_1^\dagger,g_1^\dagger,f_2^\dagger,g_2^\dagger,
+\]
+or the virtual repetition handle whose represented tensor is
+\[
+  u_1^\dagger:=F_{\mathrm{rep}}m^\dagger.
+\]
+Hybrid~2 rejects whenever some ordinary request is false, namely whenever
+\[
+  \MLE(h_j^\dagger)(r_j)\ne w_j
+  \quad\text{for some }j\in\{0,\ldots,q-1\}.
+\]
+The transition from Hybrid~1 to Hybrid~2 is justified by the algebra of the
+batched-evaluation check.  After the transcript prefix fixes the handles,
+points, and claimed values, \(\mathsf{MergeNativeEvals}\) uses verifier
+randomness to form one linear combination of the individual identities
+\[
+  \MLE(h_j^\dagger)(r_j)=w_j.
+\]
+Let
+\[
+  \delta_j=\MLE(h_j^\dagger)(r_j)-w_j
+  \qquad(0\le j<q),
+\]
+and let \(s=\lceil\log_2 q\rceil\), as in
+\(\mathsf{MergeNativeEvals}\).  If some ordinary request is false, then the
+polynomial
+\[
+  D(t)=\sum_{j=0}^{q-1}\chi_{\bits_s(j)}(t)\delta_j
+\]
+is not the zero polynomial on \(\F^s\), because its Boolean value at
+\(\bits_s(j)\) is \(\delta_j\).  It is multilinear, so
+\[
+  \Pr_{t\leftarrow\F^s}[D(t)=0]\le \frac{s}{|\F|}.
+\]
+For this first batching challenge, the accepting-bad set is
+\[
+  A_{\mathrm{merge},t}
+  =
+  \{t\in\F^s:D(t)=0\},
+  \qquad
+  G_{\mathrm{merge},t}
+  =
+  \F^s\setminus A_{\mathrm{merge},t}.
+\]
+Thus replacing uniform \(t\leftarrow\F^s\) by uniform
+\(t\leftarrow G_{\mathrm{merge},t}\) has distance at most \(s/|\F|\).
+
+Conditioned on \(t\in G_{\mathrm{merge},t}\), the Boolean-sum claim in
+\(\mathsf{MergeNativeEvals}\) is false.  The sumcheck has dimension \(s+n\)
+and individual degree bound \(2\): the checked polynomial is
+\[
+  G_t(X,Y)\mathsf{Eq}_E(X,Y),
+\]
+where each factor is multilinear in \((X,Y)\).  Hence the sumcheck contribution
+is
+\[
+  \frac{2(s+n)}{|\F|}.
+\]
+Equivalently, after \(t\in G_{\mathrm{merge},t}\) is fixed, let
+\(A_{\mathrm{merge},\mathrm{sc}}(t)\) be the set of sumcheck challenge tapes
+for which this false sumcheck still accepts, and let
+\[
+  G_{\mathrm{merge},\mathrm{sc}}(t)
+  =
+  \Omega_{\mathrm{sc}}^{s+n}\setminus
+  A_{\mathrm{merge},\mathrm{sc}}(t).
+\]
+The sumcheck bound gives
+\[
+  \Pr[A_{\mathrm{merge},\mathrm{sc}}(t)]\le \frac{2(s+n)}{|\F|},
+\]
+so programming the sumcheck tape from
+\(G_{\mathrm{merge},\mathrm{sc}}(t)\) changes the distribution by at most this
+amount.  The notation \(\Omega_{\mathrm{sc}}^{s+n}\) denotes the verifier's
+full random tape for the \((s+n)\)-round sumcheck.
+There is one more explicit bad challenge for this presentation.  The verifier
+divides by
+\[
+  e=\mathsf{Eq}_E(\xi,\eta).
+\]
+If \(e=0\), the protocol rejects.  This cannot help a cheating prover, but it
+does affect the transcript distribution and honest completeness.  Define
+\[
+  A_{\mathrm{merge},e}
+  =
+  \{(\xi,\eta)\in\F^s\times\F^n:
+    \mathsf{Eq}_E(\xi,\eta)=0\},
+  \qquad
+  G_{\mathrm{merge},e}
+  =
+  (\F^s\times\F^n)\setminus A_{\mathrm{merge},e}.
+\]
+The polynomial \(\mathsf{Eq}_E\) is nonzero when \(q>0\) and has total degree
+at most \(s+n\), so
+\[
+  \Pr[(\xi,\eta)\in A_{\mathrm{merge},e}]
+  \le \frac{s+n}{|\F|}.
+\]
+In the programmed hybrid, the simulator samples the merge sumcheck tape
+conditioned on producing a terminal point \((\xi,\eta)\in G_{\mathrm{merge},e}\).
+This is the same division-by-zero bad challenge that is implicit in Blaze's
+batched evaluation step; we name it because the protocol box makes the division
+explicit.
+
+Thus the probability that a false ordinary request list passes is at most
+\[
+  \varepsilon_{\mathrm{merge}}
+  :=
+  \frac{s+2(s+n)+(s+n)}{|\F|}
+  =
+  \frac{4s+3n}{|\F|}.
+\]
+Therefore the output distributions of Hybrids~1 and~2 differ by at most
+\(\varepsilon_{\mathrm{merge}}\).  In Hybrid~2 every accepting transcript has
+all ordinary native terminal evaluations correct, including the public message
+claim
+\[
+  \MLE(m^\dagger)(z)=v.
+\]
+
+\smallskip\noindent\textbf{Hybrid 3: accumulator identities.}
+Hybrid~3 rejects unless the two accumulator relations on the extracted tensors
+hold:
+\[
+  u_3^\dagger=\Acc(u_2^\dagger),
+  \qquad
+  u_5^\dagger=\Acc(u_4^\dagger).
+\]
+The first relation is checked by the first call to \(\AccReduce\), whose
+terminal requests are ordinary requests and are already true in Hybrid~2.  The
+second relation is checked by the second call to \(\AccReduce\), whose
+ordinary-side terminal requests are true by Hybrid~2 and whose endpoint-side
+terminal requests are exact HMLPCS evaluations of \(u_5^\dagger\).  If either
+accumulator identity is false, choose the first false accumulator in protocol
+order.  Let \((x_{\mathrm{acc}},y_{\mathrm{acc}})\) be the input and output
+tensors of that chosen accumulator: either
+\[
+  (x_{\mathrm{acc}},y_{\mathrm{acc}})
+  =
+  (u_2^\dagger,u_3^\dagger)
+\]
+or
+\[
+  (x_{\mathrm{acc}},y_{\mathrm{acc}})
+  =
+  (u_4^\dagger,u_5^\dagger).
+\]
+For that accumulator, the tensor
+\[
+  R_{\mathrm{acc}}=y_{\mathrm{acc}}-\Acc(x_{\mathrm{acc}})
+\]
+is nonzero.  Its multilinear extension is a nonzero polynomial of total degree
+at most \(n\), so the projection sampled in step~I9 satisfies
+\[
+  \Pr_{r_{\mathrm{chk}}\leftarrow\F^n}
+  [\MLE(R_{\mathrm{acc}})(r_{\mathrm{chk}})=0]
+  \le \frac{n}{|\F|}.
+\]
+For this projection challenge, define
+\[
+  A_{\mathrm{acc},r}
+  =
+  \{r\in\F^n:\MLE(R_{\mathrm{acc}})(r)=0\},
+  \qquad
+  G_{\mathrm{acc},r}
+  =
+  \F^n\setminus A_{\mathrm{acc},r}.
+\]
+Replacing uniform \(r_{\mathrm{chk}}\leftarrow\F^n\) by uniform sampling from
+\(G_{\mathrm{acc},r}\) has distance at most \(n/|\F|\).  On this good set, the
+corresponding Boolean-sum claim has nonzero error \(E_i\).  In
+\(\RAASixSumcheck\), the verifier batches the six Boolean-sum errors as
+\[
+  E_0+\lambda E_1+\lambda^2E_2+\cdots+\lambda^5E_5.
+\]
+This is a nonzero polynomial in \(\lambda\) of degree at most \(5\), hence it
+vanishes for a random \(\lambda\leftarrow\F\) with probability at most
+\[
+  \frac{5}{|\F|}.
+\]
+The number \(5\) is not a security parameter; it is one less than the number of
+batched Boolean-sum claims.
+Let
+\[
+  A_{\mathrm{acc},\lambda}
+  =
+  \{\lambda\in\F:
+    E_0+\lambda E_1+\cdots+\lambda^5E_5=0\},
+  \qquad
+  G_{\mathrm{acc},\lambda}
+  =
+  \F\setminus A_{\mathrm{acc},\lambda}.
+\]
+Programming \(\lambda\) from \(G_{\mathrm{acc},\lambda}\) changes the
+distribution by at most \(5/|\F|\).  Conditioned on these two good events, the
+batched sumcheck claim is false.  The
+sumcheck has dimension \(n\) and individual degree bound \(3\).  This degree
+bound is the public parameter of \(\RAASixSumcheck\): each accumulator summand
+is multilinear in the sumcheck variable, and each split-tree summand is bounded
+by the declared degree-three expression used by
+\(\mathsf{SplitEndpoint}\).  All terminal values are exact by Hybrid~2 and by
+the HMLPCS endpoint evaluations.  If
+\(A_{\mathrm{acc},\mathrm{sc}}(r,\lambda)\) is the set of \(n\)-round sumcheck
+tapes that accept this false batched claim, and
+\[
+  G_{\mathrm{acc},\mathrm{sc}}(r,\lambda)
+  =
+  \Omega_{\mathrm{sc}}^n\setminus
+  A_{\mathrm{acc},\mathrm{sc}}(r,\lambda),
+\]
+then
+\[
+  \Pr[A_{\mathrm{acc},\mathrm{sc}}(r,\lambda)]
+  \le \frac{3n}{|\F|}.
+\]
+Sampling the sumcheck tape from
+\(G_{\mathrm{acc},\mathrm{sc}}(r,\lambda)\) is the final programmed step for
+this hybrid.  Therefore
+\[
+  \varepsilon_{\mathrm{acc}}
+  :=
+  \frac{n+5+3n}{|\F|}
+  =
+  \frac{4n+5}{|\F|}.
+\]
+Hybrid~3 is within
+\(\varepsilon_{\mathrm{acc}}\) of Hybrid~2, and every accepting transcript in
+Hybrid~3 satisfies the two displayed accumulator identities.  This also fixes
+the priority rule for the shared challenge \(r_{\mathrm{chk}}\): when the
+simulator reaches the \(r_{\mathrm{chk}}\) sample, it first checks the two
+accumulator predicates.  If either accumulator predicate is false, it programs
+\(r_{\mathrm{chk}}\) using \(G_{\mathrm{acc},r}\) for the first false
+accumulator in protocol order.  Only when both accumulator predicates are true
+does the simulator allow Hybrid~4 to use the same \(r_{\mathrm{chk}}\) sample
+for a false permutation predicate.
+
+\smallskip\noindent\textbf{Hybrid 4: permutation identities.}
+Hybrid~4 rejects unless
+\[
+  u_2^\dagger=M_{\pi_1}u_1^\dagger,
+  \qquad
+  u_4^\dagger=M_{\pi_2}u_3^\dagger.
+\]
+For each \(j\in\{1,2\}\), the prover has already fixed helper tensors
+\[
+  f_j^\dagger,g_j^\dagger\in\F^{\B^n}
+\]
+after seeing \((\alpha,\beta)\).  For fixed tensors \(x,y\), the randomized
+leaf tags
+\[
+  \alpha-\bigl(x[b]+\beta\,\widehat\pi(b)\bigr)
+  \qquad\text{and}\qquad
+  \alpha-\bigl(y[a]+\beta\,\Idx(a)\bigr)
+\]
+turn equality of the two tagged multisets into a single product identity.  If
+\(y\ne M_\pi x\), choose the first false permutation in protocol order.  For
+that pair, Lemma~\ref{lem:split-tree-openinner-soundness} gives two bad-event
+terms.  First define the exceptional tag set
+\[
+  A_{\mathrm{perm},\alpha\beta}
+  =
+  \{(\alpha,\beta)\in\F^2:
+      \text{the two virtual leaf products are equal}\},
+\]
+where this set also includes the tag-erasing event \(\beta=0\).  Let
+\[
+  G_{\mathrm{perm},\alpha\beta}
+  =
+  \F^2\setminus A_{\mathrm{perm},\alpha\beta}.
+\]
+The split-tree lemma gives
+\[
+  \Pr_{(\alpha,\beta)\leftarrow\F^2}
+    [(\alpha,\beta)\in A_{\mathrm{perm},\alpha\beta}]
+  \le
+  \frac{N+1}{|\F|}.
+\]
+Thus programming \((\alpha,\beta)\) from
+\(G_{\mathrm{perm},\alpha\beta}\) changes the distribution by at most
+\((N+1)/|\F|\).
+
+Condition on \((\alpha,\beta)\in G_{\mathrm{perm},\alpha\beta}\).  After the
+prover sends the helper tensors, their effective root values are fixed.  If the
+two root values are unequal, then the ordinary root-equality evaluation request
+is false and Hybrid~2 rejects.  If the two root values are equal, the
+split-tree lemma says that at least one split residual tensor is nonzero.  In
+Hybrid~4 we are already in the branch where ordinary evaluation requests have
+been forced true, so this second case is the only one that can still reach the
+permutation residual projection.  For the chosen nonzero split residual
+\(R_{\mathrm{perm}}\), define
+\[
+  A_{\mathrm{perm},r}
+  =
+  \{r\in\F^n:\MLE(R_{\mathrm{perm}})(r)=0\},
+  \qquad
+  G_{\mathrm{perm},r}
+  =
+  \F^n\setminus A_{\mathrm{perm},r}.
+\]
+The projection bound gives
+\[
+  \Pr_{r_{\mathrm{chk}}\leftarrow\F^n}
+    [r_{\mathrm{chk}}\in A_{\mathrm{perm},r}]
+  \le
+  \frac{n}{|\F|}.
+\]
+Programming \(r_{\mathrm{chk}}\) from \(G_{\mathrm{perm},r}\) changes the
+distribution by at most \(n/|\F|\).  Hence the probability that the false
+permutation reaches the six-sumcheck with all permutation residuals hidden is
+at most
+\[
+  \frac{N+1}{|\F|}+\frac{n}{|\F|}.
+\]
+Conditioned on avoiding those two bad events, at least one of the six
+Boolean-sum errors entering \(\RAASixSumcheck\) is nonzero.  As above, scalar
+batching by \(1,\lambda,\ldots,\lambda^5\) hides a nonzero six-error vector
+with probability at most \(5/|\F|\).  Let
+\[
+  A_{\mathrm{perm},\lambda}
+  =
+  \{\lambda\in\F:
+    E_0+\lambda E_1+\cdots+\lambda^5E_5=0\},
+  \qquad
+  G_{\mathrm{perm},\lambda}
+  =
+  \F\setminus A_{\mathrm{perm},\lambda}.
+\]
+Programming \(\lambda\) from \(G_{\mathrm{perm},\lambda}\) changes the
+distribution by at most \(5/|\F|\).  Finally, after
+\(\lambda\in G_{\mathrm{perm},\lambda}\), let
+\(A_{\mathrm{perm},\mathrm{sc}}\) be the set of \(n\)-round sumcheck tapes that
+accept the false batched sum and let
+\[
+  G_{\mathrm{perm},\mathrm{sc}}
+  =
+  \Omega_{\mathrm{sc}}^n\setminus A_{\mathrm{perm},\mathrm{sc}}.
+\]
+The degree-\(3\), \(n\)-round sumcheck bound gives
+\[
+  \Pr[A_{\mathrm{perm},\mathrm{sc}}]\le \frac{3n}{|\F|}.
+\]
+Sampling the sumcheck tape from \(G_{\mathrm{perm},\mathrm{sc}}\) changes the
+distribution by at most \(3n/|\F|\).
+Therefore
+\[
+  \varepsilon_{\mathrm{perm}}
+  :=
+  \frac{N+1+n+5+3n}{|\F|}
+  =
+  \frac{N+4n+6}{|\F|}.
+\]
+After these programmed choices, a false permutation is rejected by
+construction.  Hence every accepting transcript in Hybrid~4 satisfies both
+displayed permutation identities.
+
+\smallskip\noindent\textbf{Hybrid 5: packed-RAA consistency.}
+The repetition stage is not a probabilistic check: by definition of the
+virtual repetition handle,
+\[
+  u_1^\dagger=F_{\mathrm{rep}}m^\dagger.
+\]
+Combining this definition with Hybrids~3 and~4 gives, for every accepting
+Hybrid~5 transcript,
+\[
+  u_5^\dagger
+  =
+  \Acc(M_{\pi_2}\Acc(M_{\pi_1}F_{\mathrm{rep}}m^\dagger)).
+\]
+The right-hand side is exactly \(\PRAA(m^\dagger)\).  Thus the monolithic
+\(\mathsf{OpenInner}\) checks have forced the effective endpoint tensor to be
+the packed-RAA encoding of the same effective message tensor whose MLE was
+checked at \(z\).
+
+After these hybrids, every accepting transcript in the final hybrid satisfies
+\[
+  u_5^\dagger
+  =
+  \Acc(M_{\pi_2}\Acc(M_{\pi_1}F_{\mathrm{rep}}m^\dagger))
+  =
+  \PRAA(m^\dagger),
+\]
+and the endpoint proximity gives
+\[
+  \Delta(y,\PRAA(m^\dagger))\le\delta.
+\]
+The accumulated distance from the real ideal-functionality execution is
+\[
+  \varepsilon_{\mathrm{inner}}
+  \le
+  \varepsilon_{\mathrm{merge}}
+  +\varepsilon_{\mathrm{acc}}
+  +\varepsilon_{\mathrm{perm}}
+  =
+  \frac{4s+3n}{|\F|}
+  +\frac{4n+5}{|\F|}
+  +\frac{N+4n+6}{|\F|}
+  =
+  \frac{N+11n+4s+11}{|\F|},
+\]
+with no additional error for the ideal HMLPCS proximity step.  This is a
+union-bound sum over the bad-challenge events; using a maximum instead would
+only improve constants and does not change the parameter conclusion.
+
+We can now describe the final programmed simulator.  The simulator
+\(\mathcal S_{\mathrm{inner}}^{\prover^\ast}\) runs \(\prover^\ast\) and
+generates the verifier challenges itself.  At each challenge point it first
+checks the predicates already made meaningful by the current transcript prefix.
+If the relevant predicate is false, it samples the next challenge from the good
+set named above: \(G_{\mathrm{merge},t}\),
+\(G_{\mathrm{merge},\mathrm{sc}}\), \(G_{\mathrm{merge},e}\),
+\(G_{\mathrm{acc},r}\), \(G_{\mathrm{acc},\lambda}\),
+\(G_{\mathrm{acc},\mathrm{sc}}\), \(G_{\mathrm{perm},\alpha\beta}\),
+\(G_{\mathrm{perm},r}\), \(G_{\mathrm{perm},\lambda}\), or
+\(G_{\mathrm{perm},\mathrm{sc}}\), as appropriate.  The shared
+\(r_{\mathrm{chk}}\) challenge uses the priority rule from Hybrid~3:
+accumulators first, then permutations.  If the relevant predicate is true, the
+simulator samples the next challenge from the ordinary verifier distribution.
+Therefore, in the final programmed hybrid, every false ordinary-evaluation,
+accumulator, or permutation predicate is rejected by construction.  The
+distance from the real interaction is at most the sum of the
+uniform-versus-good-set conditioning losses bounded above, hence at most
+\(\varepsilon_{\mathrm{inner}}\).
+
+The simulator records the effective tensors named in Hybrid~0.  In the final
+programmed hybrid, an accepting transcript necessarily satisfies
+\[
+  \Delta\bigl(y,\PRAA(m^\dagger)\bigr)\le\delta,
+  \qquad
+  \MLE(m^\dagger)(z)=v.
+\]
+The simulator sends this extracted \(m^\dagger\) to
+\[
+  \mathcal F_{\EncMLE[\PRAA]}^\delta.\mathsf{Open}(O_y,z,v)
+\]
+and receives the ideal output bit.  It then samples the remaining transcript
+conditioned on that ideal bit: accepting transcripts are sampled only from the
+all-predicates-good branch above, while rejecting transcripts are sampled either
+from the functionality's rejecting behavior for the extracted input or from one
+of the programmed rejecting branches for a false predicate.  If the corrupt
+prover aborts or otherwise forces a rejecting transcript before a valid
+effective input has been extracted, the simulator submits a fixed invalid
+message \(m_{\bot}\) with \(\MLE(m_{\bot})(z)\ne v\); for example, take
+\(m_{\bot}\) to be a constant tensor with constant value different from
+\(v\).  The unchanged \(\EncMLE[\PRAA]\) functionality then returns reject by
+its wrong-evaluation rule.  Thus the ideal functionality determines the output,
+and the simulator's challenge programming supplies a transcript distribution
+matching the final hybrid.  Combining the programmed hybrid with the distance
+bound above proves the claimed realization error.
+\end{proof}
+
+\paragraph{Rewrite discipline.}
+The protocol boxes remain frozen, and existing \verb|\peter| notes remain open
+action items and should not be deleted during the proof rewrite.  The imported
+Blaze replay should also remain until the native hybrid proof has fully
+replaced its explanatory role.  If the proof needs a real deviation from
+Blaze--for example, a different ordering of reductions, a stronger conclusion,
+or an assumption not present in the cited Blaze step--the text must mark it as
+\emph{Divergence from Blaze} and pause for approval before relying on it.
+
